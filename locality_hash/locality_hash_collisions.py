@@ -77,6 +77,29 @@ def run_trials(table_size, trials, suffix, location_func, decision_func):
         master_table.extend(table)
     return master_table
 
+
+def cuckoo_insert(table, location_func, location_index, value, suffix, table_indexes, collisions):
+    index = location_func(value, table_size, suffix)
+    index = index[location_index]
+
+    success = False
+    loop=False
+    if index in table_indexes:
+        loop=True
+    elif table[index] == None:
+        table[index] = value
+        success = True
+    else:
+        collisions+=1
+        table_indexes.append(index)
+        temp = table[index]
+        table[index] = value
+        value = temp
+
+    return success, value, loop
+            
+    
+
 def cuckoo(table_size, insertions, location_func, suffix):
     table_1 =[None] * table_size
     table_2 =[None] * table_size
@@ -97,36 +120,13 @@ def cuckoo(table_size, insertions, location_func, suffix):
         table_2_indexs=[]
         while not finished_hashing:
             #base case
-            primary_1, _ = location_func(value, table_size, suffix)
-            if primary_1 in table_1_indexs:
-                loop=True
+            success, value, loop = cuckoo_insert(table_1, location_func, 0, value, suffix, table_1_indexs, collisions)
+            if success or loop:
                 break
-               # exit(1)
-            if table_1[primary_1] == None:
-                table_1[primary_1] = value
-                finished_hashing = True
+
+            success, value, loop = cuckoo_insert(table_2, location_func, 1, value, suffix, table_2_indexs, collisions)
+            if success or loop:
                 break
-            else:
-                collisions+=1
-                table_1_indexs.append(primary_1)
-                temp = table_1[primary_1]
-                table_1[primary_1] = value
-                value = temp
-            
-            _, secondary_2 = location_func(value, table_size, suffix)
-            if secondary_2 in table_2_indexs:
-                loop=True
-                break
-            if table_2[secondary_2] == None:
-                table_2[secondary_2] = value
-                finished_hashing = True
-                break
-            else:
-                collisions+=1
-                table_2_indexs.append(secondary_2)
-                temp = table_2[secondary_2]
-                table_2[secondary_2] = value
-                value = temp
 
         collisions_per_insert.append(collisions)
         # for i in range(0, table_size):
@@ -223,7 +223,7 @@ def run_cuckoo_bounded_loops(table_size, trials):
 
 table_size=1024
 suffix=32
-trials=2048
+trials=64
 #run_insertion_tests(table_size,suffix,trials)
 #run_suffix_trials(table_size, trials)
 # collsions=cuckoo(table_size, table_size*2)
