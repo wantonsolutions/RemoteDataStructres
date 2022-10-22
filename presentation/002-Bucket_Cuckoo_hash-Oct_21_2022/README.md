@@ -69,6 +69,43 @@ Finally I decided to do a sweep of bucket sizes and bound sizes to see what the 
 
 ![bucket_vs_bound](bucket_vs_bound.png)
 
+This is really interesting. There seems to be a sweet spot, and the bound is not
+insane. This chart is a little complicated so I'll break it down. The top number
+in every square is the 50th percentile of where the inserts failed and created a
+loop. Each trial was run 32 times. Dark reigons are bad, white is good. The
+lower number is the size a read would have to be to ensure that a hashed item
+was captured in a single round trip. I think that the most interesting case here
+is 8x8. It appears that we get the most bang for our buck at this ratio. The
+table is getting full, and we can perform a read by grabbing the nearest 64
+blocks. I believe if we have 64 bit entries. This will be 512 bytes. Not the
+highest price to pay for a saved round trip. The cost of course is memory
+efficiency. We can do the same thing for 32 entries with a bucket size of 8, and
+suffix size of 4.
+
+One important thing to realize here is that the bigger the bucket is, the bigger
+the overhead for common case reads. If we can lower the bucket size we get
+faster common case reads.
+
+
+# Additional Notes (important)
+
+First, these reads do not need to cost the max amount. The Distance shown is the
+max distance. The client does not need to use this, it can read the exact amount
+required for any key. Why? because it will have the hashes available to it.
+ReadLocation = Hash_1(key), Readsize = Hash_2(key) - Hash_1(key). This means
+that in expection the read size is half of that of the bound. This is a very
+nice feature. 
+
+Look into how cuckoo hashing deals with duplicates. In this version we may try
+to insert twice and not know where the key is. I think there is a race condition
+here. I think that default cuckoo hashing does not protect against this from what I can tell.
+
+The switch can load balance for us. If it keeps track of each of the hash bucket
+locations, it can just steer to the correct on and apply the append just like in
+the clover case.
+
+
+
 
 
 

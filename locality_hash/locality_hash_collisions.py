@@ -136,8 +136,16 @@ def cuckoo(table_size, insertions, location_func, suffix):
         # print("-"*30)
     return collisions_per_insert
 
+class entry:
+    def __init__(self, key):
+        self.key = key
+        self.counter = 0
+    def __str__(self):
+        return(str(self.key)+ ": " + str(self.counter))
+
+
 def bucket_cuckoo_insert(table, table_size, location_func, location_index, value, bucket_size, suffix, table_values, collisions):
-    index = location_func(value, table_size, suffix)
+    index = location_func(value.key, table_size, suffix)
     index = index[location_index]
 
     #print("value: " + str(value) + "\tindex: " + str(index))
@@ -145,12 +153,12 @@ def bucket_cuckoo_insert(table, table_size, location_func, location_index, value
     success = False
     loop=False
     #loop case
-    if value in table_values:
-        #print("loop exiting")
-        success=False
-        value=value
-        loop=True
-        return success, value, loop, collisions
+    for v in table_values:
+        if v.key == value.key:
+            success=False
+            value=value
+            loop=True
+            return success, value, loop, collisions
 
     #search for an empty slot in this bucket
     for i in range(0, bucket_size):
@@ -166,10 +174,23 @@ def bucket_cuckoo_insert(table, table_size, location_func, location_index, value
     collisions+=1
     #randomly select an eviction candidate
     table_values.append(value)
+    #random
     evict_index = random.randint(0, bucket_size-1)
+    #min
+    # min = 999999999
+    # min_index = 0
+    # for i in range(0, bucket_size):
+    #     if table[index][i].counter < min:
+    #         min = table[index][i].counter
+    #         min_index = i
+    # evict_index = min_index
+        
+
+
     evict_value = table[index][evict_index]
     table[index][evict_index] = value
     value = evict_value
+    value.counter+=1
     return success, value, loop, collisions
 
 def print_bucket_table(table, table_size, bucket_size):
@@ -202,6 +223,8 @@ def bucket_cuckoo(table_size, bucket_size, insertions, location_func, suffix):
         success=False
         table_1_values=[]
         table_2_values=[]
+        #make a new entry
+        v=entry(v)
         while not success:
             success, v, loop, collisions = bucket_cuckoo_insert(table_1, table_size, location_func, 0, v, bucket_size, suffix, table_1_values, collisions)
             if success or loop:
@@ -385,8 +408,8 @@ def run_bucket_cuckoo_bucket_size(memory, suffix, trials):
 def bucket_size_vs_bound(memory, trials):
     # bucket_size=[1,2,4,8,16,32,64,128,256,512,1024]
     # suffix=[1,2,4,8,16,32,64,128,256,512,1024]
-    bucket_size=[1,2,4,8,16,32,64,128]
-    suffix=[1,2,4,8,16,32,64,128]
+    bucket_size=[1,2,4,8,16,32,64]
+    suffix=[1,2,4,8,16,32,64]
     results=[None] * len(bucket_size)
     for i in range(len(bucket_size)):
         results[i]=[None] * len(suffix)
@@ -405,8 +428,10 @@ def bucket_size_vs_bound(memory, trials):
                 collisions = bucket_cuckoo(table_size, b, inserts, get_locations_bounded, s)
                 master_table.append(len(collisions))
             master_table.sort()
+            master_table=normalize_to_memory(master_table, memory)
             #collect the 50th percentile
             result_value=master_table[int(len(master_table)*0.50)]
+            result_value=round(result_value,2)
             print(suffix_id, bucket_id, result_value)
             results[bucket_id][suffix_id]=result_value
             suffix_id+=1
@@ -441,27 +466,30 @@ trials=32
 
 #run_cuckoo_trials_50(table_size, trials)
 #run_cuckoo_bounded_loops(table_size, trials)
-memory=4096
-table_size=1024
+memory=8
+table_size=8
 bucket_size=4
 location_func=get_locations_bounded
 suffix=2
 
 
-# collisions = bucket_cuckoo(table_size, bucket_size, insertions, location_func, suffix)
+#collisions = bucket_cuckoo(table_size, bucket_size, 50, location_func, suffix)
+#exit(1)
 # print(collisions)
 
 #run_bucket_cuckoo_trials_50(table_size, bucket_size, trials)
 #run_bucket_cuckoo_bounded_loops(table_size, bucket_size, trials)
 
 #run_bucket_cuckoo_bucket_size(memory, suffix, trials)
-#bucket_size_vs_bound(memory, trials)
-
 memory=1024
-bucket_size=8
-suffix=8
 trials=1024
-run_bucket_cuckoo_bounded_fill_size(table_size, bucket_size, suffix, trials)
+bucket_size_vs_bound(memory, trials)
+
+# memory=1024
+# bucket_size=8
+# suffix=8
+# trials=1024
+# run_bucket_cuckoo_bounded_fill_size(memory, bucket_size, suffix, trials)
 
 
 
