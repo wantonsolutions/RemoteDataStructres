@@ -1,3 +1,4 @@
+from doctest import master
 import random
 import hashlib
 from symbol import return_stmt
@@ -332,21 +333,30 @@ def run_bucket_cuckoo_bounded_loops(table_size, bucket_size, trials):
     plt.savefig("bounded_bucket_cuckoo_hash_loops.pdf")
     plt.clf()
 
-def run_bucket_cuckoo_bounded_fill_size(table_size, bucket_size, trials):
-    suffix = 32
-    total_locations = (table_size * bucket_size * 2)
+def normalize_to_memory(master_table, memory):
+    print(memory)
+    print(master_table)
+
+
+    return [x/memory for x in master_table]
+
+def run_bucket_cuckoo_bounded_fill_size(memory, bucket_size, suffix, trials):
+    table_size=int((memory/2)/bucket_size)
     ratios=[0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99]
     ratios.reverse()
 
     for r in ratios:
-        inserts = int(total_locations * r)
+        inserts = int(memory * r)
         master_table=[]
         for i in range(trials):
             collisions = bucket_cuckoo(table_size, bucket_size, inserts, get_locations_bounded, suffix)
             master_table.append(len(collisions))
+
+        master_table = normalize_to_memory(master_table, memory)
         plot_cdf(master_table, str(r))
     #plt.xlim(0,1500)
-    plt.title("Bucket Cuckoo Loop Capacity By Fill Ratio (suffix 32)")
+    plt.xlim(0.4,1)
+    plt.title("Bucket Cuckoo Loop Capacity By Fill Ratio (suffix " + str(suffix) + ") \n(Bucket Size " + str(bucket_size) + ") (Memory "+ str(memory) + ")")
     plt.legend()
     plt.savefig("bounded_bucket_cuckoo_hash_fill_ratio.pdf")
     plt.clf()
@@ -437,15 +447,21 @@ bucket_size=4
 location_func=get_locations_bounded
 suffix=2
 
-#run_bucket_cuckoo_bucket_size(memory, suffix, trials)
-bucket_size_vs_bound(memory, trials)
 
 # collisions = bucket_cuckoo(table_size, bucket_size, insertions, location_func, suffix)
 # print(collisions)
 
 #run_bucket_cuckoo_trials_50(table_size, bucket_size, trials)
 #run_bucket_cuckoo_bounded_loops(table_size, bucket_size, trials)
-#run_bucket_cuckoo_bounded_fill_size(table_size, bucket_size, trials)
+
+#run_bucket_cuckoo_bucket_size(memory, suffix, trials)
+#bucket_size_vs_bound(memory, trials)
+
+memory=1024
+bucket_size=8
+suffix=8
+trials=1024
+run_bucket_cuckoo_bounded_fill_size(table_size, bucket_size, suffix, trials)
 
 
 
