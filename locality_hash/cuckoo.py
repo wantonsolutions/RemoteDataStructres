@@ -65,63 +65,9 @@ def cuckoo(table_size, insertions, location_func, suffix):
         # print("-"*30)
     return collisions_per_insert
 
-
-
-def bucket_cuckoo_insert_key(table, table_size, location_func, location_index, value, bucket_size, suffix, table_values, collisions):
-    index = location_func(value.key, table_size, suffix)
-    index = index[location_index]
-
-    #print("value: " + str(value) + "\tindex: " + str(index))
-
-    success = False
-    loop=False
-    #loop case
-    for v in table_values:
-        if v.key == value.key:
-            success=False
-            value=value
-            loop=True
-            return success, value, loop, collisions
-
-    #search for an empty slot in this bucket
-    for i in range(0, bucket_size):
-        if table[index][i] == None:
-            #print("found candidate index: " + '{0: <5}'.format(str(index)) + "\tvalue: " + str(value))
-            table[index][i] = value
-            success = True
-            value=value
-            loop=False
-            return success, value, loop, collisions
-    
-    #here we have a full bucket we need to evict a candidate
-    collisions+=1
-    #randomly select an eviction candidate
-    table_values.append(value)
-    evict_index = random.randint(0, bucket_size-1)
-
-    evict_value = table[index][evict_index]
-    table[index][evict_index] = value
-    value = evict_value
-    return success, value, loop, collisions
-
-def bucket_cuckoo_insert(table_1, table_2, table_size, location_func, value, bucket_size, suffix):
-    collisions=0
-    success=False
-    table_1_values=[]
-    table_2_values=[]
-    v = value
-    while not success:
-        success, v, loop, collisions = bucket_cuckoo_insert_key(table_1, table_size, location_func, 0, v, bucket_size, suffix, table_1_values, collisions)
-        if success or loop:
-            break
-        success, v, loop, collisions = bucket_cuckoo_insert_key(table_2, table_size, location_func, 1, v, bucket_size, suffix, table_2_values, collisions)
-        if success or loop:
-            break
-    if loop:
-        success = False
-
-    return success, collisions
-
+########################## Bucket Cuckoo Hash ###############################
+########################## Bucket Cuckoo Hash ###############################
+########################## Bucket Cuckoo Hash ###############################
 
 def print_bucket_table(table, table_size, bucket_size):
     for i in range(0, table_size):
@@ -148,15 +94,105 @@ def generate_cuckoo_tables(table_size, bucket_size):
     table_2 = generate_cuckoo_table(table_size, bucket_size)
     return table_1, table_2
 
+
+def bucket_cuckoo_insert_key(table, table_size, location_func, location_index, value, bucket_size, suffix, table_values, collisions, path):
+    index = location_func(value.key, table_size, suffix)
+    index = index[location_index]
+    path.append(index)
+
+    #print("value: " + str(value) + "\tindex: " + str(index))
+
+    success = False
+    loop=False
+    #loop case
+    for v in table_values:
+        if v.key == value.key:
+            success=False
+            value=value
+            loop=True
+            return success, value, loop, collisions, path
+
+    #search for an empty slot in this bucket
+    for i in range(0, bucket_size):
+        if table[index][i] == None:
+            #print("found candidate index: " + '{0: <5}'.format(str(index)) + "\tvalue: " + str(value))
+            table[index][i] = value
+            success = True
+            value=value
+            loop=False
+            return success, value, loop, collisions, path
+    
+    #here we have a full bucket we need to evict a candidate
+    collisions+=1
+    #randomly select an eviction candidate
+    table_values.append(value)
+    evict_index = random.randint(0, bucket_size-1)
+
+    evict_value = table[index][evict_index]
+    table[index][evict_index] = value
+    value = evict_value
+    return success, value, loop, collisions, path
+
+def bucket_cuckoo_insert(table_1, table_2, table_size, location_func, value, bucket_size, suffix):
+    collisions=0
+    success=False
+    table_1_values=[]
+    table_2_values=[]
+    path=[]
+    v = value
+    while not success:
+        success, v, loop, collisions, path = bucket_cuckoo_insert_key(table_1, table_size, location_func, 0, v, bucket_size, suffix, table_1_values, collisions, path)
+        if success or loop:
+            break
+        success, v, loop, collisions, path = bucket_cuckoo_insert_key(table_2, table_size, location_func, 1, v, bucket_size, suffix, table_2_values, collisions, path)
+        if success or loop:
+            break
+    if loop:
+        success = False
+
+    return success, collisions, path
+
 def bucket_cuckoo_insert_only(table_size, bucket_size, insertions, location_func, suffix):
     table_1, table_2 = generate_cuckoo_tables(table_size, bucket_size)
     collisions_per_insert=[]
+    paths = []
     values=np.arange(insertions)
     for v in values:
         v=entry(v)
-        success, collisions = bucket_cuckoo_insert(table_1, table_2, table_size, location_func, v, bucket_size, suffix)
+        success, collisions, path = bucket_cuckoo_insert(table_1, table_2, table_size, location_func, v, bucket_size, suffix)
         if not success:
             break
         collisions_per_insert.append(collisions)
+        paths.append(path)
     #print_styled_table(table_1, table_2, table_size, bucket_size)
-    return collisions_per_insert
+    return collisions_per_insert, paths
+
+
+def bucket_cuckoo_insert_then_measure_reads(table_size, bucket_size, insertions, location_func, suffix):
+    table_1, table_2 = generate_cuckoo_tables(table_size, bucket_size)
+    collisions_per_insert=[]
+    values=np.arange(insertions)
+    inserted_values=[]
+    read_size=[]
+    for v in values:
+        v=entry(v)
+        success, collisions, path = bucket_cuckoo_insert(table_1, table_2, table_size, location_func, v, bucket_size, suffix)
+        if not success:
+            break
+        inserted_values.append(v)
+    #measure reads
+
+    #print_styled_table(table_1, table_2, table_size, bucket_size)
+    for v in inserted_values:
+        location_1 = location_func(v.key, table_size, suffix)[0]
+        location_2 = location_func(v.key, table_size, suffix)[1]
+        #print("L1: "+str(location_1)+"\tL2: "+str(location_2))
+        diff = location_2 - location_1
+        if diff < 0:
+            continue
+        else:
+            read_size.append(diff)
+        #print(diff)
+
+    #print_styled_table(table_1, table_2, table_size, bucket_size)
+    return read_size
