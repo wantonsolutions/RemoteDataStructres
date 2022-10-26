@@ -152,6 +152,116 @@ def bucket_cuckoo_insert(table_1, table_2, table_size, location_func, value, buc
 
     return success, collisions, path
 
+class path_element:
+    def __init__(self, key, table_index, bucket_index, bucket_offset):
+        self.key = key
+        self.table_index = table_index
+        self.bucket_index = bucket_index
+        self.bucket_offset = bucket_offset
+
+    def __str__(self):
+        return "(" + str(self.key) + "," + str(self.table_index) + "," + str(self.bucket_index) + "," + str(self.bucket_offset) + ")"
+
+def bucket_cuckoo_bfs_insert(table_1, table_2, table_size, location_func, value, bucket_size, suffix):
+    #begin by performing bfs
+    path_queue = []
+    pe = path_element(value, -1,-1,-1)
+    search_item = [pe]
+    path_queue.append(search_item)
+
+    insert_path = None
+    while insert_path == None:
+        if len(path_queue) == 0:
+            #todo lets go with this for now, consdier revising terminating condition
+            return []
+        
+        search_path = path_queue.pop(0)
+        v = search_path[-1]
+
+        table_index=0
+        if v.table_index == 0:
+            table_index=1
+
+        index = location_func(v.key, table_size, suffix)
+        index = index[table_index]
+        if table_index == 0:
+            bucket = table_1[index]
+        else:
+            bucket = table_2[index]
+
+
+        i=0
+        for i in range(bucket_size):
+            if bucket[i] == None:
+                #found an empty slot
+                print("found empty slot")
+                pe = path_element(None, table_index, index, i)
+                search_path.append(pe)
+                insert_path=search_path
+                break
+            else:
+                #found a non empty slot, add to queue
+                pe = path_element(bucket[i], table_index, index, i)
+                tsp = search_path.copy()
+                should_insert=True
+                #don't put loops in the bfs tree
+                for element in tsp:
+                    if element.key == pe.key:
+                        should_insert=False
+                        break
+                if should_insert:
+                    tsp.append(pe)
+                    path_queue.append(tsp)
+
+        for e in path_queue:
+            print("[", end='')
+            for ele in e:
+                print(str(ele), end='')
+            print("]")
+
+    print("inserting: path:", end='')
+    for e in insert_path:
+        print(e, end='')
+    print("")
+
+    #now we have a path to insert the value
+    assert(len(insert_path) >=2)
+
+    i = len(insert_path)-2
+    while i >= 0:
+        move=insert_path[i]
+        insert=insert_path[i+1]
+        insert_table = None
+        if insert.table_index == 0:
+            insert_table = table_1
+        else:
+            insert_table = table_2
+        insert_table[insert.bucket_index][insert.bucket_offset] = move.key
+        i=i-1
+    
+    print_styled_table(table_1, table_2, table_size, bucket_size)
+
+    return insert_path
+
+        
+def bucket_cuckoo_bfs_insert_only(table_size, bucket_size, insertions, location_func, suffix):
+    table_1, table_2 = generate_cuckoo_tables(table_size, bucket_size)
+    collisions_per_insert=[]
+    paths = []
+    values=np.arange(insertions)
+    for v in values:
+        v=entry(v)
+        path = bucket_cuckoo_bfs_insert(table_1, table_2, table_size, location_func, v, bucket_size, suffix)
+        if path == []:
+            break
+        collisions_per_insert.append(len(paths))
+        paths.append(path)
+    #print_styled_table(table_1, table_2, table_size, bucket_size)
+    return collisions_per_insert, paths
+
+
+
+
 def bucket_cuckoo_insert_only(table_size, bucket_size, insertions, location_func, suffix):
     table_1, table_2 = generate_cuckoo_tables(table_size, bucket_size)
     collisions_per_insert=[]

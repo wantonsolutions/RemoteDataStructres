@@ -102,7 +102,7 @@ here. I think that default cuckoo hashing does not protect against this from wha
 
 The switch can load balance for us. If it keeps track of each of the hash bucket
 locations, it can just steer to the correct on and apply the append just like in
-the clover case.
+the clover case. Easy peasy.
 
 
 

@@ -45,4 +45,11 @@ different percentiles. Each Run was 128 experiments.
 ![insert_hm_90](insert_range_90.0.png)
 ![insert_hm_99](insert_range_99.0.png)
 
+# Discussion
+
+My hypothesis here seems to be spot on. At the 50th percentile we are not
+getting collisions, at this point the biggest factor is the size of the bucket.
+After collision occur however the suffix size starts to play a role in how far
+away the insert travels from its original location.
+
 
