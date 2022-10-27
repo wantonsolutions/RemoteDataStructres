@@ -236,8 +236,6 @@ def run_bucket_cuckoo_bucket_size(memory, suffix, trials):
     plt.savefig("bounded_bucket_cuckoo_hash_bucket_size.pdf")
 
 def bucket_size_vs_bound(memory, trials):
-    # bucket_size=[1,2,4,8,16,32,64,128,256,512,1024]
-    # suffix=[1,2,4,8,16,32,64,128,256,512,1024]
     bucket_size=[1,2,4,8,16,32,64]
     suffix=[1,2,4,8,16,32,64]
     results=[None] * len(bucket_size)
@@ -257,6 +255,9 @@ def bucket_size_vs_bound(memory, trials):
             for i in range(trials):
                 collisions = bucket_cuckoo_insert_only(table_size, b, inserts, get_locations_bounded, s)
                 master_table.append(len(collisions))
+            
+            print("master table----------------------")
+            print(master_table)
             master_table.sort()
             master_table=normalize_to_memory(master_table, memory)
             #collect the 50th percentile
@@ -283,6 +284,64 @@ def bucket_size_vs_bound(memory, trials):
     #plt.xlim(0,1500)
     plt.title("Bucket Size vs Bound")
     plt.savefig("bucket_vs_bound.pdf")
+
+
+
+
+def size_vs_bound(memory, trials, insertion_func, title, figname):
+    bucket_size=[1,2,4,8]
+    suffix=[1,2,4,8,16]
+    results=[None] * len(bucket_size)
+    for i in range(len(bucket_size)):
+        results[i]=[None] * len(suffix)
+    print(results)
+    fill=0.95
+    inserts=int(memory * fill)
+
+    bucket_id=0
+    for b in bucket_size:
+        table_size=int((memory/2)/b)
+        assert(table_size*b*2 == memory)
+        suffix_id=0
+        for s in suffix:
+            master_table=[]
+            for i in range(trials):
+                collisions, paths = insertion_func(table_size, b, inserts, get_locations_bounded, s)
+                print("collisions")
+                print(collisions)
+                master_table.append(len(collisions))
+
+            master_table=normalize_to_memory(master_table, memory)
+            master_table.sort()
+            result_value=master_table[int(len(master_table)*0.50)]
+            result_value=round(result_value,2)
+            print(suffix_id, bucket_id, result_value)
+            results[bucket_id][suffix_id]=result_value
+            suffix_id+=1
+        bucket_id+=1
+    print(results)
+    im = plt.imshow(results, cmap='hot', interpolation='nearest')
+    for i in range(len(bucket_size)):
+        for j in range(len(suffix)):
+            text = plt.text(j, i, str(results[i][j]) + "\n" + str(bucket_size[i]*suffix[j]),
+                        ha="center", va="center", color="b")
+
+    plt.yticks(np.arange(len(bucket_size)),labels=[ str(x) for x in bucket_size])
+    plt.ylabel("Bucket Size")
+    plt.xticks(np.arange(len(suffix)),labels=[str(x) for x in suffix])
+    plt.xlabel("Suffix Size")
+
+    plt.colorbar(im)
+
+    #plt.xlim(0,1500)
+    plt.title(title)
+    save_figure(figname)
+
+def size_vs_bound_bucket_cuckoo(memory,trials):
+    size_vs_bound(memory, trials, bucket_cuckoo_insert_only, "Bucket Size vs Bound", "bucket_vs_bound")
+
+def size_vs_bound_bfs_bucket_cuckoo(memory,trials):
+    size_vs_bound(memory, trials, bucket_cuckoo_bfs_insert_only, "Bucket Size vs Bound BFS", "bucket_vs_bound_bfs")
 
 def calculate_read_size(distance, bucket_size, entry_size):
     return (bucket_size * entry_size * 2) * (1 + distance)
@@ -371,16 +430,9 @@ def paths_to_ranges(paths, suffix_size, table_size):#, table_size):
         
 
 def bucket_cuckoo_insert_range(memory, trials):
-    # bucket_size=[1,2,4,8,16,32,64,128,256,512,1024]
-    # suffix=[1,2,4,8,16,32,64,128,256,512,1024]
 
     bucket_size=[1,2,4,8,16,32,64]
-    #bucket_size=[4]
     suffix=[1,2,4,8,16,32,64]
-    #suffix=[1]
-    
-    # bucket_size=[4]
-    # suffix=[4]
     results=[None] * len(bucket_size)
     for i in range(len(bucket_size)):
         results[i]=[None] * len(suffix)
@@ -469,12 +521,16 @@ def run_bucket_cuckoo_bfs_trials(memory, bucket_size, suffix, trials):
     inserts=int(memory * 0.95)
     master_table=[]
     for i in range(trials):
-        collisions = bucket_cuckoo_bfs_insert_only(table_size, bucket_size, inserts, get_locations_bounded, suffix=suffix)
+        collisions, paths = bucket_cuckoo_bfs_insert_only(table_size, bucket_size, inserts, get_locations_bounded, suffix=suffix)
         master_table.extend(collisions)
+        #print(collisions)
+    
+
+    plot_cdf(master_table, "bfs bound 5")
 
     plt.title("Bucket Cuckoo Hash Collisions")
     plt.legend()
-    plt.savefig("bucket_cuckoo_hash.pdf")
+    plt.savefig("bucket_cuckoo_bfs_len.pdf")
     plt.clf
 
 
@@ -501,17 +557,18 @@ suffix=2
 #run_bucket_cuckoo_bounded_loops(table_size, bucket_size, trials)
 
 #run_bucket_cuckoo_bucket_size(memory, suffix, trials)
-memory=32
-suffix=4
-bucket_size=4
-trials=1
-#bucket_size_vs_bound(memory, trials)
+memory=1024
+suffix=8
+bucket_size=8
+trials=16
+#size_vs_bound_bucket_cuckoo(memory, trials)
+size_vs_bound_bfs_bucket_cuckoo(memory, trials)
 
 #bucket_cuckoo_measure_average_read_size(memory, trials)
 #bucket_cuckoo_insert_range(memory, trials)
 
 
-run_bucket_cuckoo_bfs_trials(memory, bucket_size, suffix, trials)
+#run_bucket_cuckoo_bfs_trials(memory, bucket_size, suffix, trials)
 
 
 

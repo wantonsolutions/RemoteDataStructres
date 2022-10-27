@@ -198,33 +198,34 @@ def insert_cuckoo_path(path, tables):
     for i in reversed(range(0,len(path)-1)):
         tables[path[i+1].table_index][path[i+1].bucket_index][path[i+1].bucket_offset] = path[i].key
 
-
-def bucket_cuckoo_bfs_insert(table_1, table_2, table_size, location_func, value, bucket_size, suffix):
-    #begin by performing bfs
-    #path queue contains all active search paths. This is useful, but not optimal for reconstructing paths.
+def bucket_cuckoo_bfs(table_1,table_2, table_size, location_func, value, bucket_size, suffix, max_depth=5):
     path_queue = []
     pe = path_element(value, -1,-1,-1)
     search_item = [pe]
     path_queue.append(search_item)
 
-    insert_path = None
-    while insert_path == None:
+    insert_paths = []
+
+    solution_depth = max_depth
+    while True:
         if len(path_queue) == 0:
-            return []
+            return insert_paths
         
         search_path = path_queue.pop(0)
-        current_pe = search_path[-1]
+        if len(search_path) >= solution_depth:
+            continue
 
+        current_pe = search_path[-1]
         bucket, table_index, index = next_search_location(current_pe, table_size, location_func, suffix, table_1, table_2)
 
-        i=0
         for i in range(bucket_size):
             if bucket[i] == None:
                 #found an empty slot
-                print("found empty slot")
+                #print("found empty slot")
                 pe = path_element(bucket[i], table_index, index, i)
                 search_path.append(pe)
-                insert_path=search_path
+                solution_depth = len(search_path)
+                insert_paths.append(search_path.copy())
                 #todo we need to set the depth of the path here
                 break
             else:
@@ -235,15 +236,25 @@ def bucket_cuckoo_bfs_insert(table_1, table_2, table_size, location_func, value,
                 if not key_causes_a_path_loop(tsp, pe.key):
                     tsp.append(pe)
                     path_queue.append(tsp)
+        #print_whole_path_queue(path_queue)   
 
-        print_whole_path_queue(path_queue)   
 
-    print("inserting: path:", end='')
-    print_path(insert_path)
+def bucket_cuckoo_bfs_insert(table_1, table_2, table_size, location_func, value, bucket_size, suffix):
+    #begin by performing bfs
+    #path queue contains all active search paths. This is useful, but not optimal for reconstructing paths.
+
+    insert_paths=bucket_cuckoo_bfs(table_1, table_2, table_size, location_func, value, bucket_size, suffix, max_depth=5)
+    if len(insert_paths) == 0:
+        return []
+
+    #choose a random insert path from the available options 
+    insert_path = insert_paths[random.randint(0, len(insert_paths)-1)]
+    #print("inserting: path:", end='')
+    #print_path(insert_path)
 
     #now we have a path to insert the value
     insert_cuckoo_path(insert_path, [table_1, table_2])
-    print_styled_table(table_1, table_2, table_size, bucket_size)
+    #print_styled_table(table_1, table_2, table_size, bucket_size)
 
     return insert_path
 
@@ -256,9 +267,11 @@ def bucket_cuckoo_bfs_insert_only(table_size, bucket_size, insertions, location_
     for v in values:
         v=entry(v)
         path = bucket_cuckoo_bfs_insert(table_1, table_2, table_size, location_func, v, bucket_size, suffix)
+        #print_path(path)
         if path == []:
             break
-        collisions_per_insert.append(len(paths))
+        collisions = len(path)-2
+        collisions_per_insert.append(collisions)
         paths.append(path)
     #print_styled_table(table_1, table_2, table_size, bucket_size)
     return collisions_per_insert, paths
@@ -278,6 +291,7 @@ def bucket_cuckoo_insert_only(table_size, bucket_size, insertions, location_func
             break
         collisions_per_insert.append(collisions)
         paths.append(path)
+    #print(len(collisions_per_insert))
     #print_styled_table(table_1, table_2, table_size, bucket_size)
     return collisions_per_insert, paths
 
