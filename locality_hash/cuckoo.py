@@ -193,6 +193,11 @@ def print_path(path):
         print(str(e), end='')
     print("]")
 
+def insert_cuckoo_path(path, tables):
+    assert(len(path) >=2)
+    for i in reversed(range(0,len(path)-1)):
+        tables[path[i+1].table_index][path[i+1].bucket_index][path[i+1].bucket_offset] = path[i].key
+
 
 def bucket_cuckoo_bfs_insert(table_1, table_2, table_size, location_func, value, bucket_size, suffix):
     #begin by performing bfs
@@ -237,20 +242,7 @@ def bucket_cuckoo_bfs_insert(table_1, table_2, table_size, location_func, value,
     print_path(insert_path)
 
     #now we have a path to insert the value
-    assert(len(insert_path) >=2)
-
-    i = len(insert_path)-2
-    while i >= 0:
-        move=insert_path[i]
-        insert=insert_path[i+1]
-        insert_table = None
-        if insert.table_index == 0:
-            insert_table = table_1
-        else:
-            insert_table = table_2
-        insert_table[insert.bucket_index][insert.bucket_offset] = move.key
-        i=i-1
-    
+    insert_cuckoo_path(insert_path, [table_1, table_2])
     print_styled_table(table_1, table_2, table_size, bucket_size)
 
     return insert_path
