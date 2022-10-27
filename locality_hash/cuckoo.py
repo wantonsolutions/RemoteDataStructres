@@ -242,33 +242,14 @@ def bucket_cuckoo_bfs_insert(tables, table_size, location_func, value, bucket_si
 
     return insert_path
 
-        
-def bucket_cuckoo_bfs_insert_only(table_size, bucket_size, insertions, location_func, suffix):
+def cuckoo_insert_only(insert_func, table_size, bucket_size, insertions, location_func, suffix):
     tables = generate_cuckoo_tables(table_size, bucket_size)
     collisions_per_insert=[]
     paths = []
     values=np.arange(insertions)
     for v in values:
         v=entry(v)
-        path = bucket_cuckoo_bfs_insert(tables, table_size, location_func, v, bucket_size, suffix)
-        #print_path(path)
-        if path == []:
-            break
-        collisions = len(path)-2
-        collisions_per_insert.append(collisions)
-        paths.append(path)
-    #print_styled_table(table_1, table_2, table_size, bucket_size)
-    return collisions_per_insert, paths
-
-
-def bucket_cuckoo_insert_only(table_size, bucket_size, insertions, location_func, suffix):
-    tables = generate_cuckoo_tables(table_size, bucket_size)
-    collisions_per_insert=[]
-    paths = []
-    values=np.arange(insertions)
-    for v in values:
-        v=entry(v)
-        path = bucket_cuckoo_insert(tables, table_size, location_func, v, bucket_size, suffix)
+        path = insert_func(tables, table_size, location_func, v, bucket_size, suffix)
         if path == []:
             break
         collisions = len(path)-2
@@ -278,16 +259,21 @@ def bucket_cuckoo_insert_only(table_size, bucket_size, insertions, location_func
     #print_styled_table(table_1, table_2, table_size, bucket_size)
     return collisions_per_insert, paths
 
+        
+def bucket_cuckoo_bfs_insert_only(table_size, bucket_size, insertions, location_func, suffix):
+    return cuckoo_insert_only(bucket_cuckoo_bfs_insert, table_size, bucket_size, insertions, location_func, suffix)
 
-def bucket_cuckoo_insert_then_measure_reads(table_size, bucket_size, insertions, location_func, suffix):
+def bucket_cuckoo_insert_only(table_size, bucket_size, insertions, location_func, suffix):
+    return cuckoo_insert_only(bucket_cuckoo_insert, table_size, bucket_size, insertions, location_func, suffix)
+
+def cuckoo_insert_then_measure_reads(insert_func, table_size, bucket_size, insertions, location_func, suffix):
     tables = generate_cuckoo_tables(table_size, bucket_size)
-    collisions_per_insert=[]
     values=np.arange(insertions)
     inserted_values=[]
     read_size=[]
     for v in values:
         v=entry(v)
-        path = bucket_cuckoo_insert(tables, table_size, location_func, v, bucket_size, suffix)
+        path = insert_func(tables, table_size, location_func, v, bucket_size, suffix)
         if path == []:
             break
         inserted_values.append(v)
@@ -303,7 +289,10 @@ def bucket_cuckoo_insert_then_measure_reads(table_size, bucket_size, insertions,
             continue
         else:
             read_size.append(diff)
-        #print(diff)
 
     #print_styled_table(table_1, table_2, table_size, bucket_size)
     return read_size
+
+
+def bucket_cuckoo_insert_then_measure_reads(table_size, bucket_size, insertions, location_func, suffix):
+    return cuckoo_insert_then_measure_reads(bucket_cuckoo_insert, table_size, bucket_size, insertions, location_func, suffix)
