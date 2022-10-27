@@ -116,23 +116,18 @@ def next_table_index(table_index):
     else:
         return 0
 
-def bucket_cuckoo_insert_key(tables, table_size, location_func, pe, bucket_size, suffix, collisions, path):
+def bucket_cuckoo_insert_key(tables, table_size, location_func, pe, bucket_size, suffix, path):
 
-    bucket, table_index, index = next_search_location(pe, table_size, location_func, suffix, tables[0], tables[1])
-
-    success = False
+    bucket, table_index, index = next_search_location(pe, table_size, location_func, suffix, tables)
     #search for an empty slot in this bucket
-    for i in range(0, bucket_size):
-        if bucket[i] == None:
-            #print("found candidate index: " + '{0: <5}'.format(str(index)) + "\tvalue: " + str(value))
-            bucket[i] = entry(pe.key)
-            success = True
-            pe = path_element(None, table_index, index, i)
-            path.append(pe)
-            return success, collisions, path
+    if None in bucket:
+        i = bucket.index(None)
+        bucket[i] = entry(pe.key)
+        pe = path_element(None, table_index, index, i)
+        path.append(pe)
+        return True, path
     
     #here we have a full bucket we need to evict a candidate
-    collisions+=1
     #randomly select an eviction candidate
     evict_index = random.randint(0, bucket_size-1)
     evict_value = bucket[evict_index]
@@ -140,37 +135,29 @@ def bucket_cuckoo_insert_key(tables, table_size, location_func, pe, bucket_size,
 
     pe = path_element(evict_value.key, table_index, index, evict_index)
     if key_causes_a_path_loop(path, pe.key):
-        success=False
         path = []
-        return success, collisions, path
-
-    path.append(pe)
-    return success, collisions, path
+    else:
+        path.append(pe)
+    
+    return False, path
 
 
 def bucket_cuckoo_insert(tables, table_size, location_func, value, bucket_size, suffix):
-    collisions=0
     success=False
     pe = path_element(value.key, -1,-1,-1)
     path=[pe]
     while not success:
-        success, collisions, path = bucket_cuckoo_insert_key(tables, table_size, location_func, path[-1], bucket_size, suffix, collisions, path)
+        success, path = bucket_cuckoo_insert_key(tables, table_size, location_func, path[-1], bucket_size, suffix, path)
         if path == []:
             break
+    return path
 
-    return collisions, path
 
-
-def next_search_location(pe, table_size, location_func, suffix, table_1, table_2):
+def next_search_location(pe, table_size, location_func, suffix, tables):
         table_index=next_table_index(pe.table_index)
         index = location_func(pe.key, table_size, suffix)
         index = index[table_index]
-        print(index)
-        if table_index == 0:
-            bucket = table_1[index]
-        else:
-            bucket = table_2[index]
-
+        bucket = tables[table_index][index]
         return bucket, table_index, index
 
 def key_causes_a_path_loop(path, key):
@@ -213,7 +200,7 @@ def bucket_cuckoo_bfs(table_1,table_2, table_size, location_func, value, bucket_
             continue
 
         current_pe = search_path[-1]
-        bucket, table_index, index = next_search_location(current_pe, table_size, location_func, suffix, table_1, table_2)
+        bucket, table_index, index = next_search_location(current_pe, table_size, location_func, suffix, [table_1, table_2])
 
         for i in range(bucket_size):
             if bucket[i] == None:
@@ -281,9 +268,10 @@ def bucket_cuckoo_insert_only(table_size, bucket_size, insertions, location_func
     values=np.arange(insertions)
     for v in values:
         v=entry(v)
-        collisions, path = bucket_cuckoo_insert(tables, table_size, location_func, v, bucket_size, suffix)
+        path = bucket_cuckoo_insert(tables, table_size, location_func, v, bucket_size, suffix)
         if path == []:
             break
+        collisions = len(path)-2
         collisions_per_insert.append(collisions)
         paths.append(path)
     #print(len(collisions_per_insert))
@@ -299,7 +287,7 @@ def bucket_cuckoo_insert_then_measure_reads(table_size, bucket_size, insertions,
     read_size=[]
     for v in values:
         v=entry(v)
-        collisions, path = bucket_cuckoo_insert(tables, table_size, location_func, v, bucket_size, suffix)
+        path = bucket_cuckoo_insert(tables, table_size, location_func, v, bucket_size, suffix)
         if path == []:
             break
         inserted_values.append(v)
