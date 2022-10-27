@@ -133,20 +133,22 @@ def bucket_cuckoo_insert_key(table, table_size, location_func, location_index, v
     value = evict_value
     return success, value, loop, collisions, path
 
+def next_table_index(table_index):
+    if table_index == 0:
+        return 1
+    else:
+        return 0
+
 def bucket_cuckoo_insert(tables, table_size, location_func, value, bucket_size, suffix):
-    table_1 = tables[0]
-    table_2 = tables[1]
     collisions=0
     success=False
-    table_1_values=[]
-    table_2_values=[]
+    table_values=[[],[]]
     path=[]
     v = value
+    table_index=1
     while not success:
-        success, v, loop, collisions, path = bucket_cuckoo_insert_key(table_1, table_size, location_func, 0, v, bucket_size, suffix, table_1_values, collisions, path)
-        if success or loop:
-            break
-        success, v, loop, collisions, path = bucket_cuckoo_insert_key(table_2, table_size, location_func, 1, v, bucket_size, suffix, table_2_values, collisions, path)
+        table_index=next_table_index(table_index)
+        success, v, loop, collisions, path = bucket_cuckoo_insert_key(tables[table_index], table_size, location_func, table_index, v, bucket_size, suffix, table_values[table_index], collisions, path)
         if success or loop:
             break
     if loop:
