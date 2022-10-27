@@ -115,49 +115,35 @@ def bucket_cuckoo_insert_key(table, table_size, location_func, location_index, v
     index = index[location_index]
 
     success = False
-    #loop case
-    # if key_causes_a_path_loop(path, value.key):
-    # # for v in table_values:
-    # #     if v.key == value.key:
-    #     success=False
-    #     value=value
-    #     path = []
-    #     return success, value, collisions, path
-    # print("not causing a path loop")
-
     #search for an empty slot in this bucket
     for i in range(0, bucket_size):
         if table[index][i] == None:
             #print("found candidate index: " + '{0: <5}'.format(str(index)) + "\tvalue: " + str(value))
             table[index][i] = value
             success = True
-            value=value
 
             pe = path_element(value.key, location_index, index, i)
             path.append(pe)
 
-            return success, value, collisions, path
+            return success, collisions, path
     
     #here we have a full bucket we need to evict a candidate
     collisions+=1
     #randomly select an eviction candidate
     table_values.append(value)
     evict_index = random.randint(0, bucket_size-1)
-
     evict_value = table[index][evict_index]
     table[index][evict_index] = value
     value = evict_value
 
     pe = path_element(value.key, location_index, index, evict_index)
-
     if key_causes_a_path_loop(path, pe.key):
         success=False
-        value=value
         path = []
-        return success, value, collisions, path
+        return success, collisions, path
 
     path.append(pe)
-    return success, value, collisions, path
+    return success, collisions, path
 
 def next_table_index(table_index):
     if table_index == 0:
@@ -174,7 +160,8 @@ def bucket_cuckoo_insert(tables, table_size, location_func, value, bucket_size, 
     table_index=1
     while not success:
         table_index=next_table_index(table_index)
-        success, value, collisions, path = bucket_cuckoo_insert_key(tables[table_index], table_size, location_func, table_index, value, bucket_size, suffix, table_values[table_index], collisions, path)
+        value=entry(path[-1].key)
+        success, collisions, path = bucket_cuckoo_insert_key(tables[table_index], table_size, location_func, table_index, value, bucket_size, suffix, table_values[table_index], collisions, path)
         if path == []:
             break
 
