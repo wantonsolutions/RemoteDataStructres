@@ -560,9 +560,9 @@ suffix=2
 memory=1024
 suffix=8
 bucket_size=8
-trials=16
-size_vs_bound_bucket_cuckoo(memory, trials)
-#size_vs_bound_bfs_bucket_cuckoo(memory, trials)
+trials=1
+#size_vs_bound_bucket_cuckoo(memory, trials)
+size_vs_bound_bfs_bucket_cuckoo(memory, trials)
 
 #bucket_cuckoo_measure_average_read_size(memory, trials)
 #bucket_cuckoo_insert_range(memory, trials)
