@@ -162,8 +162,41 @@ class path_element:
     def __str__(self):
         return "(" + str(self.key) + "," + str(self.table_index) + "," + str(self.bucket_index) + "," + str(self.bucket_offset) + ")"
 
+def next_search_location(pe, table_size, location_func, suffix, table_1, table_2):
+        table_index=0
+        if pe.table_index == 0:
+            table_index=1
+
+        index = location_func(pe.key, table_size, suffix)
+        index = index[table_index]
+        if table_index == 0:
+            bucket = table_1[index]
+        else:
+            bucket = table_2[index]
+
+        return bucket, table_index, index
+
+def key_causes_a_path_loop(path, key):
+    for pe in path:
+        if pe.key == key:
+            return True
+    return False
+
+def print_whole_path_queue(path_queue):
+        for path in path_queue:
+            print_path(path)
+
+
+def print_path(path):
+    print("[", end='')
+    for e in path:
+        print(str(e), end='')
+    print("]")
+
+
 def bucket_cuckoo_bfs_insert(table_1, table_2, table_size, location_func, value, bucket_size, suffix):
     #begin by performing bfs
+    #path queue contains all active search paths. This is useful, but not optimal for reconstructing paths.
     path_queue = []
     pe = path_element(value, -1,-1,-1)
     search_item = [pe]
@@ -172,57 +205,36 @@ def bucket_cuckoo_bfs_insert(table_1, table_2, table_size, location_func, value,
     insert_path = None
     while insert_path == None:
         if len(path_queue) == 0:
-            #todo lets go with this for now, consdier revising terminating condition
             return []
         
         search_path = path_queue.pop(0)
-        v = search_path[-1]
+        current_pe = search_path[-1]
 
-        table_index=0
-        if v.table_index == 0:
-            table_index=1
-
-        index = location_func(v.key, table_size, suffix)
-        index = index[table_index]
-        if table_index == 0:
-            bucket = table_1[index]
-        else:
-            bucket = table_2[index]
-
+        bucket, table_index, index = next_search_location(current_pe, table_size, location_func, suffix, table_1, table_2)
 
         i=0
         for i in range(bucket_size):
             if bucket[i] == None:
                 #found an empty slot
                 print("found empty slot")
-                pe = path_element(None, table_index, index, i)
+                pe = path_element(bucket[i], table_index, index, i)
                 search_path.append(pe)
                 insert_path=search_path
+                #todo we need to set the depth of the path here
                 break
             else:
                 #found a non empty slot, add to queue
                 pe = path_element(bucket[i], table_index, index, i)
                 tsp = search_path.copy()
-                should_insert=True
                 #don't put loops in the bfs tree
-                for element in tsp:
-                    if element.key == pe.key:
-                        should_insert=False
-                        break
-                if should_insert:
+                if not key_causes_a_path_loop(tsp, pe.key):
                     tsp.append(pe)
                     path_queue.append(tsp)
 
-        for e in path_queue:
-            print("[", end='')
-            for ele in e:
-                print(str(ele), end='')
-            print("]")
+        print_whole_path_queue(path_queue)   
 
     print("inserting: path:", end='')
-    for e in insert_path:
-        print(e, end='')
-    print("")
+    print_path(insert_path)
 
     #now we have a path to insert the value
     assert(len(insert_path) >=2)
