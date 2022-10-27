@@ -94,23 +94,36 @@ def generate_cuckoo_tables(table_size, bucket_size):
     table_2 = generate_cuckoo_table(table_size, bucket_size)
     return table_1, table_2
 
+class path_element:
+    def __init__(self, key, table_index, bucket_index, bucket_offset):
+        self.key = key
+        self.table_index = table_index
+        self.bucket_index = bucket_index
+        self.bucket_offset = bucket_offset
+
+    def __str__(self):
+        return "(" + str(self.key) + "," + str(self.table_index) + "," + str(self.bucket_index) + "," + str(self.bucket_offset) + ")"
+
+def key_causes_a_path_loop(path, key):
+    for pe in path:
+        if pe.key == key:
+            return True
+    return False
 
 def bucket_cuckoo_insert_key(table, table_size, location_func, location_index, value, bucket_size, suffix, table_values, collisions, path):
     index = location_func(value.key, table_size, suffix)
     index = index[location_index]
-    path.append(index)
-
-    #print("value: " + str(value) + "\tindex: " + str(index))
 
     success = False
-    loop=False
     #loop case
-    for v in table_values:
-        if v.key == value.key:
-            success=False
-            value=value
-            loop=True
-            return success, value, loop, collisions, path
+    # if key_causes_a_path_loop(path, value.key):
+    # # for v in table_values:
+    # #     if v.key == value.key:
+    #     success=False
+    #     value=value
+    #     path = []
+    #     return success, value, collisions, path
+    # print("not causing a path loop")
 
     #search for an empty slot in this bucket
     for i in range(0, bucket_size):
@@ -119,8 +132,11 @@ def bucket_cuckoo_insert_key(table, table_size, location_func, location_index, v
             table[index][i] = value
             success = True
             value=value
-            loop=False
-            return success, value, loop, collisions, path
+
+            pe = path_element(value.key, location_index, index, i)
+            path.append(pe)
+
+            return success, value, collisions, path
     
     #here we have a full bucket we need to evict a candidate
     collisions+=1
@@ -131,7 +147,17 @@ def bucket_cuckoo_insert_key(table, table_size, location_func, location_index, v
     evict_value = table[index][evict_index]
     table[index][evict_index] = value
     value = evict_value
-    return success, value, loop, collisions, path
+
+    pe = path_element(value.key, location_index, index, evict_index)
+
+    if key_causes_a_path_loop(path, pe.key):
+        success=False
+        value=value
+        path = []
+        return success, value, collisions, path
+
+    path.append(pe)
+    return success, value, collisions, path
 
 def next_table_index(table_index):
     if table_index == 0:
@@ -143,27 +169,17 @@ def bucket_cuckoo_insert(tables, table_size, location_func, value, bucket_size, 
     collisions=0
     success=False
     table_values=[[],[]]
-    path=[]
+    pe = path_element(value.key, -1,-1,-1)
+    path=[pe]
     table_index=1
     while not success:
         table_index=next_table_index(table_index)
-        success, value, loop, collisions, path = bucket_cuckoo_insert_key(tables[table_index], table_size, location_func, table_index, value, bucket_size, suffix, table_values[table_index], collisions, path)
-        if success or loop:
+        success, value, collisions, path = bucket_cuckoo_insert_key(tables[table_index], table_size, location_func, table_index, value, bucket_size, suffix, table_values[table_index], collisions, path)
+        if path == []:
             break
 
-    if not success:
-        path = []
     return collisions, path
 
-class path_element:
-    def __init__(self, key, table_index, bucket_index, bucket_offset):
-        self.key = key
-        self.table_index = table_index
-        self.bucket_index = bucket_index
-        self.bucket_offset = bucket_offset
-
-    def __str__(self):
-        return "(" + str(self.key) + "," + str(self.table_index) + "," + str(self.bucket_index) + "," + str(self.bucket_offset) + ")"
 
 def next_search_location(pe, table_size, location_func, suffix, table_1, table_2):
         table_index=0
@@ -278,8 +294,6 @@ def bucket_cuckoo_bfs_insert_only(table_size, bucket_size, insertions, location_
         paths.append(path)
     #print_styled_table(table_1, table_2, table_size, bucket_size)
     return collisions_per_insert, paths
-
-
 
 
 def bucket_cuckoo_insert_only(table_size, bucket_size, insertions, location_func, suffix):
