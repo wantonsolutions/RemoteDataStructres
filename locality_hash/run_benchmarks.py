@@ -166,6 +166,12 @@ def normalize_to_memory(master_table, memory):
 
     return [x/memory for x in master_table]
 
+def get_sized_result_array(bucket_size, suffix):
+    results=[None] * len(bucket_size)
+    for i in range(len(bucket_size)):
+        results[i]=[None] * len(suffix)
+    return results
+
 def run_bucket_cuckoo_bounded_fill_size(memory, bucket_size, suffix, trials):
     table_size=int((memory/2)/bucket_size)
     ratios=[0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99]
@@ -207,59 +213,6 @@ def run_bucket_cuckoo_bucket_size(memory, suffix, trials):
     plt.title("Bucket Size Bound = "+str(suffix)+", ("+str(fill)+ "% fill), ")
     plt.legend()
     plt.savefig("bounded_bucket_cuckoo_hash_bucket_size.pdf")
-
-def bucket_size_vs_bound(memory, trials):
-    bucket_size=[1,2,4,8,16,32,64]
-    suffix=[1,2,4,8,16,32,64]
-    results=[None] * len(bucket_size)
-    for i in range(len(bucket_size)):
-        results[i]=[None] * len(suffix)
-    print(results)
-    fill=0.95
-    inserts=int(memory * fill)
-
-    bucket_id=0
-    for b in bucket_size:
-        table_size=int((memory/2)/b)
-        assert(table_size*b*2 == memory)
-        suffix_id=0
-        for s in suffix:
-            master_table=[]
-            for i in range(trials):
-                collisions = bucket_cuckoo_insert_only(table_size, b, inserts, get_locations_bounded, s)
-                master_table.append(len(collisions))
-            
-            print("master table----------------------")
-            print(master_table)
-            master_table.sort()
-            master_table=normalize_to_memory(master_table, memory)
-            #collect the 50th percentile
-            result_value=master_table[int(len(master_table)*0.50)]
-            result_value=round(result_value,2)
-            print(suffix_id, bucket_id, result_value)
-            results[bucket_id][suffix_id]=result_value
-            suffix_id+=1
-        bucket_id+=1
-    print(results)
-    im = plt.imshow(results, cmap='hot', interpolation='nearest')
-    for i in range(len(bucket_size)):
-        for j in range(len(suffix)):
-            text = plt.text(j, i, str(results[i][j]) + "\n" + str(bucket_size[i]*suffix[j]),
-                        ha="center", va="center", color="b")
-
-    plt.yticks(np.arange(len(bucket_size)),labels=[ str(x) for x in bucket_size])
-    plt.ylabel("Bucket Size")
-    plt.xticks(np.arange(len(suffix)),labels=[str(x) for x in suffix])
-    plt.xlabel("Suffix Size")
-
-    plt.colorbar(im)
-
-    #plt.xlim(0,1500)
-    plt.title("Bucket Size vs Bound")
-    plt.savefig("bucket_vs_bound.pdf")
-
-
-
 
 def size_vs_bound(memory, trials, insertion_func, title, figname):
     bucket_size=[1,2,4,8]
@@ -317,11 +270,8 @@ def calculate_read_size(distance, bucket_size, entry_size):
     return (bucket_size * entry_size * 2) * (1 + distance)
 
 def cuckoo_measure_average_read_size(memory, trials, insertion_func, title, figname):
-    #bucket_size=[1,2,4,8,16,32,64]
     bucket_size=[1,2,4,8]
-    #bucket_size=[4]
     suffix=[1,2,4,8,16]
-    #suffix=[1]
 
     results=[None] * len(bucket_size)
     for i in range(len(bucket_size)):
@@ -402,10 +352,8 @@ def paths_to_ranges(paths, suffix_size, table_size):
         #trim the first element from the path
         path=path[1:]
         r = max(path) - min(path)
-        #print("max:", max(path), "min:", min(path), "range:", r)
         if r >= 0:
             ranges.append(r)
-    #print(ranges)
     return ranges
         
 def bucket_cuckoo_insert_range(memory, trials):
@@ -414,11 +362,6 @@ def bucket_cuckoo_insert_range(memory, trials):
 def bfs_bucket_cuckoo_insert_range(memory, trials):
     cuckoo_insert_range(memory, trials, bucket_cuckoo_bfs_insert_only, "Insert Difference BFS Bucket Cuckoo", "bucket_cuckoo_bfs_insert_range")
 
-def get_sized_result_array(bucket_size, suffix):
-    results=[None] * len(bucket_size)
-    for i in range(len(bucket_size)):
-        results[i]=[None] * len(suffix)
-    return results
 
 def run_insertion_trials(trials, insertion_func, table_size, bucket_size, inserts, get_locations_func, suffix_size):
     all_results=[]
