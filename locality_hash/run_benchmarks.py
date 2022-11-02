@@ -163,56 +163,38 @@ def size_vs_bound_bfs_bucket_cuckoo(memory,trials):
 def calculate_read_size(distance, bucket_size, entry_size):
     return (bucket_size * entry_size * 2) * (1 + distance)
 
-def cuckoo_measure_average_read_size(memory, trials, insertion_func, title, figname):
-    bucket_size=[1,2,4,8]
-    suffix=[1,2,4,8,16]
-    results = get_sized_result_array(bucket_size, suffix)
-    fill=0.95
+def run_read_size_trials(trials, insertion_func, table_size, bucket_size, inserts, suffix_size):
     entry_size=8
+    master_read_sizes=[]
+    for i in range(trials):
+        read_sizes = cuckoo_insert_then_measure_reads(insertion_func, table_size, bucket_size, inserts, get_locations_bounded, suffix_size)
+        read_sizes = [calculate_read_size(x, bucket_size, entry_size) for x in read_sizes]
+        master_read_sizes.extend(read_sizes)
+    master_read_sizes.sort()
+    return master_read_sizes
+
+
+def cuckoo_measure_average_read_size(memory, trials, insertion_func, title, figname):
+    bucket=[1,2,4,8]
+    suffix=[1,2,4,8,16]
+    percentiles=[0.5]
+    results = get_sized_result_array(bucket, suffix)
+    fill=0.95
 
     inserts=int(memory * fill)
-    bucket_id=0
-    for b in bucket_size:
-        suffix_id=0
-        for s in suffix:
-            table_size=get_table_size(memory, b)
-            master_read_sizes=[]
-            for i in range(trials):
-                read_sizes = cuckoo_insert_then_measure_reads(insertion_func, table_size, b, inserts, get_locations_bounded, s)
-                read_sizes = [calculate_read_size(x, b, entry_size) for x in read_sizes]
-                master_read_sizes.extend(read_sizes)
-            master_read_sizes.sort()
-            color=(0.5,0.01*s,0.01*b)
-            plot_cdf(master_read_sizes, "b="+str(b)+", s="+str(s), color)
-            results[bucket_id][suffix_id]=master_read_sizes[int(len(master_read_sizes)/2)]
-            suffix_id+=1
-        bucket_id+=1
-    plt.title(title + "cdf")
-    plt.legend(ncol=2, prop={'size': 6})
-    plt.xlabel("Read Size (bytes)")
-    save_figure(figname+"_cdf")
-    plt.clf()
+    for bucket_id in range(len(bucket)):
+        table_size = get_table_size(memory, bucket[bucket_id])
+        for suffix_id in range(len(suffix)):
+            results[bucket_id][suffix_id]=run_read_size_trials(trials, insertion_func, table_size, bucket[bucket_id], inserts, suffix[suffix_id])
 
-    #cmap_reversed = matplotlib.cm.get_cmap('autumn_r')
-    im = plt.imshow(results, cmap='hot_r', interpolation='nearest')
-    for i in range(len(bucket_size)):
-        for j in range(len(suffix)):
-            text = plt.text(j, i, str(results[i][j]),ha="center", va="center", color="b")
-
-    plt.yticks(np.arange(len(bucket_size)),labels=[ str(x) for x in bucket_size])
-    plt.ylabel("Bucket Size")
-    plt.xticks(np.arange(len(suffix)),labels=[str(x) for x in suffix])
-    plt.xlabel("Suffix Size")
-    plt.colorbar(im)
-    #plt.xlim(0,1500)
-    plt.title(title)
-    save_figure(figname + "_heatmap")
+    bucket_suffix_cdf(title, figname, results, bucket, suffix)
+    percentile_heatmaps(title, figname, percentiles, results, bucket, suffix, reversed=True)
 
 def bucket_cuckoo_measure_average_read_size(memory, trials):
-    cuckoo_measure_average_read_size(memory, trials, bucket_cuckoo_insert, "Bucket Cuckoo Average Read Size", "bucket_cuckoo_average_read_size")
+    cuckoo_measure_average_read_size(memory, trials, bucket_cuckoo_insert, "Bucket Cuckoo Read Size", "bucket_cuckoo_read_size")
 
 def bfs_cuckoo_measure_average_read_size(memory, trials):
-    cuckoo_measure_average_read_size(memory, trials, bucket_cuckoo_bfs_insert, "Bucket Cuckoo BFS Average Read Size", "bucket_cuckoo_bfs_average_read_size")
+    cuckoo_measure_average_read_size(memory, trials, bucket_cuckoo_bfs_insert, "Bucket Cuckoo BFS Read Size", "bucket_cuckoo_bfs_read_size")
 
 
 
@@ -282,35 +264,16 @@ def bfs_bucket_cuckoo_insert_range(memory, trials):
     cuckoo_insert_range(memory, trials, bucket_cuckoo_bfs_insert_only, "Insert Difference BFS Bucket Cuckoo", "bucket_cuckoo_bfs_insert_range")
 
 
-
-# collsions=cuckoo(table_size, table_size*2)
-# print(collsions)
-
-#run_cuckoo_trials_50(table_size, trials)
-#run_cuckoo_bounded_loops(table_size, trials)
-
-
-
 memory=1024
 suffix=8
 bucket_size=8
 trials=1
 
-size_vs_bound_bucket_cuckoo(memory, trials)
+#size_vs_bound_bucket_cuckoo(memory, trials)
 #size_vs_bound_bfs_bucket_cuckoo(memory, trials)
 
-#bucket_cuckoo_measure_average_read_size(memory, trials)
-# bfs_cuckoo_measure_average_read_size(memory, trials)
+bucket_cuckoo_measure_average_read_size(memory, trials)
+#bfs_cuckoo_measure_average_read_size(memory, trials)
 
 # bucket_cuckoo_insert_range(memory, trials)
 # bfs_bucket_cuckoo_insert_range(memory, trials)
-
-
-
-
-
-# memory=1024
-# bucket_size=8
-# suffix=8
-# trials=1024
-#run_bucket_cuckoo_bounded_fill_size(memory, bucket_size, suffix, trials)
