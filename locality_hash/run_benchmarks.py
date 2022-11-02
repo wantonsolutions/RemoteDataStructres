@@ -13,25 +13,6 @@ def save_figure(filename):
     plt.savefig(filename + ".png")
     plt.clf()
 
-def cdf(data):
-    high = max(data)
-    low = min(data)
-    norm = matplotlib.colors.Normalize(low,high)
-
-    #print(data)
-    count, bins_count = np.histogram(data, bins = 100000 )
-    pdf = count / sum(count)
-    
-    y = np.cumsum(pdf)
-    x = bins_count[1:]
-
-    print('inserting')
-    y= np.insert(y,0,0)
-    x= np.insert(x,0,x[0])
-    print(y[0])
-    print(x)
-    return x, y
-
 def plot_cdf(data, label, color='none'):
     x,y = cdf(data)
     if color == 'none':
@@ -51,17 +32,9 @@ def cdf(data):
     y = np.cumsum(pdf)
     x = bins_count[1:]
 
-    print('inserting')
     y= np.insert(y,0,0)
     x= np.insert(x,0,x[0])
-    print(y[0])
-    print(x)
     return x, y
-
-# def plot_cdf(data, label):
-#     x,y = cdf(data)
-#     plt.plot(x,y, label=label)
-
 
 def run_trials(table_size, trials, suffix, location_func, decision_func):
     master_table = []
@@ -297,7 +270,6 @@ def size_vs_bound(memory, trials, insertion_func, title, figname):
     print(results)
     fill=0.95
     inserts=int(memory * fill)
-
     bucket_id=0
     for b in bucket_size:
         table_size=int((memory/2)/b)
@@ -330,9 +302,7 @@ def size_vs_bound(memory, trials, insertion_func, title, figname):
     plt.ylabel("Bucket Size")
     plt.xticks(np.arange(len(suffix)),labels=[str(x) for x in suffix])
     plt.xlabel("Suffix Size")
-
     plt.colorbar(im)
-
     #plt.xlim(0,1500)
     plt.title(title)
     save_figure(figname)
@@ -346,10 +316,11 @@ def size_vs_bound_bfs_bucket_cuckoo(memory,trials):
 def calculate_read_size(distance, bucket_size, entry_size):
     return (bucket_size * entry_size * 2) * (1 + distance)
 
-def bucket_cuckoo_measure_average_read_size(memory, trials):
-    bucket_size=[1,2,4,8,16,32,64]
+def cuckoo_measure_average_read_size(memory, trials, insertion_func, title, figname):
+    #bucket_size=[1,2,4,8,16,32,64]
+    bucket_size=[1,2,4,8]
     #bucket_size=[4]
-    suffix=[1,2,4,8,16,32,64]
+    suffix=[1,2,4,8,16]
     #suffix=[1]
 
     results=[None] * len(bucket_size)
@@ -366,7 +337,7 @@ def bucket_cuckoo_measure_average_read_size(memory, trials):
             table_size=int((memory/2)/b)
             master_read_sizes=[]
             for i in range(trials):
-                read_sizes = bucket_cuckoo_insert_then_measure_reads(table_size, b, inserts, get_locations_bounded, s)
+                read_sizes = cuckoo_insert_then_measure_reads(insertion_func, table_size, b, inserts, get_locations_bounded, s)
                 read_sizes = [calculate_read_size(x, b, entry_size) for x in read_sizes]
                 master_read_sizes.extend(read_sizes)
             master_read_sizes.sort()
@@ -375,10 +346,10 @@ def bucket_cuckoo_measure_average_read_size(memory, trials):
             results[bucket_id][suffix_id]=master_read_sizes[int(len(master_read_sizes)/2)]
             suffix_id+=1
         bucket_id+=1
-    plt.title("Average Read Size bucket size vs suffix")
+    plt.title(title + "cdf")
     plt.legend(ncol=2, prop={'size': 6})
     plt.xlabel("Read Size (bytes)")
-    plt.savefig("read_size_cdf.pdf")
+    save_figure(figname+"_cdf")
     plt.clf()
 
     #cmap_reversed = matplotlib.cm.get_cmap('autumn_r')
@@ -393,56 +364,73 @@ def bucket_cuckoo_measure_average_read_size(memory, trials):
     plt.xlabel("Suffix Size")
     plt.colorbar(im)
     #plt.xlim(0,1500)
-    plt.title("Measured Read Size 50th percentile")
-    plt.savefig("average_read_size_heatmap.pdf")
+    plt.title(title)
+    save_figure(figname + "_heatmap")
 
+def bucket_cuckoo_measure_average_read_size(memory, trials):
+    cuckoo_measure_average_read_size(memory, trials, bucket_cuckoo_insert, "Bucket Cuckoo Average Read Size", "bucket_cuckoo_average_read_size")
+
+def bfs_cuckoo_measure_average_read_size(memory, trials):
+    cuckoo_measure_average_read_size(memory, trials, bucket_cuckoo_bfs_insert, "Bucket Cuckoo BFS Average Read Size", "bucket_cuckoo_bfs_average_read_size")
+
+
+#this function attempts to remove the modulo distance from hash table insertion
+#paths.  if a wrap around occured, then this function will attempt to normalize
+#the wraped around index.  for example if a path on table [0,1,2,3,4] tried to
+#insert at index 4, then 0, this function would change the 0 index to 5. The
+#reason I'm doing this is to not have the wrap around dammage my measurements of
+#how far away indexs are from one another.
 def normalize_path(path, suffix_size, table_size):
     t = path
-    should_print=False
-    for i in range(len(path)-1):
-        value = path[i] - path[i+1]
-        if value < 0 and abs(value) > suffix_size:
-            should_print=True
-            #print(path)
+    #skip the first index because its (-1,-1,-1), and don't go to the last index
+    for i in range(1,len(path)-1,1):
+        distance = path[i].bucket_index - path[i+1].bucket_index
+        if distance < 0 and abs(distance) > suffix_size:
             for j in range(i+1, len(path)):
-                path[j]-=table_size
-        if value > 0 and abs(value) > suffix_size:
-            #print(path)
-            should_print=True
+                path[j].bucket_index-=table_size
+        if distance > 0 and abs(distance) > suffix_size:
             for j in range(i+1, len(path)):
-                path[j]+=table_size
-            #print(path)
-    # if should_print:
-    #     print("Normalized path", t, path)
-    #     print("table size, suffix", table_size, suffix_size)
+                path[j].bucket_index+=table_size
     return path
 
 
-def paths_to_ranges(paths, suffix_size, table_size):#, table_size):
+def paths_to_ranges(paths, suffix_size, table_size):
     ranges=[]
     for path in paths:
         path=normalize_path(path, suffix_size, table_size)
+        #todo this is a weird patterns, that overloads the path_element class, consider revising.
+        #trim the first element from the path
+        path=path[1:]
         r = max(path) - min(path)
+        #print("max:", max(path), "min:", min(path), "range:", r)
         if r >= 0:
             ranges.append(r)
-        #ranges.append((min(path), max(path)))
+    #print(ranges)
     return ranges
         
-
 def bucket_cuckoo_insert_range(memory, trials):
+    cuckoo_insert_range(memory, trials, bucket_cuckoo_insert_only, "Insert Difference Bucket Cuckoo", "bucket_cuckoo_insert_range")
 
-    bucket_size=[1,2,4,8,16,32,64]
-    suffix=[1,2,4,8,16,32,64]
+def bfs_bucket_cuckoo_insert_range(memory, trials):
+    cuckoo_insert_range(memory, trials, bucket_cuckoo_bfs_insert_only, "Insert Difference BFS Bucket Cuckoo", "bucket_cuckoo_bfs_insert_range")
+
+def get_sized_result_array(bucket_size, suffix):
     results=[None] * len(bucket_size)
     for i in range(len(bucket_size)):
         results[i]=[None] * len(suffix)
+    return results
+
+
+def cuckoo_insert_range(memory, trials, insertion_func, title, figname):
+    bucket_size=[1,2,4,8,16]
+    suffix=[1,2,4,8,16,32,64]
+    entry_size=8
     fill=0.95
     inserts=int(memory * fill)
-    entry_size=8
     percentiles=[0.5,0.9,0.99]
+    results = get_sized_result_array(table_size, bucket_size, suffix)
 
     bucket_id=0
-    #ax1 = plt.subplots(ncols=1, nrows=1, figsize=(6, 4))[1]
     color_pallets=[cm.Greys, cm.Purples, cm.Blues, cm.Greens, cm.Oranges, cm.Reds, cm.summer, cm.YlOrRd, cm.OrRd, cm.PuRd, cm.RdPu, cm.BuPu, cm.GnBu, cm.PuBu, cm.YlGnBu, cm.PuBuGn, cm.BuGn, cm.YlGn]
     for b in bucket_size:
         table_size=int((memory/2)/b)
@@ -450,37 +438,30 @@ def bucket_cuckoo_insert_range(memory, trials):
         suffix_id=0
         color = iter(color_pallets[bucket_id%len(color_pallets)](np.linspace(0.5, 1, len(suffix))))
         for s in suffix:
+            print("bucket size", b, "suffix size", s)
             master_table=[]
-            #color.cycle_cmap(len(suffix))
-            #color.set_cmap("autumn")
-            #plt.set_prop_cycle('color', [plt.cm.autumn(i) for i in np.linspace(0, 1, len(suffix))])
             for i in range(trials):
-
-                _, paths = bucket_cuckoo_insert_only(table_size, b, inserts, get_locations_bounded, s)
+                collisions, paths = insertion_func(table_size, b, inserts, get_locations_bounded, s)
                 ranges=paths_to_ranges(paths, s,table_size)
                 ranges = [calculate_read_size(x, b, entry_size) for x in ranges]
                 master_table.extend(ranges)
             master_table.sort()
             c=next(color)
             plot_cdf(master_table, "b="+str(b)+", s="+str(s),color=c)
-            
-            #print(suffix_id, bucket_id, result_value)
             results[bucket_id][suffix_id]=master_table
             suffix_id+=1
         bucket_id+=1
-    #print(results)
 
-    plt.title("Insert Difference")
+    plt.title(title + " cdf")
     plt.ylim(0.5,1.01)
     plt.ylim(0.85,1.01)
     plt.legend(ncol=4, prop={'size': 6})
     plt.xlabel("Distance (Bytes)")
     plt.tight_layout()
     plt.xscale("log")
-    save_figure("insert_range_cdf")
+    save_figure(figname+ "_cdf")
     plt.clf()
 
-    print("MAKING HEATMAPS")
 
     for percentile in percentiles:
         t_results=[None] * len(bucket_size)
@@ -509,10 +490,10 @@ def bucket_cuckoo_insert_range(memory, trials):
         plt.colorbar(im)
 
         #plt.xlim(0,1500)
-        percent_string=str(round(percentile*100,2))
-        plt.title("Insert Range "+percent_string+"th percentile")
+        percent_string=str(int(round(percentile*100,2)))
+        plt.title(title+"_"+percent_string+"th percentile")
         plt.tight_layout()
-        save_figure("insert_range_"+percent_string)
+        save_figure(figname+"_"+percent_string)
         plt.clf()
 
 
@@ -560,12 +541,14 @@ suffix=2
 memory=1024
 suffix=8
 bucket_size=8
-trials=1
+trials=16
 #size_vs_bound_bucket_cuckoo(memory, trials)
-size_vs_bound_bfs_bucket_cuckoo(memory, trials)
+#size_vs_bound_bfs_bucket_cuckoo(memory, trials)
 
 #bucket_cuckoo_measure_average_read_size(memory, trials)
-#bucket_cuckoo_insert_range(memory, trials)
+# bfs_cuckoo_measure_average_read_size(memory, trials)
+bucket_cuckoo_insert_range(memory, trials)
+bfs_bucket_cuckoo_insert_range(memory, trials)
 
 
 #run_bucket_cuckoo_bfs_trials(memory, bucket_size, suffix, trials)
@@ -576,4 +559,4 @@ size_vs_bound_bfs_bucket_cuckoo(memory, trials)
 # bucket_size=8
 # suffix=8
 # trials=1024
-# run_bucket_cuckoo_bounded_fill_size(memory, bucket_size, suffix, trials)
+#run_bucket_cuckoo_bounded_fill_size(memory, bucket_size, suffix, trials)
