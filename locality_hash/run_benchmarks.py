@@ -420,37 +420,24 @@ def get_sized_result_array(bucket_size, suffix):
         results[i]=[None] * len(suffix)
     return results
 
-
-def cuckoo_insert_range(memory, trials, insertion_func, title, figname):
-    bucket_size=[1,2,4,8,16]
-    suffix=[1,2,4,8,16,32,64]
+def run_insertion_trials(trials, insertion_func, table_size, bucket_size, inserts, get_locations_func, suffix_size):
+    all_results=[]
     entry_size=8
-    fill=0.95
-    inserts=int(memory * fill)
-    percentiles=[0.5,0.9,0.99]
-    results = get_sized_result_array(table_size, bucket_size, suffix)
+    for i in range(trials):
+        collisions, paths = insertion_func(table_size, bucket_size, inserts, get_locations_bounded, suffix_size)
+        ranges= paths_to_ranges(paths, suffix_size,table_size)
+        ranges = [calculate_read_size(x, bucket_size, entry_size) for x in ranges]
+        all_results.extend(ranges)
+    all_results.sort()
+    return all_results
 
-    bucket_id=0
+def bucket_suffix_cdf(title, figname, results, bucket, suffix):
     color_pallets=[cm.Greys, cm.Purples, cm.Blues, cm.Greens, cm.Oranges, cm.Reds, cm.summer, cm.YlOrRd, cm.OrRd, cm.PuRd, cm.RdPu, cm.BuPu, cm.GnBu, cm.PuBu, cm.YlGnBu, cm.PuBuGn, cm.BuGn, cm.YlGn]
-    for b in bucket_size:
-        table_size=int((memory/2)/b)
-        assert(table_size*b*2 == memory)
-        suffix_id=0
+    for bucket_id in range(len(bucket)):
         color = iter(color_pallets[bucket_id%len(color_pallets)](np.linspace(0.5, 1, len(suffix))))
-        for s in suffix:
-            print("bucket size", b, "suffix size", s)
-            master_table=[]
-            for i in range(trials):
-                collisions, paths = insertion_func(table_size, b, inserts, get_locations_bounded, s)
-                ranges=paths_to_ranges(paths, s,table_size)
-                ranges = [calculate_read_size(x, b, entry_size) for x in ranges]
-                master_table.extend(ranges)
-            master_table.sort()
+        for suffix_id in range(len(suffix)):
             c=next(color)
-            plot_cdf(master_table, "b="+str(b)+", s="+str(s),color=c)
-            results[bucket_id][suffix_id]=master_table
-            suffix_id+=1
-        bucket_id+=1
+            plot_cdf(results[bucket_id][suffix_id], "b="+str(bucket[bucket_id])+", s="+str(suffix[suffix_id]),color=c)
 
     plt.title(title + " cdf")
     plt.ylim(0.5,1.01)
@@ -462,61 +449,57 @@ def cuckoo_insert_range(memory, trials, insertion_func, title, figname):
     save_figure(figname+ "_cdf")
     plt.clf()
 
+def get_percentile_heatmap_results(results, bucket, suffix, percentile):
+    heatmap_results=get_sized_result_array(bucket, suffix)
+    for bucket_id in range(len(bucket)):
+        for suffix_id in range(len(suffix)):
+            heatmap_results[bucket_id][suffix_id]=results[bucket_id][suffix_id][int(len(results[bucket_id][suffix_id])*percentile)]
+    return heatmap_results
 
+def label_percentile_heatmap(heatmap_results, bucket, suffix, percentile):
+    for i in range(len(bucket)):
+        for j in range(len(suffix)):
+            result_value=heatmap_results[i][j]
+            result_value=round(result_value,2)
+            text = plt.text(j, i, str(result_value),ha="center", va="center", color="b")
+
+def percentile_heatmaps(title, figname, percentiles, results, bucket, suffix):
     for percentile in percentiles:
-        t_results=[None] * len(bucket_size)
-        for i in range(len(bucket_size)):
-            t_results[i]=[None] * len(suffix)
-        for i in range(len(bucket_size)):
-            for j in range(len(suffix)):
-                t_results[i][j]=results[i][j][int(len(results[i][j])*percentile)]
-                #t_results[i][j]=np.percentile(results[i][j], percentile)
+        percentile_heatmap = get_percentile_heatmap_results(results, bucket, suffix, percentile)
+        im = plt.imshow(percentile_heatmap, cmap='hot_r', interpolation='nearest')
+        plt.colorbar(im)
+        label_percentile_heatmap(percentile_heatmap, bucket, suffix, percentile)
 
-        im = plt.imshow(t_results, cmap='hot_r', interpolation='nearest')
-        for i in range(len(bucket_size)):
-            for j in range(len(suffix)):
-                #result_value=results[i][j][int(len(results[i][j])*percentile)]
-                result_value=t_results[i][j]
-                #print(result_value)
-                result_value=round(result_value,2)
-                text = plt.text(j, i, str(result_value),
-                            ha="center", va="center", color="b")
-
-        plt.yticks(np.arange(len(bucket_size)),labels=[ str(x) for x in bucket_size])
+        plt.yticks(np.arange(len(bucket)),labels=[ str(x) for x in bucket])
         plt.ylabel("Bucket Size")
         plt.xticks(np.arange(len(suffix)),labels=[str(x) for x in suffix])
         plt.xlabel("Suffix Size")
 
-        plt.colorbar(im)
-
-        #plt.xlim(0,1500)
         percent_string=str(int(round(percentile*100,2)))
         plt.title(title+"_"+percent_string+"th percentile")
         plt.tight_layout()
         save_figure(figname+"_"+percent_string)
         plt.clf()
 
+def cuckoo_insert_range(memory, trials, insertion_func, title, figname):
+    bucket=[1,2,4,8,16]
+    suffix=[1,2,4,8,16,32,64]
+    fill=0.95
+    inserts=int(memory * fill)
+    percentiles=[0.5,0.9,0.99]
+    results = get_sized_result_array(bucket, suffix)
 
-def run_bucket_cuckoo_bfs_trials(memory, bucket_size, suffix, trials):
-    table_size=int((memory/2)/bucket_size)
-    inserts=int(memory * 0.95)
-    master_table=[]
-    for i in range(trials):
-        collisions, paths = bucket_cuckoo_bfs_insert_only(table_size, bucket_size, inserts, get_locations_bounded, suffix=suffix)
-        master_table.extend(collisions)
-        #print(collisions)
-    
+    for bucket_id in range(len(bucket)):
+        table_size=int((memory/2)/bucket[bucket_id])
+        assert(table_size*bucket[bucket_id]*2 == memory)
+        for suffix_id in range(len(suffix)):
+            print("bucket size", bucket[bucket_id], "suffix size", suffix[suffix_id])
+            results[bucket_id][suffix_id]=run_insertion_trials(trials, insertion_func, table_size, bucket[bucket_id], inserts, get_locations_bounded, suffix[suffix_id])
 
-    plot_cdf(master_table, "bfs bound 5")
-
-    plt.title("Bucket Cuckoo Hash Collisions")
-    plt.legend()
-    plt.savefig("bucket_cuckoo_bfs_len.pdf")
-    plt.clf
+    bucket_suffix_cdf(title, figname, results, bucket, suffix)
+    percentile_heatmaps(title, figname, percentiles, results, bucket, suffix)
 
 
-
-#todo imortalize some of these that produced good results.
 
 # collsions=cuckoo(table_size, table_size*2)
 # print(collsions)
@@ -551,7 +534,6 @@ bucket_cuckoo_insert_range(memory, trials)
 bfs_bucket_cuckoo_insert_range(memory, trials)
 
 
-#run_bucket_cuckoo_bfs_trials(memory, bucket_size, suffix, trials)
 
 
 
