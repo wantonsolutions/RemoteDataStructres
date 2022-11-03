@@ -29,7 +29,16 @@ def cuckoo_insert(table, table_size, location_func, location_index, value, suffi
 
     return success, value, loop
             
-    
+def generate_insertions(insertions,deterministic=True):
+    if deterministic:
+        return np.arange(insertions)
+    else:
+        values=[None] * insertions
+        for i in range(0,insertions):
+            values[i]=random.randint(0,1<<32)
+        return values
+            
+
 
 def cuckoo(table_size, insertions, location_func, suffix):
     table_1 =[None] * table_size
@@ -109,6 +118,26 @@ class path_element:
 
     def __sub__(self, other):
         return self.bucket_index - other.bucket_index
+
+
+#this function attempts to remove the modulo distance from hash table insertion
+#paths.  if a wrap around occured, then this function will attempt to normalize
+#the wraped around index.  for example if a path on table [0,1,2,3,4] tried to
+#insert at index 4, then 0, this function would change the 0 index to 5. The
+#reason I'm doing this is to not have the wrap around dammage my measurements of
+#how far away indexs are from one another.
+def normalize_path(path, suffix_size, table_size):
+    t = path
+    #skip the first index because its (-1,-1,-1), and don't go to the last index
+    for i in range(1,len(path)-1,1):
+        distance = path[i].bucket_index - path[i+1].bucket_index
+        if distance < 0 and abs(distance) > suffix_size:
+            for j in range(i+1, len(path)):
+                path[j].bucket_index-=table_size
+        if distance > 0 and abs(distance) > suffix_size:
+            for j in range(i+1, len(path)):
+                path[j].bucket_index+=table_size
+    return path
 
 def key_causes_a_path_loop(path, key):
     for pe in path:
@@ -257,7 +286,8 @@ def paths_to_collisions(paths):
 def cuckoo_insert_only(insert_func, table_size, bucket_size, insertions, location_func, suffix):
     tables = generate_cuckoo_tables(table_size, bucket_size)
     paths = []
-    values=np.arange(insertions)
+    values=generate_insertions(insertions)
+
     for v in values:
         v=entry(v)
         path = insert_func(tables, table_size, location_func, v, bucket_size, suffix)
@@ -277,7 +307,7 @@ def bucket_cuckoo_insert_only(table_size, bucket_size, insertions, location_func
 
 def cuckoo_insert_then_measure_reads(insert_func, table_size, bucket_size, insertions, location_func, suffix):
     tables = generate_cuckoo_tables(table_size, bucket_size)
-    values=np.arange(insertions)
+    values=generate_insertions(insertions)
     inserted_values=[]
     read_size=[]
     for v in values:

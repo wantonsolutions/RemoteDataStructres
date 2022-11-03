@@ -5,7 +5,7 @@ def h1(key):
 
 def h2(key):
     val = str(key) + "salt"
-    return hashlib.md5(val.encode('utf-8')).hexdigest()
+    return hashlib.sha1(val.encode('utf-8')).hexdigest()
 
 def primary_location(key, table_size):
     return int(h1(key),16) % table_size

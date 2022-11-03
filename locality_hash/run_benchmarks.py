@@ -45,8 +45,9 @@ def bucket_suffix_cdf(title, figname, results, bucket, suffix):
             plot_cdf(results[bucket_id][suffix_id], "b="+str(bucket[bucket_id])+", s="+str(suffix[suffix_id]),color=c)
 
     plt.title(title + " cdf")
-    plt.ylim(0.5,1.01)
-    plt.ylim(0.85,1.01)
+    # plt.ylim(0.5,1.01)
+    # plt.ylim(0.85,1.01)
+    plt.xlim(0.9)
     plt.legend(ncol=4, prop={'size': 6})
     plt.xlabel("Distance (Bytes)")
     plt.tight_layout()
@@ -90,8 +91,6 @@ def percentile_heatmaps(title, figname, percentiles, results, bucket, suffix, re
         plt.clf()
 
 def normalize_to_memory(master_table, memory):
-    print(memory)
-    print(master_table)
     return [x/memory for x in master_table]
 
 def get_sized_result_array(bucket_size, suffix):
@@ -121,37 +120,54 @@ def run_bucket_cuckoo_bounded_fill_size(memory, bucket_size, suffix, trials):
     plt.savefig("bounded_bucket_cuckoo_hash_fill_ratio.pdf")
     plt.clf()
 
-
 def get_table_size(memory, bucket_size):
     table_size=int((memory/2)/bucket_size)
-    assert(table_size*bucket_size*2 == memory)
+    assert table_size*bucket_size*2 == memory, "table size: " + str(table_size) + "bucket size: " + str(bucket_size) + "memory: " + str(memory)
     return table_size
 
 def run_insertion_fill_trials(trials, insertion_func, table_size, bucket_size, inserts, suffix_size):
     all_results=[]
     for i in range(trials):
         collisions, paths = insertion_func(table_size, bucket_size, inserts, get_locations_bounded, suffix_size)
-        all_results.append(len(collisions))
-    all_results.sort()
+        all_results.append(paths)
     return all_results
+
+def all_paths_to_path_length(all_paths):
+    all_paths_lengths=[]
+    for paths in all_paths:
+        all_paths_lengths.extend(paths_to_collisions(paths))
+    all_paths_lengths.sort()
+    return all_paths_lengths
 
 
 def size_vs_bound(memory, trials, insertion_func, title, figname):
     bucket=[1,2,4,8,16]
     suffix=[1,2,4,8,16]
-    percentiles=[0.5]
-    results = get_sized_result_array(bucket, suffix)
+    percentiles=[0.5, 0.90, 0.99]
+    fill_results = get_sized_result_array(bucket, suffix)
+    path_results = get_sized_result_array(bucket, suffix)
     fill=0.95
     inserts=int(memory * fill)
 
     for bucket_id in range(len(bucket)):
         table_size = get_table_size(memory, bucket[bucket_id])
         for suffix_id in range(len(suffix)):
-            master_table=run_insertion_fill_trials(trials, insertion_func, table_size, bucket[bucket_id], inserts, suffix[suffix_id])
-            master_table=normalize_to_memory(master_table, memory)
-            results[bucket_id][suffix_id]=master_table
+            print("[size vs bound ("+title+")] bucket size", bucket[bucket_id], "suffix size", suffix[suffix_id])
+            all_paths=run_insertion_fill_trials(trials, insertion_func, table_size, bucket[bucket_id], inserts, suffix[suffix_id])
 
-    percentile_heatmaps(title, figname, percentiles, results, bucket, suffix)
+            # Measure how full each table got before it broke
+            fill=[len(paths) for paths in all_paths]
+            fill.sort()
+            fill=normalize_to_memory(fill, memory)
+            fill_results[bucket_id][suffix_id]=fill
+
+            #measure the path length
+            path_results[bucket_id][suffix_id]=all_paths_to_path_length(all_paths)
+
+    percentile_heatmaps(title+"_fill", figname+"_fill", percentiles, fill_results, bucket, suffix)
+    bucket_suffix_cdf(title+"_fill", figname+"_fill", fill_results, bucket, suffix)
+    percentile_heatmaps(title+"_path", figname+"_path", percentiles, path_results, bucket, suffix, reversed=True)
+    bucket_suffix_cdf(title+"_path", figname+"_path", path_results, bucket, suffix)
 
 
 def size_vs_bound_bucket_cuckoo(memory,trials):
@@ -174,7 +190,7 @@ def run_read_size_trials(trials, insertion_func, table_size, bucket_size, insert
     return master_read_sizes
 
 
-def cuckoo_measure_average_read_size(memory, trials, insertion_func, title, figname):
+def cuckoo_measure_read_size(memory, trials, insertion_func, title, figname):
     bucket=[1,2,4,8]
     suffix=[1,2,4,8,16]
     percentiles=[0.5]
@@ -185,37 +201,19 @@ def cuckoo_measure_average_read_size(memory, trials, insertion_func, title, fign
     for bucket_id in range(len(bucket)):
         table_size = get_table_size(memory, bucket[bucket_id])
         for suffix_id in range(len(suffix)):
+            print("[cuckoo read size ("+title+")] bucket size", bucket[bucket_id], "suffix size", suffix[suffix_id])
             results[bucket_id][suffix_id]=run_read_size_trials(trials, insertion_func, table_size, bucket[bucket_id], inserts, suffix[suffix_id])
 
     bucket_suffix_cdf(title, figname, results, bucket, suffix)
     percentile_heatmaps(title, figname, percentiles, results, bucket, suffix, reversed=True)
 
 def bucket_cuckoo_measure_average_read_size(memory, trials):
-    cuckoo_measure_average_read_size(memory, trials, bucket_cuckoo_insert, "Bucket Cuckoo Read Size", "bucket_cuckoo_read_size")
+    cuckoo_measure_read_size(memory, trials, bucket_cuckoo_insert, "Bucket Cuckoo Read Size", "bucket_cuckoo_read_size")
 
 def bfs_cuckoo_measure_average_read_size(memory, trials):
-    cuckoo_measure_average_read_size(memory, trials, bucket_cuckoo_bfs_insert, "Bucket Cuckoo BFS Read Size", "bucket_cuckoo_bfs_read_size")
+    cuckoo_measure_read_size(memory, trials, bucket_cuckoo_bfs_insert, "Bucket Cuckoo BFS Read Size", "bucket_cuckoo_bfs_read_size")
 
 
-
-#this function attempts to remove the modulo distance from hash table insertion
-#paths.  if a wrap around occured, then this function will attempt to normalize
-#the wraped around index.  for example if a path on table [0,1,2,3,4] tried to
-#insert at index 4, then 0, this function would change the 0 index to 5. The
-#reason I'm doing this is to not have the wrap around dammage my measurements of
-#how far away indexs are from one another.
-def normalize_path(path, suffix_size, table_size):
-    t = path
-    #skip the first index because its (-1,-1,-1), and don't go to the last index
-    for i in range(1,len(path)-1,1):
-        distance = path[i].bucket_index - path[i+1].bucket_index
-        if distance < 0 and abs(distance) > suffix_size:
-            for j in range(i+1, len(path)):
-                path[j].bucket_index-=table_size
-        if distance > 0 and abs(distance) > suffix_size:
-            for j in range(i+1, len(path)):
-                path[j].bucket_index+=table_size
-    return path
 
 def paths_to_ranges(paths, suffix_size, table_size):
     ranges=[]
@@ -243,16 +241,17 @@ def run_insertion_range_trials(trials, insertion_func, table_size, bucket_size, 
 def cuckoo_insert_range(memory, trials, insertion_func, title, figname):
     bucket=[1,2,4,8,16]
     suffix=[1,2,4,8,16,32,64]
-    fill=0.95
+    fill=0.80
+
     inserts=int(memory * fill)
     percentiles=[0.5,0.9,0.99]
     results = get_sized_result_array(bucket, suffix)
 
     for bucket_id in range(len(bucket)):
-        table_size=get_table_size(bucket[bucket_id], memory)
+        table_size = get_table_size(memory, bucket[bucket_id])
         for suffix_id in range(len(suffix)):
-            print("bucket size", bucket[bucket_id], "suffix size", suffix[suffix_id])
-            results[bucket_id][suffix_id]=run_insertion_range_trials(trials, insertion_func, table_size, bucket[bucket_id], inserts, get_locations_bounded, suffix[suffix_id])
+            print("[cuckoo insert range ("+title+")] bucket size", bucket[bucket_id], "suffix size", suffix[suffix_id])
+            results[bucket_id][suffix_id]=run_insertion_range_trials(trials, insertion_func, table_size, bucket[bucket_id], inserts, suffix[suffix_id])
 
     bucket_suffix_cdf(title, figname, results, bucket, suffix)
     percentile_heatmaps(title, figname, percentiles, results, bucket, suffix, reversed=True)
@@ -265,15 +264,13 @@ def bfs_bucket_cuckoo_insert_range(memory, trials):
 
 
 memory=1024
-suffix=8
-bucket_size=8
 trials=1
 
-#size_vs_bound_bucket_cuckoo(memory, trials)
-#size_vs_bound_bfs_bucket_cuckoo(memory, trials)
+size_vs_bound_bucket_cuckoo(memory, trials)
+size_vs_bound_bfs_bucket_cuckoo(memory, trials)
 
 bucket_cuckoo_measure_average_read_size(memory, trials)
-#bfs_cuckoo_measure_average_read_size(memory, trials)
+bfs_cuckoo_measure_average_read_size(memory, trials)
 
-# bucket_cuckoo_insert_range(memory, trials)
-# bfs_bucket_cuckoo_insert_range(memory, trials)
+bucket_cuckoo_insert_range(memory, trials)
+bfs_bucket_cuckoo_insert_range(memory, trials)
