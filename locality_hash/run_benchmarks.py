@@ -264,7 +264,7 @@ def bfs_bucket_cuckoo_insert_range(memory, trials):
 
 
 memory=1024
-trials=1
+trials=16
 
 size_vs_bound_bucket_cuckoo(memory, trials)
 size_vs_bound_bfs_bucket_cuckoo(memory, trials)

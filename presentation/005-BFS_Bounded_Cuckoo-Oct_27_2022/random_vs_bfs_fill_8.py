@@ -7,7 +7,7 @@ import numpy as np
 
 labels = ['1', '2', '4', '8', '16']
 bfs_mean = [0.62,0.81,0.9, 0.93, 0.95]
-dfs_random_mean = [0.53,0.7,0.76,0.85,0.94]
+dfs_random_mean = [0.53,0.62,0.68,0.74,0.83]
 
 x = np.arange(len(labels))  # the label locations
 width = 0.35  # the width of the bars
@@ -19,7 +19,7 @@ rects1 = ax.bar(x + width/2, bfs_mean, width, label='BFS')
 # Add some text for labels, title and custom x-axis tick labels, etc.
 ax.set_ylabel('50th Percentile Fill (before cycle)')
 ax.set_xlabel('Bound Size')
-ax.set_title('Bounded Cuckoo Fill (bucket size 8)- BFS vs Random')
+ax.set_title('BFS vs Random Fill - Bucket Size 8')
 ax.set_xticks(x, labels)
 ax.legend()
 

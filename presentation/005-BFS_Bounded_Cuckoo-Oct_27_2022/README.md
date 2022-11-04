@@ -10,8 +10,13 @@ After completing the BFS algorithm I ran the same fill test that I ran before ru
 
 # Experiments
 
+Memory Size 1024, attempt to insert up to 95% while varying the suffix and
+bucket size. In this experiment I set the depth of bfs to 5. If a solution is
+found at a lower depth, only solutions of that depth are returned. I chose one of the solutions at random here.
 
 ![insert_heatmap](bucket_vs_bound_bfs.png)
+
+Note that the values here are a bit better than when we run at random.
 
 
 

@@ -1,6 +1,7 @@
 import random
 from hash import *
 import numpy as np
+import copy
 
 class entry:
     def __init__(self, key):
@@ -139,6 +140,30 @@ def normalize_path(path, suffix_size, table_size):
                 path[j].bucket_index+=table_size
     return path
 
+def paths_to_ranges(paths, suffix_size, table_size):
+    ranges=[]
+    for path in paths:
+        path=normalize_path(path, suffix_size, table_size)
+        #todo this is a weird patterns, that overloads the path_element class, consider revising.
+        #trim the first element from the path
+        path=path[1:]
+        r = max(path) - min(path)
+        if r >= 0:
+            ranges.append(r)
+    return ranges
+
+def min_range_index(paths, suffix_size, table_size):
+    p2 = copy.deepcopy(paths)
+    ranges = paths_to_ranges(p2, suffix_size, table_size)
+    min_index=0
+    min_range=ranges[0]
+    for i in range(1, len(ranges)-1):
+        if ranges[i] < min_range:
+            min_index=i
+            min_range=ranges[i]
+    return min_index
+
+
 def key_causes_a_path_loop(path, key):
     for pe in path:
         if pe.key == key:
@@ -262,12 +287,14 @@ def bucket_cuckoo_bfs_insert(tables, table_size, location_func, value, bucket_si
     #begin by performing bfs
     #path queue contains all active search paths. This is useful, but not optimal for reconstructing paths.
 
-    insert_paths=bucket_cuckoo_bfs(tables, table_size, location_func, value, bucket_size, suffix, max_depth=5)
+    insert_paths=bucket_cuckoo_bfs(tables, table_size, location_func, value, bucket_size, suffix, max_depth=6)
     if len(insert_paths) == 0:
         return []
 
     #choose a random insert path from the available options 
     insert_path = insert_paths[random.randint(0, len(insert_paths)-1)]
+    #min insert range
+    #insert_path = insert_paths[min_range_index(insert_paths, suffix, table_size)]
     #print("inserting: path:", end='')
     #print_path(insert_path)
 
