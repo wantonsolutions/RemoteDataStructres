@@ -238,22 +238,87 @@ def print_path(path):
 
 def find_closest_target(tables, table_size, location_func, value, bucket_size, suffix):
     index = location_func(value, table_size, suffix)
-    closest_target = -1
+    closest_target_table = -1
+    closest_target_index = -1
     index = index[0]
-    while closest_target == -1:
-        for table in tables:
-            bucket = table[index]
+    while closest_target_index == -1:
+        for table_index in range(len(tables)):
+            bucket = tables[table_index][index]
             for slot in bucket:
                 if slot == None:
-                    closest_target = index
+                    closest_target_index = index
+                    closest_target_table = table_index
                     break
         index = index+1
-    print("Closest Target:" + str(closest_target))
+    print("Closest Target:" + str(closest_target_index) + " " + str(closest_target_table))
+    return closest_target_table, closest_target_index
 
+def heuristic(current_index, current_table, target_index, target_table):
+    distance = abs(current_index - target_index)
+    if current_table != target_table:
+        distance += 1
+    return distance
 
+def fscore(element, target_index, target_table):
+        g_score = element.distance
+        h_score = heuristic(element.pe.bucket_index,element.pe.table_index, target_index, target_table)
+        f_score = g_score + h_score
+        return f_score
+
+def find_lowest_f_score(open_list, target_index, target_table):
+    min_index=0
+    min_fscore=fscore(open_list[min_index], target_index, target_table)
+    for i in range(len(open_list)):
+        f_score = fscore(open_list[i], target_index, target_table)
+        if f_score < min_fscore:
+            min_fscore = f_score
+            min_index = i
+    return min_index, min_fscore
+
+class a_star_pe:
+    def __init__ (self, pe, prior, distance):
+        self.pe = pe
+        self.prior = prior
+        self.distance = distance
 
 def bucket_cuckoo_a_star(tables, table_size, location_func, value, bucket_size, suffix):
-    closest_target = find_closest_target(tables, table_size, location_func, value, bucket_size, suffix)
+    target_table, target_index = find_closest_target(tables, table_size, location_func, value, bucket_size, suffix)
+
+    search_index = location_func(value, table_size, suffix)
+    search_index = search_index[0]
+    search_element = a_star_pe(pe =path_element(value.key, 0, search_index, -1), prior=None, distance=0)
+    open_list = [search_element]
+
+    min_index, min_fscore = find_lowest_f_score(open_list, target_table, target_index)
+    print("Min F Score:" + str(min_fscore)+ " " + str(min_index)+ " " + str(open_list[min_index].pe))
+
+    while min_fscore > 0:
+        break
+        #do the search
+
+    #find the slot
+    for i in range(bucket_size):
+        if tables[search_element.pe.table_index][search_element.pe.bucket_index][i] == None:
+            search_element.pe.bucket_offset = i
+            print(i)
+            print("Found Slot:" + str(search_element.pe))
+            break
+    
+    #construct the path
+    path = []
+    while search_element != None:
+        path.append(search_element.pe)
+        search_element = search_element.prior
+    path.append(path_element(value.key, -1, -1, -1))
+    path=path[::-1]
+
+
+    print_path(path)
+    return [path]
+
+    
+
+
 
 def bucket_cuckoo_a_star_insert(tables, table_size, location_func, value, bucket_size, suffix):
     insert_paths=bucket_cuckoo_a_star(tables, table_size, location_func, value, bucket_size, suffix)
