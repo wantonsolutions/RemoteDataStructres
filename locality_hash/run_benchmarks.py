@@ -121,8 +121,9 @@ def run_bucket_cuckoo_bounded_fill_size(memory, bucket_size, suffix, trials):
     plt.clf()
 
 def get_table_size(memory, bucket_size):
+    assert memory > bucket_size, "Memory must be larger than bucket size" + " memory: " + str(memory) + " bucket_size: " + str(bucket_size)
     table_size=int((memory/2)/bucket_size)
-    assert table_size*bucket_size*2 == memory, "table size: " + str(table_size) + "bucket size: " + str(bucket_size) + "memory: " + str(memory)
+    assert table_size*bucket_size*2 == memory, "table size: " + str(table_size) + " bucket size: " + str(bucket_size) + " memory: " + str(memory)
     return table_size
 
 def run_insertion_fill_trials(trials, insertion_func, table_size, bucket_size, inserts, suffix_size):
@@ -168,7 +169,6 @@ def size_vs_bound(memory, trials, insertion_func, title, figname):
     fill=0.95
 
     fill_results, path_results = fill_and_paths(bucket, suffix, memory, fill, trials, insertion_func, title)
-
     percentile_heatmaps(title+"_fill", figname+"_fill", percentiles, fill_results, bucket, suffix)
     bucket_suffix_cdf(title+"_fill", figname+"_fill", fill_results, bucket, suffix)
     percentile_heatmaps(title+"_path", figname+"_path", percentiles, path_results, bucket, suffix, reversed=True)
@@ -267,11 +267,51 @@ def bucket_cuckoo_insert_range(memory, trials):
 def bfs_bucket_cuckoo_insert_range(memory, trials):
     cuckoo_insert_range(memory, trials, bucket_cuckoo_bfs_insert_only, "Insert Difference BFS Bucket Cuckoo", "bucket_cuckoo_bfs_insert_range")
 
+def plot_memory_results(title, figname, memory, mem_results, bucket, suffix):
+    fig, ax = plt.subplots()
+    for bucket_id in range(len(bucket)):
+        for suffix_id in range(len(suffix)):
+            results = [x[bucket_id][suffix_id] for x in mem_results]
+            ax.plot(memory, results, label="bucket size "+str(bucket[bucket_id])+" suffix size "+str(suffix[suffix_id]))
+
+    ax.set_xlabel("Memory (8 Byte entries)")
+    ax.set_ylabel("Fill")
+    ax.set_title(title)
+    ax.legend()
+    plt.tight_layout()
+    save_figure(figname)
+    plt.clf()
+
+def cuckoo_memory_inserts(trials, insertion_func, title, figname):
+    bucket=[4,8]
+    suffix=[4,8]
+    fill=0.95
+    percentiles=[0.5,0.9,0.99]
+    results = get_sized_result_array(bucket, suffix)
+
+    memory = [ 1 << i for i in range(4, 10)]
+    print(memory)
+    mem_results=[]
+    for m in memory:
+        fill_results, path_results = fill_and_paths(bucket, suffix, m, fill, trials, insertion_func, title)
+        mem_results.append(fill_results)
+
+    plot_memory_results(title, figname, memory, mem_results, bucket, suffix)
+
+def bucket_cuckoo_memory_inserts(trials):
+    cuckoo_memory_inserts(trials, bucket_cuckoo_insert_only, "Bucket Cuckoo Memory", "bucket_cuckoo_memory")
+
+def bfs_bucket_cuckoo_memory_inserts(trials):
+    cuckoo_memory_inserts(trials, bucket_cuckoo_bfs_insert_only, "Bucket Cuckoo BFS Memory", "bucket_cuckoo_bfs_memory")    
+
+
+
+
 
 memory=1024
 trials=1
 
-size_vs_bound_bucket_cuckoo(memory, trials)
+#size_vs_bound_bucket_cuckoo(memory, trials)
 # size_vs_bound_bfs_bucket_cuckoo(memory, trials)
 
 # bucket_cuckoo_measure_average_read_size(memory, trials)
@@ -279,3 +319,6 @@ size_vs_bound_bucket_cuckoo(memory, trials)
 
 # bucket_cuckoo_insert_range(memory, trials)
 # bfs_bucket_cuckoo_insert_range(memory, trials)
+
+bucket_cuckoo_memory_inserts(trials)
+#bfs_bucket_cuckoo_memory_inserts(trials)
