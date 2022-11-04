@@ -9,8 +9,8 @@ from matplotlib.pyplot import cm
 import numpy as np
 
 def save_figure(filename):
-    plt.savefig(filename + ".pdf")
-    plt.savefig(filename + ".png")
+    plt.savefig("fig/" + filename + ".pdf")
+    plt.savefig("fig/" + filename + ".png")
     plt.clf()
 
 def plot_cdf(data, label, color='none'):
@@ -139,20 +139,14 @@ def all_paths_to_path_length(all_paths):
     all_paths_lengths.sort()
     return all_paths_lengths
 
-
-def size_vs_bound(memory, trials, insertion_func, title, figname):
-    bucket=[1,2,4,8,16]
-    suffix=[1,2,4,8,16]
-    percentiles=[0.5, 0.90, 0.99]
+def fill_and_paths(bucket, suffix, memory, fill, trials, insertion_func, title):
+    inserts=int(memory * fill)
     fill_results = get_sized_result_array(bucket, suffix)
     path_results = get_sized_result_array(bucket, suffix)
-    fill=0.95
-    inserts=int(memory * fill)
-
     for bucket_id in range(len(bucket)):
         table_size = get_table_size(memory, bucket[bucket_id])
         for suffix_id in range(len(suffix)):
-            print("[size vs bound ("+title+")] bucket size", bucket[bucket_id], "suffix size", suffix[suffix_id])
+            print("[fill and paths ("+title+")] bucket size", bucket[bucket_id], "suffix size", suffix[suffix_id])
             all_paths=run_insertion_fill_trials(trials, insertion_func, table_size, bucket[bucket_id], inserts, suffix[suffix_id])
 
             # Measure how full each table got before it broke
@@ -163,6 +157,17 @@ def size_vs_bound(memory, trials, insertion_func, title, figname):
 
             #measure the path length
             path_results[bucket_id][suffix_id]=all_paths_to_path_length(all_paths)
+    return fill_results, path_results
+
+def size_vs_bound(memory, trials, insertion_func, title, figname):
+    bucket=[1,2,4,8,16]
+    suffix=[1,2,4,8,16]
+    percentiles=[0.5, 0.90, 0.99]
+    fill_results = get_sized_result_array(bucket, suffix)
+    path_results = get_sized_result_array(bucket, suffix)
+    fill=0.95
+
+    fill_results, path_results = fill_and_paths(bucket, suffix, memory, fill, trials, insertion_func, title)
 
     percentile_heatmaps(title+"_fill", figname+"_fill", percentiles, fill_results, bucket, suffix)
     bucket_suffix_cdf(title+"_fill", figname+"_fill", fill_results, bucket, suffix)
@@ -264,13 +269,13 @@ def bfs_bucket_cuckoo_insert_range(memory, trials):
 
 
 memory=1024
-trials=16
+trials=1
 
 size_vs_bound_bucket_cuckoo(memory, trials)
-size_vs_bound_bfs_bucket_cuckoo(memory, trials)
+# size_vs_bound_bfs_bucket_cuckoo(memory, trials)
 
-bucket_cuckoo_measure_average_read_size(memory, trials)
-bfs_cuckoo_measure_average_read_size(memory, trials)
+# bucket_cuckoo_measure_average_read_size(memory, trials)
+# bfs_cuckoo_measure_average_read_size(memory, trials)
 
-bucket_cuckoo_insert_range(memory, trials)
-bfs_bucket_cuckoo_insert_range(memory, trials)
+# bucket_cuckoo_insert_range(memory, trials)
+# bfs_bucket_cuckoo_insert_range(memory, trials)
