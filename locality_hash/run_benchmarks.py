@@ -55,6 +55,23 @@ def bucket_suffix_cdf(title, figname, results, bucket, suffix):
     save_figure(figname+ "_cdf")
     plt.clf()
 
+def plot_memory_results(title, figname, memory, mem_results, bucket, suffix):
+    fig, ax = plt.subplots()
+    for bucket_id in range(len(bucket)):
+        for suffix_id in range(len(suffix)):
+            results = [np.average(x[bucket_id][suffix_id]) for x in mem_results]
+            std = [np.std(x[bucket_id][suffix_id]) for x in mem_results]
+            ax.errorbar(memory, results, std, label="b-"+str(bucket[bucket_id])+" s-"+str(suffix[suffix_id]))
+
+    ax.set_xlabel("Memory (8 Byte entries)")
+    ax.set_ylabel("Fill")
+    ax.set_title(title)
+    ax.set_xscale('log')
+    ax.legend()
+    plt.tight_layout()
+    save_figure(figname)
+    plt.clf()
+
 def get_percentile_heatmap_results(results, bucket, suffix, percentile):
     heatmap_results=get_sized_result_array(bucket, suffix)
     for bucket_id in range(len(bucket)):
@@ -147,7 +164,7 @@ def fill_and_paths(bucket, suffix, memory, fill, trials, insertion_func, title):
     for bucket_id in range(len(bucket)):
         table_size = get_table_size(memory, bucket[bucket_id])
         for suffix_id in range(len(suffix)):
-            print("[fill and paths ("+title+")] bucket size", bucket[bucket_id], "suffix size", suffix[suffix_id])
+            print("[fill and paths ("+title+")] memory: "+str(memory)+" bucket size:", bucket[bucket_id], " suffix size: ", suffix[suffix_id])
             all_paths=run_insertion_fill_trials(trials, insertion_func, table_size, bucket[bucket_id], inserts, suffix[suffix_id])
 
             # Measure how full each table got before it broke
@@ -267,20 +284,6 @@ def bucket_cuckoo_insert_range(memory, trials):
 def bfs_bucket_cuckoo_insert_range(memory, trials):
     cuckoo_insert_range(memory, trials, bucket_cuckoo_bfs_insert_only, "Insert Difference BFS Bucket Cuckoo", "bucket_cuckoo_bfs_insert_range")
 
-def plot_memory_results(title, figname, memory, mem_results, bucket, suffix):
-    fig, ax = plt.subplots()
-    for bucket_id in range(len(bucket)):
-        for suffix_id in range(len(suffix)):
-            results = [x[bucket_id][suffix_id] for x in mem_results]
-            ax.plot(memory, results, label="bucket size "+str(bucket[bucket_id])+" suffix size "+str(suffix[suffix_id]))
-
-    ax.set_xlabel("Memory (8 Byte entries)")
-    ax.set_ylabel("Fill")
-    ax.set_title(title)
-    ax.legend()
-    plt.tight_layout()
-    save_figure(figname)
-    plt.clf()
 
 def cuckoo_memory_inserts(trials, insertion_func, title, figname):
     bucket=[4,8]
@@ -289,7 +292,7 @@ def cuckoo_memory_inserts(trials, insertion_func, title, figname):
     percentiles=[0.5,0.9,0.99]
     results = get_sized_result_array(bucket, suffix)
 
-    memory = [ 1 << i for i in range(4, 10)]
+    memory = [ 1 << i for i in range(4, 18)]
     print(memory)
     mem_results=[]
     for m in memory:
@@ -309,7 +312,7 @@ def bfs_bucket_cuckoo_memory_inserts(trials):
 
 
 memory=1024
-trials=1
+trials=3
 
 #size_vs_bound_bucket_cuckoo(memory, trials)
 # size_vs_bound_bfs_bucket_cuckoo(memory, trials)
