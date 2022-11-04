@@ -61,7 +61,7 @@ def plot_memory_results(title, figname, memory, mem_results, bucket, suffix):
         for suffix_id in range(len(suffix)):
             results = [np.average(x[bucket_id][suffix_id]) for x in mem_results]
             std = [np.std(x[bucket_id][suffix_id]) for x in mem_results]
-            ax.errorbar(memory, results, std, label="b-"+str(bucket[bucket_id])+" s-"+str(suffix[suffix_id]))
+            ax.errorbar(memory, results, std, label="b-"+str(bucket[bucket_id])+" s-"+str(suffix[suffix_id]), marker='o', capsize=3)
 
     ax.set_xlabel("Memory (8 Byte entries)")
     ax.set_ylabel("Fill")
@@ -286,13 +286,16 @@ def bfs_bucket_cuckoo_insert_range(memory, trials):
 
 
 def cuckoo_memory_inserts(trials, insertion_func, title, figname):
-    bucket=[4,8]
-    suffix=[4,8]
+    # bucket=[4,8]
+    # suffix=[4,8]
+    bucket=[4]
+    suffix=[4]
     fill=0.95
     percentiles=[0.5,0.9,0.99]
     results = get_sized_result_array(bucket, suffix)
 
-    memory = [ 1 << i for i in range(4, 18)]
+    #memory = [ 1 << i for i in range(4, 13)]
+    memory = [128]
     print(memory)
     mem_results=[]
     for m in memory:
@@ -307,12 +310,15 @@ def bucket_cuckoo_memory_inserts(trials):
 def bfs_bucket_cuckoo_memory_inserts(trials):
     cuckoo_memory_inserts(trials, bucket_cuckoo_bfs_insert_only, "Bucket Cuckoo BFS Memory", "bucket_cuckoo_bfs_memory")    
 
+def a_star_bucket_cuckoo_memory_inserts(trials):
+    cuckoo_memory_inserts(trials, bucket_cuckoo_a_star_insert_only, "Bucket Cuckoo A* Memory", "bucket_cuckoo_a_star_memory")
+
 
 
 
 
 memory=1024
-trials=3
+trials=1
 
 #size_vs_bound_bucket_cuckoo(memory, trials)
 # size_vs_bound_bfs_bucket_cuckoo(memory, trials)
@@ -323,5 +329,6 @@ trials=3
 # bucket_cuckoo_insert_range(memory, trials)
 # bfs_bucket_cuckoo_insert_range(memory, trials)
 
-bucket_cuckoo_memory_inserts(trials)
+#bucket_cuckoo_memory_inserts(trials)
 #bfs_bucket_cuckoo_memory_inserts(trials)
+a_star_bucket_cuckoo_memory_inserts(trials)

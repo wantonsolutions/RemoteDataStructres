@@ -236,8 +236,39 @@ def print_path(path):
         print(str(e), end='')
     print("]")
 
+def find_closest_target(tables, table_size, location_func, value, bucket_size, suffix):
+    index = location_func(value, table_size, suffix)
+    closest_target = -1
+    index = index[0]
+    while closest_target == -1:
+        for table in tables:
+            bucket = table[index]
+            for slot in bucket:
+                if slot == None:
+                    closest_target = index
+                    break
+        index = index+1
+    print("Closest Target:" + str(closest_target))
 
-def bucket_cuckoo_bfs(tables, table_size, location_func, value, bucket_size, suffix, max_depth=5):
+
+
+def bucket_cuckoo_a_star(tables, table_size, location_func, value, bucket_size, suffix):
+    closest_target = find_closest_target(tables, table_size, location_func, value, bucket_size, suffix)
+
+def bucket_cuckoo_a_star_insert(tables, table_size, location_func, value, bucket_size, suffix):
+    insert_paths=bucket_cuckoo_a_star(tables, table_size, location_func, value, bucket_size, suffix)
+
+    if len(insert_paths) == 0:
+        print("Failed Insert: " + str(value))
+        print_styled_table(tables[0],tables[1], table_size, bucket_size)
+        return []
+    #select a random path from a star
+    insert_path = insert_paths[random.randint(0, len(insert_paths)-1)]
+    insert_cuckoo_path(insert_path, tables)
+    return insert_path
+
+
+def bucket_cuckoo_bfs(tables, table_size, location_func, value, bucket_size, suffix, max_depth):
     path_queue = []
     pe = path_element(value, -1,-1,-1)
     search_item = [pe]
@@ -252,6 +283,8 @@ def bucket_cuckoo_bfs(tables, table_size, location_func, value, bucket_size, suf
         
         search_path = path_queue.pop(0)
         if len(search_path) >= solution_depth:
+            # print("max len: " + str(solution_depth))
+            # print_path(search_path)
             continue
 
         current_pe = search_path[-1]
@@ -264,13 +297,13 @@ def bucket_cuckoo_bfs(tables, table_size, location_func, value, bucket_size, suf
                 pe = path_element(bucket[i], table_index, index, i)
                 search_path.append(pe)
                 solution_depth = len(search_path)
-                insert_paths.append(search_path.copy())
+                insert_paths.append(copy.deepcopy(search_path))
                 #todo we need to set the depth of the path here
                 break
             else:
                 #found a non empty slot, add to queue
                 pe = path_element(bucket[i], table_index, index, i)
-                tsp = search_path.copy()
+                tsp = copy.deepcopy(search_path)
                 #don't put loops in the bfs tree
                 if not key_causes_a_path_loop(tsp, pe.key):
                     tsp.append(pe)
@@ -287,8 +320,10 @@ def bucket_cuckoo_bfs_insert(tables, table_size, location_func, value, bucket_si
     #begin by performing bfs
     #path queue contains all active search paths. This is useful, but not optimal for reconstructing paths.
 
-    insert_paths=bucket_cuckoo_bfs(tables, table_size, location_func, value, bucket_size, suffix, max_depth=6)
+    insert_paths=bucket_cuckoo_bfs(tables, table_size, location_func, value, bucket_size, suffix, max_depth=8)
     if len(insert_paths) == 0:
+        print("Failed Insert")
+        print_styled_table(tables[0],tables[1], table_size, bucket_size)
         return []
 
     #choose a random insert path from the available options 
@@ -303,6 +338,8 @@ def bucket_cuckoo_bfs_insert(tables, table_size, location_func, value, bucket_si
     #print_styled_table(table_1, table_2, table_size, bucket_size)
 
     return insert_path
+
+
 
 def paths_to_collisions(paths):
     collisions = [None] * len(paths)
@@ -331,6 +368,9 @@ def bucket_cuckoo_bfs_insert_only(table_size, bucket_size, insertions, location_
 
 def bucket_cuckoo_insert_only(table_size, bucket_size, insertions, location_func, suffix):
     return cuckoo_insert_only(bucket_cuckoo_insert, table_size, bucket_size, insertions, location_func, suffix)
+
+def bucket_cuckoo_a_star_insert_only(table_size, bucket_size, insertions, location_func, suffix):
+    return cuckoo_insert_only(bucket_cuckoo_a_star_insert, table_size, bucket_size, insertions, location_func, suffix)
 
 def cuckoo_insert_then_measure_reads(insert_func, table_size, bucket_size, insertions, location_func, suffix):
     tables = generate_cuckoo_tables(table_size, bucket_size)
