@@ -86,11 +86,10 @@ def print_bucket_table(table, table_size, bucket_size):
             #print("Table: " + str(i) + "\tBucket: " + str(j) + "\tValue: " + str(table[i][j]))
         print("")
 
-def print_styled_table(table_1,table_2, table_size, bucket_size):
-    print_bucket_table(table_1, table_size, bucket_size)
-    print("-"*30)
-    print_bucket_table(table_2, table_size, bucket_size)
-    print("-"*30)
+def print_styled_table(tables, table_size, bucket_size):
+    for table in tables:
+        print_bucket_table(table, table_size, bucket_size)
+        print("-"*30)
     print("-"*30)
 
 def generate_cuckoo_table(table_size, bucket_size):
@@ -237,20 +236,31 @@ def print_path(path):
     print("]")
 
 def find_closest_target(tables, table_size, location_func, value, bucket_size, suffix):
-    index = location_func(value, table_size, suffix)
+    index = location_func(value.key, table_size, suffix)
     closest_target_table = -1
     closest_target_index = -1
     index = index[0]
+    found = False
+    # print(value)
+    # print("Search: (0,"+str(index) + ")"+ " Closest Target:("+ str(closest_target_table) + "," + str(closest_target_index)+")")
     while closest_target_index == -1:
         for table_index in range(len(tables)):
+            # print(table_index)
             bucket = tables[table_index][index]
             for slot in bucket:
                 if slot == None:
                     closest_target_index = index
                     closest_target_table = table_index
+                    found=True
                     break
-        index = index+1
-    print("Closest Target:" + str(closest_target_index) + " " + str(closest_target_table))
+            if found:
+                break
+        if found:
+            break
+        index = (index+1) % len(tables[table_index])
+        assert index < table_size, "TODO Implement modulo wrap around in find closest target"
+
+    print("Search: (0,"+str(index) + ")"+ " Closest Target:("+ str(closest_target_table) + "," + str(closest_target_index)+")")
     return closest_target_table, closest_target_index
 
 def heuristic(current_index, current_table, target_index, target_table):
@@ -280,41 +290,113 @@ class a_star_pe:
         self.pe = pe
         self.prior = prior
         self.distance = distance
+    def __str__(self) -> str:
+        return "pe:" + str(self.pe) + " prior:" + str(self.prior) + " distance:" + str(self.distance)
+
+def a_star_pe_in_list(aspe, list):
+    for e in list:
+        if e.pe.key == aspe.pe.key:
+            return True
+    return False
 
 def bucket_cuckoo_a_star(tables, table_size, location_func, value, bucket_size, suffix):
+    print("-"*80)
     target_table, target_index = find_closest_target(tables, table_size, location_func, value, bucket_size, suffix)
 
-    search_index = location_func(value, table_size, suffix)
-    search_index = search_index[0]
-    search_element = a_star_pe(pe =path_element(value.key, 0, search_index, -1), prior=None, distance=0)
+    starting_pe = path_element(value.key, -1, -1, -1)
+    search_element = a_star_pe(starting_pe, prior=None, distance=0)
+
+
+
     open_list = [search_element]
+    closed_list = []
 
-    min_index, min_fscore = find_lowest_f_score(open_list, target_table, target_index)
-    print("Min F Score:" + str(min_fscore)+ " " + str(min_index)+ " " + str(open_list[min_index].pe))
+    found = False
+    while len(open_list) > 0:
+        min_index, min_fscore = find_lowest_f_score(open_list, target_table, target_index)
+        print("Min F Score:" + str(min_fscore)+ " " + str(min_index)+ " " + str(open_list[min_index].pe))
+        search_element = open_list.pop(min_index)#[min_index]
+        closed_list.append(search_element)
+        # print(search_element)
+        search_index = location_func(search_element.pe.key, table_size, suffix)
+        # print(search_index)
+        # print(search_element.pe.key)
+        table_index = next_table_index(search_element.pe.table_index)
+        search_index = search_index[table_index]
 
-    while min_fscore > 0:
-        break
-        #do the search
+        print("Search: ("+str(table_index)+","+str(search_index) + ")"+ " Closest Target:("+ str(target_table) + "," + str(target_index)+")")
 
-    #find the slot
-    for i in range(bucket_size):
-        if tables[search_element.pe.table_index][search_element.pe.bucket_index][i] == None:
-            search_element.pe.bucket_offset = i
-            print(i)
-            print("Found Slot:" + str(search_element.pe))
+
+        #Check if any slots are open for the search element
+        for i in range(bucket_size):
+            #print(tables[table_index][search_index][i])
+            if tables[table_index][search_index][i] == None:
+                #search_element.pe.bucket_offset = i
+                print("Found Slot:" + str(search_element.pe))
+
+                search_element = a_star_pe(pe = path_element(tables[table_index][search_index][i],table_index,search_index,i), prior=search_element, distance=search_element.distance+1)
+                found = True
+                break
+
+        if found:
             break
+        else:
+            print("OH GOD WE ACTUALLY HAVE TO SEARCH")
+
+        #add all the available neighbors to the open list
+        child_list=[]
+        for i in range(bucket_size):
+            neighbor = a_star_pe(pe = path_element(tables[table_index][search_index][i],table_index, search_index, i),prior=search_element, distance=search_element.distance+1)
+            child_list.append(neighbor)
+            print("Neighbor:" + str(neighbor.pe))
+
+        if found:
+            break
+        else:
+            print("OH GOD WE ACTUALLY HAVE TO GO THROUGH THE CHILDREN")
+        
+        for child in child_list:
+            print(child)
+            if a_star_pe_in_list(child, closed_list):
+                continue
+            #update existing open list elements if the new one is better
+            if a_star_pe_in_list(child, open_list):
+                for i in range(len(open_list)):
+                    if open_list[i].pe.key == child.pe.key:
+                        if open_list[i].distance > child.distance:
+                            open_list[i].distance = child.distance
+                            open_list[i].prior = child.prior
+                        break
+                continue
+            open_list.append(child)
+        
+        print("open list ITT end")
+        for e in open_list:
+            print(e)
+
     
     #construct the path
-    path = []
-    while search_element != None:
-        path.append(search_element.pe)
-        search_element = search_element.prior
-    path.append(path_element(value.key, -1, -1, -1))
-    path=path[::-1]
+    if found:
+        print("found")
+        path = []
+        while search_element != None:
+            path.append(search_element.pe)
+            search_element = search_element.prior
+        path=path[::-1]
 
 
-    print_path(path)
-    return [path]
+        print_path(path)
+        return [path]
+    else:
+        print("not found")
+        print("closed list")
+        for e in closed_list:
+            print(e)
+        print("open list")
+        for e in open_list:
+            print(e)
+
+        return[]
 
     
 
@@ -325,7 +407,7 @@ def bucket_cuckoo_a_star_insert(tables, table_size, location_func, value, bucket
 
     if len(insert_paths) == 0:
         print("Failed Insert: " + str(value))
-        print_styled_table(tables[0],tables[1], table_size, bucket_size)
+        print_styled_table(tables, table_size, bucket_size)
         return []
     #select a random path from a star
     insert_path = insert_paths[random.randint(0, len(insert_paths)-1)]
@@ -388,7 +470,7 @@ def bucket_cuckoo_bfs_insert(tables, table_size, location_func, value, bucket_si
     insert_paths=bucket_cuckoo_bfs(tables, table_size, location_func, value, bucket_size, suffix, max_depth=8)
     if len(insert_paths) == 0:
         print("Failed Insert")
-        print_styled_table(tables[0],tables[1], table_size, bucket_size)
+        print_styled_table(tables, table_size, bucket_size)
         return []
 
     #choose a random insert path from the available options 
@@ -424,7 +506,7 @@ def cuckoo_insert_only(insert_func, table_size, bucket_size, insertions, locatio
             break
         paths.append(path)
     #print(len(collisions_per_insert))
-    #print_styled_table(table_1, table_2, table_size, bucket_size)
+    print_styled_table(tables, table_size, bucket_size)
     return paths_to_collisions(paths), paths
 
         
