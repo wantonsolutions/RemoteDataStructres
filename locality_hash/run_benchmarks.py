@@ -288,14 +288,21 @@ def bfs_bucket_cuckoo_insert_range(memory, trials):
 def cuckoo_memory_inserts(trials, insertion_func, title, figname):
     # bucket=[4,8]
     # suffix=[4,8]
-    bucket=[4]
+    # bucket=[4,8]
+    # suffix=[4,8]
+    bucket=[16]
     suffix=[4]
+    # bucket=[1,2,4,8,16]
+    # suffix=[1,2,4,8,16,32,64]
     fill=0.95
     percentiles=[0.5,0.9,0.99]
     results = get_sized_result_array(bucket, suffix)
 
-    #memory = [ 1 << i for i in range(4, 13)]
-    memory = [128]
+    #24 is 8 million entries
+    #20 is 1 million
+    maximum=12
+    memory = [ 1 << i for i in range(5, maximum)]
+    #memory = [128]
     print(memory)
     mem_results=[]
     for m in memory:

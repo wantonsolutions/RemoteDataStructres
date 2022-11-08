@@ -235,15 +235,16 @@ def print_path(path):
         print(str(e), end='')
     print("]")
 
-def find_closest_target(tables, table_size, location_func, value, bucket_size, suffix):
+def find_closest_target_n(tables, table_size, location_func, value, bucket_size, suffix, n):
     index = location_func(value.key, table_size, suffix)
     closest_target_table = -1
     closest_target_index = -1
     index = index[0]
     found = False
+    results=[]
     # print(value)
     # print("Search: (0,"+str(index) + ")"+ " Closest Target:("+ str(closest_target_table) + "," + str(closest_target_index)+")")
-    while closest_target_index == -1:
+    while len(results) < n:
         for table_index in range(len(tables)):
             # print(table_index)
             bucket = tables[table_index][index]
@@ -256,30 +257,34 @@ def find_closest_target(tables, table_size, location_func, value, bucket_size, s
             if found:
                 break
         if found:
-            break
+            results.append((closest_target_table, closest_target_index))
+            found=False
         index = (index+1) % len(tables[table_index])
         assert index < table_size, "TODO Implement modulo wrap around in find closest target"
 
-    print("Search: (0,"+str(index) + ")"+ " Closest Target:("+ str(closest_target_table) + "," + str(closest_target_index)+")")
-    return closest_target_table, closest_target_index
+    # print("Search: (0,"+str(index) + ")"+ " Closest Target:("+ str(closest_target_table) + "," + str(closest_target_index)+")")
+    return results
 
-def heuristic(current_index, current_table, target_index, target_table):
+#todo fix heuristic
+def heuristic(current_index, current_table, target_index, target_table,table_size):
+    if (target_index < current_index):
+        target_index += table_size
     distance = abs(current_index - target_index)
     if current_table != target_table:
         distance += 1
     return distance
 
-def fscore(element, target_index, target_table):
+def fscore(element, target_index, target_table,table_size):
         g_score = element.distance
-        h_score = heuristic(element.pe.bucket_index,element.pe.table_index, target_index, target_table)
+        h_score = heuristic(element.pe.bucket_index,element.pe.table_index, target_index, target_table,table_size)
         f_score = g_score + h_score
         return f_score
 
-def find_lowest_f_score(open_list, target_index, target_table):
+def find_lowest_f_score(open_list, target_index, target_table, table_size):
     min_index=0
-    min_fscore=fscore(open_list[min_index], target_index, target_table)
+    min_fscore=fscore(open_list[min_index], target_index, target_table, table_size)
     for i in range(len(open_list)):
-        f_score = fscore(open_list[i], target_index, target_table)
+        f_score = fscore(open_list[i], target_index, target_table, table_size)
         if f_score < min_fscore:
             min_fscore = f_score
             min_index = i
@@ -299,85 +304,109 @@ def a_star_pe_in_list(aspe, list):
             return True
     return False
 
+def pop_open_list(open_list, open_list_map, target_index, target_table, table_size):
+    min_index, min_fscore = find_lowest_f_score(open_list, target_index, target_table, table_size)
+    # print("Min F Score:" + str(min_fscore)+ " index" + str(min_index)+ " pe" + str(open_list[min_index].pe))
+    # for l in open_list:
+    #     print(l)
+    # print(open_list_map)
+    val = open_list.pop(min_index)
+    # print("Popped:" + str(val))
+    del open_list_map[val.pe.key]
+    return val
+
+def push_open_list(open_list, open_list_map, aspe):
+    open_list.append(aspe)
+    open_list_map[aspe.pe.key] = aspe
+
+def open_list_contains(open_list_map, aspe):
+    return aspe.pe.key in open_list_map
+
+def push_closed_list(closed_list, closed_list_map, aspe):
+    closed_list.append(aspe)
+    closed_list_map[aspe.pe.key] = aspe
+
+def closed_list_contains(closed_list_map, aspe):
+    return aspe.pe.key in closed_list_map
+
 def bucket_cuckoo_a_star(tables, table_size, location_func, value, bucket_size, suffix):
-    print("-"*80)
-    target_table, target_index = find_closest_target(tables, table_size, location_func, value, bucket_size, suffix)
+    # print("-"*80)
+    targets = find_closest_target_n(tables, table_size, location_func, value, bucket_size, suffix, 10)
 
-    starting_pe = path_element(value.key, -1, -1, -1)
-    search_element = a_star_pe(starting_pe, prior=None, distance=0)
+    while (len(targets) > 0):
+        target_table, target_index = targets.pop(0)
+        starting_pe = path_element(value.key, -1, -1, -1)
+        search_element = a_star_pe(starting_pe, prior=None, distance=0)
 
+        open_list = [search_element]
+        closed_list = []
 
+        open_list_map=dict()
+        closed_list_map=dict()
+        open_list_map[search_element.pe.key] = search_element
 
-    open_list = [search_element]
-    closed_list = []
+        found = False
+        while len(open_list) > 0:
+            # min_index, min_fscore = find_lowest_f_score(open_list, target_table, target_index, table_size)
+            # search_element = open_list.pop(min_index)#[min_index]
+            search_element = pop_open_list(open_list, open_list_map, target_table, target_index, table_size)
+            push_closed_list(closed_list, closed_list_map, search_element)
 
-    found = False
-    while len(open_list) > 0:
-        min_index, min_fscore = find_lowest_f_score(open_list, target_table, target_index)
-        print("Min F Score:" + str(min_fscore)+ " " + str(min_index)+ " " + str(open_list[min_index].pe))
-        search_element = open_list.pop(min_index)#[min_index]
-        closed_list.append(search_element)
-        # print(search_element)
-        search_index = location_func(search_element.pe.key, table_size, suffix)
-        # print(search_index)
-        # print(search_element.pe.key)
-        table_index = next_table_index(search_element.pe.table_index)
-        search_index = search_index[table_index]
+            search_index = location_func(search_element.pe.key, table_size, suffix)
+            table_index = next_table_index(search_element.pe.table_index)
+            search_index = search_index[table_index]
 
-        print("Search: ("+str(table_index)+","+str(search_index) + ")"+ " Closest Target:("+ str(target_table) + "," + str(target_index)+")")
+            # print("Search: ("+str(table_index)+","+str(search_index) + ")"+ " Closest Target:("+ str(target_table) + "," + str(target_index)+")")
+            #Check if any slots are open for the search element
+            for i in range(bucket_size):
+                if tables[table_index][search_index][i] == None:
+                    # print("Found Slot:" + str(search_element.pe))
+                    search_element = a_star_pe(pe = path_element(tables[table_index][search_index][i],table_index,search_index,i), prior=search_element, distance=search_element.distance+1)
+                    found = True
+                    break
 
-
-        #Check if any slots are open for the search element
-        for i in range(bucket_size):
-            #print(tables[table_index][search_index][i])
-            if tables[table_index][search_index][i] == None:
-                #search_element.pe.bucket_offset = i
-                print("Found Slot:" + str(search_element.pe))
-
-                search_element = a_star_pe(pe = path_element(tables[table_index][search_index][i],table_index,search_index,i), prior=search_element, distance=search_element.distance+1)
-                found = True
+            if found:
                 break
+            # else:
+            #     # print("OH GOD WE ACTUALLY HAVE TO SEARCH")
 
+            #add all the available neighbors to the open list
+            child_list=[]
+            for i in range(bucket_size):
+                neighbor = a_star_pe(pe = path_element(tables[table_index][search_index][i],table_index, search_index, i),prior=search_element, distance=search_element.distance+1)
+                child_list.append(neighbor)
+            
+            for child in child_list:
+                # print(child)
+                if closed_list_contains(closed_list_map, child):
+                    continue
+                #update existing open list elements if the new one is better
+                if open_list_contains(open_list_map, child):
+                    existing_element = open_list_map[child.pe.key]
+                    if child.distance < existing_element.distance:
+                        existing_element.distance = child.distance
+                        existing_element.prior = child.prior
+                    continue
+                    # for i in range(len(open_list)):
+                    #     if open_list[i].pe.key == child.pe.key:
+                    #         if open_list[i].distance > child.distance:
+                    #             open_list[i].distance = child.distance
+                    #             open_list[i].prior = child.prior
+                    #         break
+                    #continue
+                push_open_list(open_list, open_list_map, child)
+            
+            # print("open list ITT end")
+            # for e in open_list:
+            #     print(e)
+            
         if found:
             break
-        else:
-            print("OH GOD WE ACTUALLY HAVE TO SEARCH")
-
-        #add all the available neighbors to the open list
-        child_list=[]
-        for i in range(bucket_size):
-            neighbor = a_star_pe(pe = path_element(tables[table_index][search_index][i],table_index, search_index, i),prior=search_element, distance=search_element.distance+1)
-            child_list.append(neighbor)
-            print("Neighbor:" + str(neighbor.pe))
-
-        if found:
-            break
-        else:
-            print("OH GOD WE ACTUALLY HAVE TO GO THROUGH THE CHILDREN")
-        
-        for child in child_list:
-            print(child)
-            if a_star_pe_in_list(child, closed_list):
-                continue
-            #update existing open list elements if the new one is better
-            if a_star_pe_in_list(child, open_list):
-                for i in range(len(open_list)):
-                    if open_list[i].pe.key == child.pe.key:
-                        if open_list[i].distance > child.distance:
-                            open_list[i].distance = child.distance
-                            open_list[i].prior = child.prior
-                        break
-                continue
-            open_list.append(child)
-        
-        print("open list ITT end")
-        for e in open_list:
-            print(e)
 
     
     #construct the path
     if found:
-        print("found")
+        # print("found")
         path = []
         while search_element != None:
             path.append(search_element.pe)
@@ -385,16 +414,16 @@ def bucket_cuckoo_a_star(tables, table_size, location_func, value, bucket_size, 
         path=path[::-1]
 
 
-        print_path(path)
+        # print_path(path)
         return [path]
     else:
-        print("not found")
-        print("closed list")
-        for e in closed_list:
-            print(e)
-        print("open list")
-        for e in open_list:
-            print(e)
+        # print("not found")
+        # print("closed list")
+        # for e in closed_list:
+        #     print(e)
+        # print("open list")
+        # for e in open_list:
+        #     print(e)
 
         return[]
 
@@ -406,10 +435,7 @@ def bucket_cuckoo_a_star_insert(tables, table_size, location_func, value, bucket
     insert_paths=bucket_cuckoo_a_star(tables, table_size, location_func, value, bucket_size, suffix)
 
     if len(insert_paths) == 0:
-        print("Failed Insert: " + str(value))
-        print_styled_table(tables, table_size, bucket_size)
         return []
-    #select a random path from a star
     insert_path = insert_paths[random.randint(0, len(insert_paths)-1)]
     insert_cuckoo_path(insert_path, tables)
     return insert_path
@@ -506,7 +532,7 @@ def cuckoo_insert_only(insert_func, table_size, bucket_size, insertions, locatio
             break
         paths.append(path)
     #print(len(collisions_per_insert))
-    print_styled_table(tables, table_size, bucket_size)
+    # print_styled_table(tables, table_size, bucket_size)
     return paths_to_collisions(paths), paths
 
         
