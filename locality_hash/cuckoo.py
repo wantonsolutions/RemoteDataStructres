@@ -2,6 +2,7 @@ import random
 from hash import *
 import numpy as np
 import copy
+import heapq
 
 class entry:
     def __init__(self, key):
@@ -30,7 +31,7 @@ def cuckoo_insert(table, table_size, location_func, location_index, value, suffi
 
     return success, value, loop
             
-def generate_insertions(insertions,deterministic=True):
+def generate_insertions(insertions,deterministic=False):
     if deterministic:
         return np.arange(insertions)
     else:
@@ -274,29 +275,22 @@ def heuristic(current_index, current_table, target_index, target_table,table_siz
         distance += 1
     return distance
 
-def fscore(element, target_index, target_table,table_size):
+def fscore(element, target_index, target_table, table_size):
         g_score = element.distance
         h_score = heuristic(element.pe.bucket_index,element.pe.table_index, target_index, target_table,table_size)
         f_score = g_score + h_score
         return f_score
 
-def find_lowest_f_score(open_list, target_index, target_table, table_size):
-    min_index=0
-    min_fscore=fscore(open_list[min_index], target_index, target_table, table_size)
-    for i in range(len(open_list)):
-        f_score = fscore(open_list[i], target_index, target_table, table_size)
-        if f_score < min_fscore:
-            min_fscore = f_score
-            min_index = i
-    return min_index, min_fscore
-
 class a_star_pe:
-    def __init__ (self, pe, prior, distance):
+    def __init__ (self, pe, prior, distance, score):
         self.pe = pe
         self.prior = prior
         self.distance = distance
+        self.fscore = score
+    def __lt__(self, other):
+        return self.fscore < other.fscore
     def __str__(self) -> str:
-        return "pe:" + str(self.pe) + " prior:" + str(self.prior) + " distance:" + str(self.distance)
+        return "pe:" + str(self.pe) + " prior:" + str(self.prior) + " distance:" + str(self.distance) + "fscore: " + str(self.fscore)
 
 def a_star_pe_in_list(aspe, list):
     for e in list:
@@ -304,26 +298,19 @@ def a_star_pe_in_list(aspe, list):
             return True
     return False
 
-def pop_open_list(open_list, open_list_map, target_index, target_table, table_size):
-    min_index, min_fscore = find_lowest_f_score(open_list, target_index, target_table, table_size)
-    # print("Min F Score:" + str(min_fscore)+ " index" + str(min_index)+ " pe" + str(open_list[min_index].pe))
-    # for l in open_list:
-    #     print(l)
-    # print(open_list_map)
-    val = open_list.pop(min_index)
-    # print("Popped:" + str(val))
+def pop_open_list(open_list, open_list_map):
+    val = heapq.heappop(open_list)
     del open_list_map[val.pe.key]
     return val
 
 def push_open_list(open_list, open_list_map, aspe):
-    open_list.append(aspe)
+    heapq.heappush(open_list,aspe)
     open_list_map[aspe.pe.key] = aspe
 
 def open_list_contains(open_list_map, aspe):
     return aspe.pe.key in open_list_map
 
-def push_closed_list(closed_list, closed_list_map, aspe):
-    closed_list.append(aspe)
+def push_closed_list(closed_list_map, aspe):
     closed_list_map[aspe.pe.key] = aspe
 
 def closed_list_contains(closed_list_map, aspe):
@@ -336,21 +323,20 @@ def bucket_cuckoo_a_star(tables, table_size, location_func, value, bucket_size, 
     while (len(targets) > 0):
         target_table, target_index = targets.pop(0)
         starting_pe = path_element(value.key, -1, -1, -1)
-        search_element = a_star_pe(starting_pe, prior=None, distance=0)
+        search_element = a_star_pe(starting_pe, prior=None, distance=0, score=0)
 
-        open_list = [search_element]
-        closed_list = []
-
+        open_list = []
         open_list_map=dict()
+        push_open_list(open_list, open_list_map, search_element)
+
         closed_list_map=dict()
-        open_list_map[search_element.pe.key] = search_element
 
         found = False
         while len(open_list) > 0:
             # min_index, min_fscore = find_lowest_f_score(open_list, target_table, target_index, table_size)
             # search_element = open_list.pop(min_index)#[min_index]
-            search_element = pop_open_list(open_list, open_list_map, target_table, target_index, table_size)
-            push_closed_list(closed_list, closed_list_map, search_element)
+            search_element = pop_open_list(open_list, open_list_map)
+            push_closed_list(closed_list_map, search_element)
 
             search_index = location_func(search_element.pe.key, table_size, suffix)
             table_index = next_table_index(search_element.pe.table_index)
@@ -361,23 +347,26 @@ def bucket_cuckoo_a_star(tables, table_size, location_func, value, bucket_size, 
             for i in range(bucket_size):
                 if tables[table_index][search_index][i] == None:
                     # print("Found Slot:" + str(search_element.pe))
-                    search_element = a_star_pe(pe = path_element(tables[table_index][search_index][i],table_index,search_index,i), prior=search_element, distance=search_element.distance+1)
+                    search_element = a_star_pe(pe = path_element(tables[table_index][search_index][i],table_index,search_index,i), prior=search_element, distance=search_element.distance+1, score=0)
+                    f_score = fscore(search_element, target_index, target_table, table_size)
+                    search_element.fscore = f_score
+
                     found = True
                     break
 
             if found:
                 break
-            # else:
-            #     # print("OH GOD WE ACTUALLY HAVE TO SEARCH")
+
 
             #add all the available neighbors to the open list
             child_list=[]
             for i in range(bucket_size):
-                neighbor = a_star_pe(pe = path_element(tables[table_index][search_index][i],table_index, search_index, i),prior=search_element, distance=search_element.distance+1)
+                neighbor = a_star_pe(pe = path_element(tables[table_index][search_index][i],table_index, search_index, i),prior=search_element, distance=search_element.distance+1, score=0)
+                f_score = fscore(neighbor, target_index, target_table, table_size)
+                neighbor.fscore = f_score
                 child_list.append(neighbor)
             
             for child in child_list:
-                # print(child)
                 if closed_list_contains(closed_list_map, child):
                     continue
                 #update existing open list elements if the new one is better
@@ -385,20 +374,13 @@ def bucket_cuckoo_a_star(tables, table_size, location_func, value, bucket_size, 
                     existing_element = open_list_map[child.pe.key]
                     if child.distance < existing_element.distance:
                         existing_element.distance = child.distance
-                        existing_element.prior = child.prior
+                        existing_element.prior = child.priorA
+                        f_score = fscore(existing_element, target_index, target_table, table_size)
+                        existing_element.fscore = f_score
+
                     continue
-                    # for i in range(len(open_list)):
-                    #     if open_list[i].pe.key == child.pe.key:
-                    #         if open_list[i].distance > child.distance:
-                    #             open_list[i].distance = child.distance
-                    #             open_list[i].prior = child.prior
-                    #         break
-                    #continue
                 push_open_list(open_list, open_list_map, child)
             
-            # print("open list ITT end")
-            # for e in open_list:
-            #     print(e)
             
         if found:
             break
@@ -424,6 +406,8 @@ def bucket_cuckoo_a_star(tables, table_size, location_func, value, bucket_size, 
         # print("open list")
         # for e in open_list:
         #     print(e)
+        search_index = location_func(value, table_size, suffix)[0]
+        print("FAILED TO INSERT VALUE " + str(value.key) + " into index " + str(search_index))
 
         return[]
 
@@ -529,11 +513,14 @@ def cuckoo_insert_only(insert_func, table_size, bucket_size, insertions, locatio
         v=entry(v)
         path = insert_func(tables, table_size, location_func, v, bucket_size, suffix)
         if path == []:
+            # paths.append([v])
+            # print("this is why we can't have nice things")
+            # print(v)
             break
         paths.append(path)
     #print(len(collisions_per_insert))
     # print_styled_table(tables, table_size, bucket_size)
-    return paths_to_collisions(paths), paths
+    return paths_to_collisions(paths), paths, tables
 
         
 def bucket_cuckoo_bfs_insert_only(table_size, bucket_size, insertions, location_func, suffix):

@@ -60,14 +60,45 @@ def plot_memory_results(title, figname, memory, mem_results, bucket, suffix):
     for bucket_id in range(len(bucket)):
         for suffix_id in range(len(suffix)):
             results = [np.average(x[bucket_id][suffix_id]) for x in mem_results]
+            label_str="b-"+str(bucket[bucket_id])+"_s-"+str(suffix[suffix_id])
             std = [np.std(x[bucket_id][suffix_id]) for x in mem_results]
-            ax.errorbar(memory, results, std, label="b-"+str(bucket[bucket_id])+" s-"+str(suffix[suffix_id]), marker='o', capsize=3)
+            print(label_str + "_fill=" + str(results))
+            print(label_str + "_x=" + str(memory))
+            print(label_str + "_std=" + str(std))
+            ax.errorbar(memory, results, std, label=label_str, marker='o', capsize=3)
 
     ax.set_xlabel("Memory (8 Byte entries)")
     ax.set_ylabel("Fill")
     ax.set_title(title)
     ax.set_xscale('log')
     ax.legend()
+    plt.tight_layout()
+    save_figure(figname)
+    plt.clf()
+
+def plot_table_fills(title, figname, memory, table_results, bucket, suffix):
+    print(len(table_results))
+    fig, axs = plt.subplots(len(table_results)+1)
+    print(len(axs))
+    counter=0
+    for bucket_id in range(len(bucket)):
+        for suffix_id in range(len(suffix)):
+
+            table_refs = table_results[bucket_id][suffix_id]
+            table_refs = table_refs[0]
+            print(table_refs)
+            axs[counter].bar(np.arange(len(table_refs)),table_refs)
+            axs[counter].set_xlabel("Memory (8 Byte entries)")
+            axs[counter].set_ylabel("Fill")
+            axs[counter].set_title(title)
+            # axs[counter].set_xscale('log')
+            axs[counter].legend()
+            counter+=1
+            # results = [np.average(x[bucket_id][suffix_id]) for x in mem_results]
+            # std = [np.std(x[bucket_id][suffix_id]) for x in mem_results]
+            # ax.errorbar(memory, results, std, label="b-"+str(bucket[bucket_id])+" s-"+str(suffix[suffix_id]), marker='o', capsize=3)
+
+    
     plt.tight_layout()
     save_figure(figname)
     plt.clf()
@@ -146,9 +177,43 @@ def get_table_size(memory, bucket_size):
 def run_insertion_fill_trials(trials, insertion_func, table_size, bucket_size, inserts, suffix_size):
     all_results=[]
     for i in range(trials):
-        collisions, paths = insertion_func(table_size, bucket_size, inserts, get_locations_bounded, suffix_size)
+        collisions, paths, _ = insertion_func(table_size, bucket_size, inserts, get_locations_bounded, suffix_size)
         all_results.append(paths)
     return all_results
+
+def run_table_density_trials(trials, insertion_func, table_size, bucket_size, inserts, suffix_size):
+    all_results=[]
+    for i in range(trials):
+        _, paths, table = insertion_func(table_size, bucket_size, inserts, get_locations_bounded, suffix_size)
+        all_results.append(table)
+    return all_results
+
+def fill_table(bucket, suffix, memory, fill, trials, insertion_func, title):
+    inserts=int(memory * fill)
+    table_results = get_sized_result_array(bucket, suffix)
+    for bucket_id in range(len(bucket)):
+        table_size = get_table_size(memory, bucket[bucket_id])
+        for suffix_id in range(len(suffix)):
+            print("[table fill ("+title+")] memory: "+str(memory)+" bucket size:", bucket[bucket_id], " suffix size: ", suffix[suffix_id])
+            all_tables=run_table_density_trials(trials, insertion_func, table_size, bucket[bucket_id], inserts, suffix[suffix_id])
+            #todo average aross tables?
+            assert len(all_tables) == trials, "all tables: " + str(len(all_tables)) + " trials: " + str(trials) + "mismatch here something is wrong"
+            tables = all_tables[0]
+
+            #print_styled_table(tables, table_size, suffix[suffix_id])
+
+            table_ref = [0] * len(tables[0])
+            for bucket in tables[0]:
+                for value in bucket:
+                    search_index = get_locations_bounded(value, table_size, suffix[suffix_id])
+                    # table_index = 1
+                    # search_index = search_index[table_index]
+                    table_ref[search_index[1]] += 1
+                    table_ref[search_index[0]] += 1
+            table_results[bucket_id][suffix_id]=table_ref
+    return table_results
+
+
 
 def all_paths_to_path_length(all_paths):
     all_paths_lengths=[]
@@ -253,7 +318,7 @@ def run_insertion_range_trials(trials, insertion_func, table_size, bucket_size, 
     all_results=[]
     entry_size=8
     for i in range(trials):
-        collisions, paths = insertion_func(table_size, bucket_size, inserts, get_locations_bounded, suffix_size)
+        collisions, paths, _ = insertion_func(table_size, bucket_size, inserts, get_locations_bounded, suffix_size)
         ranges= paths_to_ranges(paths, suffix_size,table_size)
         ranges = [calculate_read_size(x, bucket_size, entry_size) for x in ranges]
         all_results.extend(ranges)
@@ -286,22 +351,22 @@ def bfs_bucket_cuckoo_insert_range(memory, trials):
 
 
 def cuckoo_memory_inserts(trials, insertion_func, title, figname):
-    # bucket=[4,8]
-    # suffix=[4,8]
-    # bucket=[4,8]
-    # suffix=[4,8]
-    bucket=[16]
-    suffix=[4]
-    # bucket=[1,2,4,8,16]
-    # suffix=[1,2,4,8,16,32,64]
+    # bucket=[16,32]
+    # suffix=[4,8,16]
+    # bucket=[16]
+    # suffix=[16]
+
+    bucket=[16,32]
+    suffix=[4,8,16]
+
     fill=0.95
     percentiles=[0.5,0.9,0.99]
     results = get_sized_result_array(bucket, suffix)
 
     #24 is 8 million entries
     #20 is 1 million
-    maximum=12
-    memory = [ 1 << i for i in range(5, maximum)]
+    maximum=21
+    memory = [ 1 << i for i in range(20, maximum)]
     #memory = [128]
     print(memory)
     mem_results=[]
@@ -319,6 +384,31 @@ def bfs_bucket_cuckoo_memory_inserts(trials):
 
 def a_star_bucket_cuckoo_memory_inserts(trials):
     cuckoo_memory_inserts(trials, bucket_cuckoo_a_star_insert_only, "Bucket Cuckoo A* Memory", "bucket_cuckoo_a_star_memory")
+
+def cuckoo_table_density(trials, insertion_func, title, figname):
+    bucket=[16]
+    suffix=[16]
+    percentiles=[0.5,0.9,0.99]
+    results = get_sized_result_array(bucket, suffix)
+
+    #24 is 8 million entries
+    #20 is 1 million
+    # maximum=18
+    # memory = [ 1 << i for i in range(6, maximum)]
+
+    memory = [1024]
+    print(memory)
+    table_results=[]
+    for m in memory:
+        table_fills = fill_table(bucket, suffix, m, 0.95, trials, insertion_func, title)
+        table_results.append(table_fills)
+
+    
+
+    plot_table_fills(title, figname, memory, table_results, bucket, suffix)
+
+def a_star_bucket_cuckoo_table_density(trials):
+    cuckoo_table_density(trials, bucket_cuckoo_a_star_insert_only, "Bucket Cuckoo A* Table Density", "bucket_cuckoo_a_star_table_density")
 
 
 
@@ -338,4 +428,6 @@ trials=1
 
 #bucket_cuckoo_memory_inserts(trials)
 #bfs_bucket_cuckoo_memory_inserts(trials)
-a_star_bucket_cuckoo_memory_inserts(trials)
+#a_star_bucket_cuckoo_memory_inserts(trials)
+
+a_star_bucket_cuckoo_table_density(trials)
