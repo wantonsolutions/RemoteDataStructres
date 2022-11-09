@@ -263,6 +263,9 @@ def size_vs_bound_bucket_cuckoo(memory,trials):
 def size_vs_bound_bfs_bucket_cuckoo(memory,trials):
     size_vs_bound(memory, trials, bucket_cuckoo_bfs_insert_only, "Bucket Size vs Bound BFS", "bucket_vs_bound_bfs")
 
+def size_vs_bound_a_star_bucket_cuckoo(memory,trials):
+    size_vs_bound(memory, trials, bucket_cuckoo_a_star_insert_only, "Bucket Cuckoo A* Bound", "bucket_vs_bound_a_star")
+
 def calculate_read_size(distance, bucket_size, entry_size):
     return (bucket_size * entry_size * 2) * (1 + distance)
 
@@ -356,17 +359,18 @@ def cuckoo_memory_inserts(trials, insertion_func, title, figname):
     # bucket=[16]
     # suffix=[16]
 
-    bucket=[16,32]
-    suffix=[4,8,16]
+    bucket=[16]
+    suffix=[8]
 
     fill=0.95
     percentiles=[0.5,0.9,0.99]
     results = get_sized_result_array(bucket, suffix)
 
     #24 is 8 million entries
-    #20 is 1 million
-    maximum=21
-    memory = [ 1 << i for i in range(20, maximum)]
+    #21 is 1 million
+    maximum=20
+    minimum=5
+    memory = [ 1 << i for i in range(minimum, maximum)]
     #memory = [128]
     print(memory)
     mem_results=[]
@@ -414,11 +418,12 @@ def a_star_bucket_cuckoo_table_density(trials):
 
 
 
-memory=1024
-trials=1
+memory=1024 * 64
+trials=4
 
-#size_vs_bound_bucket_cuckoo(memory, trials)
+# size_vs_bound_bucket_cuckoo(memory, trials)
 # size_vs_bound_bfs_bucket_cuckoo(memory, trials)
+#size_vs_bound_a_star_bucket_cuckoo(memory,trials)
 
 # bucket_cuckoo_measure_average_read_size(memory, trials)
 # bfs_cuckoo_measure_average_read_size(memory, trials)
@@ -426,8 +431,8 @@ trials=1
 # bucket_cuckoo_insert_range(memory, trials)
 # bfs_bucket_cuckoo_insert_range(memory, trials)
 
-#bucket_cuckoo_memory_inserts(trials)
-#bfs_bucket_cuckoo_memory_inserts(trials)
-#a_star_bucket_cuckoo_memory_inserts(trials)
+# bucket_cuckoo_memory_inserts(trials)
+# bfs_bucket_cuckoo_memory_inserts(trials)
+a_star_bucket_cuckoo_memory_inserts(trials)
 
-a_star_bucket_cuckoo_table_density(trials)
+#a_star_bucket_cuckoo_table_density(trials)

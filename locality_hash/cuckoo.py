@@ -236,38 +236,50 @@ def print_path(path):
         print(str(e), end='')
     print("]")
 
+def bucket_has_empty(bucket):
+    for slot in bucket:
+        if slot == None:
+            return True
+
 def find_closest_target_n(tables, table_size, location_func, value, bucket_size, suffix, n):
     index = location_func(value.key, table_size, suffix)
-    closest_target_table = -1
-    closest_target_index = -1
     index = index[0]
-    found = False
     results=[]
-    # print(value)
-    # print("Search: (0,"+str(index) + ")"+ " Closest Target:("+ str(closest_target_table) + "," + str(closest_target_index)+")")
     while len(results) < n:
         for table_index in range(len(tables)):
-            # print(table_index)
             bucket = tables[table_index][index]
-            for slot in bucket:
-                if slot == None:
-                    closest_target_index = index
-                    closest_target_table = table_index
-                    found=True
-                    break
-            if found:
-                break
-        if found:
-            results.append((closest_target_table, closest_target_index))
-            found=False
+            if bucket_has_empty(bucket):
+                results.append((table_index, index))
         index = (index+1) % len(tables[table_index])
         assert index < table_size, "TODO Implement modulo wrap around in find closest target"
+    return results
 
-    # print("Search: (0,"+str(index) + ")"+ " Closest Target:("+ str(closest_target_table) + "," + str(closest_target_index)+")")
+def find_closest_target_n_bi(tables, table_size, location_func, value, bucket_size, suffix, n):
+    index = location_func(value.key, table_size, suffix)
+    index_1 = index[0]
+    index_2 = index[0] - 1
+    if index_2 < 0:
+        index_2 = table_size - 1
+    
+    results=[]
+    while len(results) < n:
+        for table_index in range(len(tables)):
+            bucket = tables[table_index][index_1]
+            if bucket_has_empty(bucket):
+                results.append((table_index, index_1))
+            bucket = tables[table_index][index_2]
+            if bucket_has_empty(bucket):
+                results.append((table_index, index_2))
+        index_1 = (index_1+1) % len(tables[table_index])
+        index_2 = (index_2-1)
+        if index_2 < 0:
+            index_2 = table_size - 1
+        assert index_1 < table_size, "TODO Implement modulo wrap around in find closest target"
+        assert index_2 < table_size and index_2 >= 0, "TODO something wrong with look back index"
     return results
 
 #todo fix heuristic
-def heuristic(current_index, current_table, target_index, target_table,table_size):
+def heuristic(current_index, current_table, target_index, target_table, table_size, suffix_size):
     if (target_index < current_index):
         target_index += table_size
     distance = abs(current_index - target_index)
@@ -275,9 +287,44 @@ def heuristic(current_index, current_table, target_index, target_table,table_siz
         distance += 1
     return distance
 
-def fscore(element, target_index, target_table, table_size):
+def heuristic_2(current_index, current_table, target_index, target_table,table_size, suffix_size):
+    if (target_index == current_index and current_table == target_table):
+        return 0
+    # if we are on the first table
+
+    #distance between indexes is target - current max travel distance per hash
+    #step is suffix size - 1 Given that we already handled the 0 distance case
+    #we add 1 because if we have to move, it is at least one step multiply by
+    #two because if we stay in the same table it takes 2 steps. For each shuffle
+
+    distance = (((target_index - current_index) / (suffix_size - 1))+1) * 2
+
+    #we only need to make a correction if the tables are not the same, otherwise the step direction does not matter
+    if (target_table != current_table):
+        #the table we are in determines the number of shuffles.
+        #table 1 moves backwards more easily, while table 0 moves forward more easily (by one step)
+        #travel direction is the -1 or +1 move depending on what table we are in
+        travel_direction = 1
+        if (current_table == 1):
+            travel_direction *= -1
+
+        #we need to know what direction we are traveling in, as stated before, if we
+        #are moving forward distance > 0 than table 1 will have a -1 step advantage
+        #over table 2 and vice versa.
+        if (distance > 0):
+            travel_direction *= -1
+        
+        distance += travel_direction
+    
+    return distance
+
+
+
+
+def fscore(element, target_index, target_table, table_size, suffix_size):
         g_score = element.distance
-        h_score = heuristic(element.pe.bucket_index,element.pe.table_index, target_index, target_table,table_size)
+        #h_score = heuristic(element.pe.bucket_index,element.pe.table_index, target_index, target_table,table_size, suffix_size)
+        h_score = heuristic_2(element.pe.bucket_index,element.pe.table_index, target_index, target_table,table_size, suffix_size)
         f_score = g_score + h_score
         return f_score
 
@@ -318,7 +365,9 @@ def closed_list_contains(closed_list_map, aspe):
 
 def bucket_cuckoo_a_star(tables, table_size, location_func, value, bucket_size, suffix):
     # print("-"*80)
-    targets = find_closest_target_n(tables, table_size, location_func, value, bucket_size, suffix, 10)
+    #targets = find_closest_target_n(tables, table_size, location_func, value, bucket_size, suffix, 10)
+    targets = find_closest_target_n_bi(tables, table_size, location_func, value, bucket_size, suffix, 20)
+    #print(targets)
 
     while (len(targets) > 0):
         target_table, target_index = targets.pop(0)
@@ -348,7 +397,7 @@ def bucket_cuckoo_a_star(tables, table_size, location_func, value, bucket_size, 
                 if tables[table_index][search_index][i] == None:
                     # print("Found Slot:" + str(search_element.pe))
                     search_element = a_star_pe(pe = path_element(tables[table_index][search_index][i],table_index,search_index,i), prior=search_element, distance=search_element.distance+1, score=0)
-                    f_score = fscore(search_element, target_index, target_table, table_size)
+                    f_score = fscore(search_element, target_index, target_table, table_size, suffix)
                     search_element.fscore = f_score
 
                     found = True
@@ -362,7 +411,7 @@ def bucket_cuckoo_a_star(tables, table_size, location_func, value, bucket_size, 
             child_list=[]
             for i in range(bucket_size):
                 neighbor = a_star_pe(pe = path_element(tables[table_index][search_index][i],table_index, search_index, i),prior=search_element, distance=search_element.distance+1, score=0)
-                f_score = fscore(neighbor, target_index, target_table, table_size)
+                f_score = fscore(neighbor, target_index, target_table, table_size, suffix)
                 neighbor.fscore = f_score
                 child_list.append(neighbor)
             
@@ -374,8 +423,8 @@ def bucket_cuckoo_a_star(tables, table_size, location_func, value, bucket_size, 
                     existing_element = open_list_map[child.pe.key]
                     if child.distance < existing_element.distance:
                         existing_element.distance = child.distance
-                        existing_element.prior = child.priorA
-                        f_score = fscore(existing_element, target_index, target_table, table_size)
+                        existing_element.prior = child.prior
+                        f_score = fscore(existing_element, target_index, target_table, table_size, suffix)
                         existing_element.fscore = f_score
 
                     continue
@@ -407,7 +456,7 @@ def bucket_cuckoo_a_star(tables, table_size, location_func, value, bucket_size, 
         # for e in open_list:
         #     print(e)
         search_index = location_func(value, table_size, suffix)[0]
-        print("FAILED TO INSERT VALUE " + str(value.key) + " into index " + str(search_index))
+        #print("FAILED TO INSERT VALUE " + str(value.key) + " into index " + str(search_index))
 
         return[]
 
@@ -479,8 +528,8 @@ def bucket_cuckoo_bfs_insert(tables, table_size, location_func, value, bucket_si
 
     insert_paths=bucket_cuckoo_bfs(tables, table_size, location_func, value, bucket_size, suffix, max_depth=8)
     if len(insert_paths) == 0:
-        print("Failed Insert")
-        print_styled_table(tables, table_size, bucket_size)
+        #print("Failed Insert")
+        #print_styled_table(tables, table_size, bucket_size)
         return []
 
     #choose a random insert path from the available options 
@@ -513,13 +562,11 @@ def cuckoo_insert_only(insert_func, table_size, bucket_size, insertions, locatio
         v=entry(v)
         path = insert_func(tables, table_size, location_func, v, bucket_size, suffix)
         if path == []:
-            # paths.append([v])
-            # print("this is why we can't have nice things")
-            # print(v)
             break
         paths.append(path)
     #print(len(collisions_per_insert))
     # print_styled_table(tables, table_size, bucket_size)
+    print("Fill: " + str(round(len(paths)/len(values), 2)))
     return paths_to_collisions(paths), paths, tables
 
         
