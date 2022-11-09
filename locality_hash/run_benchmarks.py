@@ -359,8 +359,8 @@ def cuckoo_memory_inserts(trials, insertion_func, title, figname):
     # bucket=[16]
     # suffix=[16]
 
-    bucket=[16]
-    suffix=[8]
+    bucket=[64]
+    suffix=[2]
 
     fill=0.95
     percentiles=[0.5,0.9,0.99]
@@ -368,8 +368,8 @@ def cuckoo_memory_inserts(trials, insertion_func, title, figname):
 
     #24 is 8 million entries
     #21 is 1 million
-    maximum=20
-    minimum=5
+    maximum=18
+    minimum=7
     memory = [ 1 << i for i in range(minimum, maximum)]
     #memory = [128]
     print(memory)
@@ -419,7 +419,7 @@ def a_star_bucket_cuckoo_table_density(trials):
 
 
 memory=1024 * 64
-trials=4
+trials=1
 
 # size_vs_bound_bucket_cuckoo(memory, trials)
 # size_vs_bound_bfs_bucket_cuckoo(memory, trials)

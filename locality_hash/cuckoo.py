@@ -3,6 +3,7 @@ from hash import *
 import numpy as np
 import copy
 import heapq
+from tqdm import tqdm
 
 class entry:
     def __init__(self, key):
@@ -558,7 +559,7 @@ def cuckoo_insert_only(insert_func, table_size, bucket_size, insertions, locatio
     paths = []
     values=generate_insertions(insertions)
 
-    for v in values:
+    for v in tqdm(values, leave=False):
         v=entry(v)
         path = insert_func(tables, table_size, location_func, v, bucket_size, suffix)
         if path == []:
