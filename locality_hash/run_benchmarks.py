@@ -117,6 +117,52 @@ def label_percentile_heatmap(heatmap_results, bucket, suffix, percentile):
             result_value=round(result_value,2)
             text = plt.text(j, i, str(result_value),ha="center", va="center", color="b")
 
+def normalize_distance(location_1, location_2, table_size):
+    if location_1 > location_2:
+        location_2  += table_size
+    return location_2 - location_1
+
+def visualize_distance(tables, suffix_size):
+    dtables=[]
+    zero = -5
+    minimum=1 << 32
+    maximum=zero
+    for table_index in range(len(tables)):
+        distance=copy.deepcopy(tables[table_index])
+        for i in range(len(distance)):
+            for j in range(len(distance[i])):
+                if distance[i][j] == None:
+                    distance[i][j] = zero
+                else:
+                    d = get_locations_bounded(distance[i][j], len(distance), suffix_size)
+                    d = normalize_distance(d[0], d[1], len(distance))
+                    distance[i][j] = d
+                if distance[i][j] < minimum:
+                    minimum = distance[i][j]
+                elif distance[i][j] > maximum:
+                    maximum = distance[i][j]
+        dtables.append(distance)
+    
+    fig, axs = plt.subplots(nrows=1, ncols=len(dtables))
+    for i in range(len(dtables)):
+        im = axs[i].imshow(dtables[i], cmap="hot_r", vmin=minimum, vmax=maximum)
+        #if i == len(dtables)-1:
+        fig.colorbar(im, ax=axs[i])
+        axs[i].set_title("Table "+str(i))
+        axs[i].set_xlabel("bucket id")
+        axs[i].set_ylabel("index")
+
+    plt.tight_layout()
+    save_figure("debug_distance.pdf")
+    plt.clf()
+
+
+def visualize_table(tables, suffix_size, options):
+    if options["print_table"]:    
+        print_styled_table(tables, len(tables[0]), len(tables[0][0]))
+    if options["distance"]:
+        visualize_distance(tables, suffix_size)
+
 def percentile_heatmaps(title, figname, percentiles, results, bucket, suffix, reversed=False):
     for percentile in percentiles:
         percentile_heatmap = get_percentile_heatmap_results(results, bucket, suffix, percentile)
@@ -201,6 +247,9 @@ def fill_table(bucket, suffix, memory, fill, trials, insertion_func, title):
             tables = all_tables[0]
 
             #print_styled_table(tables, table_size, suffix[suffix_id])
+            #print_styled_table(tables, table_size, suffix[suffix_id])
+            options={"print_table":False, "distance":True}
+            visualize_table(tables,suffix[suffix_id],options)
 
             table_ref = [0] * len(tables[0])
             for bucket in tables[0]:
@@ -243,8 +292,8 @@ def fill_and_paths(bucket, suffix, memory, fill, trials, insertion_func, title):
     return fill_results, path_results
 
 def size_vs_bound(memory, trials, insertion_func, title, figname):
-    bucket=[1,2,4,8,16]
-    suffix=[1,2,4,8,16]
+    bucket=[1,2,4,8]
+    suffix=[1,2,3,4]
     percentiles=[0.5, 0.90, 0.99]
     fill_results = get_sized_result_array(bucket, suffix)
     path_results = get_sized_result_array(bucket, suffix)
@@ -359,8 +408,8 @@ def cuckoo_memory_inserts(trials, insertion_func, title, figname):
     # bucket=[16]
     # suffix=[16]
 
-    bucket=[64]
-    suffix=[2]
+    bucket=[8]
+    suffix=[3]
 
     fill=0.95
     percentiles=[0.5,0.9,0.99]
@@ -368,7 +417,7 @@ def cuckoo_memory_inserts(trials, insertion_func, title, figname):
 
     #24 is 8 million entries
     #21 is 1 million
-    maximum=18
+    maximum=21
     minimum=7
     memory = [ 1 << i for i in range(minimum, maximum)]
     #memory = [128]
@@ -390,8 +439,8 @@ def a_star_bucket_cuckoo_memory_inserts(trials):
     cuckoo_memory_inserts(trials, bucket_cuckoo_a_star_insert_only, "Bucket Cuckoo A* Memory", "bucket_cuckoo_a_star_memory")
 
 def cuckoo_table_density(trials, insertion_func, title, figname):
-    bucket=[16]
-    suffix=[16]
+    bucket=[32]
+    suffix=[4]
     percentiles=[0.5,0.9,0.99]
     results = get_sized_result_array(bucket, suffix)
 
@@ -400,7 +449,7 @@ def cuckoo_table_density(trials, insertion_func, title, figname):
     # maximum=18
     # memory = [ 1 << i for i in range(6, maximum)]
 
-    memory = [1024]
+    memory = [1024 * 16]
     print(memory)
     table_results=[]
     for m in memory:
@@ -414,15 +463,62 @@ def cuckoo_table_density(trials, insertion_func, title, figname):
 def a_star_bucket_cuckoo_table_density(trials):
     cuckoo_table_density(trials, bucket_cuckoo_a_star_insert_only, "Bucket Cuckoo A* Table Density", "bucket_cuckoo_a_star_table_density")
 
+def bfs_bucket_cuckoo_table_density(trials):
+    cuckoo_table_density(trials, bucket_cuckoo_bfs_insert_only, "Bucket Cuckoo A* Table Density", "bucket_cuckoo_a_star_table_density")
+
+def plot_hash_distribution(title, figname, suffix, results):
+    fig, ax = plt.subplots()
+    for r, s in zip(reversed(results), reversed(suffix)):
+        hist = dict()
+        print("suffix: "+str(s)+" Average: "+str(np.average(r)), " Median: "+str(np.median(r)))
+        for x in r:
+            hist[x] = hist.get(x, 0) + 1
+        hist = sorted(hist.items())
+        #print("suffix", s, "x", [x[0] for x in hist], "y", [x[1] for x in hist])
+        x, y = zip(*hist)
+        y = list(y)
+        sy= sum(y)
+        y = [x / sy for x in y]
+        ax.plot(x, y, label="suffix size "+str(s))
+        #ax.hist(r, bins=1000, label="suffix size "+str(s))
+    ax.set(xlabel='hash distance', ylabel='count (normalized)', title=title)
+    ax.set_xscale('log', base=2)
+    ax.set_yscale('log')
+    ax.legend()
+    plt.tight_layout()
+    save_figure(figname)
 
 
 
 
-memory=1024 * 64
+def hash_distribution(trials, title, figname):
+    #suffix=[1,2,4,8,16,32,64]
+    suffix=[1,2,3,4]
+    results=[]
+    insertions = 1000000
+    table_size = 1000000
+    for s in suffix:
+        run_results=[]
+        for v in np.arange(insertions):
+            index=get_locations_bounded(v,table_size,s)
+            i1 = index[0]
+            i2 = index[1]
+            if i2< i1:
+                i2 = i2 + table_size
+            distance = i2 - i1
+            run_results.append(distance)
+        results.append(run_results)
+
+    plot_hash_distribution(title, figname, suffix, results)
+            
+
+
+
+memory=1024
 trials=1
 
-# size_vs_bound_bucket_cuckoo(memory, trials)
-# size_vs_bound_bfs_bucket_cuckoo(memory, trials)
+#size_vs_bound_bucket_cuckoo(memory, trials)
+#size_vs_bound_bfs_bucket_cuckoo(memory, trials)
 #size_vs_bound_a_star_bucket_cuckoo(memory,trials)
 
 # bucket_cuckoo_measure_average_read_size(memory, trials)
@@ -436,3 +532,6 @@ trials=1
 a_star_bucket_cuckoo_memory_inserts(trials)
 
 #a_star_bucket_cuckoo_table_density(trials)
+#bfs_bucket_cuckoo_table_density(trials)
+
+#hash_distribution(trials, "Hash Distribution", "hash_distribution")

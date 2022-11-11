@@ -94,6 +94,9 @@ def print_styled_table(tables, table_size, bucket_size):
         print("-"*30)
     print("-"*30)
 
+
+
+
 def generate_cuckoo_table(table_size, bucket_size):
     table = [] * table_size
     for i in range(0, table_size):
@@ -527,7 +530,7 @@ def bucket_cuckoo_bfs_insert(tables, table_size, location_func, value, bucket_si
     #begin by performing bfs
     #path queue contains all active search paths. This is useful, but not optimal for reconstructing paths.
 
-    insert_paths=bucket_cuckoo_bfs(tables, table_size, location_func, value, bucket_size, suffix, max_depth=8)
+    insert_paths=bucket_cuckoo_bfs(tables, table_size, location_func, value, bucket_size, suffix, max_depth=5)
     if len(insert_paths) == 0:
         #print("Failed Insert")
         #print_styled_table(tables, table_size, bucket_size)
