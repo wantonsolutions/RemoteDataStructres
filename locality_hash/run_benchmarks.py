@@ -59,6 +59,8 @@ def plot_memory_results(title, figname, memory, mem_results, bucket, suffix):
     fig, ax = plt.subplots()
     for bucket_id in range(len(bucket)):
         for suffix_id in range(len(suffix)):
+            for x in mem_results:
+                print(x)
             results = [np.average(x[bucket_id][suffix_id]) for x in mem_results]
             label_str="b-"+str(bucket[bucket_id])+"_s-"+str(suffix[suffix_id])
             std = [np.std(x[bucket_id][suffix_id]) for x in mem_results]
@@ -184,8 +186,12 @@ def percentile_heatmaps(title, figname, percentiles, results, bucket, suffix, re
         save_figure(figname+"_"+percent_string)
         plt.clf()
 
-def normalize_to_memory(master_table, memory):
-    return [x/memory for x in master_table]
+def total_inserts(memory, r):
+    return int(memory * r)
+
+def normalize_to_memory(master_table, memory, fill):
+    inserts=total_inserts(memory, fill)
+    return [(x/inserts)*fill for x in master_table]
 
 def get_sized_result_array(bucket_size, suffix):
     results=[None] * len(bucket_size)
@@ -199,13 +205,13 @@ def run_bucket_cuckoo_bounded_fill_size(memory, bucket_size, suffix, trials):
     ratios.reverse()
 
     for r in ratios:
-        inserts = int(memory * r)
+        inserts = total_inserts(memory,r)
         master_table=[]
         for i in range(trials):
             collisions = bucket_cuckoo_insert_only(table_size, bucket_size, inserts, get_locations_bounded, suffix)
             master_table.append(len(collisions))
 
-        master_table = normalize_to_memory(master_table, memory)
+        master_table = normalize_to_memory(master_table, memory, r)
         plot_cdf(master_table, str(r))
     #plt.xlim(0,1500)
     plt.xlim(0.4,1)
@@ -235,7 +241,7 @@ def run_table_density_trials(trials, insertion_func, table_size, bucket_size, in
     return all_results
 
 def fill_table(bucket, suffix, memory, fill, trials, insertion_func, title):
-    inserts=int(memory * fill)
+    inserts=total_inserts(memory, fill)
     table_results = get_sized_result_array(bucket, suffix)
     for bucket_id in range(len(bucket)):
         table_size = get_table_size(memory, bucket[bucket_id])
@@ -272,7 +278,7 @@ def all_paths_to_path_length(all_paths):
     return all_paths_lengths
 
 def fill_and_paths(bucket, suffix, memory, fill, trials, insertion_func, title):
-    inserts=int(memory * fill)
+    inserts=total_inserts(memory, fill)
     fill_results = get_sized_result_array(bucket, suffix)
     path_results = get_sized_result_array(bucket, suffix)
     for bucket_id in range(len(bucket)):
@@ -282,9 +288,9 @@ def fill_and_paths(bucket, suffix, memory, fill, trials, insertion_func, title):
             all_paths=run_insertion_fill_trials(trials, insertion_func, table_size, bucket[bucket_id], inserts, suffix[suffix_id])
 
             # Measure how full each table got before it broke
-            fill=[len(paths) for paths in all_paths]
-            fill.sort()
-            fill=normalize_to_memory(fill, memory)
+            fills=[len(paths) for paths in all_paths]
+            fills.sort()
+            fills=normalize_to_memory(fills, memory, fill)
             fill_results[bucket_id][suffix_id]=fill
 
             #measure the path length
@@ -336,7 +342,7 @@ def cuckoo_measure_read_size(memory, trials, insertion_func, title, figname):
     results = get_sized_result_array(bucket, suffix)
     fill=0.95
 
-    inserts=int(memory * fill)
+    inserts=total_inserts(memory, fill)
     for bucket_id in range(len(bucket)):
         table_size = get_table_size(memory, bucket[bucket_id])
         for suffix_id in range(len(suffix)):
@@ -382,7 +388,7 @@ def cuckoo_insert_range(memory, trials, insertion_func, title, figname):
     suffix=[1,2,4,8,16,32,64]
     fill=0.80
 
-    inserts=int(memory * fill)
+    inserts=total_inserts(memory, fill)
     percentiles=[0.5,0.9,0.99]
     results = get_sized_result_array(bucket, suffix)
 
@@ -409,7 +415,7 @@ def cuckoo_memory_inserts(trials, insertion_func, title, figname):
     # suffix=[16]
 
     bucket=[8]
-    suffix=[3]
+    suffix=[2]
 
     fill=0.95
     percentiles=[0.5,0.9,0.99]
@@ -417,8 +423,8 @@ def cuckoo_memory_inserts(trials, insertion_func, title, figname):
 
     #24 is 8 million entries
     #21 is 1 million
-    maximum=21
-    minimum=7
+    maximum=18
+    minimum=15
     memory = [ 1 << i for i in range(minimum, maximum)]
     #memory = [128]
     print(memory)
