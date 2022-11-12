@@ -339,7 +339,7 @@ def run_read_size_trials(trials, insertion_func, table_size, bucket_size, insert
 
 def cuckoo_measure_read_size(memory, trials, insertion_func, title, figname):
     bucket=[8]
-    suffix=[1]
+    suffix=[2]
     percentiles=[0.5, 0.9, 0.99]
     results = get_sized_result_array(bucket, suffix)
     fill=0.95
@@ -450,8 +450,8 @@ def a_star_bucket_cuckoo_memory_inserts(trials):
     cuckoo_memory_inserts(trials, bucket_cuckoo_a_star_insert_only, "Bucket Cuckoo A* Memory", "bucket_cuckoo_a_star_memory")
 
 def cuckoo_table_density(trials, insertion_func, title, figname):
-    bucket=[32]
-    suffix=[4]
+    bucket=[8]
+    suffix=[2]
     percentiles=[0.5,0.9,0.99]
     results = get_sized_result_array(bucket, suffix)
 
@@ -535,16 +535,16 @@ trials=1
 
 # bucket_cuckoo_measure_average_read_size(memory, trials)
 # bfs_cuckoo_measure_average_read_size(memory, trials)
-#a_star_cuckoo_measure_average_read_size(memory, trials)
+# a_star_cuckoo_measure_average_read_size(memory, trials)
 
 # bucket_cuckoo_insert_range(memory, trials)
 # bfs_bucket_cuckoo_insert_range(memory, trials)
 
 # bucket_cuckoo_memory_inserts(trials)
 # bfs_bucket_cuckoo_memory_inserts(trials)
-a_star_bucket_cuckoo_memory_inserts(trials)
+#a_star_bucket_cuckoo_memory_inserts(trials)
 
 #a_star_bucket_cuckoo_table_density(trials)
-#bfs_bucket_cuckoo_table_density(trials)
+bfs_bucket_cuckoo_table_density(trials)
 
 #hash_distribution(trials, "Hash Distribution", "hash_distribution")

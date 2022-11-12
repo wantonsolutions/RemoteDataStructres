@@ -32,7 +32,11 @@ def secondary_bounded_location_exp(key, table_size, suffix_size):
     primary = primary_location(key, table_size)
     zeros = (h3_suffix(key) + 1) * suffix_size
     #how do increase bin size?
-    secondary = (int(h2(key),16)) % (2**zeros)
+    zeros = (2 ** zeros)
+    # if zeros > 32:
+    #     zeros = 32
+    secondary = (int(h2(key),16)) % zeros
+    #print(zeros)
     #secondary = (int(h2(key),16)) % int((2**zeros) / 2) #does not really work
     # secondary = int(secondary/2) #todo play with this line to see how it affects the performance
     return (primary + secondary) % table_size
