@@ -1,0 +1,4 @@
+suffix: 4 Average: 33005.344533  Median: 15.0
+suffix: 3 Average: 10491.265885  Median: 7.0
+suffix: 2 Average: 1481.967505  Median: 3.0
+suffix: 1 Average: 8.009355  Median: 1.0
