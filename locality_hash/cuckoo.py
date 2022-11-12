@@ -300,8 +300,36 @@ def heuristic_2(current_index, current_table, target_index, target_table,table_s
     #step is suffix size - 1 Given that we already handled the 0 distance case
     #we add 1 because if we have to move, it is at least one step multiply by
     #two because if we stay in the same table it takes 2 steps. For each shuffle
-
     distance = (((target_index - current_index) / (suffix_size - 1))+1) * 2
+
+    #we only need to make a correction if the tables are not the same, otherwise the step direction does not matter
+    if (target_table != current_table):
+        #the table we are in determines the number of shuffles.
+        #table 1 moves backwards more easily, while table 0 moves forward more easily (by one step)
+        #travel direction is the -1 or +1 move depending on what table we are in
+        travel_direction = 1
+        if (current_table == 1):
+            travel_direction *= -1
+
+        #we need to know what direction we are traveling in, as stated before, if we
+        #are moving forward distance > 0 than table 1 will have a -1 step advantage
+        #over table 2 and vice versa.
+        if (distance > 0):
+            travel_direction *= -1
+        
+        distance += travel_direction
+    
+    return distance
+
+#designed for exp
+def heuristic_3(current_index, current_table, target_index, target_table,table_size, suffix_size):
+    if (target_index == current_index and current_table == target_table):
+        return 0
+
+    if suffix_size > 1:
+        distance = (((target_index - current_index) / ((suffix_size*suffix_size) - 1))+1) * 2
+    else:
+        distance = (target_index - current_index)*2
 
     #we only need to make a correction if the tables are not the same, otherwise the step direction does not matter
     if (target_table != current_table):
@@ -328,7 +356,8 @@ def heuristic_2(current_index, current_table, target_index, target_table,table_s
 def fscore(element, target_index, target_table, table_size, suffix_size):
         g_score = element.distance
         #h_score = heuristic(element.pe.bucket_index,element.pe.table_index, target_index, target_table,table_size, suffix_size)
-        h_score = heuristic_2(element.pe.bucket_index,element.pe.table_index, target_index, target_table,table_size, suffix_size)
+        #h_score = heuristic_2(element.pe.bucket_index,element.pe.table_index, target_index, target_table,table_size, suffix_size)
+        h_score = heuristic_3(element.pe.bucket_index,element.pe.table_index, target_index, target_table,table_size, suffix_size)
         f_score = g_score + h_score
         return f_score
 
@@ -570,6 +599,7 @@ def cuckoo_insert_only(insert_func, table_size, bucket_size, insertions, locatio
         paths.append(path)
     #print(len(collisions_per_insert))
     # print_styled_table(tables, table_size, bucket_size)
+    # print("len paths: " + str(len(paths)))
     print("Fill: " + str(round(len(paths)/len(values), 2)))
     return paths_to_collisions(paths), paths, tables
 
@@ -588,7 +618,7 @@ def cuckoo_insert_then_measure_reads(insert_func, table_size, bucket_size, inser
     values=generate_insertions(insertions)
     inserted_values=[]
     read_size=[]
-    for v in values:
+    for v in tqdm(values, leave=False):
         v=entry(v)
         path = insert_func(tables, table_size, location_func, v, bucket_size, suffix)
         if path == []:

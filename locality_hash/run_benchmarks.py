@@ -52,6 +52,7 @@ def bucket_suffix_cdf(title, figname, results, bucket, suffix):
     plt.xlabel("Distance (Bytes)")
     plt.tight_layout()
     plt.xscale("log")
+    plt.grid()
     save_figure(figname+ "_cdf")
     plt.clf()
 
@@ -191,7 +192,8 @@ def total_inserts(memory, r):
 
 def normalize_to_memory(master_table, memory, fill):
     inserts=total_inserts(memory, fill)
-    return [(x/inserts)*fill for x in master_table]
+    table=[(x/inserts)*fill for x in master_table]
+    return table
 
 def get_sized_result_array(bucket_size, suffix):
     results=[None] * len(bucket_size)
@@ -291,7 +293,7 @@ def fill_and_paths(bucket, suffix, memory, fill, trials, insertion_func, title):
             fills=[len(paths) for paths in all_paths]
             fills.sort()
             fills=normalize_to_memory(fills, memory, fill)
-            fill_results[bucket_id][suffix_id]=fill
+            fill_results[bucket_id][suffix_id]=fills
 
             #measure the path length
             path_results[bucket_id][suffix_id]=all_paths_to_path_length(all_paths)
@@ -336,9 +338,9 @@ def run_read_size_trials(trials, insertion_func, table_size, bucket_size, insert
 
 
 def cuckoo_measure_read_size(memory, trials, insertion_func, title, figname):
-    bucket=[1,2,4,8]
-    suffix=[1,2,4,8,16]
-    percentiles=[0.5]
+    bucket=[8]
+    suffix=[1]
+    percentiles=[0.5, 0.9, 0.99]
     results = get_sized_result_array(bucket, suffix)
     fill=0.95
 
@@ -357,6 +359,9 @@ def bucket_cuckoo_measure_average_read_size(memory, trials):
 
 def bfs_cuckoo_measure_average_read_size(memory, trials):
     cuckoo_measure_read_size(memory, trials, bucket_cuckoo_bfs_insert, "Bucket Cuckoo BFS Read Size", "bucket_cuckoo_bfs_read_size")
+
+def a_star_cuckoo_measure_average_read_size(memory, trials):
+    cuckoo_measure_read_size(memory, trials, bucket_cuckoo_a_star_insert, "Bucket Cuckoo A Star Read Size", "bucket_cuckoo_a_star_read_size")
 
 
 
@@ -423,7 +428,7 @@ def cuckoo_memory_inserts(trials, insertion_func, title, figname):
 
     #24 is 8 million entries
     #21 is 1 million
-    maximum=18
+    maximum=19
     minimum=15
     memory = [ 1 << i for i in range(minimum, maximum)]
     #memory = [128]
@@ -520,7 +525,8 @@ def hash_distribution(trials, title, figname):
 
 
 
-memory=1024
+memory=1024 * 64
+#memory=1024 * 1024
 trials=1
 
 #size_vs_bound_bucket_cuckoo(memory, trials)
@@ -529,6 +535,7 @@ trials=1
 
 # bucket_cuckoo_measure_average_read_size(memory, trials)
 # bfs_cuckoo_measure_average_read_size(memory, trials)
+#a_star_cuckoo_measure_average_read_size(memory, trials)
 
 # bucket_cuckoo_insert_range(memory, trials)
 # bfs_bucket_cuckoo_insert_range(memory, trials)
