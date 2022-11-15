@@ -3,6 +3,7 @@ from locality_hash_collisions import *
 
 from doctest import master
 from symbol import return_stmt
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 import matplotlib
 from matplotlib.pyplot import cm
@@ -228,28 +229,28 @@ def get_table_size(memory, bucket_size):
     assert table_size*bucket_size*2 == memory, "table size: " + str(table_size) + " bucket size: " + str(bucket_size) + " memory: " + str(memory)
     return table_size
 
-def run_insertion_fill_trials(trials, insertion_func, table_size, bucket_size, inserts, suffix_size):
+def run_insertion_fill_trials(trials, insertion_func, location_func, table_size, bucket_size, inserts, suffix_size):
     all_results=[]
     for i in range(trials):
-        collisions, paths, _ = insertion_func(table_size, bucket_size, inserts, get_locations_bounded, suffix_size)
+        collisions, paths, _ = insertion_func(table_size, bucket_size, inserts, location_func, suffix_size)
         all_results.append(paths)
     return all_results
 
-def run_table_density_trials(trials, insertion_func, table_size, bucket_size, inserts, suffix_size):
+def run_table_density_trials(trials, insertion_func, location_func, table_size, bucket_size, inserts, suffix_size):
     all_results=[]
     for i in range(trials):
-        _, paths, table = insertion_func(table_size, bucket_size, inserts, get_locations_bounded, suffix_size)
+        _, paths, table = insertion_func(table_size, bucket_size, inserts, location_func, suffix_size)
         all_results.append(table)
     return all_results
 
-def fill_table(bucket, suffix, memory, fill, trials, insertion_func, title):
+def fill_table(bucket, suffix, memory, fill, trials, insertion_func, location_func, title):
     inserts=total_inserts(memory, fill)
     table_results = get_sized_result_array(bucket, suffix)
     for bucket_id in range(len(bucket)):
         table_size = get_table_size(memory, bucket[bucket_id])
         for suffix_id in range(len(suffix)):
             print("[table fill ("+title+")] memory: "+str(memory)+" bucket size:", bucket[bucket_id], " suffix size: ", suffix[suffix_id])
-            all_tables=run_table_density_trials(trials, insertion_func, table_size, bucket[bucket_id], inserts, suffix[suffix_id])
+            all_tables=run_table_density_trials(trials, insertion_func, location_func, table_size, bucket[bucket_id], inserts, suffix[suffix_id])
             #todo average aross tables?
             assert len(all_tables) == trials, "all tables: " + str(len(all_tables)) + " trials: " + str(trials) + "mismatch here something is wrong"
             tables = all_tables[0]
@@ -279,7 +280,7 @@ def all_paths_to_path_length(all_paths):
     all_paths_lengths.sort()
     return all_paths_lengths
 
-def fill_and_paths(bucket, suffix, memory, fill, trials, insertion_func, title):
+def fill_and_paths(bucket, suffix, memory, fill, trials, insertion_func, location_func, title):
     inserts=total_inserts(memory, fill)
     fill_results = get_sized_result_array(bucket, suffix)
     path_results = get_sized_result_array(bucket, suffix)
@@ -287,7 +288,7 @@ def fill_and_paths(bucket, suffix, memory, fill, trials, insertion_func, title):
         table_size = get_table_size(memory, bucket[bucket_id])
         for suffix_id in range(len(suffix)):
             print("[fill and paths ("+title+")] memory: "+str(memory)+" bucket size:", bucket[bucket_id], " suffix size: ", suffix[suffix_id])
-            all_paths=run_insertion_fill_trials(trials, insertion_func, table_size, bucket[bucket_id], inserts, suffix[suffix_id])
+            all_paths=run_insertion_fill_trials(trials, insertion_func, location_func, table_size, bucket[bucket_id], inserts, suffix[suffix_id])
 
             # Measure how full each table got before it broke
             fills=[len(paths) for paths in all_paths]
@@ -326,18 +327,18 @@ def size_vs_bound_a_star_bucket_cuckoo(memory,trials):
 def calculate_read_size(distance, bucket_size, entry_size):
     return (bucket_size * entry_size * 2) * (1 + distance)
 
-def run_read_size_trials(trials, insertion_func, table_size, bucket_size, inserts, suffix_size):
+def run_read_size_trials(trials, insertion_func, location_func, table_size, bucket_size, inserts, suffix_size):
     entry_size=8
     master_read_sizes=[]
     for i in range(trials):
-        read_sizes = cuckoo_insert_then_measure_reads(insertion_func, table_size, bucket_size, inserts, get_locations_bounded, suffix_size)
+        read_sizes = cuckoo_insert_then_measure_reads(insertion_func, table_size, bucket_size, inserts, location_func, suffix_size)
         read_sizes = [calculate_read_size(x, bucket_size, entry_size) for x in read_sizes]
         master_read_sizes.extend(read_sizes)
     master_read_sizes.sort()
     return master_read_sizes
 
 
-def cuckoo_measure_read_size(memory, trials, insertion_func, title, figname):
+def cuckoo_measure_read_size(memory, trials, insertion_func, location_func, title, figname):
     bucket=[8]
     suffix=[2]
     percentiles=[0.5, 0.9, 0.99]
@@ -349,19 +350,25 @@ def cuckoo_measure_read_size(memory, trials, insertion_func, title, figname):
         table_size = get_table_size(memory, bucket[bucket_id])
         for suffix_id in range(len(suffix)):
             print("[cuckoo read size ("+title+")] bucket size", bucket[bucket_id], "suffix size", suffix[suffix_id])
-            results[bucket_id][suffix_id]=run_read_size_trials(trials, insertion_func, table_size, bucket[bucket_id], inserts, suffix[suffix_id])
+            results[bucket_id][suffix_id]=run_read_size_trials(trials, insertion_func, location_func, table_size, bucket[bucket_id], inserts, suffix[suffix_id])
 
     bucket_suffix_cdf(title, figname, results, bucket, suffix)
     percentile_heatmaps(title, figname, percentiles, results, bucket, suffix, reversed=True)
 
 def bucket_cuckoo_measure_average_read_size(memory, trials):
-    cuckoo_measure_read_size(memory, trials, bucket_cuckoo_insert, "Bucket Cuckoo Read Size", "bucket_cuckoo_read_size")
+    cuckoo_measure_read_size(memory, trials, bucket_cuckoo_insert, get_locations_bounded, "Bucket Cuckoo Read Size", "bucket_cuckoo_read_size")
 
 def bfs_cuckoo_measure_average_read_size(memory, trials):
-    cuckoo_measure_read_size(memory, trials, bucket_cuckoo_bfs_insert, "Bucket Cuckoo BFS Read Size", "bucket_cuckoo_bfs_read_size")
+    cuckoo_measure_read_size(memory, trials, bucket_cuckoo_bfs_insert, get_locations_bounded, "Bucket Cuckoo BFS Read Size", "bucket_cuckoo_bfs_read_size")
 
 def a_star_cuckoo_measure_average_read_size(memory, trials):
-    cuckoo_measure_read_size(memory, trials, bucket_cuckoo_a_star_insert, "Bucket Cuckoo A Star Read Size", "bucket_cuckoo_a_star_read_size")
+    cuckoo_measure_read_size(memory, trials, bucket_cuckoo_a_star_insert, get_locations_bounded, "Bucket Cuckoo A Star Read Size", "bucket_cuckoo_a_star_read_size")
+
+def a_star_cuckoo_measure_read_hash_comp(memory, trials):
+    # cuckoo_measure_read_size(memory, trials, bucket_cuckoo_a_star_insert, get_locations_bounded, "A Star Bounded", "read_a_star_bounded")
+    # cuckoo_measure_read_size(memory, trials, bucket_cuckoo_a_star_insert, get_locations_bounded_exp, "A Star exp", "read_a_star_exp")
+    cuckoo_measure_read_size(memory, trials, bucket_cuckoo_a_star_insert, get_locations_bounded_phi, "A Star phi", "read_a_star_phi")
+
 
 
 
@@ -413,7 +420,7 @@ def bfs_bucket_cuckoo_insert_range(memory, trials):
     cuckoo_insert_range(memory, trials, bucket_cuckoo_bfs_insert_only, "Insert Difference BFS Bucket Cuckoo", "bucket_cuckoo_bfs_insert_range")
 
 
-def cuckoo_memory_inserts(trials, insertion_func, title, figname):
+def cuckoo_memory_inserts(trials, insertion_func, location_func, title, figname):
     # bucket=[16,32]
     # suffix=[4,8,16]
     # bucket=[16]
@@ -428,28 +435,32 @@ def cuckoo_memory_inserts(trials, insertion_func, title, figname):
 
     #24 is 8 million entries
     #21 is 1 million
-    maximum=19
+    maximum=22
     minimum=15
     memory = [ 1 << i for i in range(minimum, maximum)]
     #memory = [128]
     print(memory)
     mem_results=[]
     for m in memory:
-        fill_results, path_results = fill_and_paths(bucket, suffix, m, fill, trials, insertion_func, title)
+        fill_results, path_results = fill_and_paths(bucket, suffix, m, fill, trials, insertion_func, location_func, title)
         mem_results.append(fill_results)
 
     plot_memory_results(title, figname, memory, mem_results, bucket, suffix)
 
 def bucket_cuckoo_memory_inserts(trials):
-    cuckoo_memory_inserts(trials, bucket_cuckoo_insert_only, "Bucket Cuckoo Memory", "bucket_cuckoo_memory")
+    cuckoo_memory_inserts(trials, bucket_cuckoo_insert_only, get_locations_bounded_exp, "Bucket Cuckoo Memory", "bucket_cuckoo_memory")
 
 def bfs_bucket_cuckoo_memory_inserts(trials):
-    cuckoo_memory_inserts(trials, bucket_cuckoo_bfs_insert_only, "Bucket Cuckoo BFS Memory", "bucket_cuckoo_bfs_memory")    
+    cuckoo_memory_inserts(trials, bucket_cuckoo_bfs_insert_only, get_locations_bounded_exp, "Bucket Cuckoo BFS Memory", "bucket_cuckoo_bfs_memory")    
 
 def a_star_bucket_cuckoo_memory_inserts(trials):
-    cuckoo_memory_inserts(trials, bucket_cuckoo_a_star_insert_only, "Bucket Cuckoo A* Memory", "bucket_cuckoo_a_star_memory")
+    cuckoo_memory_inserts(trials, bucket_cuckoo_a_star_insert_only, get_locations_bounded_exp, "Bucket Cuckoo A* Memory", "bucket_cuckoo_a_star_memory")
 
-def cuckoo_table_density(trials, insertion_func, title, figname):
+def a_star_bucket_cuckoo_memory_hashes(trials):
+    #cuckoo_memory_inserts(trials, bucket_cuckoo_a_star_insert_only, get_locations_bounded_exp, "Bucket Cuckoo A* Memory exp", "bucket_cuckoo_a_star_memory_exp")
+    cuckoo_memory_inserts(trials, bucket_cuckoo_a_star_insert_only, get_locations_bounded_phi, "Bucket Cuckoo A* Memory phi", "bucket_cuckoo_a_star_memory_phi")
+
+def cuckoo_table_density(trials, insertion_func, location_func,title, figname):
     bucket=[8]
     suffix=[2]
     percentiles=[0.5,0.9,0.99]
@@ -464,7 +475,7 @@ def cuckoo_table_density(trials, insertion_func, title, figname):
     print(memory)
     table_results=[]
     for m in memory:
-        table_fills = fill_table(bucket, suffix, m, 0.95, trials, insertion_func, title)
+        table_fills = fill_table(bucket, suffix, m, 0.95, trials, insertion_func, location_func, title)
         table_results.append(table_fills)
 
     
@@ -472,16 +483,16 @@ def cuckoo_table_density(trials, insertion_func, title, figname):
     plot_table_fills(title, figname, memory, table_results, bucket, suffix)
 
 def a_star_bucket_cuckoo_table_density(trials):
-    cuckoo_table_density(trials, bucket_cuckoo_a_star_insert_only, "Bucket Cuckoo A* Table Density", "bucket_cuckoo_a_star_table_density")
+    cuckoo_table_density(trials, bucket_cuckoo_a_star_insert_only, get_locations_bounded_exp, "Bucket Cuckoo A* Table Density", "bucket_cuckoo_a_star_table_density")
 
 def bfs_bucket_cuckoo_table_density(trials):
-    cuckoo_table_density(trials, bucket_cuckoo_bfs_insert_only, "Bucket Cuckoo A* Table Density", "bucket_cuckoo_a_star_table_density")
+    cuckoo_table_density(trials, bucket_cuckoo_bfs_insert_only, get_locations_bounded_exp, "Bucket Cuckoo A* Table Density", "bucket_cuckoo_a_star_table_density")
 
-def plot_hash_distribution(title, figname, suffix, results):
+def plot_hash_distribution(title, figname, ids, results):
     fig, ax = plt.subplots()
-    for r, s in zip(reversed(results), reversed(suffix)):
+    for r, id in zip(reversed(results), reversed(ids)):
         hist = dict()
-        print("suffix: "+str(s)+" Average: "+str(np.average(r)), " Median: "+str(np.median(r)))
+        print("id: "+str(id)+" Average: "+str(np.average(r)), " Median: "+str(np.median(r)))
         for x in r:
             hist[x] = hist.get(x, 0) + 1
         hist = sorted(hist.items())
@@ -490,7 +501,7 @@ def plot_hash_distribution(title, figname, suffix, results):
         y = list(y)
         sy= sum(y)
         y = [x / sy for x in y]
-        ax.plot(x, y, label="suffix size "+str(s))
+        ax.plot(x, y, label=id)
         #ax.hist(r, bins=1000, label="suffix size "+str(s))
     ax.set(xlabel='hash distance', ylabel='count (normalized)', title=title)
     ax.set_xscale('log', base=2)
@@ -501,33 +512,35 @@ def plot_hash_distribution(title, figname, suffix, results):
 
 
 
-
-def hash_distribution(trials, title, figname):
+def test_hash_distribution(trials, title, figname):
     #suffix=[1,2,4,8,16,32,64]
-    suffix=[1,2,3,4]
+    suffix=[2,3,4,5,6]
+    base=[2]
+    exp=[2]
     results=[]
-    insertions = 1000000
-    table_size = 1000000
+    ids=[]
+    insertions = 100000
+    table_size = 100000
     for s in suffix:
-        run_results=[]
-        for v in np.arange(insertions):
-            index=get_locations_bounded(v,table_size,s)
-            i1 = index[0]
-            i2 = index[1]
-            if i2< i1:
-                i2 = i2 + table_size
-            distance = i2 - i1
-            run_results.append(distance)
-        results.append(run_results)
-
-    plot_hash_distribution(title, figname, suffix, results)
+        for b in base:
+            for e in exp:
+                run_results=[]
+                print("suffix", s, "base", b, "exp", e)
+                id="s"+str(s)+":b"+str(b)+":e"+str(e)
+                for v in tqdm(np.arange(insertions), leave=False):
+                    index=get_locations_bounded_test(v,table_size,s,b,e)
+                    distance = normalize_distance(index[0],index[1],table_size)
+                    run_results.append(distance)
+                results.append(run_results)
+                ids.append(id)
+    plot_hash_distribution(title, figname, ids, results)
             
 
 
 
 memory=1024 * 64
 #memory=1024 * 1024
-trials=1
+trials=4
 
 #size_vs_bound_bucket_cuckoo(memory, trials)
 #size_vs_bound_bfs_bucket_cuckoo(memory, trials)
@@ -545,6 +558,9 @@ trials=1
 #a_star_bucket_cuckoo_memory_inserts(trials)
 
 #a_star_bucket_cuckoo_table_density(trials)
-bfs_bucket_cuckoo_table_density(trials)
+#bfs_bucket_cuckoo_table_density(trials)
 
-#hash_distribution(trials, "Hash Distribution", "hash_distribution")
+#test_hash_distribution(trials, "Hash Distribution", "hash_distribution")
+
+a_star_cuckoo_measure_read_hash_comp(memory, trials)
+a_star_bucket_cuckoo_memory_hashes(trials)
