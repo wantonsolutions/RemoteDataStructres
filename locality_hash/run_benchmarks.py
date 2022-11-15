@@ -366,8 +366,9 @@ def a_star_cuckoo_measure_average_read_size(memory, trials):
 
 def a_star_cuckoo_measure_read_hash_comp(memory, trials):
     # cuckoo_measure_read_size(memory, trials, bucket_cuckoo_a_star_insert, get_locations_bounded, "A Star Bounded", "read_a_star_bounded")
-    # cuckoo_measure_read_size(memory, trials, bucket_cuckoo_a_star_insert, get_locations_bounded_exp, "A Star exp", "read_a_star_exp")
+    #cuckoo_measure_read_size(memory, trials, bucket_cuckoo_a_star_insert, get_locations_bounded_exp, "A Star exp", "read_a_star_exp")
     cuckoo_measure_read_size(memory, trials, bucket_cuckoo_a_star_insert, get_locations_bounded_phi, "A Star phi", "read_a_star_phi")
+    #cuckoo_measure_read_size(memory, trials, bucket_cuckoo_a_star_insert, get_locations_bounded_fixed, "A Star fixed", "read_a_star_fixed")
 
 
 
@@ -435,8 +436,8 @@ def cuckoo_memory_inserts(trials, insertion_func, location_func, title, figname)
 
     #24 is 8 million entries
     #21 is 1 million
-    maximum=22
-    minimum=15
+    maximum=23
+    minimum=5
     memory = [ 1 << i for i in range(minimum, maximum)]
     #memory = [128]
     print(memory)
@@ -457,8 +458,9 @@ def a_star_bucket_cuckoo_memory_inserts(trials):
     cuckoo_memory_inserts(trials, bucket_cuckoo_a_star_insert_only, get_locations_bounded_exp, "Bucket Cuckoo A* Memory", "bucket_cuckoo_a_star_memory")
 
 def a_star_bucket_cuckoo_memory_hashes(trials):
-    #cuckoo_memory_inserts(trials, bucket_cuckoo_a_star_insert_only, get_locations_bounded_exp, "Bucket Cuckoo A* Memory exp", "bucket_cuckoo_a_star_memory_exp")
+    cuckoo_memory_inserts(trials, bucket_cuckoo_a_star_insert_only, get_locations_bounded_exp, "Bucket Cuckoo A* Memory exp", "bucket_cuckoo_a_star_memory_exp")
     cuckoo_memory_inserts(trials, bucket_cuckoo_a_star_insert_only, get_locations_bounded_phi, "Bucket Cuckoo A* Memory phi", "bucket_cuckoo_a_star_memory_phi")
+    #cuckoo_memory_inserts(trials, bucket_cuckoo_a_star_insert_only, get_locations_bounded_fixed, "Bucket Cuckoo A* Memory fixed", "bucket_cuckoo_a_star_memory_fixed")
 
 def cuckoo_table_density(trials, insertion_func, location_func,title, figname):
     bucket=[8]
@@ -540,7 +542,7 @@ def test_hash_distribution(trials, title, figname):
 
 memory=1024 * 64
 #memory=1024 * 1024
-trials=4
+trials=3
 
 #size_vs_bound_bucket_cuckoo(memory, trials)
 #size_vs_bound_bfs_bucket_cuckoo(memory, trials)
