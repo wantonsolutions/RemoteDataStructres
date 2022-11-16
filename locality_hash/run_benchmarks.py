@@ -1,5 +1,7 @@
 from cuckoo import *
 from locality_hash_collisions import *
+import hash
+from hash import secondary_bounded_location_exp_extern
 
 from doctest import master
 from symbol import return_stmt
@@ -55,6 +57,24 @@ def bucket_suffix_cdf(title, figname, results, bucket, suffix):
     plt.xscale("log")
     plt.grid()
     save_figure(figname+ "_cdf")
+    plt.clf()
+
+def plot_memory_results_2(title, figname, memory, mem_resuts, ids):
+    fig, ax = plt.subplots()
+    print(memory)
+    print(mem_resuts)
+    for id, exp in zip(ids, mem_resuts):
+        results = [np.average(x) for x in exp]
+        std = [np.std(x) for x in exp]
+        ax.errorbar(memory, results, std, label=id, marker='o', capsize=3)
+
+    ax.set_xlabel("Memory (8 Byte entries)")
+    ax.set_ylabel("Fill")
+    ax.set_title(title)
+    ax.set_xscale('log')
+    ax.legend()
+    plt.tight_layout()
+    save_figure(figname)
     plt.clf()
 
 def plot_memory_results(title, figname, memory, mem_results, bucket, suffix):
@@ -422,11 +442,6 @@ def bfs_bucket_cuckoo_insert_range(memory, trials):
 
 
 def cuckoo_memory_inserts(trials, insertion_func, location_func, title, figname):
-    # bucket=[16,32]
-    # suffix=[4,8,16]
-    # bucket=[16]
-    # suffix=[16]
-
     bucket=[8]
     suffix=[2]
 
@@ -445,7 +460,6 @@ def cuckoo_memory_inserts(trials, insertion_func, location_func, title, figname)
     for m in memory:
         fill_results, path_results = fill_and_paths(bucket, suffix, m, fill, trials, insertion_func, location_func, title)
         mem_results.append(fill_results)
-
     plot_memory_results(title, figname, memory, mem_results, bucket, suffix)
 
 def bucket_cuckoo_memory_inserts(trials):
@@ -461,6 +475,41 @@ def a_star_bucket_cuckoo_memory_hashes(trials):
     cuckoo_memory_inserts(trials, bucket_cuckoo_a_star_insert_only, get_locations_bounded_exp, "Bucket Cuckoo A* Memory exp", "bucket_cuckoo_a_star_memory_exp")
     cuckoo_memory_inserts(trials, bucket_cuckoo_a_star_insert_only, get_locations_bounded_phi, "Bucket Cuckoo A* Memory phi", "bucket_cuckoo_a_star_memory_phi")
     #cuckoo_memory_inserts(trials, bucket_cuckoo_a_star_insert_only, get_locations_bounded_fixed, "Bucket Cuckoo A* Memory fixed", "bucket_cuckoo_a_star_memory_fixed")
+
+def exp_hash_memory(trials, insertion_func, location_fun, title, figname):
+    #from hash import global_exp
+    exps=[1,1.5,1.6,1.7,1.8,1.9,2.0,2.1,2.2,2.3]
+    ids=[str(x) for x in exps]
+    bucket=[8]
+    suffix=[2]
+
+    fill=0.95
+    #24 is 8 million entries
+    #21 is 1 million
+    maximum=15
+    minimum=5
+    memory = [ 1 << i for i in range(minimum, maximum)]
+    results=[]
+    for exp in exps:
+        #global_exp = exp
+
+        #secondary_bounded_location_exp_extern.global_exp=exp
+        hash.global_exp=exp
+        m_results=[]
+        for m in memory:
+            fill_results, path_results = fill_and_paths(bucket, suffix, m, fill, trials, insertion_func, location_fun, title + " " + str(exp))
+            fill_results = [item for sublist in fill_results for item in sublist]
+            fill_results = [item for sublist in fill_results for item in sublist]
+
+            m_results.append(fill_results)
+        results.append(m_results)
+    plot_memory_results_2(title, figname, memory, results, ids)
+
+def a_star_exp_hash(trials):
+    exp_hash_memory(trials, bucket_cuckoo_a_star_insert_only, get_locations_bounded_exp_extern, "A* exp tests", "exp_hash_exp")
+
+
+
 
 def cuckoo_table_density(trials, insertion_func, location_func,title, figname):
     bucket=[8]
@@ -542,7 +591,7 @@ def test_hash_distribution(trials, title, figname):
 
 memory=1024 * 64
 #memory=1024 * 1024
-trials=3
+trials=2
 
 #size_vs_bound_bucket_cuckoo(memory, trials)
 #size_vs_bound_bfs_bucket_cuckoo(memory, trials)
@@ -564,5 +613,8 @@ trials=3
 
 #test_hash_distribution(trials, "Hash Distribution", "hash_distribution")
 
-a_star_cuckoo_measure_read_hash_comp(memory, trials)
-a_star_bucket_cuckoo_memory_hashes(trials)
+# a_star_cuckoo_measure_read_hash_comp(memory, trials)
+# a_star_bucket_cuckoo_memory_hashes(trials)
+
+
+a_star_exp_hash(trials)

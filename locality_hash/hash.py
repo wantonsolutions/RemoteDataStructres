@@ -49,8 +49,7 @@ def secondary_bounded_location_exp(key, table_size, suffix_size):
 def secondary_bounded_location_phi(key, table_size, suffix_size):
     primary = primary_location(key, table_size)
     #exp = (h3_phi_suffix(key) + 1)
-    #phi=1.815
-    phi=1.9
+    phi=1.815
 
     factor = phi
     exp = (h3_suffix_base(key,2) + factor)
@@ -60,6 +59,23 @@ def secondary_bounded_location_phi(key, table_size, suffix_size):
 
     secondary = (int(h2(key),16)) % mod_size
     return (primary + secondary) % table_size
+
+def secondary_bounded_location_exp_extern(key, table_size, suffix_size):
+    global global_exp 
+    #print("exp:"+str(global_exp))
+    primary = primary_location(key, table_size)
+    #exp = (h3_phi_suffix(key) + 1)
+    #phi=1.815
+
+    factor = global_exp
+    exp = (h3_suffix_base(key,2) + factor)
+    mod_size = int((factor ** exp))
+    # if mod_size > 8:
+    #     mod_size = 8
+
+    secondary = (int(h2(key),16)) % mod_size
+    return (primary + secondary) % table_size
+
 
 def secondary_bounded_location_fixed(key, table_size, suffix_size):
     primary = primary_location(key, table_size)
@@ -76,6 +92,9 @@ def get_locations_bounded(key, table_size, suffix_size):
 
 def get_locations_bounded_exp(key, table_size, suffix_size):
     return (primary_location(key, table_size), secondary_bounded_location_exp(key, table_size, suffix_size))
+
+def get_locations_bounded_exp_extern(key, table_size, suffix_size):
+    return (primary_location(key, table_size), secondary_bounded_location_exp_extern(key, table_size, suffix_size))
 
 def get_locations_bounded_phi(key, table_size, suffix_size):
     return (primary_location(key, table_size), secondary_bounded_location_phi(key, table_size, suffix_size))
