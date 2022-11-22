@@ -23,4 +23,36 @@ def secondary_bounded_location_exp(key, table_size, suffix_size):
     return (primary + secondary) % table_size
 ```
 
+
+I decided to run experiments to show how varying the value of suffix = B^E performed with respect to read distances.
+
+Here is a variance of the exponent E
+
 ![memory_vs_fill](001_exp_hash_1_4.png)
+
+Also experiments for base B
+
+![base](002_base_scan.png)
+
+The exponential table has distances which vary quite a bit from the original bucket suffix configuration. 
+
+I've plotted a distribution of the distances as a table visual using a heatmap.
+Here is the base distribution
+![base](003_bounded_hash_visual.png)
+
+Here is the exponential distribution
+![exp](004_exp_hash_visual.png)
+
+I decided to also run some basic experiments where i checked the fill difference across some of the exponents.
+
+![1.9](005_exp_1.9_fill.png)
+![2.0](006_exp_2.0_fill.png)
+![2.1](007_exp_2.1_fill.png)
+
+Based on the fill results it seems to me that 2.0 is probably the best to go with at the moment. I took the opprotunity to run the same experiment but collect the distribution of read size as a CDF.
+
+![2.0 read](008_exp_2.0_read.png)
+
+
+
+
