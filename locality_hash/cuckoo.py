@@ -5,6 +5,9 @@ import copy
 import heapq
 from tqdm import tqdm
 
+from matplotlib import pyplot as plt
+
+
 class entry:
     def __init__(self, key):
         self.key = key
@@ -95,6 +98,10 @@ def print_styled_table(tables, table_size, bucket_size):
     print("-"*30)
 
 
+def normalize_distance(location_1, location_2, table_size):
+    if location_1 > location_2:
+        location_2  += table_size
+    return location_2 - location_1
 
 
 def generate_cuckoo_table(table_size, bucket_size):

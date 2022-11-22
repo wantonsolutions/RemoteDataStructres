@@ -141,12 +141,8 @@ def label_percentile_heatmap(heatmap_results, bucket, suffix, percentile):
             result_value=round(result_value,2)
             text = plt.text(j, i, str(result_value),ha="center", va="center", color="b")
 
-def normalize_distance(location_1, location_2, table_size):
-    if location_1 > location_2:
-        location_2  += table_size
-    return location_2 - location_1
 
-def visualize_distance(tables, suffix_size):
+def visualize_distance(tables, suffix_size, d_func):
     dtables=[]
     zero = -5
     minimum=1 << 32
@@ -158,7 +154,7 @@ def visualize_distance(tables, suffix_size):
                 if distance[i][j] == None:
                     distance[i][j] = zero
                 else:
-                    d = get_locations_bounded(distance[i][j], len(distance), suffix_size)
+                    d = d_func(distance[i][j], len(distance), suffix_size)
                     d = normalize_distance(d[0], d[1], len(distance))
                     distance[i][j] = d
                 if distance[i][j] < minimum:
@@ -167,17 +163,17 @@ def visualize_distance(tables, suffix_size):
                     maximum = distance[i][j]
         dtables.append(distance)
     
-    fig, axs = plt.subplots(nrows=1, ncols=len(dtables))
+    fig, axs = plt.subplots(nrows=1, ncols=len(dtables), figsize=(5,6))
     for i in range(len(dtables)):
         im = axs[i].imshow(dtables[i], cmap="hot_r", vmin=minimum, vmax=maximum)
         #if i == len(dtables)-1:
-        fig.colorbar(im, ax=axs[i])
+        fig.colorbar(im, ax=axs[i], label="Distance")
         axs[i].set_title("Table "+str(i))
         axs[i].set_xlabel("bucket id")
         axs[i].set_ylabel("index")
 
-    plt.tight_layout()
-    save_figure("debug_distance.pdf")
+    fig.tight_layout(pad=3)
+    save_figure("debug_distance")
     plt.clf()
 
 
@@ -185,7 +181,12 @@ def visualize_table(tables, suffix_size, options):
     if options["print_table"]:    
         print_styled_table(tables, len(tables[0]), len(tables[0][0]))
     if options["distance"]:
-        visualize_distance(tables, suffix_size)
+        if "distance_func" in options:
+            d_func = options["distance_func"]
+        else:
+            print("using default distance function (get_locations_bounded) for visualization")
+            d_func = get_locations_bounded
+        visualize_distance(tables, suffix_size, d_func)
 
 def percentile_heatmaps(title, figname, percentiles, results, bucket, suffix, reversed=False):
     for percentile in percentiles:
@@ -277,7 +278,7 @@ def fill_table(bucket, suffix, memory, fill, trials, insertion_func, location_fu
 
             #print_styled_table(tables, table_size, suffix[suffix_id])
             #print_styled_table(tables, table_size, suffix[suffix_id])
-            options={"print_table":False, "distance":True}
+            options={"print_table":False, "distance":True, "distance_func":location_func}
             visualize_table(tables,suffix[suffix_id],options)
 
             table_ref = [0] * len(tables[0])
@@ -386,8 +387,8 @@ def a_star_cuckoo_measure_average_read_size(memory, trials):
 
 def a_star_cuckoo_measure_read_hash_comp(memory, trials):
     # cuckoo_measure_read_size(memory, trials, bucket_cuckoo_a_star_insert, get_locations_bounded, "A Star Bounded", "read_a_star_bounded")
-    #cuckoo_measure_read_size(memory, trials, bucket_cuckoo_a_star_insert, get_locations_bounded_exp, "A Star exp", "read_a_star_exp")
-    cuckoo_measure_read_size(memory, trials, bucket_cuckoo_a_star_insert, get_locations_bounded_phi, "A Star phi", "read_a_star_phi")
+    cuckoo_measure_read_size(memory, trials, bucket_cuckoo_a_star_insert, get_locations_bounded_exp, "A Star exp", "read_a_star_exp")
+    #cuckoo_measure_read_size(memory, trials, bucket_cuckoo_a_star_insert, get_locations_bounded_phi, "A Star phi", "read_a_star_phi")
     #cuckoo_measure_read_size(memory, trials, bucket_cuckoo_a_star_insert, get_locations_bounded_fixed, "A Star fixed", "read_a_star_fixed")
 
 
@@ -478,7 +479,7 @@ def a_star_bucket_cuckoo_memory_hashes(trials):
 
 def exp_hash_memory(trials, insertion_func, location_fun, title, figname):
     #from hash import global_exp
-    exps=[1,1.5,1.6,1.7,1.8,1.9,2.0,2.1,2.2,2.3]
+    exps=[1.7,1.8,1.9,2.0,2.1,2.2,2.3]
     ids=[str(x) for x in exps]
     bucket=[8]
     suffix=[2]
@@ -509,11 +510,9 @@ def a_star_exp_hash(trials):
     exp_hash_memory(trials, bucket_cuckoo_a_star_insert_only, get_locations_bounded_exp_extern, "A* exp tests", "exp_hash_exp")
 
 
-
-
 def cuckoo_table_density(trials, insertion_func, location_func,title, figname):
-    bucket=[8]
-    suffix=[2]
+    bucket=[16]
+    suffix=[8]
     percentiles=[0.5,0.9,0.99]
     results = get_sized_result_array(bucket, suffix)
 
@@ -522,7 +521,7 @@ def cuckoo_table_density(trials, insertion_func, location_func,title, figname):
     # maximum=18
     # memory = [ 1 << i for i in range(6, maximum)]
 
-    memory = [1024 * 16]
+    memory = [1024* 4]
     print(memory)
     table_results=[]
     for m in memory:
@@ -534,7 +533,8 @@ def cuckoo_table_density(trials, insertion_func, location_func,title, figname):
     plot_table_fills(title, figname, memory, table_results, bucket, suffix)
 
 def a_star_bucket_cuckoo_table_density(trials):
-    cuckoo_table_density(trials, bucket_cuckoo_a_star_insert_only, get_locations_bounded_exp, "Bucket Cuckoo A* Table Density", "bucket_cuckoo_a_star_table_density")
+    #cuckoo_table_density(trials, bucket_cuckoo_a_star_insert_only, get_locations_bounded_exp, "Bucket Cuckoo A* Table Density", "bucket_cuckoo_a_star_table_density")
+    cuckoo_table_density(trials, bucket_cuckoo_a_star_insert_only, get_locations_bounded, "Bucket Cuckoo A* Table Density", "bucket_cuckoo_a_star_table_density")
 
 def bfs_bucket_cuckoo_table_density(trials):
     cuckoo_table_density(trials, bucket_cuckoo_bfs_insert_only, get_locations_bounded_exp, "Bucket Cuckoo A* Table Density", "bucket_cuckoo_a_star_table_density")
@@ -591,7 +591,7 @@ def test_hash_distribution(trials, title, figname):
 
 memory=1024 * 64
 #memory=1024 * 1024
-trials=2
+trials=1
 
 #size_vs_bound_bucket_cuckoo(memory, trials)
 #size_vs_bound_bfs_bucket_cuckoo(memory, trials)
@@ -613,8 +613,7 @@ trials=2
 
 #test_hash_distribution(trials, "Hash Distribution", "hash_distribution")
 
-# a_star_cuckoo_measure_read_hash_comp(memory, trials)
+a_star_cuckoo_measure_read_hash_comp(memory, trials)
 # a_star_bucket_cuckoo_memory_hashes(trials)
 
-
-a_star_exp_hash(trials)
+#a_star_exp_hash(trials)
