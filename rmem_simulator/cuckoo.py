@@ -1,3 +1,5 @@
+import hash
+
 TABLE_ENTRY_SIZE = 8
 
 def generate_bucket_cuckoo_hash_index(memory_size, bucket_size):
@@ -67,4 +69,8 @@ def fill_table_with_read(table, bucket_id, bucket_offset, size, read):
     for i in range(total_indexs):
         bucket, offset = absolute_index_to_bucket_index(base + i, bucket_size)
         table[bucket][offset] = read[i]
+
+
+def basic_insert(value):
+
     

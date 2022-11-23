@@ -53,6 +53,29 @@ Based on the fill results it seems to me that 2.0 is probably the best to go wit
 
 ![2.0 read](008_exp_2.0_read.png)
 
+Finally I ran a long two day trial to determine what the fill distribution for a
+variety of exp's were. This time the base was also varied along with the exp.
+The function I used is as follows. Note that this time the global_exp is used
+both as the factor and in the exponent.
+
+```python
+def secondary_bounded_location_exp_extern(key, table_size, suffix_size):
+    global global_exp 
+    primary = primary_location(key, table_size)
+
+    factor = global_exp #used for testing exp between 1.5 and 2.5
+    exp = (h3_suffix_base(key,2) + factor) #use base 2 for key probability
+    mod_size = int((factor ** exp)) #generated max suffix size
+
+    secondary = (int(h2(key),16)) % mod_size #perform the modulo
+    return (primary + secondary) % table_size
+```
+
+To test this I ran on a sweep of exponents.
+
+![long exp](009_exp_A-star_fill.png)
+
+This set of experiments was actually conducted over the course of around a week. I've consolidated them for ease of reference.
 
 
 

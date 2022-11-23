@@ -12,11 +12,11 @@ def h3(key):
     return hashlib.sha1(val.encode('utf-8')).hexdigest()
 
 def primary_location(key, table_size):
-    return int(h1(key),16) % table_size
+    return int(h1(key),32) % table_size
 
 
 def secondary_location(key, table_size):
-    return int(h2(key),16) % table_size
+    return int(h2(key),32) % table_size
 
 def h3_suffix(key):
     val = int(h3(key),32)
@@ -42,7 +42,7 @@ def secondary_bounded_location_exp(key, table_size, suffix_size):
     #this works
     zeros = (h3_suffix(key)) + 2
     zeros = (2 ** zeros)
-    secondary = (int(h2(key),16)) % zeros
+    secondary = (int(h2(key),32)) % zeros
     ##
     return (primary + secondary) % table_size
 
@@ -57,23 +57,18 @@ def secondary_bounded_location_phi(key, table_size, suffix_size):
     # if mod_size > 8:
     #     mod_size = 8
 
-    secondary = (int(h2(key),16)) % mod_size
+    secondary = (int(h2(key),32)) % mod_size
     return (primary + secondary) % table_size
 
 def secondary_bounded_location_exp_extern(key, table_size, suffix_size):
     global global_exp 
-    #print("exp:"+str(global_exp))
     primary = primary_location(key, table_size)
-    #exp = (h3_phi_suffix(key) + 1)
-    #phi=1.815
 
-    factor = global_exp
-    exp = (h3_suffix_base(key,2) + factor)
-    mod_size = int((factor ** exp))
-    # if mod_size > 8:
-    #     mod_size = 8
+    factor = global_exp #used for testing exp between 1.5 and 2.5
+    exp = (h3_suffix_base(key,2) + factor) #use base 2 for key probability
+    mod_size = int((factor ** exp)) #generated max suffix size
 
-    secondary = (int(h2(key),16)) % mod_size
+    secondary = (int(h2(key),32)) % mod_size #perform the modulo
     return (primary + secondary) % table_size
 
 
@@ -128,7 +123,7 @@ def secondary_bounded_location_exp_test(key, table_size, suffix_size, base, expo
     zeros = int((exponential ** zeros))
     # if zeros > 32:
     #     zeros = 32
-    secondary = (int(h2(key),16)) % zeros
+    secondary = (int(h2(key),32)) % zeros
     #print(zeros)
     #secondary = (int(h2(key),16)) % int((2**zeros) / 2) #does not really work
     # secondary = int(secondary/2) #todo play with this line to see how it affects the performance
