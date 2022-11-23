@@ -1,3 +1,5 @@
+from cuckoo import *
+
 class Message:
     def __init__(self, config):
         self.payload = dict()
@@ -14,6 +16,7 @@ class Client:
     def __init__(self, config):
         self.config = config
         self.client_id = config['client_id']
+
     def __str__(self):
         return "Client: " + str(self.client_id)
 
@@ -28,10 +31,23 @@ class Client:
         print("Client " + str(self.client_id) + " generated message: " + str(message) + "\n")
         return message
 
+
+
+
 class Memory:
     def __init__(self, config):
         self.config = config
         self.memory_id = config['memory_id']
+        self.bucket_size = config['bucket_size']
+
+        #create the index structure
+        print("Initializing memory Index")
+        index_func = config['memory_index_function']
+        index_args = config['memory_index_args']
+        print("Index Function: " + str(index_func.__name__))
+        print("Index Args: " + str(index_args)+"\n")
+        self.index = index_func(**index_args)        
+
     
     def __str__(self):
         return "Memory: " + str(self.memory_id)
@@ -112,14 +128,30 @@ class Simulator:
         self.client_ingress_event()
 
     def run(self):
+
+        bucket_size=8
+        memory_size=1024
+        index_gen_function=generate_bucket_cuckoo_hash_index
+        index_gen_args={'memory_size': memory_size, 'bucket_size': bucket_size}
+
+
         #initialize clients
         for i in range(self.config['num_clients']):
             client_config = {'client_id': i}
+
+            client_config['bucket_size'] = bucket_size
+            client_config['client_index_function'] = index_gen_function
+            client_config['client_index_args'] = index_gen_args
             c = Client(client_config)
+
             self.client_list.append(c)
 
         #initialize memory
         memory_config = {'memory_id': 0}
+        memory_config['bucket_size'] = bucket_size
+        memory_config['memory_index_function'] = index_gen_function
+        memory_config['memory_index_args'] = index_gen_args
+
         self.memory = Memory(memory_config)
 
         #initialize switch
