@@ -1,3 +1,15 @@
+class Message:
+    def __init__(self, config):
+        self.payload = dict()
+        for key, value in config.items():
+            self.payload[key] = value
+    
+    def __str__(self):
+        v = ""
+        for key, value in self.payload.items():
+            v += str(key) + ":" + str(value) + "\n"
+        return v[:len(v)-1]
+
 class Client:
     def __init__(self, config):
         self.config = config
@@ -5,33 +17,33 @@ class Client:
     def __str__(self):
         return "Client: " + str(self.client_id)
 
-    def process_messages(self, inbound_messages):
-        for message in inbound_messages:
-            print("Client " + str(self.client_id) + " received message: " + str(message))
+    def process_message(self, message):
+        print("Client " + str(self.client_id) + " received message: " + str(message) + "\n")
 
-    def generate_messages(self):
-        outbound_messages = []
-        message = "ping"
-        outbound_messages.append(message)
-        return outbound_messages
+    def generate_message(self):
+        type = "ping"
+        sender = self.client_id
+        dest = "memory"
+        message = Message({'type': type, 'src': sender, 'dest': dest})
+        print("Client " + str(self.client_id) + " generated message: " + str(message) + "\n")
+        return message
 
 class Memory:
-    def __int__(self, config):
+    def __init__(self, config):
         self.config = config
         self.memory_id = config['memory_id']
     
     def __str__(self):
         return "Memory: " + str(self.memory_id)
 
-    def process_messages(self, inbound_messages):
-        outbound_messages = []
-        counter = 0
-        for message in inbound_messages:
-            print(message)
-            om = "message " + str(counter) + "processed"
-            counter += 1
-            outbound_messages.append(om)
-        return outbound_messages
+    def process_message(self, message):
+        print("Memory: " + str(message) + "\n")
+        #turn message around with ping
+        tmp = message.payload['src']
+        message.payload['src'] = message.payload['dest']
+        message.payload['dest'] = tmp
+        message.payload['type'] = "pong"
+        return message
 
 class Switch:
     def __init__(self, config):
@@ -41,19 +53,10 @@ class Switch:
     def __str__(self):
         return "Switch: " + str(self.switch_id)
 
-    def process_messages(self, inbound_messages):
-        outbound_messages = []
-        counter = 0
-        for message in inbound_messages:
-            print(message)
-            om = "message " + str(counter) + "processed"
-            counter += 1
-            outbound_messages.append(om)
-        return outbound_messages
+    def process_message(self, message):
+        print("Switch: " + str(message) + "\n")
+        return message
 
-class Message:
-    def __init__(self, config):
-        self.payload = dict()
 
 class Simulator:
     def __init__(self, config):
@@ -70,46 +73,71 @@ class Simulator:
     def __str__(self):
         return "Simulator"
 
-    def client_egress_events(self):
+    def client_egress_event(self, client_id):
         #generate client messages
-        for c in self.client_list:
-            messages = c.generate_messages()
-            self.client_switch_channel.append(messages)
+        c = self.client_list[client_id]
+        messages = c.generate_message()
+        self.client_switch_channel.append(messages)
 
-    def switch_client_events(self):
+    def switch_client_event(self):
         #send a client messages to the switch
         cm = self.client_switch_channel.pop()
-        sm = self.switch.process_messages(cm)
+        sm = self.switch.process_message(cm)
         self.switch_memory_channel.append(sm)
 
-    def memory_events(self):
+    def memory_event(self):
         #send switch messages to the memory
         sm = self.switch_memory_channel.pop()
-        mm = self.memory.process_messages(mm)
+        mm = self.memory.process_message(sm)
         self.memory_switch_channel.append(mm)
 
-    def switch_memory_events(self):
+    def switch_memory_event(self):
         #send memory message through the switch
         mm = self.memory_switch_channel.pop()
-        sm = self.switch.process_messages(sm)
+        sm = self.switch.process_message(mm)
         self.switch_client_channel.append(sm)
 
-    def client_ingress_events(self):
+    def client_ingress_event(self):
         #send switch messages to the client
         sm = self.switch_client_channel.pop()
-        message_recipient = sm.payload["client_id"]
-        self.client_list[message_recipient].process_messages(sm)
+        message_recipient = sm.payload["dest"]
+        self.client_list[message_recipient].process_message(sm)
 
 
-    def simulation_step(self):
+    def deterministic_simulation_step(self):
+        self.client_egress_event(0)
+        self.switch_client_event()
+        self.memory_event()
+        self.switch_memory_event()
+        self.client_ingress_event()
 
-        self.client_egress_events()
-        self.switch_client_events()
-        self.memory_events()
-        self.switch_memory_events()
-        self.client_ingress_events()
+    def run(self):
+        #initialize clients
+        for i in range(self.config['num_clients']):
+            client_config = {'client_id': i}
+            c = Client(client_config)
+            self.client_list.append(c)
+
+        #initialize memory
+        memory_config = {'memory_id': 0}
+        self.memory = Memory(memory_config)
+
+        #initialize switch
+        switch_config = {'switch_id': 0}
+        self.switch = Switch(switch_config)
+
+        #run simulation
+        for i in range(self.config['num_steps']):
+            self.deterministic_simulation_step()
 
 
+def main():
+    config = {'num_clients': 1, 'num_steps': 1}
+    simulator = Simulator(config)
+    simulator.run()
+
+if __name__ == "__main__":
+    main()
 
 
 
