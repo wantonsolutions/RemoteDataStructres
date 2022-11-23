@@ -479,7 +479,7 @@ def a_star_bucket_cuckoo_memory_hashes(trials):
 
 def exp_hash_memory(trials, insertion_func, location_fun, title, figname):
     #from hash import global_exp
-    exps=[1.7,1.8,1.9,2.0,2.1,2.2,2.3]
+    exps=[1.7,1.8,1.9,2.0]
     ids=[str(x) for x in exps]
     bucket=[8]
     suffix=[2]
@@ -487,8 +487,8 @@ def exp_hash_memory(trials, insertion_func, location_fun, title, figname):
     fill=0.95
     #24 is 8 million entries
     #21 is 1 million
-    maximum=15
-    minimum=5
+    maximum=22
+    minimum=19
     memory = [ 1 << i for i in range(minimum, maximum)]
     results=[]
     for exp in exps:
@@ -591,7 +591,7 @@ def test_hash_distribution(trials, title, figname):
 
 memory=1024 * 64
 #memory=1024 * 1024
-trials=1
+trials=3
 
 #size_vs_bound_bucket_cuckoo(memory, trials)
 #size_vs_bound_bfs_bucket_cuckoo(memory, trials)
@@ -613,7 +613,7 @@ trials=1
 
 #test_hash_distribution(trials, "Hash Distribution", "hash_distribution")
 
-a_star_cuckoo_measure_read_hash_comp(memory, trials)
+#a_star_cuckoo_measure_read_hash_comp(memory, trials)
 # a_star_bucket_cuckoo_memory_hashes(trials)
 
-#a_star_exp_hash(trials)
+a_star_exp_hash(trials)
