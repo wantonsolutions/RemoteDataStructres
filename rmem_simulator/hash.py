@@ -12,7 +12,12 @@ def h3(key):
     return hashlib.sha1(val.encode('utf-8')).hexdigest()
 
 def primary_location(key, table_size):
-    return (int(h1(key),32) % (table_size / 2)) * 2
+    hash = int(h1(key),32)
+    #print("hash: " + str(hash))
+    #print("table_size: " + str(table_size))
+    mhash = (hash % int(table_size/2)) * 2
+    #print(mhash)
+    return mhash
 
 def to_base(n, base):
     if n == 0:
@@ -41,7 +46,8 @@ def secondary_location(key, factor, table_size):
 
 def hash_locations(key, table_size):
     factor=2.0
-    return (primary_location(key, table_size), secondary_location(key, factor, table_size))
-
-def hash_locations_factor(key, table_size, factor):
+    p = primary_location(key, table_size)
+    s = secondary_location(key, factor, table_size)
+    if p > s:
+        print("primary is greater than secondary" + str(p) + " " + str(s))
     return (primary_location(key, table_size), secondary_location(key, factor, table_size))

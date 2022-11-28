@@ -2,6 +2,9 @@ import hash
 
 TABLE_ENTRY_SIZE = 8
 
+def get_bucket_size(table):
+    return len(table[0]) * TABLE_ENTRY_SIZE
+
 def generate_bucket_cuckoo_hash_index(memory_size, bucket_size):
     number_tables=2
     entry_size=8
@@ -46,7 +49,6 @@ def assert_operation_in_table_bound(table, bucket_id, bucket_offset, size):
 def read_table_entry(table, bucket_id, bucket_offset, size):
 
     assert_operation_in_table_bound(table, bucket_id, bucket_offset, size)
-
     bucket_size = len(table[0])
     total_indexs = size/TABLE_ENTRY_SIZE
 
@@ -64,13 +66,12 @@ def fill_table_with_read(table, bucket_id, bucket_offset, size, read):
     bucket_size = len(table[0])
     total_indexs = len(read)/TABLE_ENTRY_SIZE
 
-    #write read to the table
+    #write remote read to the table
     base = bucket_id * bucket_size + bucket_offset
     for i in range(total_indexs):
         bucket, offset = absolute_index_to_bucket_index(base + i, bucket_size)
         table[bucket][offset] = read[i]
 
 
-def basic_insert(value):
 
     
