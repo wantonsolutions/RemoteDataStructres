@@ -226,7 +226,7 @@ def test_hashes():
 
 def main():
     #test_hashes()
-    config = {'num_clients': 1, 'num_steps': 1}
+    config = {'num_clients': 1, 'num_steps': 50}
     simulator = Simulator(config)
     simulator.run()
 
