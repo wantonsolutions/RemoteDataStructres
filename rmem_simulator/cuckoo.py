@@ -1,5 +1,25 @@
 import hash
 
+class Message:
+    def __init__(self, config):
+        self.payload = dict()
+        for key, value in config.items():
+            self.payload[key] = value
+    
+    def __str__(self):
+        v = ""
+        for key, value in self.payload.items():
+            v += str(key) + ":" + str(value) + "\n"
+        return v[:len(v)-1]
+
+def messages_append_or_extend(messages, message):
+    if message != None:
+        if isinstance(message, list):
+            messages.extend(message)
+        else:
+            messages.append(message)
+    return messages
+
 TABLE_ENTRY_SIZE = 8
 
 def get_bucket_size(table):
@@ -50,7 +70,7 @@ def read_table_entry(table, bucket_id, bucket_offset, size):
 
     assert_operation_in_table_bound(table, bucket_id, bucket_offset, size)
     bucket_size = len(table[0])
-    total_indexs = size/TABLE_ENTRY_SIZE
+    total_indexs = int(size/TABLE_ENTRY_SIZE)
 
     #collect the read
     read = []
@@ -71,6 +91,81 @@ def fill_table_with_read(table, bucket_id, bucket_offset, size, read):
     for i in range(total_indexs):
         bucket, offset = absolute_index_to_bucket_index(base + i, bucket_size)
         table[bucket][offset] = read[i]
+
+#cuckoo protocols
+
+class state_machine:
+    def __init__(self, config):
+        self.config = config
+
+    def fsm(self, message=None):
+        print("state machine top level overload this")
+
+class basic_memory_state_machine(state_machine):
+    def __init__(self,config):
+        super().__init__(config)
+        self.table = config["table"]
+        self.bucket_size = len(self.table)
+        self.table_size = len(self.table[0])
+        self.state = "memory... state not being used"
+    
+    def fsm(self, message=None):
+        print(message.payload)
+        if message == None:
+            return None
+        if message.payload["function"] == read_table_entry:
+            print("running read table entry")
+            bucket_id=message.payload["function_args"]['bucket_id']
+            bucket_offset=message.payload["function_args"]['bucket_offset']
+            size=message.payload["function_args"]['size']
+
+            read = read_table_entry(self.table, bucket_id, bucket_offset, size)
+            m = Message({"function":fill_table_with_read, "function_args":{"read":read}})
+            m.payload["function_args"]["bucket_id"] = bucket_id
+            m.payload["function_args"]["bucket_offset"] = bucket_offset
+            m.payload["function_args"]["size"] = size
+
+            print(m)
+
+            return m
+        else:
+            print("unknown message type " + str(message))
+
+class basic_insert_state_machine(state_machine):
+    def __init__(self, config):
+        self.total_inserts = config["total_inserts"]
+        self.table = config["table"]
+        self.table_size = len(self.table)
+        self.bucket_size = len(self.table[0])
+
+        self.current_insert = 0
+        self.state="idle"
+    def __str__(self):
+        print("Basic_Insert_State_Machine")
+
+    def fsm(self, message = None):
+        if self.state == "idle":
+            print("generating insert")
+            self.current_insert += 1
+            self.state = "reading"
+            locations = hash.hash_locations(self.current_insert, self.table_size)
+            print(locations)
+
+            #only perform an insert to the first location.
+            location = locations[0]
+            message = Message({})
+            message.payload["function"] = read_table_entry
+            message.payload["function_args"] = {'bucket_id':location, 'bucket_offset':0, 'size':self.bucket_size}
+            return message
+
+            # generate read
+        if self.state == "done":
+            print(str(self) + " done")
+
+
+    
+    
+
 
 
 
