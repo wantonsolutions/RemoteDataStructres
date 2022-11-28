@@ -127,34 +127,19 @@ class basic_memory_state_machine(state_machine):
             return None
         if message.payload["function"] == read_table_entry:
             print("running read table entry")
-            bucket_id=message.payload["function_args"]['bucket_id']
-            bucket_offset=message.payload["function_args"]['bucket_offset']
-            size=message.payload["function_args"]['size']
-
-            read = read_table_entry(self.table, bucket_id, bucket_offset, size)
-            m = Message({"function":fill_table_with_read, "function_args":{"read":read}})
-            m.payload["function_args"]["bucket_id"] = bucket_id
-            m.payload["function_args"]["bucket_offset"] = bucket_offset
-            m.payload["function_args"]["size"] = size
-
-            print(m)
-
-            return m
+            args = message.payload["function_args"]
+            read = read_table_entry(self.table, **args)
+            response = Message({"function":fill_table_with_read, "function_args":{"read":read, "bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "size":args["size"]}})
+            print(response)
+            return response
 
         if message.payload["function"] == cas_table_entry:
             print("running cas table entry")
-            bucket_id=message.payload["function_args"]['bucket_id']
-            bucket_offset=message.payload["function_args"]['bucket_offset']
-            old=message.payload["function_args"]['old']
-            new=message.payload["function_args"]['new']
-            success, value = cas_table_entry(self.table, bucket_id, bucket_offset, old, new)
-
-            m = Message({"function":fill_table_with_cas, "function_args":{"value":value, "success":success}})
-            m.payload["function_args"]["bucket_id"] = bucket_id
-            m.payload["function_args"]["bucket_offset"] = bucket_offset
-            print(m)
-            return m
-
+            args = message.payload["function_args"]
+            success, value = cas_table_entry(self.table, **args)
+            response = Message({"function":fill_table_with_cas, "function_args":{"bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "value":value, "success":success}})
+            print(response)
+            return response
 
         else:
             print("unknown message type " + str(message))
@@ -195,14 +180,12 @@ class basic_insert_state_machine(state_machine):
             #insert the table which was read from remote memory
             assert message.payload["function"] == fill_table_with_read, "client is in reading state but message is not a read " + str(message)
             print("inserting response")
-            bucket_id = message.payload["function_args"]["bucket_id"]
-            bucket_offset = message.payload["function_args"]["bucket_offset"]
-            size = message.payload["function_args"]["size"]
-            fill_table_with_read(self.table, bucket_id, bucket_offset, size, message.payload["function_args"]["read"])
+            args = message.payload["function_args"]
+            fill_table_with_read(self.table, **args)
 
             #at this point we have done the read on the remote node, it's time to actually do the insert
             #find the first empty bucket
-            bucket=self.table[bucket_id]
+            bucket=self.table[args["bucket_id"]]
             bucket_cas_index = -1
             for i in range(self.bucket_size):
                 if bucket[i] == None:
@@ -217,7 +200,7 @@ class basic_insert_state_machine(state_machine):
             #at this point we can actually attempt an insert
             message = Message({})
             message.payload["function"] = cas_table_entry
-            message.payload["function_args"] = {'bucket_id':bucket_id, 'bucket_offset':bucket_cas_index, 'old':None, 'new':self.current_insert}
+            message.payload["function_args"] = {'bucket_id':args["bucket_id"], 'bucket_offset':bucket_cas_index, 'old':None, 'new':self.current_insert}
             self.state = "inserting"
             return message
 
@@ -227,13 +210,10 @@ class basic_insert_state_machine(state_machine):
                 return None
             assert message.payload["function"] == fill_table_with_cas, "client is in inserting state but message is not a cas " + str(message)
             print("inserting response")
-            bucket_id = message.payload["function_args"]["bucket_id"]
-            bucket_offset = message.payload["function_args"]["bucket_offset"]
-            success = message.payload["function_args"]["success"]
-            value = message.payload["function_args"]["value"]
-            fill_table_with_cas(self.table, bucket_id, bucket_offset, success, value)
+            args = message.payload["function_args"]
+            fill_table_with_cas(self.table, **args)
 
-            if success:
+            if args["success"]:
                 self.state = "idle"
                 return None
             else:
