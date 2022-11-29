@@ -9,7 +9,7 @@ class Node:
         self.logger = logging.getLogger("root")
 
     def log_prefix(self):
-        return str(self)
+        return "{:<10}".format(str(self))
 
     def info(self, message):
         self.logger.info("[" + self.log_prefix() + "] " + message)
@@ -88,17 +88,13 @@ class Memory(Node):
         return "Memory: " + str(self.memory_id)
 
     def state_machine_step(self, message):
-        self.logger.debug("Memory: " + str(message) + "\n")
         responses = []
         response = self.state_machine.fsm(message)
         responses = messages_append_or_extend(responses, response)
-        self.logger.debug("responses")
-        self.logger.debug(responses)
         for i in range(len(responses)):
             if(responses[i] != None):
                 responses[i].payload['src'] = message.payload['dest']
                 responses[i].payload['dest'] = message.payload['src']
-                self.logger.debug("Turning around message " + str(responses[i]))
         return responses
 
 class Switch(Node):
@@ -108,14 +104,17 @@ class Switch(Node):
         self.switch_id = config['switch_id']
     
     def __str__(self):
-        return "Switch: " + str(self.switch_id)
+        return "Switch"
 
     def process_message(self, message):
-        self.logger.debug("Switch: " + str(message.payload["function"]) + "\n")
+        p = message.payload
+        dest = p["dest"]
+        src = p["src"]
+        self.info("src: "+str(src) + ", dest: " + str(dest) + ", func: " + str(p["function"].__name__))
         return message
 
 
-class Simulator:
+class Simulator(Node):
     def __init__(self, config):
         self.logger = logging.getLogger('root')
         self.step=0
@@ -185,7 +184,7 @@ class Simulator:
 
     #this is mostly a debugging function for a single client
     def deterministic_simulation_step(self):
-        self.logger.info("Step: " + str(self.step))
+        self.critical("Step: " + str(self.step))
         self.client_events()
         self.switch_events()
         self.memory_event()
