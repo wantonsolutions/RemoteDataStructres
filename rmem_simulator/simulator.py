@@ -1,19 +1,21 @@
+import log
+import logging
 from cuckoo import *
 from hash import *
-
+from time import sleep
 
 class Client:
     def __init__(self, config):
+        self.logger = logging.getLogger('root')
         self.config = config
         self.client_id = config['client_id']
 
         self.bucket_size = config['bucket_size']
         #create the index structure
-        print(self.log_str() +  "Init Index")
         index_func = config['index_init_function']
         index_args = config['index_init_args']
 
-        print("Index Function: " + str(index_func.__name__))
+        self.logger.debug("Index Function: " + str(index_func.__name__))
         print("Index Args: " + str(index_args)+"\n")
         self.index = index_func(**index_args)
 
@@ -226,6 +228,8 @@ def test_hashes():
 
 def main():
     #test_hashes()
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator")
     config = {'num_clients': 1, 'num_steps': 50}
     simulator = Simulator(config)
     simulator.run()
