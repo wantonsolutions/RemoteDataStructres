@@ -9,7 +9,7 @@ class Node:
         self.logger = logging.getLogger("root")
 
     def log_prefix(self):
-        return "{:<10}".format(str(self))
+        return "{:<9}".format(str(self))
 
     def info(self, message):
         self.logger.info("[" + self.log_prefix() + "] " + message)
@@ -240,7 +240,7 @@ def main():
     #test_hashes()
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
-    config = {'num_clients': 1, 'num_steps': 500}
+    config = {'num_clients': 2, 'num_steps': 500}
     simulator = Simulator(config)
     simulator.run()
 

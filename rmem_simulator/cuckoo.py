@@ -17,6 +17,12 @@ class Message:
             v += str(key) + ":" + str(value) + "\n"
         return v[:len(v)-1]
 
+def print_bucket_table(table, table_size, bucket_size):
+    for i in range(0, table_size):
+        for j in range(0, bucket_size):
+            print("[" + '{0: <5}'.format(str(table[i][j])) + "] ", end='')
+        print("")
+
 def messages_append_or_extend(messages, message):
     if message != None:
         if isinstance(message, list):
@@ -115,7 +121,7 @@ class state_machine:
         self.config = config
 
     def log_prefix(self):
-        return "{:<10}".format(str(self))
+        return "{:<9}".format(str(self))
 
     def info(self, message):
         self.logger.info("[" + self.log_prefix() + "] " + message)
@@ -136,8 +142,8 @@ class basic_memory_state_machine(state_machine):
     def __init__(self,config):
         super().__init__(config)
         self.table = config["table"]
-        self.bucket_size = len(self.table)
-        self.table_size = len(self.table[0])
+        self.bucket_size = len(self.table[0])
+        self.table_size = len(self.table)
         self.state = "memory... state not being used"
 
     def __str__(self):
@@ -158,6 +164,9 @@ class basic_memory_state_machine(state_machine):
             self.info("CAS: " + "Bucket: " + str(args["bucket_id"]) + " Offset: " + str(args["bucket_offset"]) + " Old: " + str(args["old"]) + " New: " + str(args["new"]))
             success, value = cas_table_entry(self.table, **args)
             response = Message({"function":fill_table_with_cas, "function_args":{"bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "value":value, "success":success}})
+
+            print_bucket_table(self.table, self.table_size, self.bucket_size)
+
             rargs=response.payload["function_args"]
             self.info("Read Response: " +  "Success: " + str(rargs["success"]) + " Value: " + str(rargs["value"]))
             return response
@@ -180,20 +189,43 @@ class basic_insert_state_machine(state_machine):
     def __str__(self):
         return "Client " + str(self.id)
 
+    def read_current(self):
+        locations = hash.hash_locations(self.current_insert, self.table_size)
+        self.info("Inserting: " + str(self.current_insert) + " Locations: " + str(locations))
+        bucket = locations[0]
+        message = Message({})
+        message.payload["function"] = read_table_entry
+        message.payload["function_args"] = {'bucket_id':bucket, 'bucket_offset':0, 'size':n_buckets_size(self.bucket_size)}
+        return message
+
+    def table_contains_value(self, value):
+        #todo this does not actually work because their may be duplicates while inserting
+        #todo asynchronusly
+        locations = hash.hash_locations(value, self.table_size)
+        for location in locations:
+            bucket = self.table[location]
+            if value in bucket:
+                return True
+        return False
+
+    def find_empty_index(self, bucket_index):
+        bucket = self.table[bucket_index]
+        empty_index = -1
+        for i in range(len(bucket)):
+            if bucket[i] == None:
+                empty_index = i
+                break
+        return empty_index
+
+
     def fsm(self, message = None):
         if self.state == "idle":
             assert message == None, "idle state should not have a message being returned, message is old " + str(message)
             self.current_insert += 1
-            self.state = "reading"
-            locations = hash.hash_locations(self.current_insert, self.table_size)
-            self.info("Inserting: " + str(self.current_insert) + " Locations: " + str(locations))
 
+            self.state = "reading"
             #only perform an insert to the first location.
-            location = locations[0]
-            message = Message({})
-            message.payload["function"] = read_table_entry
-            message.payload["function_args"] = {'bucket_id':location, 'bucket_offset':0, 'size':n_buckets_size(self.bucket_size)}
-            return message
+            return self.read_current()
 
         if self.state == "reading":
             if message == None:
@@ -208,16 +240,16 @@ class basic_insert_state_machine(state_machine):
 
             #at this point we have done the read on the remote node, it's time to actually do the insert
             #find the first empty bucket
-            bucket=self.table[args["bucket_id"]]
-            bucket_cas_index = -1
-            for i in range(self.bucket_size):
-                if bucket[i] == None:
-                    bucket_cas_index = i
-                    break
+            
+            #check to see if the bucket contains the insert value
+            if self.table_contains_value(self.current_insert):
+                self.warning("Insert value " + str(self.current_insert) + " already exists in bucket, not inserting, and going idle")
+                self.state = "idle"
+                return
+
+            bucket_cas_index = self.find_empty_index(args["bucket_id"])
             if (bucket_cas_index == -1):
-                self.logger.warning("bucket is full, evicting")
-                self.logger.warning("Todo now we need to cuckoo search")
-                self.logger.warning("exiting for now")
+                self.warning("Bucket is full, not inserting and exiting for now. Need to Cuckoo Search")
                 exit(1)
             
             #at this point we can actually attempt an insert
@@ -240,10 +272,9 @@ class basic_insert_state_machine(state_machine):
                 self.state = "idle"
                 return None
             else:
-                self.warning("cas failed, evicting")
-                self.warning("Todo now we need to cuckoo search")
-                self.warning("exiting for now")
-                exit(1)
+                self.warning("cas failed, retrying read")
+                self.state = "reading"
+                return self.read_current()
 
             # generate read
         if self.state == "done":
