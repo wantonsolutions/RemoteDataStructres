@@ -4,9 +4,28 @@ from cuckoo import *
 from hash import *
 from time import sleep
 
-class Client:
+class Node:
     def __init__(self, config):
-        self.logger = logging.getLogger('root')
+        self.logger = logging.getLogger("root")
+
+    def log_prefix(self):
+        return str(self)
+
+    def info(self, message):
+        self.logger.info("[" + self.log_prefix() + "] " + message)
+
+    def debug(self, message):
+        self.logger.debug("[" + self.log_prefix() + "] " + message)
+
+    def warning(self, message):
+        self.logger.warning("[" + self.log_prefix() + "] " + message)
+
+    def critical(self, message):
+        self.logger.critical("[" + self.log_prefix() + "] " + message)
+
+class Client(Node):
+    def __init__(self, config):
+        super().__init__(config)
         self.config = config
         self.client_id = config['client_id']
 
@@ -15,8 +34,8 @@ class Client:
         index_func = config['index_init_function']
         index_args = config['index_init_args']
 
-        self.logger.debug("Index Function: " + str(index_func.__name__))
-        self.logger.debug("Index Args: " + str(index_args)+"\n")
+        self.debug("Index Function: " + str(index_func.__name__))
+        self.debug("Index Args: " + str(index_args)+"\n")
         self.index = index_func(**index_args)
 
         state_machine_args = config['state_machine_init_args'] 
@@ -27,18 +46,13 @@ class Client:
     def __str__(self):
         return "Client: " + str(self.client_id)
 
-    def log_str(self):
-        return "["+ str(self) + "] "
 
     def state_machine_step(self, message=None):
-        self.logger.debug(self.log_str() + "state machine step")
         messages = []
         if message == None:
-            self.logger.debug("no message for client " + str(self.client_id))
             m = self.state_machine.fsm()
             messages = messages_append_or_extend(messages, m)
         else:
-            self.logger.debug("Client " + str(self.client_id) + " received message: " + str(message) + "\n")
             m = self.state_machine.fsm(message)
             messages = messages_append_or_extend(messages, m)
 
@@ -49,19 +63,19 @@ class Client:
         return messages
 
 
-class Memory:
+class Memory(Node):
     def __init__(self, config):
+        super().__init__(config)
         self.config = config
-        self.logger = logging.getLogger('root')
         self.memory_id = config['memory_id']
         self.bucket_size = config['bucket_size']
 
         #create the index structure
-        self.logger.debug("Initializing memory Index")
+        self.debug("Initializing memory Index")
         index_func = config['index_init_function']
         index_args = config['index_init_args']
-        self.logger.debug("Index Function: " + str(index_func.__name__))
-        self.logger.debug("Index Args: " + str(index_args)+"\n")
+        self.debug("Index Function: " + str(index_func.__name__))
+        self.debug("Index Args: " + str(index_args)+"\n")
         self.index = index_func(**index_args)
 
         state_machine_args = config['state_machine_init_args']
@@ -87,9 +101,9 @@ class Memory:
                 self.logger.debug("Turning around message " + str(responses[i]))
         return responses
 
-class Switch:
+class Switch(Node):
     def __init__(self, config):
-        self.logger = logging.getLogger('root')
+        super().__init__(config)
         self.config = config
         self.switch_id = config['switch_id']
     
@@ -97,7 +111,7 @@ class Switch:
         return "Switch: " + str(self.switch_id)
 
     def process_message(self, message):
-        self.logger.debug("Switch: " + str(message) + "\n")
+        self.logger.debug("Switch: " + str(message.payload["function"]) + "\n")
         return message
 
 
@@ -139,7 +153,6 @@ class Simulator:
         #send messages to the clients
         while len(self.switch_client_channel) > 0:
             sm = self.switch_client_channel.pop()
-            self.logger.debug(sm)
             client_id = sm.payload["dest"]
             self.client_event(client_id, sm)
 

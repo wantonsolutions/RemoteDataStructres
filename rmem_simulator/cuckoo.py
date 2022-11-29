@@ -114,6 +114,21 @@ class state_machine:
         self.logger = logging.getLogger("root")
         self.config = config
 
+    def log_prefix(self):
+        return str(self)
+
+    def info(self, message):
+        self.logger.info("[" + self.log_prefix() + "] " + message)
+
+    def debug(self, message):
+        self.logger.debug("[" + self.log_prefix() + "] " + message)
+
+    def warning(self, message):
+        self.logger.warning("[" + self.log_prefix() + "] " + message)
+
+    def critical(self, message):
+        self.logger.critical("[" + self.log_prefix() + "] " + message)
+
     def fsm(self, message=None):
         self.logger.debug("state machine top level overload this")
 
@@ -124,22 +139,23 @@ class basic_memory_state_machine(state_machine):
         self.bucket_size = len(self.table)
         self.table_size = len(self.table[0])
         self.state = "memory... state not being used"
+
+    def __str__(self):
+        return "Memory Server"
     
     def fsm(self, message=None):
-        self.logger.debug(message.payload)
         if message == None:
             return None
+        args = message.payload["function_args"]
         if message.payload["function"] == read_table_entry:
-            self.logger.info("running read table entry")
-            args = message.payload["function_args"]
+            self.info("Read: " + "Bucket: " + str(args["bucket_id"]) + " Offset: " + str(args["bucket_offset"]) + " Size: " + str(args["size"]))
             read = read_table_entry(self.table, **args)
             response = Message({"function":fill_table_with_read, "function_args":{"read":read, "bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "size":args["size"]}})
-            self.logger.debug(response)
+            self.info("Read Response: " +  str(response.payload["function_args"]["read"]))
             return response
 
         if message.payload["function"] == cas_table_entry:
-            self.logger.info("running cas table entry")
-            args = message.payload["function_args"]
+            self.info("CAS: " + "Bucket: " + str(args["bucket_id"]) + " Offset: " + str(args["bucket_offset"]) + " Old: " + str(args["old"]) + " New: " + str(args["new"]))
             success, value = cas_table_entry(self.table, **args)
             response = Message({"function":fill_table_with_cas, "function_args":{"bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "value":value, "success":success}})
             self.logger.debug(response)
@@ -158,13 +174,14 @@ class basic_insert_state_machine(state_machine):
 
         self.current_insert = 0
         self.state="idle"
+
     def __str__(self):
-        self.logger.debug("Basic_Insert_State_Machine")
+        return "Client FSM"
 
     def fsm(self, message = None):
         if self.state == "idle":
             assert message == None, "idle state should not have a message being returned, message is old " + str(message)
-            self.logger.debug("generating insert")
+            self.debug("generating insert")
             self.current_insert += 1
             self.state = "reading"
             locations = hash.hash_locations(self.current_insert, self.table_size)
@@ -184,7 +201,7 @@ class basic_insert_state_machine(state_machine):
 
             #insert the table which was read from remote memory
             assert message.payload["function"] == fill_table_with_read, "client is in reading state but message is not a read " + str(message)
-            self.logger.debug("inserting response")
+            self.debug("inserting response")
             args = message.payload["function_args"]
             fill_table_with_read(self.table, **args)
 
@@ -197,9 +214,9 @@ class basic_insert_state_machine(state_machine):
                     bucket_cas_index = i
                     break
             if (bucket_cas_index == -1):
-                self.logger.debug("bucket is full, evicting")
-                self.logger.debug("Todo now we need to cuckoo search")
-                self.logger.debug("exiting for now")
+                self.logger.warning("bucket is full, evicting")
+                self.logger.warning("Todo now we need to cuckoo search")
+                self.logger.warning("exiting for now")
                 exit(1)
             
             #at this point we can actually attempt an insert
@@ -211,7 +228,7 @@ class basic_insert_state_machine(state_machine):
 
         if self.state == "inserting":
             if message == None:
-                self.logger.debug("client is in inserting state, and no message was provided, returning")
+                self.debug("State: Inserting, no message provided")
                 return None
             assert message.payload["function"] == fill_table_with_cas, "client is in inserting state but message is not a cas " + str(message)
             self.logger.debug("inserting response")
@@ -222,9 +239,9 @@ class basic_insert_state_machine(state_machine):
                 self.state = "idle"
                 return None
             else:
-                self.logger.debug("cas failed, evicting")
-                self.logger.debug("Todo now we need to cuckoo search")
-                self.logger.debug("exiting for now")
+                self.logger.warning("cas failed, evicting")
+                self.logger.warning("Todo now we need to cuckoo search")
+                self.logger.warning("exiting for now")
                 exit(1)
 
             # generate read

@@ -27,7 +27,7 @@ class CustomFormatter(logging.Formatter):
 
 def setup_custom_logger(name):
     logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
 
     ch = logging.StreamHandler()
     #ch.setLevel(logging.DEBUG)
