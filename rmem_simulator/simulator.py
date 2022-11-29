@@ -40,6 +40,7 @@ class Client(Node):
 
         state_machine_args = config['state_machine_init_args'] 
         state_machine_args['table'] = self.index
+        state_machine_args['id'] = self.client_id
         state_machine_init = config['state_machine_init']
         self.state_machine = state_machine_init(state_machine_args)
 
@@ -239,7 +240,7 @@ def main():
     #test_hashes()
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
-    config = {'num_clients': 1, 'num_steps': 50}
+    config = {'num_clients': 1, 'num_steps': 500}
     simulator = Simulator(config)
     simulator.run()
 

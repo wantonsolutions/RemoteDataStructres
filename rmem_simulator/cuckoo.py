@@ -141,7 +141,7 @@ class basic_memory_state_machine(state_machine):
         self.state = "memory... state not being used"
 
     def __str__(self):
-        return "Memory FSM"
+        return "Memory"
     
     def fsm(self, message=None):
         if message == None:
@@ -169,6 +169,7 @@ class basic_insert_state_machine(state_machine):
     def __init__(self, config):
         super().__init__(config)
         self.total_inserts = config["total_inserts"]
+        self.id = config["id"]
         self.table = config["table"]
         self.table_size = len(self.table)
         self.bucket_size = len(self.table[0])
@@ -177,7 +178,7 @@ class basic_insert_state_machine(state_machine):
         self.state="idle"
 
     def __str__(self):
-        return "Client FSM"
+        return "Client " + str(self.id)
 
     def fsm(self, message = None):
         if self.state == "idle":
