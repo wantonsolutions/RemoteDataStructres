@@ -2,14 +2,14 @@ import logging
 
 class CustomFormatter(logging.Formatter):
 
-    grey = "\033[90m"
-    green = "\033[32"
+    grey = "\033[37m"
+    green = "\033[32m"
     yellow = "\033[33m"
     red = "\033[91m"
     bold_red = "\033[31m"
     reset = "\033[0m"
     #format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
-    format="%(levelname)s\t %(filename)s:%(lineno)s\t%(message)s"
+    format="%(levelname)s\t %(filename)-15s:%(lineno)-15s %(message)s"
 
     FORMATS = {
         logging.DEBUG: grey + format + reset,
@@ -27,10 +27,10 @@ class CustomFormatter(logging.Formatter):
 
 def setup_custom_logger(name):
     logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
 
     ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
+    #ch.setLevel(logging.DEBUG)
 
     ch.setFormatter(CustomFormatter())
 

@@ -1,4 +1,6 @@
 import hashlib
+import logging
+logger = logging.getLogger('root')
 
 def h1(key):
     return hashlib.md5(str(key).encode('utf-8')).hexdigest()
@@ -49,5 +51,5 @@ def hash_locations(key, table_size):
     p = primary_location(key, table_size)
     s = secondary_location(key, factor, table_size)
     if p > s:
-        print("primary is greater than secondary" + str(p) + " " + str(s))
+        logger.info("primary is greater than secondary: " + str(p) + " " + str(s))
     return (primary_location(key, table_size), secondary_location(key, factor, table_size))

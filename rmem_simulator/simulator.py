@@ -16,7 +16,7 @@ class Client:
         index_args = config['index_init_args']
 
         self.logger.debug("Index Function: " + str(index_func.__name__))
-        print("Index Args: " + str(index_args)+"\n")
+        self.logger.debug("Index Args: " + str(index_args)+"\n")
         self.index = index_func(**index_args)
 
         state_machine_args = config['state_machine_init_args'] 
@@ -31,14 +31,14 @@ class Client:
         return "["+ str(self) + "] "
 
     def state_machine_step(self, message=None):
-        print(self.log_str() + "state machine step")
+        self.logger.debug(self.log_str() + "state machine step")
         messages = []
         if message == None:
-            print("no message for client " + str(self.client_id))
+            self.logger.debug("no message for client " + str(self.client_id))
             m = self.state_machine.fsm()
             messages = messages_append_or_extend(messages, m)
         else:
-            print("Client " + str(self.client_id) + " received message: " + str(message) + "\n")
+            self.logger.debug("Client " + str(self.client_id) + " received message: " + str(message) + "\n")
             m = self.state_machine.fsm(message)
             messages = messages_append_or_extend(messages, m)
 
@@ -52,15 +52,16 @@ class Client:
 class Memory:
     def __init__(self, config):
         self.config = config
+        self.logger = logging.getLogger('root')
         self.memory_id = config['memory_id']
         self.bucket_size = config['bucket_size']
 
         #create the index structure
-        print("Initializing memory Index")
+        self.logger.debug("Initializing memory Index")
         index_func = config['index_init_function']
         index_args = config['index_init_args']
-        print("Index Function: " + str(index_func.__name__))
-        print("Index Args: " + str(index_args)+"\n")
+        self.logger.debug("Index Function: " + str(index_func.__name__))
+        self.logger.debug("Index Args: " + str(index_args)+"\n")
         self.index = index_func(**index_args)
 
         state_machine_args = config['state_machine_init_args']
@@ -73,21 +74,22 @@ class Memory:
         return "Memory: " + str(self.memory_id)
 
     def state_machine_step(self, message):
-        print("Memory: " + str(message) + "\n")
+        self.logger.debug("Memory: " + str(message) + "\n")
         responses = []
         response = self.state_machine.fsm(message)
         responses = messages_append_or_extend(responses, response)
-        print("responses")
-        print(responses)
+        self.logger.debug("responses")
+        self.logger.debug(responses)
         for i in range(len(responses)):
             if(responses[i] != None):
                 responses[i].payload['src'] = message.payload['dest']
                 responses[i].payload['dest'] = message.payload['src']
-                print("Turning around message " + str(responses[i]))
+                self.logger.debug("Turning around message " + str(responses[i]))
         return responses
 
 class Switch:
     def __init__(self, config):
+        self.logger = logging.getLogger('root')
         self.config = config
         self.switch_id = config['switch_id']
     
@@ -95,12 +97,13 @@ class Switch:
         return "Switch: " + str(self.switch_id)
 
     def process_message(self, message):
-        print("Switch: " + str(message) + "\n")
+        self.logger.debug("Switch: " + str(message) + "\n")
         return message
 
 
 class Simulator:
     def __init__(self, config):
+        self.logger = logging.getLogger('root')
         self.step=0
         self.config = config
         self.client_list = []
@@ -136,7 +139,7 @@ class Simulator:
         #send messages to the clients
         while len(self.switch_client_channel) > 0:
             sm = self.switch_client_channel.pop()
-            print(sm)
+            self.logger.debug(sm)
             client_id = sm.payload["dest"]
             self.client_event(client_id, sm)
 
@@ -169,7 +172,7 @@ class Simulator:
 
     #this is mostly a debugging function for a single client
     def deterministic_simulation_step(self):
-        print("Step: " + str(self.step))
+        self.logger.info("Step: " + str(self.step))
         self.client_events()
         self.switch_events()
         self.memory_event()
@@ -218,12 +221,6 @@ class Simulator:
         for i in range(self.config['num_steps']):
             self.deterministic_simulation_step()
 
-
-def test_hashes():
-    for value in range(1000):
-        print("value: " + str(value) + " hash: " + str(hash_locations(value, 1024)))
-    print("exiting after test")
-    exit(0)
 
 
 def main():
