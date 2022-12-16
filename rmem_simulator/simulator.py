@@ -195,8 +195,9 @@ class Simulator(Node):
 
     def run(self):
 
-        bucket_size=8
-        memory_size=1024
+        bucket_size=4
+        entry_size=8
+        memory_size=16 * entry_size
         index_init_function=generate_bucket_cuckoo_hash_index
         index_init_args={'memory_size': memory_size, 'bucket_size': bucket_size}
 
@@ -240,7 +241,7 @@ def main():
     #test_hashes()
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
-    config = {'num_clients': 2, 'num_steps': 500}
+    config = {'num_clients': 1, 'num_steps': 30}
     simulator = Simulator(config)
     simulator.run()
 

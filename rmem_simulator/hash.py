@@ -21,6 +21,9 @@ def primary_location(key, table_size):
     #print(mhash)
     return mhash
 
+def get_table_id_from_index(index):
+    return index % 2
+
 def to_base(n, base):
     if n == 0:
         return '0'

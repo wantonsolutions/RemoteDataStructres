@@ -1,9 +1,249 @@
 import hash
 import logging
+import heapq
+from tqdm import tqdm
+import random
 
 logger = logging.getLogger('root')
 
 TABLE_ENTRY_SIZE = 8
+
+
+#########A star search
+def bucket_has_empty(bucket):
+    return None in bucket
+
+def get_first_empty_index(bucket):
+    for i in range(len(bucket)):
+        if bucket[i] == None:
+            return i
+
+class entry:
+    def __init__(self, key):
+        self.key = key
+    def __str__(self):
+        return("Key: " + str(self.key))
+
+class path_element:
+    def __init__(self, key, table_index, bucket_index, bucket_offset):
+        self.key = key
+        self.table_index = table_index
+        self.bucket_index = bucket_index
+        self.bucket_offset = bucket_offset
+
+    def __str__(self):
+        return "(" + str(self.key) + "," + str(self.table_index) + "," + str(self.bucket_index) + "," + str(self.bucket_offset) + ")"
+
+    def __gt__(self, other):
+        return self.bucket_index > other.bucket_index
+
+    def __sub__(self, other):
+        return self.bucket_index - other.bucket_index
+
+def find_closest_target_n_bi_directional(table, location_func,value, n):
+    locations = location_func(value, len(table))
+    index_1 = locations[0]
+    index_2 = locations[0] - 1
+    if index_2 < 0:
+        index_2 = len(table) - 1
+    
+    results=[]
+    while len(results) < n:
+        bucket = table[index_1]
+        if bucket_has_empty(bucket):
+            results.append(index_1)
+        bucket = table[index_2]
+        if bucket_has_empty(bucket):
+            results.append(index_2)
+        index_1 = (index_1+1) % len(table)
+        index_2 = (index_2-1)
+        if index_2 < 0:
+            index_2 = len(table) - 1
+        assert index_1 < len(table), "TODO Implement modulo wrap around in find closest target"
+        assert index_2 < len(table) and index_2 >= 0, "TODO something wrong with look back index"
+    return results
+
+class a_star_pe:
+    def __init__ (self, pe, prior, distance, score):
+        self.pe = pe
+        self.prior = prior
+        self.distance = distance
+        self.fscore = score
+    def __lt__(self, other):
+        return self.fscore < other.fscore
+    def __str__(self) -> str:
+        return "pe:" + str(self.pe) + " prior:" + str(self.prior) + " distance:" + str(self.distance) + "fscore: " + str(self.fscore)
+
+
+def pop_open_list(open_list, open_list_map):
+    val = heapq.heappop(open_list)
+    del open_list_map[val.pe.key]
+    return val
+
+def push_open_list(open_list, open_list_map, aspe):
+    heapq.heappush(open_list,aspe)
+    open_list_map[aspe.pe.key] = aspe
+
+def open_list_contains(open_list_map, aspe):
+    return aspe.pe.key in open_list_map
+
+def push_closed_list(closed_list_map, aspe):
+    closed_list_map[aspe.pe.key] = aspe
+
+def closed_list_contains(closed_list_map, aspe):
+    return aspe.pe.key in closed_list_map
+
+def next_table_index(table_index):
+    if table_index == 0:
+        return 1
+    else:
+        return 0
+
+#designed for exp
+def heuristic_3(current_index, target_index, table_size):
+
+    #todo deal with wrap around
+    #todo the first thing we should do it figure out if we want to move forward or backwards
+    #if the forward direction is closer we should go that way,
+    #and if the backwards direction is closer we should go thy.
+    # print("current_index: " + str(current_index) + " target_index: " + str(target_index))
+
+    median = 4
+    target_index = target_index % table_size
+    if  (target_index == current_index):
+        return 0
+
+    half_table = table_size/2
+    #todo start here after lunch.
+    if (target_index > current_index):
+        if (target_index - current_index <= table_size/2):
+            distance = (target_index - current_index)
+        else:
+            distance = (table_size + (current_index - target_index))
+    else:
+        if (current_index - target_index > table_size/2):
+            distance = (current_index - target_index)
+        else:
+            distance = (target_index - current_index) * -1
+
+    distance = int(distance / median)
+
+    current_table = hash.get_table_id_from_index(current_index)
+    target_table = hash.get_table_id_from_index(target_index)
+
+    if current_table == target_table: 
+        distance = distance + 1
+    return distance
+
+
+
+def fscore(element, target_index, table_size):
+        #TODO start here tomorrow, make Fscore work on a merged table
+        g_score = element.distance
+        h_score = heuristic_3(element.pe.bucket_index, target_index, table_size)
+        f_score = g_score + h_score
+        return f_score
+
+def a_star_search(table, location_func, value):
+    table_size = len(table)
+    bucket_size = len(table[0])
+    targets = find_closest_target_n_bi_directional(table, location_func, value, 20)
+
+    while (len(targets) > 0):
+        target_index = targets.pop(0)
+        starting_pe = path_element(value, -1, -1, -1)
+        search_element = a_star_pe(starting_pe, prior=None, distance=0, score=0)
+
+        open_list = []
+        open_list_map=dict()
+        push_open_list(open_list, open_list_map, search_element)
+
+        closed_list_map=dict()
+
+        found = False
+        while len(open_list) > 0:
+            # min_index, min_fscore = find_lowest_f_score(open_list, target_table, target_index, table_size)
+            # search_element = open_list.pop(min_index)#[min_index]
+            search_element = pop_open_list(open_list, open_list_map)
+            push_closed_list(closed_list_map, search_element)
+
+            locations = location_func(search_element.pe.key, len(table))
+            print(locations)
+            table_index = next_table_index(search_element.pe.table_index)
+            index = locations[table_index]
+            print(index)
+
+
+            # print("Search: ("+str(table_index)+","+str(search_index) + ")"+ " Closest Target:("+ str(target_table) + "," + str(target_index)+")")
+            #Check if any slots are open for the search element
+
+            if bucket_has_empty(table[index]):
+                # print("Found Slot:" + str(search_element.pe))
+                bucket_index = get_first_empty_index(table[index])
+                search_element = a_star_pe(pe = path_element(table[index][bucket_index],table_index,index,bucket_index), prior=search_element, distance=search_element.distance+1, score=0)
+
+                f_score = fscore(search_element, target_index, table_size)
+                search_element.fscore = f_score
+
+                found = True
+                break
+
+            if found:
+                break
+
+
+            #add all the available neighbors to the open list
+            child_list=[]
+            for i in range(bucket_size):
+                neighbor = a_star_pe(pe = path_element(table[index][i],table_index, index, i),prior=search_element, distance=search_element.distance+1, score=0)
+                f_score = fscore(neighbor, target_index, table_size)
+                neighbor.fscore = f_score
+                child_list.append(neighbor)
+            
+            for child in child_list:
+                if closed_list_contains(closed_list_map, child):
+                    continue
+                #update existing open list elements if the new one is better
+                if open_list_contains(open_list_map, child):
+                    existing_element = open_list_map[child.pe.key]
+                    if child.distance < existing_element.distance:
+                        existing_element.distance = child.distance
+                        existing_element.prior = child.prior
+                        f_score = fscore(existing_element, target_index, table_size)
+                        existing_element.fscore = f_score
+
+                    continue
+                push_open_list(open_list, open_list_map, child)
+            
+            
+        if found:
+            break
+
+    
+    #construct the path
+    if found:
+        path = []
+        while search_element != None:
+            path.append(search_element.pe)
+            search_element = search_element.prior
+        path=path[::-1]
+
+
+        return [path]
+    else:
+        search_index = location_func(value, table_size, suffix)[0]
+        return[]
+
+def bucket_cuckoo_a_star_insert(table, location_func, value):
+    insert_paths=a_star_search(table, location_func, value)
+    if len(insert_paths) == 0:
+        return []
+    insert_path = insert_paths[random.randint(0, len(insert_paths)-1)]
+    print(insert_path)
+    # insert_cuckoo_path(insert_path, tables)
+    # return insert_path
+
+
 
 class Message:
     def __init__(self, config):
@@ -42,12 +282,21 @@ def n_buckets_size(n_buckets):
 def generate_bucket_cuckoo_hash_index(memory_size, bucket_size):
     number_tables=2
     entry_size=8
+
+    total_rows = int(memory_size/bucket_size)/entry_size
+    print("Memory Size: " + str(memory_size))
+    print("Bucket Size: " + str(bucket_size))
+    print("Total Rows: " + str(total_rows))
+
+    assert(total_rows > 1, "We must have more than 1 row")
+
+
     #for cuckoo hashing we have two tables, therefore memory size must be a power of two
     assert(memory_size % number_tables == 0)
     #We also need the number of buckets to fit into memory correctly
     assert((memory_size/number_tables) % bucket_size == 0)
     #finally each entry in the bucket is 8 bytes
-    assert(((memory_size/number_tables)/bucket_size % entry_size == 0))
+    assert(((memory_size/number_tables)/bucket_size % entry_size == 0), "Memory size must be a multiple of 8")
     table = []
     rows = int((memory_size/entry_size)/bucket_size)
     for i in range(rows):
@@ -225,6 +474,8 @@ class basic_insert_state_machine(state_machine):
 
             self.state = "reading"
             #only perform an insert to the first location.
+            path=bucket_cuckoo_a_star_insert(self.table, hash.hash_locations, self.current_insert)
+
             return self.read_current()
 
         if self.state == "reading":
