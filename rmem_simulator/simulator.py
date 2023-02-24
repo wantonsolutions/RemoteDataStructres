@@ -198,7 +198,7 @@ class Simulator(Node):
         bucket_size=4
         entry_size=8
         memory_size=16 * entry_size
-        index_init_function=generate_bucket_cuckoo_hash_index
+        index_init_function=Table
         index_init_args={'memory_size': memory_size, 'bucket_size': bucket_size}
 
 
@@ -207,7 +207,7 @@ class Simulator(Node):
             client_config = {'client_id': i}
 
             client_config['bucket_size'] = bucket_size
-            client_config['index_init_function'] = index_init_function
+            client_config['index_init_function'] = Table
             client_config['index_init_args'] = index_init_args
 
             client_config['state_machine_init']=basic_insert_state_machine
@@ -220,7 +220,7 @@ class Simulator(Node):
         #initialize memory
         memory_config = {'memory_id': 0}
         memory_config['bucket_size'] = bucket_size
-        memory_config['index_init_function'] = index_init_function
+        memory_config['index_init_function'] = Table
         memory_config['index_init_args'] = index_init_args
 
         memory_config['state_machine_init']=basic_memory_state_machine
