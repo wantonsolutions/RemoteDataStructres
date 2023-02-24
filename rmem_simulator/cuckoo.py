@@ -8,7 +8,6 @@ logger = logging.getLogger('root')
 
 TABLE_ENTRY_SIZE = 8
 
-
 #########A star search
 def bucket_has_empty(bucket):
     return None in bucket
@@ -18,12 +17,15 @@ def get_first_empty_index(bucket):
         if bucket[i] == None:
             return i
 
+#an entry is a physical entry in the hash table index.
 class entry:
     def __init__(self, key):
         self.key = key
     def __str__(self):
         return("Key: " + str(self.key))
 
+#paths are built from path elements. A path element is a tuple of (key, table_index, bucket_index, bucket_offset)
+#that defines a cuckoo path
 class path_element:
     def __init__(self, key, table_index, bucket_index, bucket_offset):
         self.key = key
@@ -40,6 +42,22 @@ class path_element:
     def __sub__(self, other):
         return self.bucket_index - other.bucket_index
 
+#print a list of path elements
+#todo refactor to create a class called path
+def print_path(path):
+    print("Printing Path")
+    if path == None:
+        print("No path")
+        return
+    for i in range(len(path)):
+        print(path[i])
+
+#locations for insertion are found in both directions from
+#the hash location.  this function searches in both
+#directions to produce a list of n locations which are close
+#to the original hash. There is no guarantee that these
+#entries are reachable. They are merely the closest n open
+#entries.
 def find_closest_target_n_bi_directional(table, location_func,value, n):
     locations = location_func(value, len(table))
     index_1 = locations[0]
@@ -63,6 +81,9 @@ def find_closest_target_n_bi_directional(table, location_func,value, n):
         assert index_2 < len(table) and index_2 >= 0, "TODO something wrong with look back index"
     return results
 
+#an a star path element is a path element which we search
+#for using a star. These elements have a prior, a score, and
+#a distance from the destination.
 class a_star_pe:
     def __init__ (self, pe, prior, distance, score):
         self.pe = pe
@@ -239,9 +260,7 @@ def bucket_cuckoo_a_star_insert(table, location_func, value):
     if len(insert_paths) == 0:
         return []
     insert_path = insert_paths[random.randint(0, len(insert_paths)-1)]
-    print(insert_path)
-    # insert_cuckoo_path(insert_path, tables)
-    # return insert_path
+    return insert_path
 
 
 
@@ -284,21 +303,32 @@ def generate_bucket_cuckoo_hash_index(memory_size, bucket_size):
     entry_size=8
 
     total_rows = int(memory_size/bucket_size)/entry_size
-    print("Memory Size: " + str(memory_size))
-    print("Bucket Size: " + str(bucket_size))
-    print("Total Rows: " + str(total_rows))
+    logger.debug("Memory Size: " + str(memory_size))
+    logger.debug("Bucket Size: " + str(bucket_size))
+    logger.debug("Total Rows: " + str(total_rows))
 
-    assert(total_rows > 1, "We must have more than 1 row")
-
+    #we must have more than one row. I'm not worried about
+    #the pessimal case here, the point is to test hash
+    #tables
+    row_err = "We must have more than 1 row"
+    assert(total_rows > 1, row_err)
 
     #for cuckoo hashing we have two tables, therefore memory size must be a power of two
-    assert(memory_size % number_tables == 0)
+    table_div_error = "Memory must divide evenly across tables. Memory:" + str(memory_size) + " Tables:" + str(number_tables)
+    assert(memory_size % number_tables == 0, table_div_error)
+
     #We also need the number of buckets to fit into memory correctly
-    assert((memory_size/number_tables) % bucket_size == 0)
+    bucket_div_error = "Memory must divide evenly across buckets. Memory:" + str(memory_size) + " Buckets:" + str(bucket_size)
+    assert((memory_size/number_tables) % bucket_size == 0, bucket_div_error)
+
     #finally each entry in the bucket is 8 bytes
-    assert(((memory_size/number_tables)/bucket_size % entry_size == 0), "Memory size must be a multiple of 8")
+    entry_div_error = "Memory must divide evenly across entries. Memory:" + str(memory_size) + " Entries:" + str(entry_size)
+    assert(((memory_size/number_tables)/bucket_size % entry_size == 0), entry_div_error)
+
     table = []
     rows = int((memory_size/entry_size)/bucket_size)
+
+    logger.debug("Generating table with " + str(rows) + " rows and " + str(bucket_size) + " buckets per row")
     for i in range(rows):
         table.append([None]*bucket_size)
     return table
@@ -433,6 +463,8 @@ class basic_insert_state_machine(state_machine):
         self.bucket_size = len(self.table[0])
 
         self.current_insert = 0
+        self.search_path = []
+        self.search_path_index = 0
         self.state="idle"
 
     def __str__(self):
@@ -445,6 +477,14 @@ class basic_insert_state_machine(state_machine):
         message = Message({})
         message.payload["function"] = read_table_entry
         message.payload["function_args"] = {'bucket_id':bucket, 'bucket_offset':0, 'size':n_buckets_size(self.bucket_size)}
+        return message
+
+
+
+    def read_path_element(self, pe):
+        message = Message({})
+        message.payload["function"] = read_table_entry
+        message.payload["function_args"] = {'bucket_id':pe.bucket_index, 'bucket_offset':0, 'size':n_buckets_size(self.bucket_size)}
         return message
 
     def table_contains_value(self, value):
@@ -474,9 +514,10 @@ class basic_insert_state_machine(state_machine):
 
             self.state = "reading"
             #only perform an insert to the first location.
-            path=bucket_cuckoo_a_star_insert(self.table, hash.hash_locations, self.current_insert)
-
-            return self.read_current()
+            self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.hash_locations, self.current_insert)
+            self.search_index=1
+            print_path(self.search_path)
+            return self.read_path_element(self.search_path[self.search_index])
 
         if self.state == "reading":
             if message == None:
