@@ -27,7 +27,7 @@ class path_element:
         self.bucket_offset = bucket_offset
 
     def __str__(self):
-        return "(" + str(self.key) + "," + str(self.table_index) + "," + str(self.bucket_index) + "," + str(self.bucket_offset) + ")"
+        return "(key: " + str(self.key) + ", table: " + str(self.table_index) + ", bucket: " + str(self.bucket_index) + ", offset: " + str(self.bucket_offset) + ")"
 
     def __gt__(self, other):
         return self.bucket_index > other.bucket_index
@@ -53,7 +53,7 @@ def print_path(path):
 #to the original hash. There is no guarantee that these
 #entries are reachable. They are merely the closest n open
 #entries.
-def find_closest_target_n_bi_directional(table, location_func,value, n):
+def find_closest_target_n_bi_directional(table, location_func, value, n):
     locations = location_func(value, table.table_size)
     index_1 = locations[0]
     index_2 = locations[0] - 1
@@ -385,6 +385,7 @@ class Table:
         assert self.table[0] != None, "table must have dimensions"
         assert read_size % TABLE_ENTRY_SIZE == 0, "size must be a multiple of 8"
 
+#RDMA operations on the table
 def fill_table_with_cas(table, bucket_id, bucket_offset, success, value):
     table.assert_operation_in_table_bound(bucket_id, bucket_offset, TABLE_ENTRY_SIZE)
     table.set_entry(bucket_id,bucket_offset,value)
@@ -423,7 +424,6 @@ def fill_table_with_read(table, bucket_id, bucket_offset, size, read):
         table.set_entry(bucket, offset, read[i])
 
 #cuckoo protocols
-
 class state_machine:
     def __init__(self, config):
         self.logger = logging.getLogger("root")
@@ -505,22 +505,28 @@ class basic_insert_state_machine(state_machine):
         message.payload["function_args"] = {'bucket_id':bucket, 'bucket_offset':0, 'size':self.table.row_size()}
         return message
 
-
-
     def read_path_element(self, pe):
         message = Message({})
         message.payload["function"] = read_table_entry
         message.payload["function_args"] = {'bucket_id':pe.bucket_index, 'bucket_offset':0, 'size':self.table.row_size()}
         return message
 
-    def table_contains_value(self, value):
-        #todo this does not actually work because their may be duplicates while inserting
-        #todo asynchronusly
+    def local_table_contains_value(self, value):
         locations = hash.hash_locations(value, self.table.table_size)
         for bucket_index in locations:
             if self.table.bucket_contains(bucket_index, value):
                 return True
         return False
+
+    def next_cas_message(self):
+
+        insert_pe = self.search_path[self.search_path_index] 
+        copy_pe = self.search_path[self.search_path_index-1]
+
+        message = Message({})
+        message.payload["function"] = cas_table_entry
+        message.payload["function_args"] = {'bucket_id':insert_pe.bucket_index, 'bucket_offset':insert_pe.bucket_offset, 'old':insert_pe.key, 'new':copy_pe.key}
+        return message
 
 
     def fsm(self, message = None):
@@ -529,44 +535,47 @@ class basic_insert_state_machine(state_machine):
             assert message == None, "idle state should not have a message being returned, message is old " + str(message)
             self.current_insert += 1
 
-            self.state = "reading"
             #only perform an insert to the first location.
             self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.hash_locations, self.current_insert)
             print_path(self.search_path)
-            self.search_index=1
-            return self.read_path_element(self.search_path[self.search_index])
+            self.search_path_index = len(self.search_path)-1
 
-        if self.state == "reading":
-            if message == None:
-                self.debug("client is in reading state, and no message was provided, returning")
-                return None
-
-            #insert the table which was read from remote memory
-            assert message.payload["function"] == fill_table_with_read, "client is in reading state but message is not a read " + str(message)
-            self.info("Read Response: " +  str(message.payload["function_args"]["read"]))
-            args = message.payload["function_args"]
-            fill_table_with_read(self.table, **args)
-
-            #at this point we have done the read on the remote node, it's time to actually do the insert
-            #find the first empty bucket
-            
-            #check to see if the bucket contains the insert value
-            if self.table_contains_value(self.current_insert):
-                self.warning("Insert value " + str(self.current_insert) + " already exists in bucket, not inserting, and going idle")
-                self.state = "idle"
-                return
-
-            bucket_cas_index = self.table.find_empty_index(args["bucket_id"])
-            if (bucket_cas_index == -1):
-                self.warning("Bucket is full, not inserting and exiting for now. Need to Cuckoo Search")
-                exit(1)
-            
-            #at this point we can actually attempt an insert
-            message = Message({})
-            message.payload["function"] = cas_table_entry
-            message.payload["function_args"] = {'bucket_id':args["bucket_id"], 'bucket_offset':bucket_cas_index, 'old':None, 'new':self.current_insert}
             self.state = "inserting"
+            message = self.next_cas_message()
+
             return message
+
+        # if self.state == "reading":
+        #     if message == None:
+        #         self.debug("client is in reading state, and no message was provided, returning")
+        #         return None
+
+        #     #insert the table which was read from remote memory
+        #     assert message.payload["function"] == fill_table_with_read, "client is in reading state but message is not a read " + str(message)
+        #     self.info("Read Response: " +  str(message.payload["function_args"]["read"]))
+        #     args = message.payload["function_args"]
+        #     fill_table_with_read(self.table, **args)
+
+        #     #at this point we have done the read on the remote node, it's time to actually do the insert
+        #     #find the first empty bucket
+            
+        #     #check to see if the bucket contains the insert value
+        #     if self.local_table_contains_value(self.current_insert):
+        #         self.warning("Insert value " + str(self.current_insert) + " already exists in bucket, not inserting, and going idle")
+        #         self.state = "idle"
+        #         return
+
+        #     bucket_cas_index = self.table.find_empty_index(args["bucket_id"])
+        #     if (bucket_cas_index == -1):
+        #         self.warning("Bucket is full, not inserting and exiting for now. Need to Cuckoo Search")
+        #         exit(1)
+
+        #     #at this point we can actually attempt an insert
+        #     message = Message({})
+        #     message.payload["function"] = cas_table_entry
+        #     message.payload["function_args"] = {'bucket_id':args["bucket_id"], 'bucket_offset':bucket_cas_index, 'old':None, 'new':self.current_insert}
+        #     self.state = "inserting"
+        #     return message
 
         if self.state == "inserting":
             if message == None:
@@ -577,17 +586,93 @@ class basic_insert_state_machine(state_machine):
             self.info("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["value"]))
             fill_table_with_cas(self.table, **args)
 
-            if args["success"]:
+            if not args["success"]:
+                # self.state = "idle"
+                # return None
+                self.warning("cas failed, retrying read")
                 self.state = "idle"
+                #todo perform a read, for not we should not fail cas
+                # return self.read_current()
+
+            self.search_path_index -= 1
+            if self.search_path_index == 0:
+                self.info("complete insertion")
+                self.state="idle"
                 return None
             else:
-                self.warning("cas failed, retrying read")
-                self.state = "reading"
-                return self.read_current()
+                message = self.next_cas_message()
+                return message
+            
+
 
             # generate read
-        if self.state == "done":
-            self.logger.debug(str(self) + " done")
+
+
+    # def fsm(self, message = None):
+
+    #     if self.state == "idle":
+    #         assert message == None, "idle state should not have a message being returned, message is old " + str(message)
+    #         self.current_insert += 1
+
+    #         self.state = "reading"
+    #         #only perform an insert to the first location.
+    #         self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.hash_locations, self.current_insert)
+    #         print_path(self.search_path)
+    #         self.search_index=1
+    #         return self.read_path_element(self.search_path[self.search_index])
+
+    #     if self.state == "reading":
+    #         if message == None:
+    #             self.debug("client is in reading state, and no message was provided, returning")
+    #             return None
+
+    #         #insert the table which was read from remote memory
+    #         assert message.payload["function"] == fill_table_with_read, "client is in reading state but message is not a read " + str(message)
+    #         self.info("Read Response: " +  str(message.payload["function_args"]["read"]))
+    #         args = message.payload["function_args"]
+    #         fill_table_with_read(self.table, **args)
+
+    #         #at this point we have done the read on the remote node, it's time to actually do the insert
+    #         #find the first empty bucket
+            
+    #         #check to see if the bucket contains the insert value
+    #         if self.local_table_contains_value(self.current_insert):
+    #             self.warning("Insert value " + str(self.current_insert) + " already exists in bucket, not inserting, and going idle")
+    #             self.state = "idle"
+    #             return
+
+    #         bucket_cas_index = self.table.find_empty_index(args["bucket_id"])
+    #         if (bucket_cas_index == -1):
+    #             self.warning("Bucket is full, not inserting and exiting for now. Need to Cuckoo Search")
+    #             exit(1)
+            
+    #         #at this point we can actually attempt an insert
+    #         message = Message({})
+    #         message.payload["function"] = cas_table_entry
+    #         message.payload["function_args"] = {'bucket_id':args["bucket_id"], 'bucket_offset':bucket_cas_index, 'old':None, 'new':self.current_insert}
+    #         self.state = "inserting"
+    #         return message
+
+    #     if self.state == "inserting":
+    #         if message == None:
+    #             self.debug("State: Inserting, no message provided")
+    #             return None
+    #         assert message.payload["function"] == fill_table_with_cas, "client is in inserting state but message is not a cas " + str(message)
+    #         args = message.payload["function_args"]
+    #         self.info("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["value"]))
+    #         fill_table_with_cas(self.table, **args)
+
+    #         if args["success"]:
+    #             self.state = "idle"
+    #             return None
+    #         else:
+    #             self.warning("cas failed, retrying read")
+    #             self.state = "reading"
+    #             return self.read_current()
+
+    #         # generate read
+    #     if self.state == "done":
+    #         self.logger.debug(str(self) + " done")
 
 
     
