@@ -3,6 +3,7 @@ import logging
 from cuckoo import *
 from hash import *
 from time import sleep
+import json
 
 class Node:
     def __init__(self, config):
@@ -195,9 +196,10 @@ class Simulator(Node):
 
     def run(self):
 
-        bucket_size=4
-        entry_size=8
-        memory_size=16 * entry_size
+        bucket_size=self.config['bucket_size']
+        entry_size=self.config['entry_size']
+        indexes=self.config['indexes']
+        memory_size=entry_size * indexes
         index_init_function=Table
         index_init_args={'memory_size': memory_size, 'bucket_size': bucket_size}
 
@@ -235,15 +237,43 @@ class Simulator(Node):
         for i in range(self.config['num_steps']):
             self.deterministic_simulation_step()
 
+    def collect_stats(self):
+        statistics = dict()
+
+        #simulator stats
+        statistics['config'] = dict()
+        statistics['config'] = self.config
+
+        #memory stats
+        statistics['memory'] = dict()
+        fill = self.memory.index.get_fill_percentage()
+        statistics['memory']['fill'] = fill
+
+        stats = json.dumps(statistics)
+        self.logger.info(stats)
+
+     
+def gen_config():
+    config = dict()
+    config['num_clients']=1
+    config['num_steps']=65
+
+    #table settings
+    config['bucket_size']=4
+    config['entry_size']=8
+    config['indexes']=32
+
+    return config
 
 
 def main():
     #test_hashes()
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
-    config = {'num_clients': 1, 'num_steps': 30}
+    config = gen_config()
     simulator = Simulator(config)
     simulator.run()
+    simulator.collect_stats()
 
 if __name__ == "__main__":
     main()

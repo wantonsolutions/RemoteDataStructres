@@ -54,5 +54,5 @@ def hash_locations(key, table_size):
     p = primary_location(key, table_size)
     s = secondary_location(key, factor, table_size)
     if p > s:
-        logger.info("primary is greater than secondary: " + str(p) + " " + str(s))
+        logger.debug("primary is greater than secondary: " + str(p) + " " + str(s))
     return (primary_location(key, table_size), secondary_location(key, factor, table_size))
