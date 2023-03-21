@@ -183,10 +183,19 @@ class Simulator(Node):
             mm = self.memory.state_machine_step(sm)
             self.memory_switch_channel.extend(mm)
 
+    def no_events(self):
+        return len(self.client_switch_channel) == 0 and len(self.switch_memory_channel) == 0 and len(self.switch_client_channel) == 0 and len(self.memory_switch_channel) == 0
+
+    def clients_complete(self):
+        for i in range(len(self.client_list)):
+            if self.client_list[i].state_machine.state != "complete":
+                return False
+        return True
+
 
     #this is mostly a debugging function for a single client
     def deterministic_simulation_step(self):
-        self.critical("Step: " + str(self.step))
+        self.warning("Step: " + str(self.step))
         self.client_events()
         self.switch_events()
         self.memory_event()
@@ -237,6 +246,9 @@ class Simulator(Node):
         for i in range(self.config['num_steps']):
             self.deterministic_simulation_step()
 
+            if self.no_events() == True and self.clients_complete() == True:
+                break
+
     def collect_stats(self):
         statistics = dict()
 
@@ -248,15 +260,15 @@ class Simulator(Node):
         statistics['memory'] = dict()
         fill = self.memory.index.get_fill_percentage()
         statistics['memory']['fill'] = fill
+        self.memory.index.print()
 
-        stats = json.dumps(statistics)
-        self.logger.info(stats)
+        return statistics
 
      
-def gen_config():
+def default_config():
     config = dict()
     config['num_clients']=1
-    config['num_steps']=65
+    config['num_steps']=100000
 
     #table settings
     config['bucket_size']=4
@@ -270,7 +282,7 @@ def main():
     #test_hashes()
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
-    config = gen_config()
+    config = default_config()
     simulator = Simulator(config)
     simulator.run()
     simulator.collect_stats()

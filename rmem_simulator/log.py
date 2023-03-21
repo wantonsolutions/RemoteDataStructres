@@ -30,11 +30,11 @@ def setup_custom_logger(name):
     logger = logging.getLogger(name)
     #logger.setLevel(logging.DEBUG)
     logger.setLevel(logging.INFO)
-
     ch = logging.StreamHandler()
-
     ch.setFormatter(CustomFormatter())
-
     logger.addHandler(ch)
-
     return logger
+
+def set_off():
+    logger = logging.getLogger('root')
+    logger.setLevel(logging.CRITICAL)

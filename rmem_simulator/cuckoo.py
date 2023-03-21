@@ -3,7 +3,6 @@ import logging
 import heapq
 from tqdm import tqdm
 import random
-import json
 
 logger = logging.getLogger('root')
 
@@ -247,6 +246,8 @@ def a_star_search(table, location_func, value):
         return []
 
 def bucket_cuckoo_a_star_insert(table, location_func, value):
+    if table.full():
+        return []
     insert_paths=a_star_search(table, location_func, value)
     if len(insert_paths) == 0:
         return []
@@ -283,8 +284,6 @@ class Table:
         self.entry_size=8
         self.memory_size=memory_size
         self.bucket_size=bucket_size
-        print(memory_size)
-        print(bucket_size)
         self.table=self.generate_bucket_cuckoo_hash_index(memory_size, bucket_size)
         self.table_size = len(self.table)
         self.fill = 0
@@ -313,7 +312,7 @@ class Table:
         old = self.table[bucket][offset]
         if old == None:
             self.fill += 1
-            print("Fill: " + str(self.fill))
+            # print("Fill: " + str(self.fill))
         self.table[bucket][offset] = entry
 
 
@@ -330,6 +329,9 @@ class Table:
 
     def get_fill_percentage(self):
         return float(self.fill)/float(self.table_size * self.bucket_size)
+
+    def full(self):
+        return self.fill == self.table_size * self.bucket_size
 
 
     def generate_bucket_cuckoo_hash_index(self, memory_size, bucket_size):
@@ -487,7 +489,7 @@ class basic_memory_state_machine(state_machine):
             success, value = cas_table_entry(self.table, **args)
             response = Message({"function":fill_table_with_cas, "function_args":{"bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "value":value, "success":success}})
 
-            self.table.print()
+            ##self.table.print()
 
             rargs=response.payload["function_args"]
             self.info("Read Response: " +  "Success: " + str(rargs["success"]) + " Value: " + str(rargs["value"]))
@@ -563,7 +565,7 @@ class basic_insert_state_machine(state_machine):
 
             self.search_path_index = len(self.search_path)-1
             message = self.next_cas_message()
-            print_path(self.search_path)
+            # print_path(self.search_path)
             return message
 
         if self.state == "inserting":
@@ -582,7 +584,7 @@ class basic_insert_state_machine(state_machine):
             if not success:
                 exit(0)
                 self.warning("cas failed, retrying read")
-                self.table.print()
+                ##self.table.print()
                 #don't try anything special, just back off and start again
                 self.current_insert = self.current_insert - 1
                 self.state = "idle"
