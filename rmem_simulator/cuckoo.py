@@ -47,6 +47,20 @@ def print_path(path):
         prefix = str(i)
         print(prefix + ") " + str(value))
 
+def path_index_range(path):
+    max_index = -1
+    min_index = 1 << 32 #very large
+    # print_path(path)
+    for i in range(len(path)):
+        value = path[i]
+        # print(value)
+        if value.bucket_index > max_index:
+            max_index = value.bucket_index
+        if value.bucket_index >= 0 and value.bucket_index < min_index:
+            min_index = value.bucket_index
+    # print("max,min index",max_index,min_index )
+    return max_index - min_index
+
 #locations for insertion are found in both directions from
 #the hash location.  this function searches in both
 #directions to produce a list of n locations which are close
@@ -129,6 +143,8 @@ def heuristic_3(current_index, target_index, table_size):
 
     half_table = table_size/2
     #todo start here after lunch.
+
+
     if (target_index > current_index):
         if (target_index - current_index <= table_size/2):
             distance = (target_index - current_index)
@@ -149,12 +165,32 @@ def heuristic_3(current_index, target_index, table_size):
         distance = distance + 1
     return distance
 
+def heuristic_4(current_index, target_index, table_size):
+    median = 4 ## This value is the median number of buckets we hop per step
+    distance = 0
+    target_index = target_index % table_size
+    if  (target_index == current_index):
+        return distance
+
+    current_table = hash.get_table_id_from_index(current_index)
+    target_table = hash.get_table_id_from_index(target_index)
+    if current_table == target_table:
+        distance = distance + 1
+
+    # if (target_index < current_index):
+    #     target_index = target_index + table_size
+
+    # distance = distance + int((target_index - current_index) / median)
+    return distance
+
+
 
 
 def fscore(element, target_index, table_size):
         #TODO start here tomorrow, make Fscore work on a merged table
         g_score = element.distance
-        h_score = heuristic_3(element.pe.bucket_index, target_index, table_size)
+        h_score = heuristic_4(element.pe.bucket_index, target_index, table_size)
+        # print(h_score)
         f_score = g_score + h_score
         return f_score
 
@@ -291,6 +327,7 @@ class Table:
 
     def print(self):
         for i in range(0, self.table_size):
+            print('{0: <5}'.format(str(i)+")"), end='')
             for j in range(0, self.bucket_size):
                 print("[" + '{0: <5}'.format(str(self.table[i][j])) + "] ", end='')
             print("")
@@ -446,6 +483,37 @@ class state_machine:
         self.logger = logging.getLogger("root")
         self.config = config
 
+        #state machine statistics
+        self.total_bytes = 0
+        self.read_bytes = 0
+        self.write_bytes = 0
+        self.cas_bytes = 0
+        self.total_reads = 0
+        self.total_writes = 0
+        self.total_cas = 0
+        self.total_cas_failures = 0
+
+        self.current_read_length = 0
+        self.messages_per_read = []
+        self.current_insert_length = 0
+        self.messages_per_insert = []
+        self.index_range_per_insert = []
+
+    def get_stats(self):
+        stats = dict()
+        stats["total_bytes"] = self.total_bytes
+        stats["read_bytes"] = self.read_bytes
+        stats["write_bytes"] = self.write_bytes
+        stats["cas_bytes"] = self.cas_bytes
+        stats["total_reads"] = self.total_reads
+        stats["total_writes"] = self.total_writes
+        stats["total_cas"] = self.total_cas
+        stats["total_cas_failures"] = self.total_cas_failures
+        stats["messages_per_read"] = self.messages_per_read
+        stats["messages_per_insert"] = self.messages_per_insert
+        stats["index_range_per_insert"] = self.index_range_per_insert
+        return stats
+
     def log_prefix(self):
         return "{:<9}".format(str(self))
 
@@ -463,40 +531,6 @@ class state_machine:
 
     def fsm(self, message=None):
         self.logger.debug("state machine top level overload this")
-
-class basic_memory_state_machine(state_machine):
-    def __init__(self,config):
-        super().__init__(config)
-        self.table = config["table"]
-        self.state = "memory... state not being used"
-
-    def __str__(self):
-        return "Memory"
-    
-    def fsm(self, message=None):
-        if message == None:
-            return None
-        args = message.payload["function_args"]
-        if message.payload["function"] == read_table_entry:
-            self.info("Read: " + "Bucket: " + str(args["bucket_id"]) + " Offset: " + str(args["bucket_offset"]) + " Size: " + str(args["size"]))
-            read = read_table_entry(self.table, **args)
-            response = Message({"function":fill_table_with_read, "function_args":{"read":read, "bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "size":args["size"]}})
-            self.info("Read Response: " +  str(response.payload["function_args"]["read"]))
-            return response
-
-        if message.payload["function"] == cas_table_entry:
-            self.info("CAS: " + "Bucket: " + str(args["bucket_id"]) + " Offset: " + str(args["bucket_offset"]) + " Old: " + str(args["old"]) + " New: " + str(args["new"]))
-            success, value = cas_table_entry(self.table, **args)
-            response = Message({"function":fill_table_with_cas, "function_args":{"bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "value":value, "success":success}})
-
-            ##self.table.print()
-
-            rargs=response.payload["function_args"]
-            self.info("Read Response: " +  "Success: " + str(rargs["success"]) + " Value: " + str(rargs["value"]))
-            return response
-
-        else:
-            self.logger.warning("unknown message type " + str(message))
 
 class basic_insert_state_machine(state_machine):
     def __init__(self, config):
@@ -537,6 +571,9 @@ class basic_insert_state_machine(state_machine):
 
     def next_cas_message(self):
 
+        # print(self.search_path_index)
+        # print(self.search_path)
+        # print(self.state)
         insert_pe = self.search_path[self.search_path_index] 
         copy_pe = self.search_path[self.search_path_index-1]
 
@@ -545,11 +582,14 @@ class basic_insert_state_machine(state_machine):
         message.payload["function_args"] = {'bucket_id':insert_pe.bucket_index, 'bucket_offset':insert_pe.bucket_offset, 'old':insert_pe.key, 'new':copy_pe.key}
         return message
 
+    def unpack_cas_response(self, message):
 
-    def fsm(self, message = None):
+            assert message.payload["function"] == fill_table_with_cas, "client is in inserting state but message is not a cas " + str(message)
+            args = message.payload["function_args"]
+            self.info("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["value"]))
+            return args
 
-        if self.state == "idle":
-            assert message == None, "idle state should not have a message being returned, message is old " + str(message)
+    def begin_insert(self):
             self.state = "inserting"
             self.current_insert = self.current_insert + 1
             insert_value = self.current_insert + (self.id * 100) #BUG insert values are unique to each client (but not really)
@@ -562,19 +602,36 @@ class basic_insert_state_machine(state_machine):
                 self.state = "complete"
                 return None
 
-
+            #todo there are going to be cases where this fails because 
             self.search_path_index = len(self.search_path)-1
-            message = self.next_cas_message()
-            # print_path(self.search_path)
-            return message
+
+            self.current_insert_length=len(self.search_path)
+
+    def end_insert(self):
+            self.info("complete insertion")
+            self.state="idle"
+            self.messages_per_insert.append(self.current_insert_length)
+            self.index_range_per_insert.append(path_index_range(self.search_path))
+
+
+    def fsm(self, message = None):
+
+        if self.state == "idle":
+            assert message == None, "idle state should not have a message being returned, message is old " + str(message)
+
+            self.begin_insert()
+            if self.state == "complete":
+                return None
+
+            return self.next_cas_message()
 
         if self.state == "inserting":
+            #there should be a message, otherwise don't do anything
             if message == None:
-                self.debug("State: Inserting no message provided when one should be")
                 return None
-            assert message.payload["function"] == fill_table_with_cas, "client is in inserting state but message is not a cas " + str(message)
-            args = message.payload["function_args"]
-            self.info("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["value"]))
+
+            #unpack the cas response
+            args = self.unpack_cas_response(message)
 
             #read in the cas response as a properly sized read to the local table
             fill_local_table_with_cas_response(self.table, args)
@@ -593,92 +650,45 @@ class basic_insert_state_machine(state_machine):
             #Step down the search path a single index
             self.search_path_index -= 1
             if self.search_path_index == 0:
-                self.info("complete insertion")
-                self.state="idle"
+                self.end_insert()
                 return None
             else:
-                message = self.next_cas_message()
-                return message
+                return self.next_cas_message()
 
         if self.state == "complete":
             return None
-            
-
-
             # generate read
 
+class basic_memory_state_machine(state_machine):
+    def __init__(self,config):
+        super().__init__(config)
+        self.table = config["table"]
+        self.state = "memory... state not being used"
 
-    # def fsm(self, message = None):
-
-    #     if self.state == "idle":
-    #         assert message == None, "idle state should not have a message being returned, message is old " + str(message)
-    #         self.current_insert += 1
-
-    #         self.state = "reading"
-    #         #only perform an insert to the first location.
-    #         self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.hash_locations, self.current_insert)
-    #         print_path(self.search_path)
-    #         self.search_index=1
-    #         return self.read_path_element(self.search_path[self.search_index])
-
-    #     if self.state == "reading":
-    #         if message == None:
-    #             self.debug("client is in reading state, and no message was provided, returning")
-    #             return None
-
-    #         #insert the table which was read from remote memory
-    #         assert message.payload["function"] == fill_table_with_read, "client is in reading state but message is not a read " + str(message)
-    #         self.info("Read Response: " +  str(message.payload["function_args"]["read"]))
-    #         args = message.payload["function_args"]
-    #         fill_table_with_read(self.table, **args)
-
-    #         #at this point we have done the read on the remote node, it's time to actually do the insert
-    #         #find the first empty bucket
-            
-    #         #check to see if the bucket contains the insert value
-    #         if self.local_table_contains_value(self.current_insert):
-    #             self.warning("Insert value " + str(self.current_insert) + " already exists in bucket, not inserting, and going idle")
-    #             self.state = "idle"
-    #             return
-
-    #         bucket_cas_index = self.table.find_empty_index(args["bucket_id"])
-    #         if (bucket_cas_index == -1):
-    #             self.warning("Bucket is full, not inserting and exiting for now. Need to Cuckoo Search")
-    #             exit(1)
-            
-    #         #at this point we can actually attempt an insert
-    #         message = Message({})
-    #         message.payload["function"] = cas_table_entry
-    #         message.payload["function_args"] = {'bucket_id':args["bucket_id"], 'bucket_offset':bucket_cas_index, 'old':None, 'new':self.current_insert}
-    #         self.state = "inserting"
-    #         return message
-
-    #     if self.state == "inserting":
-    #         if message == None:
-    #             self.debug("State: Inserting, no message provided")
-    #             return None
-    #         assert message.payload["function"] == fill_table_with_cas, "client is in inserting state but message is not a cas " + str(message)
-    #         args = message.payload["function_args"]
-    #         self.info("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["value"]))
-    #         fill_table_with_cas(self.table, **args)
-
-    #         if args["success"]:
-    #             self.state = "idle"
-    #             return None
-    #         else:
-    #             self.warning("cas failed, retrying read")
-    #             self.state = "reading"
-    #             return self.read_current()
-
-    #         # generate read
-    #     if self.state == "done":
-    #         self.logger.debug(str(self) + " done")
-
-
+    def __str__(self):
+        return "Memory"
     
-    
+    def fsm(self, message=None):
+        if message == None:
+            return None
+        args = message.payload["function_args"]
+        if message.payload["function"] == read_table_entry:
+            self.info("Read: " + "Bucket: " + str(args["bucket_id"]) + " Offset: " + str(args["bucket_offset"]) + " Size: " + str(args["size"]))
+            read = read_table_entry(self.table, **args)
+            response = Message({"function":fill_table_with_read, "function_args":{"read":read, "bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "size":args["size"]}})
+            self.info("Read Response: " +  str(response.payload["function_args"]["read"]))
+            return response
 
+        if message.payload["function"] == cas_table_entry:
+            self.info("CAS: " + "Bucket: " + str(args["bucket_id"]) + " Offset: " + str(args["bucket_offset"]) + " Old: " + str(args["old"]) + " New: " + str(args["new"]))
+            success, value = cas_table_entry(self.table, **args)
+            response = Message({"function":fill_table_with_cas, "function_args":{"bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "value":value, "success":success}})
 
+            ##self.table.print()
 
+            rargs=response.payload["function_args"]
+            self.info("Read Response: " +  "Success: " + str(rargs["success"]) + " Value: " + str(rargs["value"]))
+            return response
 
-    
+        else:
+            self.logger.warning("unknown message type " + str(message))

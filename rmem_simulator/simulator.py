@@ -212,6 +212,9 @@ class Simulator(Node):
         index_init_function=Table
         index_init_args={'memory_size': memory_size, 'bucket_size': bucket_size}
 
+        #initialize hash function
+        hash.set_factor(self.config['hash_factor'])
+
 
         #initialize clients
         for i in range(self.config['num_clients']):
@@ -262,18 +265,36 @@ class Simulator(Node):
         statistics['memory']['fill'] = fill
         self.memory.index.print()
 
+        statistics['hash'] = dict()
+        statistics['hash']['factor'] = hash.get_factor()
+
+        #client stats
+        statistics['clients'] = []
+
+        for i in range(len(self.client_list)):
+            client = self.client_list[i]
+            client_stats = dict()
+            client_stats['client_id'] = client.client_id
+            client_stats['stats'] = client.state_machine.get_stats()
+            statistics['clients'].append(client_stats)
+
+        #TODO start here after lunch, we are calculating the path lenght and number of messages
+        #assosiated with each of the inserts, as well as the range on the table.
+
         return statistics
 
      
 def default_config():
     config = dict()
     config['num_clients']=1
-    config['num_steps']=100000
+    config['num_steps']=1000000
 
     #table settings
     config['bucket_size']=4
     config['entry_size']=8
     config['indexes']=32
+
+    config['hash_factor']=hash.DEFAULT_FACTOR
 
     return config
 
