@@ -168,7 +168,6 @@ def plot_insertion_range_cdf():
     ax2.set_xlabel("Insertion number")
     ax2.set_ylabel("insertion range")
     plt.tight_layout()
-
     plt.savefig("insertion_range_cdf.pdf")
 
 
@@ -194,6 +193,36 @@ def plot_hash_distribution():
     ax.hist(primary, bins=bins)
     ax.hist(secondary, bins=bins)
     plt.savefig("hash_distribution.pdf")
+
+
+def plot_hash_factor_distance_cdf():
+    import hash
+    factors = [1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.0]
+    samples = 10000
+    table_size = 512
+    fig, ax = plt.subplots()
+    ax.set_xlabel('Read Size (Bytes)')
+    ax.set_ylabel('CDF')
+    ax.set_title('Hash Factor Distance CDF')
+    for f in factors:
+        print("factor: " + str(f))
+        hash.set_factor(f)
+        distances = []
+        for i in range(samples):
+            v1, v2 = hash.hash_locations(i, table_size)
+            distances.append(8 + (abs(v1-v2) * 8))
+        x, y = cdf(distances)
+        ax.plot(x,y, label=str(f))
+    ax.set_xlim(0,1500)
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig("hash_factor_distance_cdf.pdf")
+
+
+
+
+
+
     
 
 # factor_table_size_experiments()
@@ -206,5 +235,6 @@ def plot_hash_distribution():
 # plot_hash_distribution()
 
 plot_insertion_range_cdf()
+# plot_hash_factor_distance_cdf()
 
 

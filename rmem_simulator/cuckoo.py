@@ -305,7 +305,76 @@ class Message:
         return v[:len(v)-1]
 
 
+class Lock:
+    def __init__(self):
+        self.lock_state = 0
 
+    def lock(self):
+        self.lock_state = 1
+
+    def unlock(self):
+        self.lock_state = 0
+
+    def is_locked(self):
+        return self.lock_state == 1
+
+    def __str__(self):
+        if self.is_locked():
+            return "Locked"
+        else:
+            return "Unlocked"
+
+
+
+class LockTable:
+    def __init__(self, memory_size, entry_size, bucket_size, buckets_per_lock):
+        self.memory_size = memory_size
+        self.entry_size = entry_size
+        self.bucket_size = bucket_size
+        self.buckets_per_lock = buckets_per_lock
+        rows = int(((memory_size/entry_size))/bucket_size)
+        assert rows % buckets_per_lock == 0, "Number of buckets per lock must be a factor of the number of rows"
+        total_locks = int(rows/buckets_per_lock)
+        print("Lock Table Locks:" + str(total_locks))
+        self.locks = [Lock() for i in range(total_locks)]
+
+        print(self)
+
+    def set_lock(self, lock_index):
+        if self.locks[lock_index].is_locked():
+            return False
+        self.locks[lock_index].lock()
+        return True
+    
+    def unlock_lock(self, lock_index):
+        if not self.locks[lock_index].is_locked():
+            return False
+        self.locks[lock_index].unlock()
+        return True
+
+    def multi_lock(self, lock_indexes):
+        for i in lock_indexes:
+            if self.locks[i].is_locked():
+                return False
+        for i in lock_indexes:
+            self.locks[i].lock()
+        return True
+
+    def multi_unlock(self, lock_indexes):
+        for i in lock_indexes:
+            if not self.locks[i].is_locked():
+                return False
+        for i in lock_indexes:
+            self.locks[i].unlock()
+        return True
+
+    def __str__(self):
+        s = ""
+        for i in range(len(self.locks)):
+            bottom_bucket = i*self.buckets_per_lock
+            top_bucket = bottom_bucket + self.buckets_per_lock - 1
+            s += str(bottom_bucket) + "-" + str(top_bucket) + ":" + str(self.locks[i]) + "\n"
+        return s[:len(s)-1]
 
 
 
@@ -317,6 +386,8 @@ class Table:
         self.bucket_size=bucket_size
         self.table=self.generate_bucket_cuckoo_hash_index(memory_size, bucket_size)
         self.table_size = len(self.table)
+
+        self.lock_table = LockTable(memory_size, self.entry_size, bucket_size, self.table_size)
         self.fill = 0
 
 
