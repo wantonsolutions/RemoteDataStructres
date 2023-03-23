@@ -696,6 +696,7 @@ class state_machine:
     def critical(self, message):
         self.logger.critical("[" + self.log_prefix() + "] " + message)
 
+
 class basic_insert_state_machine(state_machine):
     def __init__(self, config):
         super().__init__(config)
@@ -803,12 +804,6 @@ class basic_insert_state_machine(state_machine):
             success = args["success"]
             if not success:
                 exit(0)
-                self.warning("cas failed, retrying read")
-                ##self.table.print()
-                #don't try anything special, just back off and start again
-                self.current_insert = self.current_insert - 1
-                self.state = "idle"
-                return None
 
             #Step down the search path a single index
             self.search_path_index -= 1
