@@ -143,12 +143,31 @@ def plot_insertion_range_cdf():
     stats = sim.collect_stats()
     c0_stats = stats['clients'][0]
     print(c0_stats)
-    x, y = cdf(c0_stats['stats']['index_range_per_insert'])
-    fig, ax = plt.subplots()
+    ranges = c0_stats['stats']['index_range_per_insert']
+    x, y = cdf(ranges)
+    fig, (ax1, ax2) = plt.subplots(2,1)
 
-    ax.plot(x,y)
-    ax.set_xlabel('Insertion Range')
-    ax.set_title('Insertion Range CDF')
+    ax1.plot(x,y)
+    ax1.set_xlabel('Insertion Range')
+    ax1.set_title('Insertion Range CDF')
+
+    nf=0
+    nn=0
+    for j in y:
+        if j < 0.95:
+            nf+=1
+        if j < 0.99:
+            nn+=1
+
+    ax1.vlines(x[nf], 0, 1, color='red', linestyle='--', label="95%")
+    ax1.vlines(x[nn], 0, 1, color='black', linestyle='--', label="99%")
+    ax1.legend()
+    
+
+    ax2.plot(ranges)
+    ax2.set_xlabel("Insertion number")
+    ax2.set_ylabel("insertion range")
+    plt.tight_layout()
 
     plt.savefig("insertion_range_cdf.pdf")
 

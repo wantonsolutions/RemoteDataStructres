@@ -305,13 +305,8 @@ class Message:
         return v[:len(v)-1]
 
 
-def messages_append_or_extend(messages, message):
-    if message != None:
-        if isinstance(message, list):
-            messages.extend(message)
-        else:
-            messages.append(message)
-    return messages
+
+
 
 
 class Table:
@@ -477,6 +472,61 @@ def fill_local_table_with_cas_response(table, args):
     del(args_copy["success"])
     fill_table_with_read(table, **args_copy)
 
+
+#message helper functions
+function_to_type_map = {
+    cas_table_entry: "cas",
+    fill_table_with_cas: "cas_response",
+    read_table_entry: "read",
+    fill_table_with_read: "read_response",
+}
+
+def message_type(message):
+    payload = message.payload
+    function = payload["function"]
+    if function in function_to_type_map:
+        return function_to_type_map[function]
+    print("Unknown message type! " + str(message))
+    exit(1)
+
+ethernet_size = 18 #14 header 4 crc
+ipv4_size = 20 #20 header
+udp_size = 8 #8 header
+roce_size = 16 #12 header 4 crc
+base_roce_size = ethernet_size + ipv4_size + udp_size + roce_size
+
+read_header = 16
+read_response_header = 4
+cas_header = 28
+cas_response_header = 8
+
+header_size = {
+    "cas": base_roce_size + cas_header,
+    "cas_response": base_roce_size + cas_response_header,
+    "read": base_roce_size + read_header,
+    "read_response": base_roce_size + read_response_header,
+}
+
+def message_to_bytes(message):
+    t = message_type(message)
+    size = header_size[t]
+    payload = message.payload
+    if "size" in payload["function_args"]:
+        size += payload["function_args"]["size"]
+    return size
+
+
+def messages_append_or_extend(messages, message):
+    if message != None:
+        if isinstance(message, list):
+            messages.extend(message)
+        else:
+            messages.append(message)
+    return messages
+
+
+
+
 #cuckoo protocols
 class state_machine:
     def __init__(self, config):
@@ -493,6 +543,7 @@ class state_machine:
         self.total_cas = 0
         self.total_cas_failures = 0
 
+        #todo add to a subclass
         self.current_read_length = 0
         self.messages_per_read = []
         self.current_insert_length = 0
@@ -509,10 +560,55 @@ class state_machine:
         stats["total_writes"] = self.total_writes
         stats["total_cas"] = self.total_cas
         stats["total_cas_failures"] = self.total_cas_failures
+
+        #todo add to a subclass 
         stats["messages_per_read"] = self.messages_per_read
         stats["messages_per_insert"] = self.messages_per_insert
         stats["index_range_per_insert"] = self.index_range_per_insert
         return stats
+
+    def update_message_stats(self, message):
+
+        if message == None:
+            return
+
+        size = message_to_bytes(message)
+        self.total_bytes += size
+        t = message_type(message)
+        payload = message.payload
+        if t == "read":
+            self.total_reads += 1
+            self.read_bytes += size
+        elif t == "read_response":
+            self.read_bytes += size
+        elif t == "cas":
+            self.total_cas += 1
+            self.cas_bytes += size
+        elif t == "cas_response":
+            self.cas_bytes += size
+            if payload["function_args"]["success"] == False:
+                self.total_cas_failures += 1
+        elif t == "write":
+            self.total_writes += 1
+            self.write_bytes += size
+        elif t == "write_response":
+            self.write_bytes += size
+        else:
+            print("Unknown message type! " + str(message))
+            exit(1)
+
+    
+    def fsm(self, message = None):
+        #caclulate statistics
+        self.update_message_stats(message)
+        #return fsm_wapper
+        output_message = self.fsm_logic(message)
+        self.update_message_stats(output_message)
+        return output_message
+
+    def fsm_logic(self, messages=None):
+        print("state machine top level overload this")
+
 
     def log_prefix(self):
         return "{:<9}".format(str(self))
@@ -528,9 +624,6 @@ class state_machine:
 
     def critical(self, message):
         self.logger.critical("[" + self.log_prefix() + "] " + message)
-
-    def fsm(self, message=None):
-        self.logger.debug("state machine top level overload this")
 
 class basic_insert_state_machine(state_machine):
     def __init__(self, config):
@@ -614,8 +707,7 @@ class basic_insert_state_machine(state_machine):
             self.index_range_per_insert.append(path_index_range(self.search_path))
 
 
-    def fsm(self, message = None):
-
+    def fsm_logic(self, message = None):
         if self.state == "idle":
             assert message == None, "idle state should not have a message being returned, message is old " + str(message)
 
@@ -668,9 +760,10 @@ class basic_memory_state_machine(state_machine):
     def __str__(self):
         return "Memory"
     
-    def fsm(self, message=None):
+    def fsm_logic(self, message=None):
         if message == None:
             return None
+
         args = message.payload["function_args"]
         if message.payload["function"] == read_table_entry:
             self.info("Read: " + "Bucket: " + str(args["bucket_id"]) + " Offset: " + str(args["bucket_offset"]) + " Size: " + str(args["size"]))
