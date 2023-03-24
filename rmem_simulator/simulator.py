@@ -224,7 +224,7 @@ class Simulator(Node):
             client_config['index_init_function'] = Table
             client_config['index_init_args'] = index_init_args
 
-            client_config['state_machine_init']=basic_insert_state_machine
+            client_config['state_machine_init']=lockless_a_star_insert_only_state_machine
             client_config['state_machine_init_args']={'total_inserts': 1}
 
             c = Client(client_config)

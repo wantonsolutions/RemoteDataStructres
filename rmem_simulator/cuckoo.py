@@ -707,27 +707,29 @@ class state_machine:
         self.logger.critical("[" + self.log_prefix() + "] " + message)
 
 
-class basic_insert_state_machine(state_machine):
+class client_state_machine(state_machine):
     def __init__(self, config):
         super().__init__(config)
         self.total_inserts = config["total_inserts"]
         self.id = config["id"]
         self.table = config["table"]
-
-        self.current_insert = 0
-        self.search_path = []
-        self.search_path_index = 0
         self.state="idle"
 
     def __str__(self):
         return "Client " + str(self.id)
 
+class lockless_a_star_insert_only_state_machine(client_state_machine):
+    def __init__(self, config):
+        super().__init__(config)
+
+        self.current_insert = 0
+        self.search_path = []
+        self.search_path_index = 0
 
     def next_cas_message(self):
         insert_pe = self.search_path[self.search_path_index] 
         copy_pe = self.search_path[self.search_path_index-1]
         return cas_table_entry_message(insert_pe.bucket_index, insert_pe.bucket_offset, insert_pe.key, copy_pe.key)
-
 
     def begin_insert(self):
             self.state = "inserting"
