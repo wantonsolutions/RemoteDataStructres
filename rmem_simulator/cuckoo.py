@@ -595,7 +595,17 @@ def messages_append_or_extend(messages, message):
             messages.append(message)
     return messages
 
+def cas_table_entry_message(bucket_index, bucket_offset, old, new):
+        message = Message({})
+        message.payload["function"] = cas_table_entry
+        message.payload["function_args"] = {'bucket_id':bucket_index, 'bucket_offset':bucket_offset, 'old':old, 'new':new}
+        return message
 
+def unpack_cas_response(message):
+        assert message.payload["function"] == fill_table_with_cas, "client is in inserting state but message is not a cas " + str(message)
+        args = message.payload["function_args"]
+        logger.info("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["value"]))
+        return args
 
 
 #cuckoo protocols
@@ -712,47 +722,12 @@ class basic_insert_state_machine(state_machine):
     def __str__(self):
         return "Client " + str(self.id)
 
-    def read_current(self):
-        locations = hash.hash_locations(self.current_insert, self.table.table_size)
-        self.info("Inserting: " + str(self.current_insert) + " Locations: " + str(locations))
-        bucket = locations[0]
-        message = Message({})
-        message.payload["function"] = read_table_entry
-        message.payload["function_args"] = {'bucket_id':bucket, 'bucket_offset':0, 'size':self.table.row_size()}
-        return message
-
-    def read_path_element(self, pe):
-        message = Message({})
-        message.payload["function"] = read_table_entry
-        message.payload["function_args"] = {'bucket_id':pe.bucket_index, 'bucket_offset':0, 'size':self.table.row_size()}
-        return message
-
-    def local_table_contains_value(self, value):
-        locations = hash.hash_locations(value, self.table.table_size)
-        for bucket_index in locations:
-            if self.table.bucket_contains(bucket_index, value):
-                return True
-        return False
 
     def next_cas_message(self):
-
-        # print(self.search_path_index)
-        # print(self.search_path)
-        # print(self.state)
         insert_pe = self.search_path[self.search_path_index] 
         copy_pe = self.search_path[self.search_path_index-1]
+        return cas_table_entry_message(insert_pe.bucket_index, insert_pe.bucket_offset, insert_pe.key, copy_pe.key)
 
-        message = Message({})
-        message.payload["function"] = cas_table_entry
-        message.payload["function_args"] = {'bucket_id':insert_pe.bucket_index, 'bucket_offset':insert_pe.bucket_offset, 'old':insert_pe.key, 'new':copy_pe.key}
-        return message
-
-    def unpack_cas_response(self, message):
-
-            assert message.payload["function"] == fill_table_with_cas, "client is in inserting state but message is not a cas " + str(message)
-            args = message.payload["function_args"]
-            self.info("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["value"]))
-            return args
 
     def begin_insert(self):
             self.state = "inserting"
@@ -769,7 +744,6 @@ class basic_insert_state_machine(state_machine):
 
             #todo there are going to be cases where this fails because 
             self.search_path_index = len(self.search_path)-1
-
             self.current_insert_length=len(self.search_path)
 
     def end_insert(self):
@@ -795,8 +769,7 @@ class basic_insert_state_machine(state_machine):
                 return None
 
             #unpack the cas response
-            args = self.unpack_cas_response(message)
-
+            args = unpack_cas_response(message)
             #read in the cas response as a properly sized read to the local table
             fill_local_table_with_cas_response(self.table, args)
 
@@ -815,7 +788,6 @@ class basic_insert_state_machine(state_machine):
 
         if self.state == "complete":
             return None
-            # generate read
 
 class basic_memory_state_machine(state_machine):
     def __init__(self,config):
@@ -851,3 +823,26 @@ class basic_memory_state_machine(state_machine):
 
         else:
             self.logger.warning("unknown message type " + str(message))
+
+#examples of reading
+# def read_current(self):
+#     locations = hash.hash_locations(self.current_insert, self.table.table_size)
+#     self.info("Inserting: " + str(self.current_insert) + " Locations: " + str(locations))
+#     bucket = locations[0]
+#     message = Message({})
+#     message.payload["function"] = read_table_entry
+#     message.payload["function_args"] = {'bucket_id':bucket, 'bucket_offset':0, 'size':self.table.row_size()}
+#     return message
+
+# def read_path_element(self, pe):
+#     message = Message({})
+#     message.payload["function"] = read_table_entry
+#     message.payload["function_args"] = {'bucket_id':pe.bucket_index, 'bucket_offset':0, 'size':self.table.row_size()}
+#     return message
+
+# def local_table_contains_value(self, value):
+#     locations = hash.hash_locations(value, self.table.table_size)
+#     for bucket_index in locations:
+#         if self.table.bucket_contains(bucket_index, value):
+#             return True
+#     return False
