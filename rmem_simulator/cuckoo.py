@@ -7,6 +7,7 @@ import random
 logger = logging.getLogger('root')
 
 TABLE_ENTRY_SIZE = 8
+CAS_SIZE = 64
 
 #########A star search
 
@@ -307,16 +308,20 @@ class Message:
 
 class Lock:
     def __init__(self):
-        self.lock_state = 0
+        self.lock_state = False
 
     def lock(self):
-        self.lock_state = 1
+        self.lock_state = True
 
     def unlock(self):
-        self.lock_state = 0
+        self.lock_state = False
 
     def is_locked(self):
-        return self.lock_state == 1
+        return self.lock_state == True
+
+    def equals(self, other):
+        return self.lock_state == other.lock_state
+
 
     def __str__(self):
         if self.is_locked():
@@ -338,6 +343,7 @@ class LockTable:
         print("Lock Table Locks:" + str(self.total_locks))
         self.locks = [Lock() for i in range(self.total_locks)]
 
+
         print(self)
 
     def set_lock(self, lock_index):
@@ -352,6 +358,7 @@ class LockTable:
         self.locks[lock_index].unlock()
         return True
 
+    
     def multi_lock(self, lock_indexes):
         for i in lock_indexes:
             if self.locks[i].is_locked():
@@ -367,6 +374,20 @@ class LockTable:
         for i in lock_indexes:
             self.locks[i].unlock()
         return True
+
+
+    def get_cas_range(self, starting_index):
+        locks=[Lock()] * CAS_SIZE
+        index = starting_index
+        for i in range(CAS_SIZE):
+            if index >= len(self.locks):
+                break
+            locks[i] = self.locks[index]
+            index += 1
+        return locks
+
+
+
 
     def __str__(self):
         s = ""
@@ -513,6 +534,65 @@ def cas_table_entry(table, bucket_id, bucket_offset, old, new):
     else:
         return (False, v)
 
+def masked_cas_lock_table(lock_table, lock_index, old, new, mask):
+    #sanity check
+    assert len(old) == CAS_SIZE, "old must be 64 bytes"
+    assert len(old) == len(new), "old and new must be the same length"
+    assert len(new) == len(mask), "new and mask must be the same length"
+
+    assert lock_table != None, "lock table is not initalized"
+    assert lock_index < len(lock_table), "lock index is out of bounds"
+
+    index = lock_index
+
+    #XOR check that the old value in the cas matches the existing lock table.
+    for o, n, m in zip(old,m):
+        #if the index steps out of the range of the lock table break, we have not learned anything by this
+        if index >= len(lock_table):
+            break
+        if m == True:
+            #we actually want to check the lock
+            if not lock_table[index].equals(o):
+                #if the old cas value is not the same as the submitted value return the current state of the table
+                current = lock_table.get_cas_range(lock_index)
+                return (False,current)
+
+    #now we just apply. At this point we know that the old value is the same as the current so we can lock and unlock accordingly.
+    index = lock_index
+    for n, m in zip(new,mask):
+        if index >= len(lock_table):
+            break
+        #If this value is part of the mask, set it to the cas value
+        if m == True:
+            lock_table[index] = n
+        index += 1
+    current = lock_table.get_cas_range(lock_index)
+    return (True, current)
+
+def fill_table_with_masked_cas(lock_table, lock_index, success, value, mask):
+    #sanity check
+    assert len(value) == CAS_SIZE, "value must be 64 bytes"
+    assert len(value) == len(mask), "value and mask must be the same length"
+
+    assert lock_table != None, "lock table is not initalized"
+    assert lock_index < len(lock_table), "lock index is out of bounds"
+
+    index = lock_index
+    for v, m in zip(value,mask):
+        if index >= len(lock_table):
+            break
+        #If this value is part of the mask, set it to the cas value
+        if m == True:
+            lock_table[index] = v
+        index += 1
+
+    if not success:
+        logger.warning("returned value is not the same as the value in the table, inserted it anyways")
+
+
+
+
+
 def read_table_entry(table, bucket_id, bucket_offset, size):
     table.assert_operation_in_table_bound(bucket_id, bucket_offset, size)
     total_indexs = int(size/TABLE_ENTRY_SIZE)
@@ -603,6 +683,18 @@ def cas_table_entry_message(bucket_index, bucket_offset, old, new):
 
 def unpack_cas_response(message):
         assert message.payload["function"] == fill_table_with_cas, "client is in inserting state but message is not a cas " + str(message)
+        args = message.payload["function_args"]
+        logger.info("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["value"]))
+        return args
+
+def masked_cas_lock_table_message(lock_index, old, new, mask):
+        message = Message({})
+        message.payload["function"] = masked_cas_lock_table
+        message.payload["function_args"] = {'lock_index':lock_index, 'old':old, 'new':new, 'mask':mask}
+        return message
+
+def unpack_masked_cas_response(message):
+        assert message.payload["function"] == fill_masked_cas_lock_table, "client is in inserting state but message is not a cas " + str(message)
         args = message.payload["function_args"]
         logger.info("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["value"]))
         return args
