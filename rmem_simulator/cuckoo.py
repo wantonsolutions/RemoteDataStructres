@@ -325,9 +325,12 @@ class Lock:
 
     def __str__(self):
         if self.is_locked():
-            return "Locked"
+            return "L"
         else:
-            return "Unlocked"
+            return "U"
+
+    def __repr__(self):
+        return self.__str__()
 
 
 
@@ -541,18 +544,18 @@ def masked_cas_lock_table(lock_table, lock_index, old, new, mask):
     assert len(new) == len(mask), "new and mask must be the same length"
 
     assert lock_table != None, "lock table is not initalized"
-    assert lock_index < len(lock_table), "lock index is out of bounds"
+    assert lock_index < lock_table.total_locks, "lock index is out of bounds"
 
     index = lock_index
 
     #XOR check that the old value in the cas matches the existing lock table.
-    for o, n, m in zip(old,m):
+    for o, m in zip(old,mask):
         #if the index steps out of the range of the lock table break, we have not learned anything by this
-        if index >= len(lock_table):
+        if index >= lock_table.total_locks:
             break
         if m == True:
             #we actually want to check the lock
-            if not lock_table[index].equals(o):
+            if not lock_table.locks[index].equals(o):
                 #if the old cas value is not the same as the submitted value return the current state of the table
                 current = lock_table.get_cas_range(lock_index)
                 return (False,current)
@@ -560,16 +563,16 @@ def masked_cas_lock_table(lock_table, lock_index, old, new, mask):
     #now we just apply. At this point we know that the old value is the same as the current so we can lock and unlock accordingly.
     index = lock_index
     for n, m in zip(new,mask):
-        if index >= len(lock_table):
+        if index >= lock_table.total_locks:
             break
         #If this value is part of the mask, set it to the cas value
         if m == True:
-            lock_table[index] = n
+            lock_table.locks[index] = n
         index += 1
     current = lock_table.get_cas_range(lock_index)
     return (True, current)
 
-def fill_table_with_masked_cas(lock_table, lock_index, success, value, mask):
+def fill_lock_table_masked_cas(lock_table, lock_index, success, value, mask):
     #sanity check
     assert len(value) == CAS_SIZE, "value must be 64 bytes"
     assert len(value) == len(mask), "value and mask must be the same length"
@@ -588,9 +591,6 @@ def fill_table_with_masked_cas(lock_table, lock_index, success, value, mask):
 
     if not success:
         logger.warning("returned value is not the same as the value in the table, inserted it anyways")
-
-
-
 
 
 def read_table_entry(table, bucket_id, bucket_offset, size):
@@ -624,10 +624,13 @@ def fill_local_table_with_cas_response(table, args):
     fill_table_with_read(table, **args_copy)
 
 
+
 #message helper functions
 function_to_type_map = {
     cas_table_entry: "cas",
     fill_table_with_cas: "cas_response",
+    masked_cas_lock_table: "masked_cas",
+    fill_lock_table_masked_cas: "masked_cas_response",
     read_table_entry: "read",
     fill_table_with_read: "read_response",
 }
@@ -637,7 +640,7 @@ def message_type(message):
     function = payload["function"]
     if function in function_to_type_map:
         return function_to_type_map[function]
-    print("Unknown message type! " + str(message))
+    print("Unknown message type! (message type function)", message)
     exit(1)
 
 ethernet_size = 18 #14 header 4 crc
@@ -654,6 +657,8 @@ cas_response_header = 8
 header_size = {
     "cas": base_roce_size + cas_header,
     "cas_response": base_roce_size + cas_response_header,
+    "masked_cas": base_roce_size + cas_header + CAS_SIZE,
+    "masked_cas_response": base_roce_size + cas_response_header,
     "read": base_roce_size + read_header,
     "read_response": base_roce_size + read_response_header,
 }
@@ -694,9 +699,9 @@ def masked_cas_lock_table_message(lock_index, old, new, mask):
         return message
 
 def unpack_masked_cas_response(message):
-        assert message.payload["function"] == fill_masked_cas_lock_table, "client is in inserting state but message is not a cas " + str(message)
+        assert message.payload["function"] == fill_lock_table_masked_cas, "client is in inserting state but message is not a cas " + str(message)
         args = message.payload["function_args"]
-        logger.info("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["value"]))
+        logger.info("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["value"]) + str(args["mask"]))
         return args
 
 
@@ -754,10 +759,10 @@ class state_machine:
             self.read_bytes += size
         elif t == "read_response":
             self.read_bytes += size
-        elif t == "cas":
+        elif t == "cas" or t == "masked_cas":
             self.total_cas += 1
             self.cas_bytes += size
-        elif t == "cas_response":
+        elif t == "cas_response" or t == "masked_cas_response":
             self.cas_bytes += size
             if payload["function_args"]["success"] == False:
                 self.total_cas_failures += 1
@@ -813,6 +818,31 @@ class client_state_machine(state_machine):
 def unique_insert(insert, client_id, total_clients):
     return insert * total_clients + client_id
 
+def blank_global_lock_cas():
+    index = 0
+    mask = [0] * CAS_SIZE
+    mask[0] = 1
+    old = []
+    new = []
+    for i in range(CAS_SIZE):
+        old.append(Lock())
+        new.append(Lock())
+    return (index, old, new, mask)
+
+
+def aquire_global_lock_masked_cas():
+    index, old, new, mask = blank_global_lock_cas()
+    new[0].lock()
+    old[0].unlock()
+    return index, old, new, mask
+
+def release_global_lock_masked_cas():
+    index, old, new, mask = blank_global_lock_cas()
+    new[0].unlock()
+    old[0].lock()
+    return index, old, new, mask
+
+
 
 class global_lock_a_star_insert_only_state_machine(client_state_machine):
     def __init__(self, config):
@@ -826,9 +856,24 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         print("Aquiring global lock")
         #sanity checking
         if self.table.lock_table.total_locks != 1:
-            self.critical("Attemptying to aquire global locks, but table has " + str(len(self.table.lock_table.total_locks)) + " locks")
+            self.critical("Attemptying to aquire global locks, but table has " + str(self.table.lock_table.total_locks) + " locks")
         else:
             self.critical("Lock table has one lock, attempting to grab it")
+            index, old, new, mask = aquire_global_lock_masked_cas()
+            masked_cas_message = masked_cas_lock_table_message(index, old, new, mask)
+            return masked_cas_message
+        return None
+
+    def release_global_lock(self):
+        print("Releasing global lock")
+        #sanity checking
+        if self.table.lock_table.total_locks != 1:
+            self.critical("Attemptying to release global locks, but table has " + str(len(self.table.lock_table)) + " locks")
+        else:
+            self.critical("Lock table has one lock, attempting to release it")
+            index, old, new, mask = release_global_lock_masked_cas()
+            masked_cas_message = masked_cas_lock_table_message(index, old, new, mask)
+            return masked_cas_message
         return None
 
 
@@ -841,6 +886,41 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             insert_value = unique_insert(self.current_insert, self.id, self.config["num_clients"])
             self.state = "aquire_global_lock"
             return self.aquire_global_lock()
+
+        if self.state == "aquire_global_lock":
+            if message == None:
+                return None
+            if message_type(message) == "masked_cas_response":
+                if message.payload["function_args"]["success"] == True:
+                    self.state = "critical_section"
+                    return None
+                else:
+                    self.state = "aquire_global_lock"
+                    return self.aquire_global_lock()
+            else:
+                self.critical("Unexpected message type " + str(message_type(message)))
+                exit(1)
+
+        if self.state == "critical_section":
+            self.critical("I've made it to the critical section for the " + str(self.current_insert) + "th time")
+            self.state = "release_global_lock"
+            return self.release_global_lock()
+
+        if self.state == "release_global_lock":
+            if message == None:
+                return None
+            if message_type(message) == "masked_cas_response":
+                if message.payload["function_args"]["success"] == True:
+                    self.state = "idle"
+                    return None
+                else:
+                    self.state = "release_global_lock"
+                    self.critical("What the fuck is happening I failed to release a lock")
+                    exit(1)
+                    return self.release_global_lock()
+
+            self.critical("Unexpected message type " + str(message_type(message)))
+            return None
 
         
 
@@ -972,8 +1052,15 @@ class basic_memory_state_machine(state_machine):
             self.info("Read Response: " +  "Success: " + str(rargs["success"]) + " Value: " + str(rargs["value"]))
             return response
 
+        if message.payload["function"] == masked_cas_lock_table:
+            self.info("Masked CAS in Memory: "+ str(args["lock_index"]) + " Old: " + str(args["old"]) + " New: " + str(args["new"]) + " Mask: " + str(args["mask"]))
+            success, value = masked_cas_lock_table(self.table.lock_table, **args)
+            response = Message({"function": fill_lock_table_masked_cas, "function_args":{"lock_index":args["lock_index"], "success":success, "value": value, "mask":args["mask"]}})
+            return response
+            
         else:
-            self.logger.warning("unknown message type " + str(message))
+            self.logger.warning("MEMORY: unknown message type " + str(message))
+
 
 #examples of reading
 # def read_current(self):
@@ -996,4 +1083,4 @@ class basic_memory_state_machine(state_machine):
 #     for bucket_index in locations:
 #         if self.table.bucket_contains(bucket_index, value):
 #             return True
-#     return False
+#     return Fals
