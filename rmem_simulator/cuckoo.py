@@ -334,9 +334,9 @@ class LockTable:
         self.buckets_per_lock = buckets_per_lock
         rows = int(((memory_size/entry_size))/bucket_size)
         assert rows % buckets_per_lock == 0, "Number of buckets per lock must be a factor of the number of rows"
-        total_locks = int(rows/buckets_per_lock)
-        print("Lock Table Locks:" + str(total_locks))
-        self.locks = [Lock() for i in range(total_locks)]
+        self.total_locks = int(rows/buckets_per_lock)
+        print("Lock Table Locks:" + str(self.total_locks))
+        self.locks = [Lock() for i in range(self.total_locks)]
 
         print(self)
 
@@ -717,6 +717,63 @@ class client_state_machine(state_machine):
 
     def __str__(self):
         return "Client " + str(self.id)
+
+def unique_insert(insert, client_id, total_clients):
+    return insert * total_clients + client_id
+
+
+class global_lock_a_star_insert_only_state_machine(client_state_machine):
+    def __init__(self, config):
+        super().__init__(config)
+
+        self.current_insert = 0
+        self.search_path = []
+        self.search_path_index = 0
+
+    def aquire_global_lock(self):
+        print("Aquiring global lock")
+        #sanity checking
+        if self.table.lock_table.total_locks != 1:
+            self.critical("Attemptying to aquire global locks, but table has " + str(len(self.table.lock_table.total_locks)) + " locks")
+        else:
+            self.critical("Lock table has one lock, attempting to grab it")
+        return None
+
+
+
+    def fsm_logic(self, message = None):
+
+        if self.state== "idle":
+            self.current_insert = self.current_insert + 1
+            print(self.config)
+            insert_value = unique_insert(self.current_insert, self.id, self.config["num_clients"])
+            self.state = "aquire_global_lock"
+            return self.aquire_global_lock()
+
+        
+
+
+        #Idle
+            #generate next insert value
+            #state = "aquire_global_lock"
+            #generate and send lock request
+        
+        #aquire_global_lock
+            #if lock granted -> read from table
+            #else -> generate and send lock request
+
+        #critical section
+            #perform A* search
+            #read the path range
+            #confirm path
+            #insert path
+            #release lock
+
+        #insert along a* path.
+
+        
+
+
 
 class lockless_a_star_insert_only_state_machine(client_state_machine):
     def __init__(self, config):

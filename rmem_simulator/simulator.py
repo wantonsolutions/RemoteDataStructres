@@ -42,6 +42,7 @@ class Client(Node):
         state_machine_args = config['state_machine_init_args'] 
         state_machine_args['table'] = self.index
         state_machine_args['id'] = self.client_id
+        state_machine_args['num_clients'] = config['num_clients']
         state_machine_init = config['state_machine_init']
         self.state_machine = state_machine_init(state_machine_args)
 
@@ -219,12 +220,14 @@ class Simulator(Node):
         #initialize clients
         for i in range(self.config['num_clients']):
             client_config = {'client_id': i}
+            client_config['num_clients'] = self.config['num_clients']
 
             client_config['bucket_size'] = bucket_size
             client_config['index_init_function'] = Table
             client_config['index_init_args'] = index_init_args
 
-            client_config['state_machine_init']=lockless_a_star_insert_only_state_machine
+            # client_config['state_machine_init']=lockless_a_star_insert_only_state_machine
+            client_config['state_machine_init']=global_lock_a_star_insert_only_state_machine
             client_config['state_machine_init_args']={'total_inserts': 1}
 
             c = Client(client_config)

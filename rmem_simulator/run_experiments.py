@@ -46,7 +46,6 @@ def pow_2_table_sizes(count):
     return table_sizes
 
 
-
 def table_size_experiment():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
@@ -74,8 +73,8 @@ def plot_table_size_experiment():
     plot_fills(runs)
 
 def factor_table_size_experiments():
-    table_sizes = [64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536]
-    factors = [1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.0]
+    table_sizes = [1024, 2048, 4096, 8192, 16384, 32768, 65536]
+    factors = [2.5, 2.6, 2.7, 2.8, 2.9, 3.0]
 
     factor_runs = []
     for f in factors:
@@ -221,10 +220,37 @@ def plot_hash_factor_distance_cdf():
 
 
 
+def todos():
+    print("Write a function to CAS a single lock in the lock table. The CAS operation here is just for a global lock")
+    print("Write a multi cas function to grab multiple locks in the lock table")
+    print("Implement A lock aquisition function that grabs a few locks at a time.")
+    print("move the table and a* search to a shared file so I can do millions of inserts on the table just like the prior tests")
 
 
+def insertion_debug():
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator")
+
+    table_size = 64
+    clients=1
+    runs=[]
+    config = simulator.default_config()
+    sim = simulator.Simulator(config)
+    print("table size: ", table_size)
+    config['indexes'] = table_size
+    config['num_clients'] = clients
+    config['num_steps'] = 10
+    sim = simulator.Simulator(config)
+    # log.set_off()
+    sim.run()
+    stats = sim.collect_stats()
+    runs.append(stats)
+    save_statistics(runs)
     
 
+todos()
+
+insertion_debug()
 # factor_table_size_experiments()
 # plot_factor_table_size_experiments()
 
@@ -233,8 +259,7 @@ def plot_hash_factor_distance_cdf():
 # plot_table_size_experiment()
 
 # plot_hash_distribution()
-
-plot_insertion_range_cdf()
+# plot_insertion_range_cdf()
 # plot_hash_factor_distance_cdf()
 
 
