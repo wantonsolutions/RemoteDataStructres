@@ -226,6 +226,68 @@ def todos():
     print("Implement A lock aquisition function that grabs a few locks at a time.")
     print("move the table and a* search to a shared file so I can do millions of inserts on the table just like the prior tests")
 
+def global_lock_success_rate():
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator for global locking")
+    table_size = 1024
+    client_counts = [1, 2, 4, 8, 16, 32, 64, 128, 256]
+    runs=[]
+    for client_count in client_counts:
+        config = simulator.default_config()
+        sim = simulator.Simulator(config)
+        print("table size: ", table_size)
+        config['indexes'] = table_size
+        config['num_clients'] = client_count
+        config["num_steps"] = 10000
+        sim = simulator.Simulator(config)
+        log.set_off()
+        sim.run()
+        stats = sim.collect_stats()
+        runs.append(stats)
+    save_statistics(runs)
+
+def plot_global_lock_success_rate():
+    stats = load_statistics()
+    print(stats)
+    success_rates = []
+    std_errs = []
+    clients = []
+    for stat in stats:
+        per_client_success_rate = []
+        for client in stat['clients']:
+            print(client)
+            total_cas = client['stats']['total_cas']
+            total_cas_failure = client['stats']['total_cas_failures']
+            success_rate = float(1.0 - float(total_cas_failure)/float(total_cas))
+            print(total_cas,total_cas_failure,success_rate)
+            per_client_success_rate.append(success_rate)
+        mean =np.mean(per_client_success_rate)
+        std_err = np.std(per_client_success_rate) / np.sqrt(np.size(per_client_success_rate))
+        success_rates.append(mean)
+        std_errs.append(std_err)
+        # print(len(stat['clients']))
+        clients.append(str(len(stat['clients'])))
+
+
+    x_pos = np.arange(len(success_rates))
+    fig, ax = plt.subplots()
+    ax.bar(x_pos,success_rates,yerr=std_errs,align="center", edgecolor='black')
+    ax.set_ylabel("success rate")
+    ax.set_xlabel("# clients")
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(clients)
+    # ax.set_yscale('log')
+    ax.set_title("Success Rate for global lock aquires")
+    plt.tight_layout()
+    plt.savefig("global_lock_aquire.pdf")
+
+
+    
+            # print(client['total_cas'], client['total_cas_failures'])
+
+
+
+
 
 def insertion_debug():
     logger = log.setup_custom_logger('root')
@@ -239,7 +301,7 @@ def insertion_debug():
     print("table size: ", table_size)
     config['indexes'] = table_size
     config['num_clients'] = clients
-    config['num_steps'] = 10
+    config['num_steps'] = 100
     sim = simulator.Simulator(config)
     # log.set_off()
     sim.run()
@@ -248,9 +310,12 @@ def insertion_debug():
     save_statistics(runs)
     
 
-todos()
+# global_lock_success_rate()
+plot_global_lock_success_rate()
 
-insertion_debug()
+# todos()
+
+# insertion_debug()
 # factor_table_size_experiments()
 # plot_factor_table_size_experiments()
 

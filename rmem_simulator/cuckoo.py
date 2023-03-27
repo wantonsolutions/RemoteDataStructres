@@ -853,36 +853,32 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         self.search_path_index = 0
 
     def aquire_global_lock(self):
-        print("Aquiring global lock")
+        self.info("client " + str(self.id) + " Aquiring global lock")
         #sanity checking
         if self.table.lock_table.total_locks != 1:
             self.critical("Attemptying to aquire global locks, but table has " + str(self.table.lock_table.total_locks) + " locks")
+            exit(0)
         else:
-            self.critical("Lock table has one lock, attempting to grab it")
             index, old, new, mask = aquire_global_lock_masked_cas()
             masked_cas_message = masked_cas_lock_table_message(index, old, new, mask)
             return masked_cas_message
-        return None
 
     def release_global_lock(self):
-        print("Releasing global lock")
+        self.info("client " + str(self.id) + " Releasing global lock")
         #sanity checking
         if self.table.lock_table.total_locks != 1:
             self.critical("Attemptying to release global locks, but table has " + str(len(self.table.lock_table)) + " locks")
+            exit(0)
         else:
-            self.critical("Lock table has one lock, attempting to release it")
             index, old, new, mask = release_global_lock_masked_cas()
             masked_cas_message = masked_cas_lock_table_message(index, old, new, mask)
             return masked_cas_message
-        return None
-
 
 
     def fsm_logic(self, message = None):
 
         if self.state== "idle":
             self.current_insert = self.current_insert + 1
-            print(self.config)
             insert_value = unique_insert(self.current_insert, self.id, self.config["num_clients"])
             self.state = "aquire_global_lock"
             return self.aquire_global_lock()
@@ -902,7 +898,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
                 exit(1)
 
         if self.state == "critical_section":
-            self.critical("I've made it to the critical section for the " + str(self.current_insert) + "th time")
+            self.info("I've made it to the critical section for the " + str(self.current_insert) + "th time")
             self.state = "release_global_lock"
             return self.release_global_lock()
 
