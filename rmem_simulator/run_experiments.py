@@ -230,7 +230,7 @@ def global_lock_success_rate():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator for global locking")
     table_size = 1024
-    client_counts = [1, 2, 4, 8, 16, 32, 64, 128, 256]
+    client_counts = [1, 2, 4, 8, 16, 32, 64, 128]
     runs=[]
     for client_count in client_counts:
         config = simulator.default_config()
@@ -238,7 +238,7 @@ def global_lock_success_rate():
         print("table size: ", table_size)
         config['indexes'] = table_size
         config['num_clients'] = client_count
-        config["num_steps"] = 10000
+        config["num_steps"] = 400000
         sim = simulator.Simulator(config)
         log.set_off()
         sim.run()
@@ -280,13 +280,6 @@ def plot_global_lock_success_rate():
     ax.set_title("Success Rate for global lock aquires")
     plt.tight_layout()
     plt.savefig("global_lock_aquire.pdf")
-
-
-    
-            # print(client['total_cas'], client['total_cas_failures'])
-
-
-
 
 
 def insertion_debug():

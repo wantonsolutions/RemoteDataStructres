@@ -204,6 +204,42 @@ class Simulator(Node):
         self.client_events()
         self.step = self.step+1
 
+    def random_single_simulation_step(self):
+        self.warning("Step: " + str(self.step))
+        value = random.randint(0, 3)
+        #client events
+        if value == 0:
+            #deliver or generate
+            d_or_g = random.randint(0, 1)
+            if d_or_g == 0:
+                #deliver
+                if len(self.switch_client_channel) > 0:
+                    sm = self.switch_client_channel.pop()
+                    client_id = sm.payload["dest"]
+                    self.client_event(client_id, sm)
+            else:
+                #generate
+                client = random.randint(0, len(self.client_list)-1)
+                self.client_event(client)
+        elif value == 1:
+            c_or_m = random.randint(0, 1)
+            if c_or_m == 0:
+                if len(self.client_switch_channel) > 0:
+                    cm = self.client_switch_channel.pop()
+                    sm = self.switch.process_message(cm)
+                    self.switch_memory_channel.append(sm)
+            else:
+                if len(self.memory_switch_channel) > 0:
+                    mm = self.memory_switch_channel.pop()
+                    sm = self.switch.process_message(mm)
+                    self.switch_client_channel.append(sm)
+
+        elif value == 2:
+            self.memory_event()
+
+        self.step = self.step+1
+
+
     def run(self):
 
         bucket_size=self.config['bucket_size']
@@ -250,7 +286,8 @@ class Simulator(Node):
 
         #run simulation
         for i in range(self.config['num_steps']):
-            self.deterministic_simulation_step()
+            # self.deterministic_simulation_step()
+            self.random_single_simulation_step()
 
             if self.no_events() == True and self.clients_complete() == True:
                 break
@@ -266,7 +303,7 @@ class Simulator(Node):
         statistics['memory'] = dict()
         fill = self.memory.index.get_fill_percentage()
         statistics['memory']['fill'] = fill
-        self.memory.index.print()
+        # self.memory.index.print()
 
         statistics['hash'] = dict()
         statistics['hash']['factor'] = hash.get_factor()

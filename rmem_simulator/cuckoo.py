@@ -919,17 +919,6 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             return None
 
         
-
-
-        #Idle
-            #generate next insert value
-            #state = "aquire_global_lock"
-            #generate and send lock request
-        
-        #aquire_global_lock
-            #if lock granted -> read from table
-            #else -> generate and send lock request
-
         #critical section
             #perform A* search
             #read the path range
