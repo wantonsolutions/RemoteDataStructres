@@ -289,15 +289,15 @@ def insertion_debug():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
 
-    table_size = 64
-    clients=2
+    table_size = 128
+    clients=8
     runs=[]
     config = simulator.default_config()
     sim = simulator.Simulator(config)
     print("table size: ", table_size)
     config['indexes'] = table_size
     config['num_clients'] = clients
-    config['num_steps'] = 1000
+    config['num_steps'] = 100000
     sim = simulator.Simulator(config)
     # log.set_off()
     try:
