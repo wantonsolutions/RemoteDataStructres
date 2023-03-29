@@ -30,6 +30,9 @@ class path_element:
     def __str__(self):
         return "(key: " + str(self.key) + ", table: " + str(self.table_index) + ", bucket: " + str(self.bucket_index) + ", offset: " + str(self.bucket_offset) + ")"
 
+    def __repr__(self):
+        return str(self)
+
     def __gt__(self, other):
         return self.bucket_index > other.bucket_index
 
@@ -939,6 +942,11 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         copy_pe = self.search_path[self.search_path_index-1]
         return cas_table_entry_message(insert_pe.bucket_index, insert_pe.bucket_offset, insert_pe.key, copy_pe.key)
 
+    def undo_last_cas_message(self):
+        last_pe = self.search_path[self.search_path_index+1]
+        current_pe = self.search_path[self.search_path_index]
+        return cas_table_entry_message(last_pe.bucket_index, last_pe.bucket_offset, current_pe.key, None)
+
     def begin_insert(self):
             self.state = "inserting"
             self.current_insert_value = unique_insert(self.current_insert, self.id, self.config["num_clients"])
@@ -957,7 +965,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
 
     def end_insert(self):
             self.info("complete insertion")
-            self.completed_inserts.append(self.current_insert)
+            self.completed_inserts.append(self.current_insert_value)
             self.messages_per_insert.append(self.current_insert_length)
             self.index_range_per_insert.append(path_index_range(self.search_path))
 
@@ -1008,8 +1016,29 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             success = args["success"]
             if not success:
                 self.state = "critical_section"
+                self.critical("Insert Failed: " + str(self.current_insert_value) + "| trying again")
+                self.critical("failed insert path: " + str(self.search_path))
+                self.critical("failed insert path index: " + str(self.search_path_index) + "of  " + str(len(self.search_path) -1 ))
+                self.critical("failed cas: " + str(message))
+                self.critical("cas element: " + str(self.search_path[self.search_path_index]))
+
+                #if we have not issued a successful CAS yet there is nothing to backtrack to.
+                if self.search_path_index == len(self.search_path)-1:
+                    self.critical("Insertion has failed but no harm was done, trying again")
+                    self.state = "critical_section"
+                    return None
+                else:
+                    self.critical("Insertion has failed, but we have issued a CAS, we can backtrack to repair damage")
+                    self.state = "undo_last_cas"
+                    message = self.undo_last_cas_message()
+                    print(message)
+                    return message
+
+
+
+
                 #todo start here after lunch we need to work on the failed insert backtrack.
-                # exit(0)
+                raise Exception("Failed insertion")
 
             #Step down the search path a single index
             self.search_path_index -= 1
@@ -1017,6 +1046,24 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
                 return self.end_insert()
             else:
                 return self.next_cas_message()
+
+        if self.state == "undo_last_cas":
+            if message == None:
+                return None
+            #unpack the cas response
+            args = unpack_cas_response(message)
+            #read in the cas response as a properly sized read to the local table
+            fill_local_table_with_cas_response(self.table, args)
+
+            #If CAS failed, try the insert a second time.
+            success = args["success"]
+            if not success:
+                raise Exception("Failed to undo last cas -- this is a really bad scenario")
+            
+            self.critical("Last CAS was undone, now we are just trying again")
+            self.state = "critical_section"
+            return None
+
 
     
         if self.state == "release_global_lock":

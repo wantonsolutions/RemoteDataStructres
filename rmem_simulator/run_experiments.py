@@ -300,7 +300,12 @@ def insertion_debug():
     config['num_steps'] = 1000
     sim = simulator.Simulator(config)
     # log.set_off()
-    sim.run()
+    try:
+        sim.run()
+    except Exception as e:
+        print(e)
+        stats = sim.collect_stats()
+        sim.validate_run()
     sim.validate_run()
     stats = sim.collect_stats()
     runs.append(stats)
