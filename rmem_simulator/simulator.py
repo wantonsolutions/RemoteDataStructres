@@ -110,10 +110,10 @@ class Switch(Node):
         return "Switch"
 
     def process_message(self, message):
-        p = message.payload
-        dest = p["dest"]
-        src = p["src"]
-        self.info("src: "+str(src) + ", dest: " + str(dest) + ", func: " + str(p["function"].__name__))
+        # p = message.payload
+        # dest = p["dest"]
+        # src = p["src"]
+        # self.info("src: "+str(src) + ", dest: " + str(dest) + ", func: " + str(p["function"].__name__))
         return message
 
 
@@ -185,7 +185,10 @@ class Simulator(Node):
             self.memory_switch_channel.extend(mm)
 
     def no_events(self):
-        return len(self.client_switch_channel) == 0 and len(self.switch_memory_channel) == 0 and len(self.switch_client_channel) == 0 and len(self.memory_switch_channel) == 0
+        return len(self.client_switch_channel) == 0 and \
+            len(self.switch_memory_channel) == 0 and  \
+            len(self.switch_client_channel) == 0 and \
+            len(self.memory_switch_channel) == 0
 
     def clients_complete(self):
         for i in range(len(self.client_list)):
@@ -196,7 +199,7 @@ class Simulator(Node):
 
     #this is mostly a debugging function for a single client
     def deterministic_simulation_step(self):
-        self.warning("Step: " + str(self.step))
+        # self.warning("Step: " + str(self.step))
         self.client_events()
         self.switch_events()
         self.memory_event()
@@ -205,12 +208,14 @@ class Simulator(Node):
         self.step = self.step+1
 
     def random_single_simulation_step(self):
-        self.warning("Step: " + str(self.step))
-        value = random.randint(0, 3)
+        # self.warning("Step: " + str(self.step))
+        value = int(random.random() * 10000)
+        top = value % 3
+        bottom = int(value / 3)
         #client events
-        if value == 0:
+        if top == 0:
             #deliver or generate
-            d_or_g = random.randint(0, 1)
+            d_or_g = bottom % 2
             if d_or_g == 0:
                 #deliver
                 if len(self.switch_client_channel) > 0:
@@ -219,10 +224,10 @@ class Simulator(Node):
                     self.client_event(client_id, sm)
             else:
                 #generate
-                client = random.randint(0, len(self.client_list)-1)
+                client = int(random.random() * len(self.client_list))
                 self.client_event(client)
-        elif value == 1:
-            c_or_m = random.randint(0, 1)
+        elif top == 1:
+            c_or_m = bottom % 2
             if c_or_m == 0:
                 if len(self.client_switch_channel) > 0:
                     cm = self.client_switch_channel.pop()
@@ -234,7 +239,7 @@ class Simulator(Node):
                     sm = self.switch.process_message(mm)
                     self.switch_client_channel.append(sm)
 
-        elif value == 2:
+        elif top == 2:
             self.memory_event()
 
         self.step = self.step+1

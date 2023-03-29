@@ -100,7 +100,7 @@ class a_star_pe:
         self.fscore = score
     def __lt__(self, other):
         return self.fscore < other.fscore
-    def __str__(self) -> str:
+    def __str__(self):
         return "pe:" + str(self.pe) + " prior:" + str(self.prior) + " distance:" + str(self.distance) + "fscore: " + str(self.fscore)
 
 
@@ -308,19 +308,23 @@ class Message:
 
 class Lock:
     def __init__(self):
-        self.lock_state = False
+        self.lock_state = 0
 
     def lock(self):
-        self.lock_state = True
+        self.lock_state = 1
 
     def unlock(self):
-        self.lock_state = False
+        self.lock_state = 0
 
     def is_locked(self):
-        return self.lock_state == True
+        return self.lock_state == 1
 
     def equals(self, other):
-        return self.lock_state == other.lock_state
+        return self.lock_state == other
+
+    def set_bit(self, bit):
+        self.lock_state = bit
+
 
 
     def __str__(self):
@@ -343,11 +347,11 @@ class LockTable:
         rows = int(((memory_size/entry_size))/bucket_size)
         assert rows % buckets_per_lock == 0, "Number of buckets per lock must be a factor of the number of rows"
         self.total_locks = int(rows/buckets_per_lock)
-        print("Lock Table Locks:" + str(self.total_locks))
+        # print("Lock Table Locks:" + str(self.total_locks))
         self.locks = [Lock() for i in range(self.total_locks)]
 
 
-        print(self)
+        # print(self)
 
     def set_lock(self, lock_index):
         if self.locks[lock_index].is_locked():
@@ -415,7 +419,7 @@ class Table:
         self.fill = 0
 
 
-    def print(self):
+    def print_table(self):
         for i in range(0, self.table_size):
             print('{0: <5}'.format(str(i)+")"), end='')
             for j in range(0, self.bucket_size):
@@ -553,7 +557,7 @@ def masked_cas_lock_table(lock_table, lock_index, old, new, mask):
         #if the index steps out of the range of the lock table break, we have not learned anything by this
         if index >= lock_table.total_locks:
             break
-        if m == True:
+        if m == 1:
             #we actually want to check the lock
             if not lock_table.locks[index].equals(o):
                 #if the old cas value is not the same as the submitted value return the current state of the table
@@ -566,8 +570,8 @@ def masked_cas_lock_table(lock_table, lock_index, old, new, mask):
         if index >= lock_table.total_locks:
             break
         #If this value is part of the mask, set it to the cas value
-        if m == True:
-            lock_table.locks[index] = n
+        if m == 1:
+            lock_table.locks[index].set_bit(n)
         index += 1
     current = lock_table.get_cas_range(lock_index)
     return (True, current)
@@ -822,24 +826,21 @@ def blank_global_lock_cas():
     index = 0
     mask = [0] * CAS_SIZE
     mask[0] = 1
-    old = []
-    new = []
-    for i in range(CAS_SIZE):
-        old.append(Lock())
-        new.append(Lock())
+    old = [0] * CAS_SIZE
+    new = [0] * CAS_SIZE
     return (index, old, new, mask)
 
 
 def aquire_global_lock_masked_cas():
     index, old, new, mask = blank_global_lock_cas()
-    new[0].lock()
-    old[0].unlock()
+    new[0]=1
+    old[0]=0
     return index, old, new, mask
 
 def release_global_lock_masked_cas():
     index, old, new, mask = blank_global_lock_cas()
-    new[0].unlock()
-    old[0].lock()
+    new[0]=0
+    old[0]=1
     return index, old, new, mask
 
 
@@ -874,6 +875,59 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             masked_cas_message = masked_cas_lock_table_message(index, old, new, mask)
             return masked_cas_message
 
+    def aquire_global_lock_fsm(self, message):
+        output_message = None
+        if message_type(message) == "masked_cas_response":
+            if message.payload["function_args"]["success"] == True:
+                self.state = "critical_section"
+            else:
+                output_message=self.aquire_global_lock()
+        else:
+            self.critical("Unexpected message type " + str(message_type(message)))
+            exit(1)
+        return output_message
+
+    def release_global_lock_fsm(self, message):
+        if message_type(message) == "masked_cas_response":
+            if message.payload["function_args"]["success"] == True:
+                self.state = "idle"
+            else:
+                self.state = "release_global_lock"
+                self.critical("What the fuck is happening I failed to release a lock")
+                exit(1)
+        else:
+            self.critical("Unexpected message type " + str(message_type(message)))
+        return None
+
+    
+    def next_cas_message(self):
+        insert_pe = self.search_path[self.search_path_index] 
+        copy_pe = self.search_path[self.search_path_index-1]
+        return cas_table_entry_message(insert_pe.bucket_index, insert_pe.bucket_offset, insert_pe.key, copy_pe.key)
+
+    def begin_insert(self):
+            self.state = "inserting"
+            self.current_insert = self.current_insert + 1
+            insert_value = self.current_insert + (self.id * 100) #BUG insert values are unique to each client (but not really)
+
+            #only perform an insert to the first location.
+            self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.hash_locations, insert_value)
+
+            if len(self.search_path) == 0:
+                self.info("Insert Failed: " + str(insert_value) + "| unable to continue, client " + str(self.id) + " is done")
+                self.state = "complete"
+                return None
+
+            #todo there are going to be cases where this fails because 
+            self.search_path_index = len(self.search_path)-1
+            self.current_insert_length=len(self.search_path)
+
+    def end_insert(self):
+            self.info("complete insertion")
+            self.state="idle"
+            self.messages_per_insert.append(self.current_insert_length)
+            self.index_range_per_insert.append(path_index_range(self.search_path))
+
 
     def fsm_logic(self, message = None):
 
@@ -884,18 +938,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             return self.aquire_global_lock()
 
         if self.state == "aquire_global_lock":
-            if message == None:
-                return None
-            if message_type(message) == "masked_cas_response":
-                if message.payload["function_args"]["success"] == True:
-                    self.state = "critical_section"
-                    return None
-                else:
-                    self.state = "aquire_global_lock"
-                    return self.aquire_global_lock()
-            else:
-                self.critical("Unexpected message type " + str(message_type(message)))
-                exit(1)
+            return self.aquire_global_lock_fsm(message)
 
         if self.state == "critical_section":
             self.info("I've made it to the critical section for the " + str(self.current_insert) + "th time")
@@ -903,20 +946,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             return self.release_global_lock()
 
         if self.state == "release_global_lock":
-            if message == None:
-                return None
-            if message_type(message) == "masked_cas_response":
-                if message.payload["function_args"]["success"] == True:
-                    self.state = "idle"
-                    return None
-                else:
-                    self.state = "release_global_lock"
-                    self.critical("What the fuck is happening I failed to release a lock")
-                    exit(1)
-                    return self.release_global_lock()
-
-            self.critical("Unexpected message type " + str(message_type(message)))
-            return None
+            return self.release_global_lock_fsm(message)
 
         
         #critical section
@@ -1020,25 +1050,25 @@ class basic_memory_state_machine(state_machine):
 
         args = message.payload["function_args"]
         if message.payload["function"] == read_table_entry:
-            self.info("Read: " + "Bucket: " + str(args["bucket_id"]) + " Offset: " + str(args["bucket_offset"]) + " Size: " + str(args["size"]))
+            # self.info("Read: " + "Bucket: " + str(args["bucket_id"]) + " Offset: " + str(args["bucket_offset"]) + " Size: " + str(args["size"]))
             read = read_table_entry(self.table, **args)
             response = Message({"function":fill_table_with_read, "function_args":{"read":read, "bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "size":args["size"]}})
-            self.info("Read Response: " +  str(response.payload["function_args"]["read"]))
+            # self.info("Read Response: " +  str(response.payload["function_args"]["read"]))
             return response
 
         if message.payload["function"] == cas_table_entry:
-            self.info("CAS: " + "Bucket: " + str(args["bucket_id"]) + " Offset: " + str(args["bucket_offset"]) + " Old: " + str(args["old"]) + " New: " + str(args["new"]))
+            # self.info("CAS: " + "Bucket: " + str(args["bucket_id"]) + " Offset: " + str(args["bucket_offset"]) + " Old: " + str(args["old"]) + " New: " + str(args["new"]))
             success, value = cas_table_entry(self.table, **args)
             response = Message({"function":fill_table_with_cas, "function_args":{"bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "value":value, "success":success}})
 
             ##self.table.print()
 
             rargs=response.payload["function_args"]
-            self.info("Read Response: " +  "Success: " + str(rargs["success"]) + " Value: " + str(rargs["value"]))
+            # self.info("Read Response: " +  "Success: " + str(rargs["success"]) + " Value: " + str(rargs["value"]))
             return response
 
         if message.payload["function"] == masked_cas_lock_table:
-            self.info("Masked CAS in Memory: "+ str(args["lock_index"]) + " Old: " + str(args["old"]) + " New: " + str(args["new"]) + " Mask: " + str(args["mask"]))
+            # self.info("Masked CAS in Memory: "+ str(args["lock_index"]) + " Old: " + str(args["old"]) + " New: " + str(args["new"]) + " Mask: " + str(args["mask"]))
             success, value = masked_cas_lock_table(self.table.lock_table, **args)
             response = Message({"function": fill_lock_table_masked_cas, "function_args":{"lock_index":args["lock_index"], "success":success, "value": value, "mask":args["mask"]}})
             return response

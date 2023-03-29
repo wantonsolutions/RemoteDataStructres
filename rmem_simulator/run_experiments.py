@@ -3,6 +3,7 @@ import log
 import logging
 import matplotlib.pyplot as plt
 import numpy as np
+from tqdm import tqdm
 
 
 def plot_fills(runs):
@@ -230,15 +231,16 @@ def global_lock_success_rate():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator for global locking")
     table_size = 1024
-    client_counts = [1, 2, 4, 8, 16, 32, 64, 128]
+    client_counts = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
     runs=[]
-    for client_count in client_counts:
+    for client_count in tqdm(client_counts):
+        print("client count: ", client_count)
         config = simulator.default_config()
         sim = simulator.Simulator(config)
-        print("table size: ", table_size)
+        # print("table size: ", table_size)
         config['indexes'] = table_size
         config['num_clients'] = client_count
-        config["num_steps"] = 400000
+        config["num_steps"] = 1000000
         sim = simulator.Simulator(config)
         log.set_off()
         sim.run()
@@ -303,7 +305,7 @@ def insertion_debug():
     save_statistics(runs)
     
 
-# global_lock_success_rate()
+global_lock_success_rate()
 plot_global_lock_success_rate()
 
 # todos()
