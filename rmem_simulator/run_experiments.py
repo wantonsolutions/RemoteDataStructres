@@ -231,7 +231,8 @@ def global_lock_success_rate():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator for global locking")
     table_size = 1024
-    client_counts = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
+    # client_counts = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
+    client_counts = [1]
     runs=[]
     for client_count in tqdm(client_counts):
         print("client count: ", client_count)
@@ -240,9 +241,9 @@ def global_lock_success_rate():
         # print("table size: ", table_size)
         config['indexes'] = table_size
         config['num_clients'] = client_count
-        config["num_steps"] = 1000000
+        config["num_steps"] = 10000
         sim = simulator.Simulator(config)
-        log.set_off()
+        # log.set_off()
         sim.run()
         stats = sim.collect_stats()
         runs.append(stats)
@@ -289,28 +290,29 @@ def insertion_debug():
     logger.info("Starting simulator")
 
     table_size = 64
-    clients=1
+    clients=2
     runs=[]
     config = simulator.default_config()
     sim = simulator.Simulator(config)
     print("table size: ", table_size)
     config['indexes'] = table_size
     config['num_clients'] = clients
-    config['num_steps'] = 100
+    config['num_steps'] = 1000
     sim = simulator.Simulator(config)
     # log.set_off()
     sim.run()
+    sim.validate_run()
     stats = sim.collect_stats()
     runs.append(stats)
     save_statistics(runs)
     
 
-global_lock_success_rate()
-plot_global_lock_success_rate()
+# global_lock_success_rate()
+# plot_global_lock_success_rate()
 
 # todos()
 
-# insertion_debug()
+insertion_debug()
 # factor_table_size_experiments()
 # plot_factor_table_size_experiments()
 

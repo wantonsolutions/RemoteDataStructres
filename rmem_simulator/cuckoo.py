@@ -458,6 +458,13 @@ class Table:
     def bucket_contains(self, bucket_index, value):
         return value in self.table[bucket_index]
 
+    def contains(self, value):
+        locations = hash.hash_locations(value, self.table_size)
+        for bucket_index in locations:
+            if self.bucket_contains(bucket_index, value):
+                return True
+        return False
+
     def get_fill_percentage(self):
         return float(self.fill)/float(self.table_size * self.bucket_size)
 
@@ -524,6 +531,31 @@ class Table:
         assert self.table != None, "table is not initalized"
         assert self.table[0] != None, "table must have dimensions"
         assert read_size % TABLE_ENTRY_SIZE == 0, "size must be a multiple of 8"
+
+    #check if the table has any duplicates in it
+    def contains_duplicates(self):
+        check_dict = dict()
+        for i in range(len(self.table)):
+            for j in range(len(self.table[i])):
+                if self.table[i][j] != None:
+                    if self.table[i][j] in check_dict:
+                        return True
+                    else:
+                        check_dict[self.table[i][j]] = 1
+
+    def get_duplicates(self):
+        check_dict = dict()
+        duplicates = []
+        for i in range(len(self.table)):
+            for j in range(len(self.table[i])):
+                if self.table[i][j] != None:
+                    if self.table[i][j] in check_dict:
+                        tup = (self.table[i][j], check_dict[self.table[i][j]], (i,j))
+                        duplicates.append(tup)
+                    else:
+                        check_dict[self.table[i][j]] = (i,j)
+        return duplicates
+
 
 #RDMA operations on the table
 def fill_table_with_cas(table, bucket_id, bucket_offset, success, value):
@@ -640,6 +672,9 @@ function_to_type_map = {
 }
 
 def message_type(message):
+    if message == None:
+        return "None"
+
     payload = message.payload
     function = payload["function"]
     if function in function_to_type_map:
@@ -714,6 +749,7 @@ class state_machine:
     def __init__(self, config):
         self.logger = logging.getLogger("root")
         self.config = config
+        self.complete = False
 
         #state machine statistics
         self.total_bytes = 0
@@ -731,6 +767,7 @@ class state_machine:
         self.current_insert_length = 0
         self.messages_per_insert = []
         self.index_range_per_insert = []
+        self.completed_inserts = []
 
     def get_stats(self):
         stats = dict()
@@ -747,6 +784,7 @@ class state_machine:
         stats["messages_per_read"] = self.messages_per_read
         stats["messages_per_insert"] = self.messages_per_insert
         stats["index_range_per_insert"] = self.index_range_per_insert
+        stats["completed_inserts"] = self.completed_inserts
         return stats
 
     def update_message_stats(self, message):
@@ -850,6 +888,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         super().__init__(config)
 
         self.current_insert = 0
+        self.current_insert_value = None
         self.search_path = []
         self.search_path_index = 0
 
@@ -882,9 +921,6 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
                 self.state = "critical_section"
             else:
                 output_message=self.aquire_global_lock()
-        else:
-            self.critical("Unexpected message type " + str(message_type(message)))
-            exit(1)
         return output_message
 
     def release_global_lock_fsm(self, message):
@@ -895,8 +931,6 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
                 self.state = "release_global_lock"
                 self.critical("What the fuck is happening I failed to release a lock")
                 exit(1)
-        else:
-            self.critical("Unexpected message type " + str(message_type(message)))
         return None
 
     
@@ -907,16 +941,15 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
 
     def begin_insert(self):
             self.state = "inserting"
-            self.current_insert = self.current_insert + 1
-            insert_value = self.current_insert + (self.id * 100) #BUG insert values are unique to each client (but not really)
+            self.current_insert_value = unique_insert(self.current_insert, self.id, self.config["num_clients"])
 
             #only perform an insert to the first location.
-            self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.hash_locations, insert_value)
+            self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.hash_locations, self.current_insert_value)
 
             if len(self.search_path) == 0:
-                self.info("Insert Failed: " + str(insert_value) + "| unable to continue, client " + str(self.id) + " is done")
-                self.state = "complete"
-                return None
+                self.info("Insert Failed: " + str(self.current_insert_value) + "| unable to continue, client " + str(self.id) + " is done")
+                self.complete=True
+                return
 
             #todo there are going to be cases where this fails because 
             self.search_path_index = len(self.search_path)-1
@@ -924,16 +957,22 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
 
     def end_insert(self):
             self.info("complete insertion")
-            self.state="idle"
+            self.completed_inserts.append(self.current_insert)
             self.messages_per_insert.append(self.current_insert_length)
             self.index_range_per_insert.append(path_index_range(self.search_path))
+
+            #release the lock
+            self.state="release_global_lock"
+            return self.release_global_lock()
 
 
     def fsm_logic(self, message = None):
 
+        if self.complete and self.state == "idle":
+            return None
+
         if self.state== "idle":
             self.current_insert = self.current_insert + 1
-            insert_value = unique_insert(self.current_insert, self.id, self.config["num_clients"])
             self.state = "aquire_global_lock"
             return self.aquire_global_lock()
 
@@ -942,11 +981,47 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
 
         if self.state == "critical_section":
             self.info("I've made it to the critical section for the " + str(self.current_insert) + "th time")
-            self.state = "release_global_lock"
-            return self.release_global_lock()
+            self.info("time to make an insertion")
 
+            self.begin_insert()
+            if self.complete:
+                self.state = "release_global_lock"
+                return self.release_global_lock()
+
+
+            return self.next_cas_message()
+
+            # self.state = "release_global_lock"
+            # return self.release_global_lock()
+
+        if self.state == "inserting":
+            #there should be a message, otherwise don't do anything
+            if message == None:
+                return None
+
+            #unpack the cas response
+            args = unpack_cas_response(message)
+            #read in the cas response as a properly sized read to the local table
+            fill_local_table_with_cas_response(self.table, args)
+
+            #If CAS failed, try the insert a second time.
+            success = args["success"]
+            if not success:
+                self.state = "critical_section"
+                #todo start here after lunch we need to work on the failed insert backtrack.
+                # exit(0)
+
+            #Step down the search path a single index
+            self.search_path_index -= 1
+            if self.search_path_index == 0:
+                return self.end_insert()
+            else:
+                return self.next_cas_message()
+
+    
         if self.state == "release_global_lock":
             return self.release_global_lock_fsm(message)
+
 
         
         #critical section

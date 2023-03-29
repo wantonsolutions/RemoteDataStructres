@@ -291,11 +291,28 @@ class Simulator(Node):
 
         #run simulation
         for i in range(self.config['num_steps']):
-            # self.deterministic_simulation_step()
-            self.random_single_simulation_step()
+            self.deterministic_simulation_step()
+            # self.random_single_simulation_step()
 
             if self.no_events() == True and self.clients_complete() == True:
                 break
+
+    def validate_run(self):
+        #check that there are no duplicates in the table
+        if self.memory.index.contains_duplicates():
+            duplicates = self.memory.index.get_duplicates()
+            self.critical("Memory contains duplicates")
+            self.critical(str(duplicates))
+            return False
+
+        #check to make sure that all of the values inserted are actually in the hash table
+        for i in range(len(self.client_list)):
+            client = self.client_list[i]
+            for j in range(len(client.state_machine.completed_inserts)):
+                value = client.state_machine.completed_inserts[j]
+                if self.memory.index.contains(value) == False:
+                    self.critical("Memory does not contain value: " + str(value) + "inserted by " + str(client.client_id))
+                    return False
 
     def collect_stats(self):
         statistics = dict()
@@ -308,7 +325,7 @@ class Simulator(Node):
         statistics['memory'] = dict()
         fill = self.memory.index.get_fill_percentage()
         statistics['memory']['fill'] = fill
-        # self.memory.index.print()
+        self.memory.index.print_table()
 
         statistics['hash'] = dict()
         statistics['hash']['factor'] = hash.get_factor()
@@ -351,6 +368,8 @@ def main():
     config = default_config()
     simulator = Simulator(config)
     simulator.run()
+    if not simulator.validate_run():
+        logger.error("Simulation failed check the logs")
     simulator.collect_stats()
 
 if __name__ == "__main__":
