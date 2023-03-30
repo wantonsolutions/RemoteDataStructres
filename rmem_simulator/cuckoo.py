@@ -721,7 +721,7 @@ def cas_table_entry_message(bucket_index, bucket_offset, old, new):
 def unpack_cas_response(message):
         assert message.payload["function"] == fill_table_with_cas, "client is in inserting state but message is not a cas " + str(message)
         args = message.payload["function_args"]
-        logger.info("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["value"]))
+        logger.debug("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["value"]))
         return args
 
 def masked_cas_lock_table_message(lock_index, old, new, mask):
@@ -733,7 +733,7 @@ def masked_cas_lock_table_message(lock_index, old, new, mask):
 def unpack_masked_cas_response(message):
         assert message.payload["function"] == fill_lock_table_masked_cas, "client is in inserting state but message is not a cas " + str(message)
         args = message.payload["function_args"]
-        logger.info("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["value"]) + str(args["mask"]))
+        logger.debug("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["value"]) + str(args["mask"]))
         return args
 
 
@@ -982,7 +982,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         self.search_path_index = 0
 
     def aquire_global_lock(self):
-        self.info("client " + str(self.id) + " Aquiring global lock")
+        self.debug("client " + str(self.id) + " Aquiring global lock")
         #sanity checking
         if self.table.lock_table.total_locks != 1:
             self.critical("Attemptying to aquire global locks, but table has " + str(self.table.lock_table.total_locks) + " locks")
@@ -993,7 +993,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             return masked_cas_message
 
     def release_global_lock(self):
-        self.info("client " + str(self.id) + " Releasing global lock")
+        self.debug("client " + str(self.id) + " Releasing global lock")
         #sanity checking
         if self.table.lock_table.total_locks != 1:
             self.critical("Attemptying to release global locks, but table has " + str(len(self.table.lock_table)) + " locks")
@@ -1049,7 +1049,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             return self.next_cas_message()
 
     def end_insert(self):
-            self.info("complete insertion")
+            self.info("Insert Complete: " + str(self.current_insert_value))
             #update insertion stats
             self.completed_inserts.append(self.current_insert_value)
             self.insert_path_lengths.append(self.current_insert_length)
@@ -1089,7 +1089,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         if not success:
             raise Exception("Failed to undo last cas -- this is a really bad scenario")
         
-        self.critical("Last CAS was undone, now we are just trying again")
+        self.debug("Last CAS was undone, now we are just trying again")
         self.state = "critical_section"
         return None
 
@@ -1113,14 +1113,13 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
 
             #if we have not issued a successful CAS yet there is nothing to backtrack to.
             if self.search_path_index == len(self.search_path)-1:
-                self.critical("Insertion has failed but no harm was done, trying again")
+                self.debug("Insertion has failed but no harm was done, trying again")
                 self.state = "critical_section"
                 return None
             else:
-                self.critical("Insertion has failed, but we have issued a CAS, we can backtrack to repair damage")
+                self.debug("Insertion has failed, but we have issued a CAS, we can backtrack to repair damage")
                 self.state = "undo_last_cas"
                 message = self.undo_last_cas_message()
-                print(message)
                 return message
 
         #Step down the search path a single index
