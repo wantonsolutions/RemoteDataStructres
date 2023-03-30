@@ -269,7 +269,7 @@ class Simulator(Node):
 
             # client_config['state_machine_init']=lockless_a_star_insert_only_state_machine
             client_config['state_machine_init']=global_lock_a_star_insert_only_state_machine
-            client_config['state_machine_init_args']={'total_inserts': 1}
+            client_config['state_machine_init_args']={'total_inserts': 10000}
 
             c = Client(client_config)
 
@@ -291,8 +291,8 @@ class Simulator(Node):
 
         #run simulation
         for i in range(self.config['num_steps']):
-            # self.deterministic_simulation_step()
-            self.random_single_simulation_step()
+            self.deterministic_simulation_step()
+            # self.random_single_simulation_step()
 
             if self.no_events() == True and self.clients_complete() == True:
                 break
