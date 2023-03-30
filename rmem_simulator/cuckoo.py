@@ -848,12 +848,17 @@ class state_machine:
     def critical(self, message):
         self.logger.critical("[" + self.log_prefix() + "] " + message)
 
-
 class request():
     def __init__(self, request_type, key, value=None):
         self.request_type = request_type
         self.key = key
         self.value = value
+
+    def __str__(self):
+        return "Request: " + self.request_type + " Key: " + str(self.key) + " Value: " + str(self.value)
+
+    def __repr__(self):
+        return self.__str__()
 
 workload_write_percentage={
     "ycsb-a": 50,
@@ -1030,17 +1035,18 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
 
     def begin_insert(self):
             self.state = "inserting"
-            #only perform an insert to the first location.
             self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.hash_locations, self.current_insert_value)
 
             if len(self.search_path) == 0:
                 self.info("Insert Failed: " + str(self.current_insert_value) + "| unable to continue, client " + str(self.id) + " is done")
                 self.complete=True
-                return
+                self.state = "release_global_lock"
+                return self.release_global_lock()
 
             #todo there are going to be cases where this fails because 
             self.search_path_index = len(self.search_path)-1
             self.current_insert_length=len(self.search_path)
+            return self.next_cas_message()
 
     def end_insert(self):
             self.info("complete insertion")
@@ -1055,6 +1061,75 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             self.state="release_global_lock"
             return self.release_global_lock()
 
+    def idle_fsm(self,message):
+        if message != None:
+            self.critical("Idle state machine received a message" + str(message))
+            return None
+        #get the next operations
+        req = self.workload_driver.next()
+        if req == None:
+            return None
+        elif req.request_type == "put":
+            self.current_insert_value = req.key
+            self.state = "aquire_global_lock"
+            self.inserting=True
+            return self.aquire_global_lock()
+        else:
+            raise Exception("No generator for request : " + str(req.request_type))
+
+    def undo_last_cas_fsm(self, message):
+        if message == None:
+            return None
+
+        args = unpack_cas_response(message)
+        fill_local_table_with_cas_response(self.table, args)
+
+        #If CAS failed, try the insert a second time.
+        success = args["success"]
+        if not success:
+            raise Exception("Failed to undo last cas -- this is a really bad scenario")
+        
+        self.critical("Last CAS was undone, now we are just trying again")
+        self.state = "critical_section"
+        return None
+
+    def insert_fsm(self, message):
+        #there should be a message, otherwise don't do anything
+        if message == None:
+            return None
+
+        args = unpack_cas_response(message)
+        fill_local_table_with_cas_response(self.table, args)
+
+        #If CAS failed, try the insert a second time.
+        success = args["success"]
+        if not success:
+            self.state = "critical_section"
+            # self.critical("Insert Failed: " + str(self.current_insert_value) + "| trying again")
+            # self.critical("failed insert path: " + str(self.search_path))
+            # self.critical("failed insert path index: " + str(self.search_path_index) + "of  " + str(len(self.search_path) -1 ))
+            # self.critical("failed cas: " + str(message))
+            # self.critical("cas element: " + str(self.search_path[self.search_path_index]))
+
+            #if we have not issued a successful CAS yet there is nothing to backtrack to.
+            if self.search_path_index == len(self.search_path)-1:
+                self.critical("Insertion has failed but no harm was done, trying again")
+                self.state = "critical_section"
+                return None
+            else:
+                self.critical("Insertion has failed, but we have issued a CAS, we can backtrack to repair damage")
+                self.state = "undo_last_cas"
+                message = self.undo_last_cas_message()
+                print(message)
+                return message
+
+        #Step down the search path a single index
+        self.search_path_index -= 1
+        if self.search_path_index == 0:
+            return self.end_insert()
+        else:
+            return self.next_cas_message()
+
 
     def fsm_logic(self, message = None):
 
@@ -1062,100 +1137,23 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             return None
 
         if self.state== "idle":
-
-            #get the next operations
-            req = self.workload_driver.next()
-            if req == None:
-                return None
-            elif req.request_type == "put":
-                self.current_insert_value = req.key
-                self.state = "aquire_global_lock"
-                self.inserting=True
-                return self.aquire_global_lock()
-            else:
-                exit(1)
+            return self.idle_fsm(message)
 
         if self.state == "aquire_global_lock":
             return self.aquire_global_lock_fsm(message)
 
-        if self.state == "critical_section":
-            # self.info("I've made it to the critical section for the " + str(self.current_insert_value) + "th time")
-            self.info("time to make an insertion")
-
-            self.begin_insert()
-            if self.complete:
-                self.state = "release_global_lock"
-                return self.release_global_lock()
-
-
-            return self.next_cas_message()
-
-            # self.state = "release_global_lock"
-            # return self.release_global_lock()
-
-        if self.state == "inserting":
-            #there should be a message, otherwise don't do anything
-            if message == None:
-                return None
-
-            #unpack the cas response
-            args = unpack_cas_response(message)
-            #read in the cas response as a properly sized read to the local table
-            fill_local_table_with_cas_response(self.table, args)
-
-            #If CAS failed, try the insert a second time.
-            success = args["success"]
-            if not success:
-                self.state = "critical_section"
-                self.critical("Insert Failed: " + str(self.current_insert_value) + "| trying again")
-                self.critical("failed insert path: " + str(self.search_path))
-                self.critical("failed insert path index: " + str(self.search_path_index) + "of  " + str(len(self.search_path) -1 ))
-                self.critical("failed cas: " + str(message))
-                self.critical("cas element: " + str(self.search_path[self.search_path_index]))
-
-                #if we have not issued a successful CAS yet there is nothing to backtrack to.
-                if self.search_path_index == len(self.search_path)-1:
-                    self.critical("Insertion has failed but no harm was done, trying again")
-                    self.state = "critical_section"
-                    return None
-                else:
-                    self.critical("Insertion has failed, but we have issued a CAS, we can backtrack to repair damage")
-                    self.state = "undo_last_cas"
-                    message = self.undo_last_cas_message()
-                    print(message)
-                    return message
-
-                #todo start here after lunch we need to work on the failed insert backtrack.
-                raise Exception("Failed insertion")
-
-            #Step down the search path a single index
-            self.search_path_index -= 1
-            if self.search_path_index == 0:
-                return self.end_insert()
-            else:
-                return self.next_cas_message()
-
-        if self.state == "undo_last_cas":
-            if message == None:
-                return None
-            #unpack the cas response
-            args = unpack_cas_response(message)
-            #read in the cas response as a properly sized read to the local table
-            fill_local_table_with_cas_response(self.table, args)
-
-            #If CAS failed, try the insert a second time.
-            success = args["success"]
-            if not success:
-                raise Exception("Failed to undo last cas -- this is a really bad scenario")
-            
-            self.critical("Last CAS was undone, now we are just trying again")
-            self.state = "critical_section"
-            return None
-
-
-    
         if self.state == "release_global_lock":
             return self.release_global_lock_fsm(message)
+
+        if self.state == "critical_section":
+            return self.begin_insert()
+
+        if self.state == "inserting":
+            return self.insert_fsm(message)
+
+        if self.state == "undo_last_cas":
+            return self.undo_last_cas_fsm(message)
+    
 
 
 class basic_memory_state_machine(state_machine):
