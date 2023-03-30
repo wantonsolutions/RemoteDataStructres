@@ -1,4 +1,5 @@
 import simulator
+import json
 import log
 import logging
 import matplotlib.pyplot as plt
@@ -25,16 +26,14 @@ def plot_fills(runs):
     ax.plot(table_sizes, fill_rates)
     plt.savefig("fill_rate.pdf")
 
-def save_statistics(statistics):
+def save_statistics(statistics, filename="latest_statistics.json"):
     print(statistics)
-    import json
     stats = json.dumps(statistics, indent=4)
-    with open("latest_statistics.json", "w") as f:
+    with open(filename, "w") as f:
         f.write(stats)
 
-def load_statistics():
-    import json
-    with open("latest_statistics.json", "r") as f:
+def load_statistics(filename="latest_statistics.json"):
+    with open(filename, "r") as f:
         stats = json.load(f)
     return stats
 

@@ -187,9 +187,6 @@ def heuristic_4(current_index, target_index, table_size):
     # distance = distance + int((target_index - current_index) / median)
     return distance
 
-
-
-
 def fscore(element, target_index, table_size):
         #TODO start here tomorrow, make Fscore work on a merged table
         g_score = element.distance
@@ -294,8 +291,6 @@ def bucket_cuckoo_a_star_insert(table, location_func, value):
     insert_path = insert_paths[random.randint(0, len(insert_paths)-1)]
     return insert_path
 
-
-
 class Message:
     def __init__(self, config):
         self.payload = dict()
@@ -307,7 +302,6 @@ class Message:
         for key, value in self.payload.items():
             v += str(key) + ":" + str(value) + "\n"
         return v[:len(v)-1]
-
 
 class Lock:
     def __init__(self):
@@ -338,8 +332,6 @@ class Lock:
 
     def __repr__(self):
         return self.__str__()
-
-
 
 class LockTable:
     def __init__(self, memory_size, entry_size, bucket_size, buckets_per_lock):
@@ -406,8 +398,6 @@ class LockTable:
             top_bucket = bottom_bucket + self.buckets_per_lock - 1
             s += str(bottom_bucket) + "-" + str(top_bucket) + ":" + str(self.locks[i]) + "\n"
         return s[:len(s)-1]
-
-
 
 class Table:
     def __init__(self, memory_size, bucket_size):
@@ -753,6 +743,8 @@ class state_machine:
         self.logger = logging.getLogger("root")
         self.config = config
         self.complete = False
+        self.inserting = False
+        self.reading = False
 
         #state machine statistics
         self.total_bytes = 0
@@ -765,11 +757,13 @@ class state_machine:
         self.total_cas_failures = 0
 
         #todo add to a subclass
-        self.current_read_length = 0
+        self.current_read_messages = 0
         self.messages_per_read = []
         self.current_insert_length = 0
-        self.messages_per_insert = []
+        self.insert_path_lengths = []
         self.index_range_per_insert = []
+        self.current_insert_messages = 0
+        self.messages_per_insert = []
         self.completed_inserts = []
 
     def get_stats(self):
@@ -785,8 +779,9 @@ class state_machine:
 
         #todo add to a subclass 
         stats["messages_per_read"] = self.messages_per_read
-        stats["messages_per_insert"] = self.messages_per_insert
+        stats["insert_path_lengths"] = self.insert_path_lengths
         stats["index_range_per_insert"] = self.index_range_per_insert
+        stats["messages_per_insert"] = self.messages_per_insert
         stats["completed_inserts"] = self.completed_inserts
         return stats
 
@@ -794,6 +789,11 @@ class state_machine:
 
         if message == None:
             return
+
+        if self.inserting:
+            self.current_insert_messages += 1
+        elif self.reading:
+            self.current_read_messages +=1
 
         size = message_to_bytes(message)
         self.total_bytes += size
@@ -849,6 +849,83 @@ class state_machine:
         self.logger.critical("[" + self.log_prefix() + "] " + message)
 
 
+class request():
+    def __init__(self, request_type, key, value=None):
+        self.request_type = request_type
+        self.key = key
+        self.value = value
+
+workload_write_percentage={
+    "ycsb-a": 50,
+    "ycsb-b": 5,
+    "ycsb-c": 0,
+    "ycsb-w": 100,
+}
+
+class client_workload_driver():
+    def __init__(self, config):
+        self.workload=config["workload"]
+        self.total_requests=config["total_requests"]
+        self.client_id=config['id']
+        self.num_clients=config['num_clients']
+        #todo add a line for having a workload passed in as a file
+        self.completed_requests=0
+        self.completed_puts=0
+        self.completed_gets=0
+        self.last_request=None
+
+    def record_last_request(self):
+        request = self.last_request
+        if request == None:
+            return
+        if request.request_type == "put":
+            self.completed_puts += 1
+        elif request.request_type == "get":
+            self.completed_gets += 1
+        else:
+            print("Unknown request type! " + str(request))
+            exit(1)
+
+    def unique_insert(self, insert, client_id, total_clients):
+        return insert * total_clients + client_id
+
+    def unique_get(self, get, client_id, total_clients):
+        return get * total_clients + client_id
+
+    def next_put(self):
+        next_value = self.unique_insert(self.completed_puts, self.client_id, self.num_clients)
+        req = request("put", next_value, next_value)
+        self.last_request = req
+        return req
+
+    def next_get(self):
+        next_value = self.unique_get(self.completed_gets, self.client_id, self.num_clients)
+        req = request("get", next_value)
+        self.last_request = req
+        return req
+
+
+    def gen_next_operation(self, workload):
+        if not workload in workload_write_percentage:
+            print("Unknown workload! " + workload)
+            exit(1)
+        percentage = workload_write_percentage[workload]
+        if int(random.random() * 100) < percentage:
+            return "put"
+        else:
+            return "get"
+
+    def next(self):
+        self.record_last_request()
+        op = self.gen_next_operation(self.workload)
+        if op == "put":
+            return self.next_put()
+        elif op == "get":
+            return self.next_get()
+
+
+
+
 class client_state_machine(state_machine):
     def __init__(self, config):
         super().__init__(config)
@@ -857,11 +934,17 @@ class client_state_machine(state_machine):
         self.table = config["table"]
         self.state="idle"
 
+        workload_config = {
+            "workload": "ycsb-w",
+            "total_requests": self.total_inserts,
+            "id": self.id,
+            "num_clients": config["num_clients"],
+        }
+        self.workload_driver = client_workload_driver(workload_config)
+
     def __str__(self):
         return "Client " + str(self.id)
 
-def unique_insert(insert, client_id, total_clients):
-    return insert * total_clients + client_id
 
 def blank_global_lock_cas():
     index = 0
@@ -870,7 +953,6 @@ def blank_global_lock_cas():
     old = [0] * CAS_SIZE
     new = [0] * CAS_SIZE
     return (index, old, new, mask)
-
 
 def aquire_global_lock_masked_cas():
     index, old, new, mask = blank_global_lock_cas()
@@ -890,7 +972,6 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
     def __init__(self, config):
         super().__init__(config)
 
-        self.current_insert = 0
         self.current_insert_value = None
         self.search_path = []
         self.search_path_index = 0
@@ -930,12 +1011,12 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         if message_type(message) == "masked_cas_response":
             if message.payload["function_args"]["success"] == True:
                 self.state = "idle"
+                self.inserting=False
             else:
                 self.state = "release_global_lock"
                 self.critical("What the fuck is happening I failed to release a lock")
                 exit(1)
         return None
-
     
     def next_cas_message(self):
         insert_pe = self.search_path[self.search_path_index] 
@@ -949,8 +1030,6 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
 
     def begin_insert(self):
             self.state = "inserting"
-            self.current_insert_value = unique_insert(self.current_insert, self.id, self.config["num_clients"])
-
             #only perform an insert to the first location.
             self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.hash_locations, self.current_insert_value)
 
@@ -965,9 +1044,12 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
 
     def end_insert(self):
             self.info("complete insertion")
+            #update insertion stats
             self.completed_inserts.append(self.current_insert_value)
-            self.messages_per_insert.append(self.current_insert_length)
+            self.insert_path_lengths.append(self.current_insert_length)
             self.index_range_per_insert.append(path_index_range(self.search_path))
+            self.messages_per_insert.append(self.current_insert_messages)
+            self.current_insert_messages = 0
 
             #release the lock
             self.state="release_global_lock"
@@ -980,15 +1062,24 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             return None
 
         if self.state== "idle":
-            self.current_insert = self.current_insert + 1
-            self.state = "aquire_global_lock"
-            return self.aquire_global_lock()
+
+            #get the next operations
+            req = self.workload_driver.next()
+            if req == None:
+                return None
+            elif req.request_type == "put":
+                self.current_insert_value = req.key
+                self.state = "aquire_global_lock"
+                self.inserting=True
+                return self.aquire_global_lock()
+            else:
+                exit(1)
 
         if self.state == "aquire_global_lock":
             return self.aquire_global_lock_fsm(message)
 
         if self.state == "critical_section":
-            self.info("I've made it to the critical section for the " + str(self.current_insert) + "th time")
+            # self.info("I've made it to the critical section for the " + str(self.current_insert_value) + "th time")
             self.info("time to make an insertion")
 
             self.begin_insert()
@@ -1034,9 +1125,6 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
                     print(message)
                     return message
 
-
-
-
                 #todo start here after lunch we need to work on the failed insert backtrack.
                 raise Exception("Failed insertion")
 
@@ -1069,93 +1157,6 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         if self.state == "release_global_lock":
             return self.release_global_lock_fsm(message)
 
-
-        
-        #critical section
-            #perform A* search
-            #read the path range
-            #confirm path
-            #insert path
-            #release lock
-
-        #insert along a* path.
-
-        
-
-
-
-class lockless_a_star_insert_only_state_machine(client_state_machine):
-    def __init__(self, config):
-        super().__init__(config)
-
-        self.current_insert = 0
-        self.search_path = []
-        self.search_path_index = 0
-
-    def next_cas_message(self):
-        insert_pe = self.search_path[self.search_path_index] 
-        copy_pe = self.search_path[self.search_path_index-1]
-        return cas_table_entry_message(insert_pe.bucket_index, insert_pe.bucket_offset, insert_pe.key, copy_pe.key)
-
-    def begin_insert(self):
-            self.state = "inserting"
-            self.current_insert = self.current_insert + 1
-            insert_value = self.current_insert + (self.id * 100) #BUG insert values are unique to each client (but not really)
-
-            #only perform an insert to the first location.
-            self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.hash_locations, insert_value)
-
-            if len(self.search_path) == 0:
-                self.info("Insert Failed: " + str(insert_value) + "| unable to continue, client " + str(self.id) + " is done")
-                self.state = "complete"
-                return None
-
-            #todo there are going to be cases where this fails because 
-            self.search_path_index = len(self.search_path)-1
-            self.current_insert_length=len(self.search_path)
-
-    def end_insert(self):
-            self.info("complete insertion")
-            self.state="idle"
-            self.messages_per_insert.append(self.current_insert_length)
-            self.index_range_per_insert.append(path_index_range(self.search_path))
-
-
-    def fsm_logic(self, message = None):
-        if self.state == "idle":
-            assert message == None, "idle state should not have a message being returned, message is old " + str(message)
-
-            self.begin_insert()
-            if self.state == "complete":
-                return None
-
-            return self.next_cas_message()
-
-        if self.state == "inserting":
-            #there should be a message, otherwise don't do anything
-            if message == None:
-                return None
-
-            #unpack the cas response
-            args = unpack_cas_response(message)
-            #read in the cas response as a properly sized read to the local table
-            fill_local_table_with_cas_response(self.table, args)
-
-            #If CAS failed, try the insert a second time.
-            success = args["success"]
-            if not success:
-                exit(0)
-
-            #Step down the search path a single index
-            self.search_path_index -= 1
-            if self.search_path_index == 0:
-                self.end_insert()
-                return None
-            else:
-                return self.next_cas_message()
-
-        if self.state == "complete":
-            return None
 
 class basic_memory_state_machine(state_machine):
     def __init__(self,config):
