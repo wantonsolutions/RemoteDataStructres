@@ -220,8 +220,6 @@ def plot_hash_factor_distance_cdf():
     plt.savefig("hash_factor_distance_cdf.pdf")
 
 
-
-
 def todos():
     print("Write a function to CAS a single lock in the lock table. The CAS operation here is just for a global lock")
     print("Write a multi cas function to grab multiple locks in the lock table")
@@ -256,6 +254,7 @@ def plot_global_lock_success_rate():
         "cas_success_rate",
         "read_write_ratio",
         "bytes_per_operation",
+        "fill_factor"
         ]
     plot_cuckoo.multi_plot_runs(stats, plot_names)
     # print(stats)

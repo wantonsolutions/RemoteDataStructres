@@ -4,7 +4,10 @@ import numpy as np
 def multi_plot_runs(runs, plot_names):
     print("plotting ", len(runs), " runs: with", len(plot_names), " plots" + str(plot_names))
 
-    fig, axs = plt.subplots(len(plot_names), 1)
+    fig_width = 5
+    fig_height = 2
+    total_height = fig_height * len(plot_names)
+    fig, axs = plt.subplots(len(plot_names), 1, figsize=(fig_width, total_height))
     if len(plot_names) == 1:
         axs = [axs]
     i=0
@@ -16,6 +19,8 @@ def multi_plot_runs(runs, plot_names):
             read_write_ratio(axs[i],runs)
         elif plot_name == "bytes_per_operation":
             bytes_per_operation(axs[i],runs)
+        elif plot_name == "fill_factor":
+            fill_factor(axs[i],runs)
         else:
             print("unknown plot name: ", plot_name)
         i+=1
@@ -137,9 +142,26 @@ def bytes_per_operation(ax, stats):
     ax.set_xticks(x_pos+bar_width/2)
     ax.set_xticklabels(clients)
 
+def fill_factor(ax, stats):
+    print("FILL FACTOR")
+    print("TODO make the x axis configurable not just table size")
+
+    label = str("exp - " + str(stats[0]['hash']['factor']))
+    table_sizes = []
+    fill_rates = []
+    for stat in stats:
+        c = stat["config"]
+        table_sizes.append(c['indexes'])
+        fill_rates.append(stat['memory']['fill'])
+
+    if len(set(table_sizes)) == 1:
+        ax.text(0.5, 0.5, "Warning - table sizes are all the same", horizontalalignment='center', verticalalignment='center', transform=ax.transAxes, color='red')
+    elif len(set(table_sizes)) != len(table_sizes):
+        ax.text(0.5, 0.5, "Warning - table sizes are not unique ", horizontalalignment='center', verticalalignment='center', transform=ax.transAxes, color='red')
 
 
-        
-
-
-
+    ax.plot(table_sizes, fill_rates, label=str(label), marker='o')
+    ax.set_xlabel('Table Size')
+    ax.set_ylabel('Fill Rate')
+    ax.set_title('Fill Rate vs Table Size')
+    ax.legend()
