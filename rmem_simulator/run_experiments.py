@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 
+import plot_cuckoo
+
 
 def plot_fills(runs):
 
@@ -231,7 +233,7 @@ def global_lock_success_rate():
     logger.info("Starting simulator for global locking")
     table_size = 1024
     # client_counts = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
-    client_counts = [1]
+    client_counts = [1, 2, 4, 8, 16, 32]
     runs=[]
     for client_count in tqdm(client_counts):
         print("client count: ", client_count)
@@ -242,7 +244,7 @@ def global_lock_success_rate():
         config['num_clients'] = client_count
         config["num_steps"] = 10000
         sim = simulator.Simulator(config)
-        # log.set_off()
+        log.set_off()
         sim.run()
         stats = sim.collect_stats()
         runs.append(stats)
@@ -250,38 +252,44 @@ def global_lock_success_rate():
 
 def plot_global_lock_success_rate():
     stats = load_statistics()
-    print(stats)
-    success_rates = []
-    std_errs = []
-    clients = []
-    for stat in stats:
-        per_client_success_rate = []
-        for client in stat['clients']:
-            print(client)
-            total_cas = client['stats']['total_cas']
-            total_cas_failure = client['stats']['total_cas_failures']
-            success_rate = float(1.0 - float(total_cas_failure)/float(total_cas))
-            print(total_cas,total_cas_failure,success_rate)
-            per_client_success_rate.append(success_rate)
-        mean =np.mean(per_client_success_rate)
-        std_err = np.std(per_client_success_rate) / np.sqrt(np.size(per_client_success_rate))
-        success_rates.append(mean)
-        std_errs.append(std_err)
-        # print(len(stat['clients']))
-        clients.append(str(len(stat['clients'])))
+    plot_names = [
+        "cas_success_rate",
+        "read_write_ratio",
+        "bytes_per_operation",
+        ]
+    plot_cuckoo.multi_plot_runs(stats, plot_names)
+    # print(stats)
+    # success_rates = []
+    # std_errs = []
+    # clients = []
+    # for stat in stats:
+    #     per_client_success_rate = []
+    #     for client in stat['clients']:
+    #         print(client)
+    #         total_cas = client['stats']['total_cas']
+    #         total_cas_failure = client['stats']['total_cas_failures']
+    #         success_rate = float(1.0 - float(total_cas_failure)/float(total_cas))
+    #         print(total_cas,total_cas_failure,success_rate)
+    #         per_client_success_rate.append(success_rate)
+    #     mean =np.mean(per_client_success_rate)
+    #     std_err = np.std(per_client_success_rate) / np.sqrt(np.size(per_client_success_rate))
+    #     success_rates.append(mean)
+    #     std_errs.append(std_err)
+    #     # print(len(stat['clients']))
+    #     clients.append(str(len(stat['clients'])))
 
 
-    x_pos = np.arange(len(success_rates))
-    fig, ax = plt.subplots()
-    ax.bar(x_pos,success_rates,yerr=std_errs,align="center", edgecolor='black')
-    ax.set_ylabel("success rate")
-    ax.set_xlabel("# clients")
-    ax.set_xticks(x_pos)
-    ax.set_xticklabels(clients)
-    # ax.set_yscale('log')
-    ax.set_title("Success Rate for global lock aquires")
-    plt.tight_layout()
-    plt.savefig("global_lock_aquire.pdf")
+    # x_pos = np.arange(len(success_rates))
+    # fig, ax = plt.subplots()
+    # ax.bar(x_pos,success_rates,yerr=std_errs,align="center", edgecolor='black')
+    # ax.set_ylabel("success rate")
+    # ax.set_xlabel("# clients")
+    # ax.set_xticks(x_pos)
+    # ax.set_xticklabels(clients)
+    # # ax.set_yscale('log')
+    # ax.set_title("Success Rate for global lock aquires")
+    # plt.tight_layout()
+    # plt.savefig("global_lock_aquire.pdf")
 
 
 def insertion_debug():
@@ -309,14 +317,14 @@ def insertion_debug():
     stats = sim.collect_stats()
     runs.append(stats)
     save_statistics(runs)
-    
 
-# global_lock_success_rate()
-# plot_global_lock_success_rate()
+    
+global_lock_success_rate()
+plot_global_lock_success_rate()
 
 # todos()
 
-insertion_debug()
+# insertion_debug()
 # factor_table_size_experiments()
 # plot_factor_table_size_experiments()
 

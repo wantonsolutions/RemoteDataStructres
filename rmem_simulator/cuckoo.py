@@ -767,17 +767,51 @@ class state_machine:
         self.total_cas_failures = 0
 
         #todo add to a subclass
-        self.current_read_messages = 0
-        self.messages_per_read = []
+        #insert stats
         self.current_insert_length = 0
         self.insert_path_lengths = []
         self.index_range_per_insert = []
         self.current_insert_messages = 0
         self.messages_per_insert = []
         self.completed_inserts = []
+        self.completed_insert_count = 0
+        self.failed_inserts = []
+        self.failed_insert_count = 0
 
+        #read stats
+        self.current_read_messages = 0
+        self.messages_per_read = []
         self.completed_reads = []
+        self.completed_read_count = 0
         self.failed_reads = []
+        self.failed_read_count = 0
+
+    def complete_read_stats(self, success, read_value):
+        if success:
+            self.completed_read_count += 1
+            self.completed_reads.append(read_value)
+        else:
+            self.failed_read_count += 1
+            self.failed_reads.append(read_value)
+        self.messages_per_read.append(self.current_read_messages)
+
+        #clear for next time
+        self.current_read_messages = 0
+
+    def complete_insert_stats(self, success, insert_value, search_path):
+        if success:
+            self.completed_inserts.append(insert_value)
+            self.completed_insert_count += 1
+        else:
+            self.failed_inserts.append(insert_value)
+            self.failed_insert_count += 1
+
+        self.insert_path_lengths.append(self.current_insert_length)
+        self.index_range_per_insert.append(path_index_range(search_path))
+        self.messages_per_insert.append(self.current_insert_messages)
+
+        #clear for next insert
+        self.current_insert_messages = 0
 
     def get_stats(self):
         stats = dict()
@@ -791,11 +825,19 @@ class state_machine:
         stats["total_cas_failures"] = self.total_cas_failures
 
         #todo add to a subclass 
-        stats["messages_per_read"] = self.messages_per_read
         stats["insert_path_lengths"] = self.insert_path_lengths
         stats["index_range_per_insert"] = self.index_range_per_insert
         stats["messages_per_insert"] = self.messages_per_insert
         stats["completed_inserts"] = self.completed_inserts
+        stats["completed_insert_count"] = self.completed_insert_count
+        stats["failed_inserts"] = self.failed_inserts
+        stats["failed_insert_count"] = self.failed_insert_count
+
+        stats["messages_per_read"] = self.messages_per_read
+        stats["completed_reads"] = self.completed_reads
+        stats["completed_read_count"] = self.completed_read_count
+        stats["failed_reads"] = self.failed_reads
+        stats["failed_read_count"] = self.failed_read_count
         return stats
 
     def update_message_stats(self, messages):
@@ -1083,12 +1125,8 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
     def end_insert(self):
         self.info("Insert Complete: " + str(self.current_insert_value))
         #update insertion stats
-        self.completed_inserts.append(self.current_insert_value)
-        self.insert_path_lengths.append(self.current_insert_length)
-        self.index_range_per_insert.append(path_index_range(self.search_path))
-        self.messages_per_insert.append(self.current_insert_messages)
-        self.current_insert_messages = 0
-
+        success=True
+        self.complete_insert_stats(success, self.current_insert_value, self.search_path)
         #release the lock
         self.state="release_global_lock"
         return self.release_global_lock()
@@ -1145,20 +1183,20 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
 
             #check if the read is complete
             self.outstanding_read_requests = self.outstanding_read_requests - 1
+            success=False
             if self.outstanding_read_requests == 0:
                 if self.read_values_found == 0:
                     self.info("Read Failed: " + str(self.current_read_key))
-                    self.critical(str(self.completed_inserts))
-                    self.failed_reads.append(self.current_read_key)
                 elif self.read_values_found == 1:
+                    success = True
                     self.info("Read Complete: " + str(self.read_values))
-                    self.completed_reads.append(self.current_read_key)
                 elif self.read_values_found > 1:
+                    success = True
                     self.info("Read Complete: " + str(self.read_values) + " Duplicate Found")
                     self.info("TODO we likely need a tie breaker here")
-                    self.completed_reads.append(self.current_read_key)
 
                 self.state="idle"
+                self.complete_read_stats(success, self.current_read_key)
                 self.reading=False
         return None
 
@@ -1199,6 +1237,11 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             raise Exception("Failed to undo last cas -- this is a really bad scenario")
         
         self.debug("Last CAS was undone, now we are just trying again")
+        # todo I could optionally consider this an insertion failure
+        # uncomment the code below to do so it should work but it's not tested
+        # success=False
+        # self.complete_insert_stats(success, self.current_insert_value, self.search_path)
+        
         self.state = "critical_section"
         return None
 
