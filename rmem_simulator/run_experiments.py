@@ -319,7 +319,7 @@ def insertion_debug():
     save_statistics(runs)
 
     
-global_lock_success_rate()
+# global_lock_success_rate()
 plot_global_lock_success_rate()
 
 # todos()

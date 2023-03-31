@@ -75,8 +75,8 @@ def read_write_ratio(ax, stats):
         read_percent = []
         write_percent = []
         for client in stat['clients']:
-            reads = len(client['stats']['completed_reads'])
-            writes = len(client['stats']['completed_inserts'])
+            reads = client['stats']['completed_read_count']
+            writes = client['stats']['completed_insert_count']
             total_ops = reads + writes
             read_percent.append(float(reads)/float(total_ops))
             write_percent.append(float(writes)/float(total_ops))
@@ -88,17 +88,20 @@ def read_write_ratio(ax, stats):
 
     x_pos = np.arange(len(read_rates))
     bar_width = 0.35
-    ax.bar(x_pos,read_rates,bar_width,yerr=read_err,align="center", edgecolor='black')
-    ax.bar(x_pos+bar_width,write_rates,bar_width,yerr=write_err,align="center", edgecolor='black')
+    ax.bar(x_pos,read_rates,bar_width,yerr=read_err,align="center", edgecolor='black', label="Read")
+    ax.bar(x_pos+bar_width,write_rates,bar_width,yerr=write_err,align="center", edgecolor='black', label="Write")
     ax.set_ylabel("Read/Write ratio")
     ax.set_xlabel("# clients")
     ax.set_xticks(x_pos+bar_width/2)
     ax.set_xticklabels(clients)
+    ax.legend()
 
 def bytes_per_operation(ax, stats):
     print("BYTES PER OPERATION")
     print("TODO make the x axis configurable not just clients")
     print("TODO make the y axis configurable not just bytes")
+    print("TODO this plot makes the assumption that read make up all of the read operation")
+    print("TODO this plot makes the assumption that CAS makes up all of the write operations")
 
     #read write ratio should work for both single and multi run
     if isinstance(stats, dict):
@@ -113,8 +116,8 @@ def bytes_per_operation(ax, stats):
         read_bytes_per_op = []
         write_bytes_per_op = []
         for client in stat['clients']:
-            reads = len(client['stats']['completed_reads'])
-            writes = len(client['stats']['completed_inserts'])
+            reads = client['stats']['completed_read_count']
+            writes = client['stats']['completed_insert_count']
             read_bytes_per_op.append(float(client['stats']['read_bytes'])/float(reads))
             write_bytes_per_op.append(float(client['stats']['cas_bytes'])/float(writes))
         read_bytes.append(np.mean(read_bytes_per_op))
@@ -125,8 +128,10 @@ def bytes_per_operation(ax, stats):
 
     x_pos = np.arange(len(read_bytes))
     bar_width = 0.35
-    ax.bar(x_pos,read_bytes,bar_width,yerr=read_err,align="center", edgecolor='black')
-    ax.bar(x_pos+bar_width,write_bytes,bar_width,yerr=write_err,align="center", edgecolor='black')
+    ax.bar(x_pos,read_bytes,bar_width,yerr=read_err,align="center", edgecolor='black', label="Read")
+    ax.bar(x_pos+bar_width,write_bytes,bar_width,yerr=write_err,align="center", edgecolor='black', label="Write")
+    ax.legend()
+    ax.set_yscale('log')
     ax.set_ylabel("Bytes per operation")
     ax.set_xlabel("# clients")
     ax.set_xticks(x_pos+bar_width/2)
