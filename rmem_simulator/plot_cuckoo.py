@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+
 def multi_plot_runs(runs, plot_names):
     print("plotting ", len(runs), " runs: with", len(plot_names), " plots" + str(plot_names))
 
@@ -11,8 +12,11 @@ def multi_plot_runs(runs, plot_names):
     if len(plot_names) == 1:
         axs = [axs]
     i=0
+
     for plot_name in plot_names:
         print(plot_name)
+        if plot_name == "general_stats":
+            general_stats(axs[i],runs)
         if plot_name == "cas_success_rate":
             cas_success_rate(axs[i],runs)
         elif plot_name == "read_write_ratio":
@@ -37,8 +41,8 @@ def stderr(data):
 
 def cas_success_rate(ax, stats):
     print("CAS SUCCESS RATE")
-    print("todo - label graph with workload")
-    print("todo print locking strategy")
+    print("\ttodo - label graph with workload")
+    print("\ttodo print locking strategy")
     success_rates = []
     std_errs = []
     clients = []
@@ -65,7 +69,7 @@ def cas_success_rate(ax, stats):
 
 def read_write_ratio(ax, stats):
     print("READ WRITE RATIO")
-    print("TODO make the x axis configurable not just clients")
+    print("\tTODO make the x axis configurable not just clients")
 
     #read write ratio should work for both single and multi run
     if isinstance(stats, dict):
@@ -103,10 +107,10 @@ def read_write_ratio(ax, stats):
 
 def bytes_per_operation(ax, stats):
     print("BYTES PER OPERATION")
-    print("TODO make the x axis configurable not just clients")
-    print("TODO make the y axis configurable not just bytes")
-    print("TODO this plot makes the assumption that read make up all of the read operation")
-    print("TODO this plot makes the assumption that CAS makes up all of the write operations")
+    print("\tTODO make the x axis configurable not just clients")
+    print("\tTODO make the y axis configurable not just bytes")
+    print("\tTODO this plot makes the assumption that read make up all of the read operation")
+    print("\tTODO this plot makes the assumption that CAS makes up all of the write operations")
 
     #read write ratio should work for both single and multi run
     if isinstance(stats, dict):
@@ -123,8 +127,8 @@ def bytes_per_operation(ax, stats):
         for client in stat['clients']:
             reads = client['stats']['completed_read_count']
             writes = client['stats']['completed_insert_count']
-            read_bytes_per_op.append(float(client['stats']['read_bytes'])/float(reads))
-            write_bytes_per_op.append(float(client['stats']['cas_bytes'])/float(writes))
+            read_bytes_per_op.append(float(client['stats']['read_operation_bytes'])/float(reads))
+            write_bytes_per_op.append(float(client['stats']['insert_operation_bytes'])/float(writes))
         read_bytes.append(np.mean(read_bytes_per_op))
         read_err.append(stderr(read_bytes_per_op))
         write_bytes.append(np.mean(write_bytes_per_op))
@@ -144,7 +148,7 @@ def bytes_per_operation(ax, stats):
 
 def fill_factor(ax, stats):
     print("FILL FACTOR")
-    print("TODO make the x axis configurable not just table size")
+    print("\tTODO make the x axis configurable not just table size")
 
     label = str("exp - " + str(stats[0]['hash']['factor']))
     table_sizes = []
@@ -165,3 +169,54 @@ def fill_factor(ax, stats):
     ax.set_ylabel('Fill Rate')
     ax.set_title('Fill Rate vs Table Size')
     ax.legend()
+
+def calculate_total_runs(stats):
+    if isinstance(stats, list):
+        total = 0
+        for s in stats:
+            total += calculate_total_runs(s)
+        return total
+    return 1
+
+def total_run_entry(stats):
+    runs = calculate_total_runs(stats)
+    return ("runs", runs)
+
+def workload_entry(stats):
+    workloads = dict()
+    if not isinstance(stats, list):
+        stats = [stats]
+
+    for s in stats:
+        for c in s['clients']:
+            print("SDFSDFSDFSDFFSDF")
+            print(c)
+            w = c['stats']['workload_stats']['workload']
+            workloads[w] = True
+
+    loads = ""
+    for w in workloads:
+        if loads != "":
+            loads = loads + ", "
+        loads= loads + w
+    return ("workload", loads)
+
+def general_stats(ax, stats):
+    print("RUN STATISTICS")
+    rows=[]
+    values=[]
+    staistic_functions=[
+        total_run_entry,
+        workload_entry,
+    ]
+    print(len(stats))
+    for f in staistic_functions:
+        label, value = f(stats)
+        rows.append(label)
+        values.append([value])
+    ax.axis('off')
+
+    print(values)
+    print(rows)
+
+    ax.table(cellText=values, rowLabels = rows, loc='center')

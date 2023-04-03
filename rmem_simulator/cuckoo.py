@@ -777,6 +777,7 @@ class state_machine:
         self.completed_insert_count = 0
         self.failed_inserts = []
         self.failed_insert_count = 0
+        self.insert_operation_bytes = 0
 
         #read stats
         self.current_read_messages = 0
@@ -785,6 +786,7 @@ class state_machine:
         self.completed_read_count = 0
         self.failed_reads = []
         self.failed_read_count = 0
+        self.read_operation_bytes = 0
 
     def complete_read_stats(self, success, read_value):
         if success:
@@ -832,12 +834,14 @@ class state_machine:
         stats["completed_insert_count"] = self.completed_insert_count
         stats["failed_inserts"] = self.failed_inserts
         stats["failed_insert_count"] = self.failed_insert_count
+        stats["insert_operation_bytes"] = self.insert_operation_bytes
 
         stats["messages_per_read"] = self.messages_per_read
         stats["completed_reads"] = self.completed_reads
         stats["completed_read_count"] = self.completed_read_count
         stats["failed_reads"] = self.failed_reads
         stats["failed_read_count"] = self.failed_read_count
+        stats["read_operation_bytes"] = self.read_operation_bytes
         return stats
 
     def update_message_stats(self, messages):
@@ -849,12 +853,15 @@ class state_machine:
             messages = [messages]
 
         for message in messages:
-            if self.inserting:
-                self.current_insert_messages += 1
-            elif self.reading:
-                self.current_read_messages +=1
 
             size = message_to_bytes(message)
+            if self.inserting:
+                self.current_insert_messages += 1
+                self.insert_operation_bytes += size
+            elif self.reading:
+                self.current_read_messages +=1
+                self.read_operation_bytes += size
+
             self.total_bytes += size
             t = message_type(message)
             payload = message.payload
@@ -938,6 +945,17 @@ class client_workload_driver():
         self.completed_gets=0
         self.last_request=None
 
+    def get_stats(self):
+        stats = dict()
+        stats["completed_requests"] = self.completed_requests
+        stats["completed_puts"] = self.completed_puts
+        stats["completed_gets"] = self.completed_gets
+        stats["workload"] = self.workload
+        stats["total_requests"] = self.total_requests
+        stats["client_id"] = self.client_id
+        stats["num_clients"] = self.num_clients
+        return stats
+
     def record_last_request(self):
         request = self.last_request
         self.completed_requests += 1
@@ -1010,10 +1028,16 @@ class client_state_machine(state_machine):
             "id": self.id,
             "num_clients": config["num_clients"],
         }
+        self.workload_config=workload_config
         self.workload_driver = client_workload_driver(workload_config)
 
     def __str__(self):
         return "Client " + str(self.id)
+
+    def get_stats(self):
+        stats = super().get_stats()
+        stats["workload_stats"] = self.workload_driver.get_stats()
+        return stats
 
 
 def blank_global_lock_cas():
