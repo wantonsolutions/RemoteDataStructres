@@ -322,12 +322,12 @@ def insertion_debug():
     save_statistics(runs)
 
     
-global_lock_success_rate()
+# global_lock_success_rate()
 # plot_global_lock_success_rate()
 
 # todos()
 
-# insertion_debug()
+insertion_debug()
 plot_general_stats_last_run()
 # factor_table_size_experiments()
 # plot_factor_table_size_experiments()

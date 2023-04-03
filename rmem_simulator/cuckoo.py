@@ -1183,11 +1183,27 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
                 return True
         return False
 
+    def keys_contained_in_read_response(self, key, read):
+        count=0
+        for k in read:
+            if k == None:
+                continue
+            if k == key:
+                count=count+1
+        return count
+
     def get_entry_from_read(self, key, read):
         for k in read:
             if k == key:
                 return k
         return None
+
+    def get_entries_from_read(self, key, read):
+        found = []
+        for k in read:
+            if k == key:
+                found.append(k)
+        return found
 
     def read_fsm(self, message):
         if message == None:
@@ -1198,12 +1214,9 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             args = unpack_read_response(message)
             fill_local_table_with_read_response(self.table, args)
             read = args["read"]
-            if self.read_response_contains_key(self.current_read_key,read):
-                self.read_values_found = self.read_values_found + 1
-                self.read_values.append(self.get_entry_from_read(self.current_read_key, read))
-                if self.read_values_found > 1:
-                    self.critical("Duplicate found: " + str(self.read_values))
-                    self.duplicates_found = self.duplicates_found + 1
+            keys_found = self.keys_contained_in_read_response(self.current_read_key, read)
+            self.read_values_found = self.read_values_found + keys_found
+            self.read_values.extend(self.get_entries_from_read(self.current_read_key, read))
 
             #check if the read is complete
             self.outstanding_read_requests = self.outstanding_read_requests - 1
@@ -1218,6 +1231,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
                     success = True
                     self.info("Read Complete: " + str(self.read_values) + " Duplicate Found")
                     self.info("TODO we likely need a tie breaker here")
+                    self.duplicates_found = self.duplicates_found + 1
 
                 self.state="idle"
                 self.complete_read_stats(success, self.current_read_key)
