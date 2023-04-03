@@ -186,20 +186,52 @@ def workload_entry(stats):
     workloads = dict()
     if not isinstance(stats, list):
         stats = [stats]
-
     for s in stats:
         for c in s['clients']:
-            print("SDFSDFSDFSDFFSDF")
-            print(c)
             w = c['stats']['workload_stats']['workload']
             workloads[w] = True
-
     loads = ""
     for w in workloads:
         if loads != "":
             loads = loads + ", "
         loads= loads + w
     return ("workload", loads)
+
+def get_config_list(stats, key):
+    key_dict = dict()
+    if not isinstance(stats, list):
+        stats = [stats]
+
+    for s in stats:
+        keys = s["config"][key]
+        key_dict[keys] = True
+
+    klist=[] 
+    for k in key_dict:
+        klist.append(k)
+
+    klist.sort()
+
+    sklist = ""
+    for k in klist:
+        if sklist != "":
+            sklist = sklist + ", "
+        sklist = sklist + str(k)
+    return sklist
+
+def clients_entry(stats):
+    return ("clients", get_config_list(stats, "num_clients"))
+
+def hash_factors(stats):
+    return ("hash factor", get_config_list(stats, "hash_factor"))
+
+def table_sizes(stats):
+    return ("table size", get_config_list(stats, "indexes"))
+
+
+    
+
+    
 
 def general_stats(ax, stats):
     print("RUN STATISTICS")
@@ -208,6 +240,9 @@ def general_stats(ax, stats):
     staistic_functions=[
         total_run_entry,
         workload_entry,
+        clients_entry,
+        hash_factors,
+        table_sizes
     ]
     print(len(stats))
     for f in staistic_functions:
