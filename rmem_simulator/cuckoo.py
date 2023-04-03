@@ -422,8 +422,11 @@ class Table:
     def get_bucket_size(self):
         return len(self.table[0]) * TABLE_ENTRY_SIZE
         
-    def row_size(self):
+    def row_size_bytes(self):
         return self.n_buckets_size(self.bucket_size)
+
+    def row_size_in_indexes(self):
+        return len(self.table[0])
 
     def n_buckets_size(self, n_buckets):
         return n_buckets * TABLE_ENTRY_SIZE
@@ -1077,6 +1080,10 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         self.read_values = []
         self.duplicates_found = 0
 
+        self.read_threshold_bytes = config['read_threshold_bytes']
+        assert self.read_threshold_bytes >= self.table.row_size_bytes(), "read threshold is smaller than a single row in the table (this is not allowed)"
+
+
 
     def aquire_global_lock(self):
         self.debug("client " + str(self.id) + " Aquiring global lock")
@@ -1158,22 +1165,61 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
     def single_bucket_read_message(self, bucket):
         message = Message({})
         message.payload["function"] = read_table_entry
-        message.payload["function_args"] = {'bucket_id':bucket, 'bucket_offset':0, 'size':self.table.row_size()}
+        message.payload["function_args"] = {'bucket_id':bucket, 'bucket_offset':0, 'size':self.table.row_size_bytes()}
         return message
 
+    #single smaller reads for each bucket
+    def single_bucket_read_messages(self, buckets):
+        messages = []
+        for bucket in buckets:
+            messages.append(self.single_bucket_read_message(bucket))
+        return messages
+
+    #one big read for all the buckets    
+    def multi_bucket_read_message(self, buckets):
+        min_bucket = min(buckets)
+        size = self.single_read_size_bytes(buckets)
+        message = Message({})
+        message.payload["function"] = read_table_entry
+        message.payload["function_args"] = {'bucket_id':min_bucket, 'bucket_offset':0, 'size':size}
+        return [message]
+
+
+    # def begin_read(self):
+    #     self.state = "reading"
+    #     self.reading=True
+    #     locations = hash.hash_locations(self.current_read_key, self.table.table_size)
+    #     # self.info("Reading: " + str(self.current_read_key) + " Locations: " + str(locations))
+    #     table_0_message = self.single_bucket_read_message(locations[0])
+    #     table_1_message = self.single_bucket_read_message(locations[1])
+    #     # print("table 0 message: " + str(table_0_message))
+    #     # print("table 1 message: " + str(table_1_message))
+    #     self.outstanding_read_requests = 2
+    #     self.read_values_found = 0
+    #     self.read_values = []
+    #     return [table_0_message, table_1_message]
+
+    def single_read_size_bytes(self, buckets):
+        min_bucket = min(buckets)
+        max_bucket = max(buckets)
+        distance = abs(max_bucket - min_bucket)
+        indexes = (distance + 1) * self.table.row_size_bytes()
+        return indexes
+
+    #threshold reads
     def begin_read(self):
-        self.state = "reading"
-        self.reading=True
         locations = hash.hash_locations(self.current_read_key, self.table.table_size)
-        # self.info("Reading: " + str(self.current_read_key) + " Locations: " + str(locations))
-        table_0_message = self.single_bucket_read_message(locations[0])
-        table_1_message = self.single_bucket_read_message(locations[1])
-        # print("table 0 message: " + str(table_0_message))
-        # print("table 1 message: " + str(table_1_message))
-        self.outstanding_read_requests = 2
+        if self.single_read_size_bytes(locations) <= self.read_threshold_bytes:
+            messages = self.multi_bucket_read_message(locations)
+        else:
+            messages = self.single_bucket_read_messages(locations)
+
+        self.outstanding_read_requests = len(messages)
         self.read_values_found = 0
         self.read_values = []
-        return [table_0_message, table_1_message]
+        self.state = "reading"
+        self.reading=True
+        return messages
 
     def read_response_contains_key(self, key, read):
         for k in read:
@@ -1220,18 +1266,18 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
 
             #check if the read is complete
             self.outstanding_read_requests = self.outstanding_read_requests - 1
-            success=False
             if self.outstanding_read_requests == 0:
                 if self.read_values_found == 0:
+                    success = False
                     self.info("Read Failed: " + str(self.current_read_key))
                 elif self.read_values_found == 1:
                     success = True
                     self.info("Read Complete: " + str(self.read_values))
                 elif self.read_values_found > 1:
                     success = True
+                    self.duplicates_found = self.duplicates_found + 1
                     self.info("Read Complete: " + str(self.read_values) + " Duplicate Found")
                     self.info("TODO we likely need a tie breaker here")
-                    self.duplicates_found = self.duplicates_found + 1
 
                 self.state="idle"
                 self.complete_read_stats(success, self.current_read_key)
@@ -1255,6 +1301,8 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             self.inserting=True
             return self.aquire_global_lock()
         elif req.request_type == "get":
+            if req.key < 0:
+                return None
             self.current_read_key = req.key
             self.state = "reading"
             self.reading=True

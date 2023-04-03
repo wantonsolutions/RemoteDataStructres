@@ -43,6 +43,7 @@ class Client(Node):
         state_machine_args['table'] = self.index
         state_machine_args['id'] = self.client_id
         state_machine_args['num_clients'] = config['num_clients']
+        state_machine_args['read_threshold_bytes'] = config['read_threshold_bytes']
         state_machine_init = config['state_machine_init']
         self.state_machine = state_machine_init(state_machine_args)
 
@@ -270,6 +271,7 @@ class Simulator(Node):
             # client_config['state_machine_init']=lockless_a_star_insert_only_state_machine
             client_config['state_machine_init']=global_lock_a_star_insert_only_state_machine
             client_config['state_machine_init_args']={'total_inserts': 10000}
+            client_config['read_threshold_bytes']=self.config['read_threshold_bytes']
 
             c = Client(client_config)
 
@@ -355,6 +357,7 @@ def default_config():
     config['bucket_size']=4
     config['entry_size']=8
     config['indexes']=32
+    config['read_threshold_bytes']=config['bucket_size'] * config['entry_size']
 
     config['hash_factor']=hash.DEFAULT_FACTOR
 

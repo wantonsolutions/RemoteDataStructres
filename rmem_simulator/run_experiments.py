@@ -308,6 +308,7 @@ def insertion_debug():
     config['indexes'] = table_size
     config['num_clients'] = clients
     config['num_steps'] = 100000
+    config['read_threshold_bytes'] = 256
     sim = simulator.Simulator(config)
     # log.set_off()
     try:
