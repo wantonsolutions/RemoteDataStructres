@@ -240,7 +240,7 @@ def global_lock_success_rate():
         # print("table size: ", table_size)
         config['indexes'] = table_size
         config['num_clients'] = client_count
-        config["num_steps"] = 10000
+        config["num_steps"] = 100000
         sim = simulator.Simulator(config)
         log.set_off()
         sim.run()

@@ -109,8 +109,6 @@ def bytes_per_operation(ax, stats):
     print("BYTES PER OPERATION")
     print("\tTODO make the x axis configurable not just clients")
     print("\tTODO make the y axis configurable not just bytes")
-    print("\tTODO this plot makes the assumption that read make up all of the read operation")
-    print("\tTODO this plot makes the assumption that CAS makes up all of the write operations")
 
     #read write ratio should work for both single and multi run
     if isinstance(stats, dict):
