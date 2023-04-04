@@ -1049,26 +1049,52 @@ class client_state_machine(state_machine):
         stats["workload_stats"] = self.workload_driver.get_stats()
         return stats
 
+def get_lock_index(buckets, locks_per_bucket):
+    return list(set([int(b/locks_per_bucket) for b in buckets]))
 
-def blank_global_lock_cas():
-    index = 0
-    mask = [0] * CAS_SIZE
-    mask[0] = 1
+def lock_array_to_bits(lock_array):
+    min_lock_index = min(lock_array)
+    lock_array = [l - min_lock_index for l in lock_array]
     old = [0] * CAS_SIZE
     new = [0] * CAS_SIZE
-    return (index, old, new, mask)
+    for l in lock_array:
+        new[l] = 1
+    mask = new #the mask is the same as the locks we want to aquire
+    return (min_lock_index, old, new, mask)
+
+def unlock_array_to_bits(lock_array):
+    # swap old and new
+    min_lock_index, old, new, mask = lock_array_to_bits(lock_array)
+    return (min_lock_index, new, old, mask)
+
+def divide_chunks(l, n): 
+    # looping till length l 
+    for i in range(0, len(l), n):  
+        yield l[i:i + n]
+
+def break_list_to_chunks(lock_array, locks_per_message):
+    return list(divide_chunks(lock_array, locks_per_message))
+
+def get_lock_or_unlock_messages(buckets, locks_per_bucket, locks_per_message, lock=True):
+    lock_array = get_lock_index(buckets, locks_per_bucket)
+    lock_chunks = break_list_to_chunks(lock_array, locks_per_message)
+    if lock:
+        lock_messages = [lock_array_to_bits(l) for l in lock_chunks]
+    else:
+        lock_messages = [unlock_array_to_bits(l) for l in lock_chunks]
+    return lock_messages
+
+def get_unlock_messages(buckets, locks_per_bucket, locks_per_message):
+    return get_lock_or_unlock_messages(buckets, locks_per_bucket, locks_per_message, lock=False)
+
+def get_lock_messages(buckets, locks_per_bucket, locks_per_message):
+    return get_lock_or_unlock_messages(buckets, locks_per_bucket, locks_per_message, lock=True)
 
 def aquire_global_lock_masked_cas():
-    index, old, new, mask = blank_global_lock_cas()
-    new[0]=1
-    old[0]=0
-    return index, old, new, mask
+    return get_lock_messages([0], 1, 1)[0]
 
 def release_global_lock_masked_cas():
-    index, old, new, mask = blank_global_lock_cas()
-    new[0]=0
-    old[0]=1
-    return index, old, new, mask
+    return get_unlock_messages([0], 1, 1)[0]
 
 
 

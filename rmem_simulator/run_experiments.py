@@ -369,10 +369,10 @@ def plot_read_threshold_experiment():
 
 # todos()
 
-# insertion_debug()
+insertion_debug()
 # plot_general_stats_last_run()
 
-read_threshold_experiment()
+# read_threshold_experiment()
 plot_general_stats_last_run()
 plot_read_threshold_experiment()
 
