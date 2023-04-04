@@ -231,9 +231,12 @@ def global_lock_success_rate():
     logger.info("Starting simulator for global locking")
     table_size = 1024
     # client_counts = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
-    client_counts = [1, 2, 4, 8, 16, 32]
+    # client_counts = [1, 2, 4, 8, 16, 32]
+    client_counts = [1, 2, 4, 8]
+
+
     runs=[]
-    for client_count in tqdm(client_counts):
+    for client_count in client_counts:
         print("client count: ", client_count)
         config = simulator.default_config()
         sim = simulator.Simulator(config)
@@ -241,6 +244,8 @@ def global_lock_success_rate():
         config['indexes'] = table_size
         config['num_clients'] = client_count
         config["num_steps"] = 100000
+        #global lock config
+        config['buckets_per_lock'] = config['indexes'] / config["bucket_size"]
         sim = simulator.Simulator(config)
         log.set_off()
         sim.run()
@@ -300,7 +305,7 @@ def insertion_debug():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
 
-    table_size = 128
+    table_size = 256
     clients=8
     runs=[]
     config = simulator.default_config()
@@ -310,6 +315,9 @@ def insertion_debug():
     config['num_clients'] = clients
     config['num_steps'] = 100000
     config['read_threshold_bytes'] = 256
+
+    #global lock config
+    config['buckets_per_lock'] = config['indexes'] / config["bucket_size"]
     sim = simulator.Simulator(config)
     # log.set_debug()
     # log.set_off()
@@ -365,12 +373,12 @@ def plot_read_threshold_experiment():
 
 
     
-# global_lock_success_rate()
+global_lock_success_rate()
 # plot_global_lock_success_rate()
 
 # todos()
 
-insertion_debug()
+# insertion_debug()
 # plot_general_stats_last_run()
 
 # read_threshold_experiment()
