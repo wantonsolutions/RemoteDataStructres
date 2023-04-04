@@ -38,3 +38,7 @@ def setup_custom_logger(name):
 def set_off():
     logger = logging.getLogger('root')
     logger.setLevel(logging.CRITICAL)
+
+def set_debug():
+    logger = logging.getLogger('root')
+    logger.setLevel(logging.DEBUG)

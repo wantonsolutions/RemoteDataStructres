@@ -311,6 +311,7 @@ def insertion_debug():
     config['num_steps'] = 100000
     config['read_threshold_bytes'] = 256
     sim = simulator.Simulator(config)
+    # log.set_debug()
     # log.set_off()
     try:
         sim.run()

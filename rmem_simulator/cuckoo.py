@@ -1186,7 +1186,6 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         assert self.read_threshold_bytes >= self.table.row_size_bytes(), "read threshold is smaller than a single row in the table (this is not allowed)"
 
 
-
     def aquire_global_lock(self):
         assert self.table.lock_table.total_locks == 1, "Attemptying to aquire global locks, but table has " + str(self.table.lock_table.total_locks) + " locks"
         index, old, new, mask = aquire_global_lock_masked_cas()
@@ -1213,32 +1212,51 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             if message.payload["function_args"]["success"] == False:
                 self.critical("What the fuck is happening I failed to release a lock")
                 exit(1)
+            if self.state == "release_global_lock":
+                self.state = "idle"
+                self.inserting=False
+                return None
+            if self.state == "release_global_lock_try_again":
+                return self.search()
+
+    def search(self, message=None):
+        assert message == None, "there should be no message passed to search"
+
+        self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.hash_locations, self.current_insert_value)
+        if len(self.search_path) == 0:
+            self.info("Search Failed: " + str(self.current_insert_value) + "| unable to continue, client " + str(self.id) + " is done")
+            self.complete=True
             self.state = "idle"
-            self.inserting=False
-        return None
+            return None
+
+        self.info("Search complete aquiring the global lock")
+
+        self.state="aquire_global_lock"
+        return self.aquire_global_lock()
 
     def begin_insert(self):
-            self.state = "inserting"
-            self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.hash_locations, self.current_insert_value)
+        self.state = "inserting"
+        #todo there are going to be cases where this fails because 
+        self.search_path_index = len(self.search_path)-1
+        self.current_insert_length=len(self.search_path)
+        return next_cas_message(self.search_path, self.search_path_index)
 
-            if len(self.search_path) == 0:
-                self.info("Insert Failed: " + str(self.current_insert_value) + "| unable to continue, client " + str(self.id) + " is done")
-                self.complete=True
-                self.state = "release_global_lock"
-                return self.release_global_lock()
-
-            #todo there are going to be cases where this fails because 
-            self.search_path_index = len(self.search_path)-1
-            self.current_insert_length=len(self.search_path)
-            return next_cas_message(self.search_path, self.search_path_index)
-
-    def end_insert(self):
+    def complete_insert(self):
         self.info("Insert Complete: " + str(self.current_insert_value))
         #update insertion stats
         success=True
         self.complete_insert_stats(success)
         #release the lock
         self.state="release_global_lock"
+        return self.release_global_lock()
+
+    def fail_insert(self):
+        self.info("Insert Failed: " + str(self.current_insert_value))
+        #update insertion stats
+        success=False
+        self.complete_insert_stats(success)
+        #release the lock
+        self.state="release_global_lock_try_again"
         return self.release_global_lock()
 
     #threshold reads
@@ -1251,7 +1269,6 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         self.state = "reading"
         self.reading=True
         return messages
-
 
     def read_fsm(self, message):
         if message == None:
@@ -1301,9 +1318,8 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         elif req.request_type == "put":
 
             self.current_insert_value = req.key
-            self.state = "aquire_global_lock"
             self.inserting=True
-            return self.aquire_global_lock()
+            return self.search()
 
         elif req.request_type == "get":
             if req.key < 0:
@@ -1328,13 +1344,9 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             raise Exception("Failed to undo last cas -- this is a really bad scenario")
         
         self.debug("Last CAS was undone, now we are just trying again")
-        # todo I could optionally consider this an insertion failure
-        # uncomment the code below to do so it should work but it's not tested
-        # success=False
-        # self.complete_insert_stats(success)
-        
-        self.state = "critical_section"
-        return None
+
+        #this insertion was a failure
+        return self.fail_insert()
 
     def insert_fsm(self, message):
         #there should be a message, otherwise don't do anything
@@ -1347,17 +1359,16 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         #If CAS failed, try the insert a second time.
         success = args["success"]
         if not success:
-            # self.critical("Insert Failed: " + str(self.current_insert_value) + "| trying again")
-            # self.critical("failed insert path: " + str(self.search_path))
-            # self.critical("failed insert path index: " + str(self.search_path_index) + "of  " + str(len(self.search_path) -1 ))
-            # self.critical("failed cas: " + str(message))
-            # self.critical("cas element: " + str(self.search_path[self.search_path_index]))
+            self.debug("Insert Failed: " + str(self.current_insert_value) + "| trying again")
+            self.debug("failed insert path: " + str(self.search_path))
+            self.debug("failed insert path index: " + str(self.search_path_index) + "of  " + str(len(self.search_path) -1 ))
+            self.debug("failed cas: " + str(message))
+            self.debug("cas element: " + str(self.search_path[self.search_path_index]))
 
             #if we have not issued a successful CAS yet there is nothing to backtrack to.
             if self.search_path_index == len(self.search_path)-1:
                 self.debug("Insertion has failed but no harm was done, trying again")
-                self.state = "critical_section"
-                return None
+                return self.fail_insert()
             else:
                 self.debug("Insertion has failed, but we have issued a CAS, we can backtrack to repair damage")
                 self.state = "undo_last_cas"
@@ -1366,7 +1377,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         #Step down the search path a single index
         self.search_path_index -= 1
         if self.search_path_index == 0:
-            return self.end_insert()
+            return self.complete_insert()
         else:
             return next_cas_message(self.search_path, self.search_path_index)
 
@@ -1382,7 +1393,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         if self.state == "aquire_global_lock":
             return self.aquire_global_lock_fsm(message)
 
-        if self.state == "release_global_lock":
+        if self.state == "release_global_lock" or self.state == "release_global_lock_try_again":
             return self.release_global_lock_fsm(message)
 
         if self.state == "critical_section":
