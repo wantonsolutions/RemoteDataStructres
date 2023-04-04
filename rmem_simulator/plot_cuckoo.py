@@ -284,6 +284,12 @@ def table_sizes(stats):
 def read_thresholds(stats):
     return ("read thresholds", get_config_list(stats, "read_threshold_bytes"))
 
+def buckets_per_lock(stats):
+    return ("buckets_per_lock", get_config_list(stats, "buckets_per_lock"))
+
+def locks_per_message(stats):
+    return ("locks_per_message", get_config_list(stats, "locks_per_message"))
+
 
 def general_stats(ax, stats):
     print("RUN STATISTICS")
@@ -296,6 +302,8 @@ def general_stats(ax, stats):
         hash_factors,
         table_sizes,
         read_thresholds,
+        buckets_per_lock,
+        locks_per_message,
     ]
     print(len(stats))
     for f in staistic_functions:

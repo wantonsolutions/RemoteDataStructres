@@ -400,15 +400,16 @@ class LockTable:
         return s[:len(s)-1]
 
 class Table:
-    def __init__(self, memory_size, bucket_size):
+    def __init__(self, memory_size, bucket_size, buckets_per_lock):
         self.number_tables=2
         self.entry_size=8
         self.memory_size=memory_size
         self.bucket_size=bucket_size
+        self.buckets_per_lock=buckets_per_lock
         self.table=self.generate_bucket_cuckoo_hash_index(memory_size, bucket_size)
         self.table_size = len(self.table)
 
-        self.lock_table = LockTable(memory_size, self.entry_size, bucket_size, self.table_size)
+        self.lock_table = LockTable(memory_size, self.entry_size, bucket_size, self.buckets_per_lock)
         self.fill = 0
 
 
@@ -1049,8 +1050,8 @@ class client_state_machine(state_machine):
         stats["workload_stats"] = self.workload_driver.get_stats()
         return stats
 
-def get_lock_index(buckets, locks_per_bucket):
-    return list(set([int(b/locks_per_bucket) for b in buckets]))
+def get_lock_index(buckets, buckets_per_lock):
+    return list(set([int(b/buckets_per_lock) for b in buckets]))
 
 def lock_array_to_bits(lock_array):
     min_lock_index = min(lock_array)
@@ -1075,8 +1076,9 @@ def divide_chunks(l, n):
 def break_list_to_chunks(lock_array, locks_per_message):
     return list(divide_chunks(lock_array, locks_per_message))
 
-def get_lock_or_unlock_messages(buckets, locks_per_bucket, locks_per_message, lock=True):
-    lock_array = get_lock_index(buckets, locks_per_bucket)
+def get_lock_or_unlock_messages(buckets, buckets_per_lock, locks_per_message, lock=True):
+    assert locks_per_message <= CAS_SIZE, "locks_per_message must be <= CAS_SIZE: locks/message-"+str(locks_per_message)+" CAS_SIZE-"+str(CAS_SIZE)
+    lock_array = get_lock_index(buckets, buckets_per_lock)
     lock_chunks = break_list_to_chunks(lock_array, locks_per_message)
     if lock:
         lock_messages = [lock_array_to_bits(l) for l in lock_chunks]
@@ -1084,11 +1086,11 @@ def get_lock_or_unlock_messages(buckets, locks_per_bucket, locks_per_message, lo
         lock_messages = [unlock_array_to_bits(l) for l in lock_chunks]
     return lock_messages
 
-def get_unlock_messages(buckets, locks_per_bucket, locks_per_message):
-    return get_lock_or_unlock_messages(buckets, locks_per_bucket, locks_per_message, lock=False)
+def get_unlock_messages(buckets, buckets_per_lock, locks_per_message):
+    return get_lock_or_unlock_messages(buckets, buckets_per_lock, locks_per_message, lock=False)
 
-def get_lock_messages(buckets, locks_per_bucket, locks_per_message):
-    return get_lock_or_unlock_messages(buckets, locks_per_bucket, locks_per_message, lock=True)
+def get_lock_messages(buckets, buckets_per_lock, locks_per_message):
+    return get_lock_or_unlock_messages(buckets, buckets_per_lock, locks_per_message, lock=True)
 
 def aquire_global_lock_masked_cas():
     return get_lock_messages([0], 1, 1)[0]
@@ -1112,6 +1114,8 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         self.read_values_found = 0
         self.read_values = []
         self.duplicates_found = 0
+        self.buckets_per_lock = config['buckets_per_lock']
+        self.locks_per_message = config['locks_per_message']
 
         self.read_threshold_bytes = config['read_threshold_bytes']
         assert self.read_threshold_bytes >= self.table.row_size_bytes(), "read threshold is smaller than a single row in the table (this is not allowed)"

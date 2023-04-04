@@ -44,6 +44,8 @@ class Client(Node):
         state_machine_args['id'] = self.client_id
         state_machine_args['num_clients'] = config['num_clients']
         state_machine_args['read_threshold_bytes'] = config['read_threshold_bytes']
+        state_machine_args['buckets_per_lock'] = config['buckets_per_lock']
+        state_machine_args['locks_per_message'] = config['locks_per_message']
         state_machine_init = config['state_machine_init']
         self.state_machine = state_machine_init(state_machine_args)
 
@@ -251,9 +253,10 @@ class Simulator(Node):
         bucket_size=self.config['bucket_size']
         entry_size=self.config['entry_size']
         indexes=self.config['indexes']
+        buckets_per_lock=self.config['buckets_per_lock']
         memory_size=entry_size * indexes
         index_init_function=Table
-        index_init_args={'memory_size': memory_size, 'bucket_size': bucket_size}
+        index_init_args={'memory_size': memory_size, 'bucket_size': bucket_size, 'buckets_per_lock': buckets_per_lock}
 
         #initialize hash function
         hash.set_factor(self.config['hash_factor'])
@@ -272,6 +275,8 @@ class Simulator(Node):
             client_config['state_machine_init']=global_lock_a_star_insert_only_state_machine
             client_config['state_machine_init_args']={'total_inserts': 10000}
             client_config['read_threshold_bytes']=self.config['read_threshold_bytes']
+            client_config['buckets_per_lock']=buckets_per_lock
+            client_config['locks_per_message']=self.config['locks_per_message']
 
             c = Client(client_config)
 
@@ -358,6 +363,10 @@ def default_config():
     config['entry_size']=8
     config['indexes']=32
     config['read_threshold_bytes']=config['bucket_size'] * config['entry_size']
+
+    #default is global locking
+    config['buckets_per_lock']=config['indexes']
+    config['locks_per_message']=1
 
     config['hash_factor']=hash.DEFAULT_FACTOR
 
