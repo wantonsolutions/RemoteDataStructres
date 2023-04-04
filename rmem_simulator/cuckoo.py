@@ -1174,6 +1174,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         current_pe = self.search_path[self.search_path_index]
         return cas_table_entry_message(last_pe.bucket_index, last_pe.bucket_offset, current_pe.key, None)
 
+
     def begin_insert(self):
             self.state = "inserting"
             self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.hash_locations, self.current_insert_value)
