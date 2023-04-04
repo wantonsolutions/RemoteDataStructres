@@ -23,6 +23,8 @@ def multi_plot_runs(runs, plot_names):
             read_write_ratio(axs[i],runs)
         elif plot_name == "bytes_per_operation":
             bytes_per_operation(axs[i],runs)
+        elif plot_name == "messages_per_operation":
+            messages_per_operation(axs[i],runs)
         elif plot_name == "fill_factor":
             fill_factor(axs[i],runs)
         else:
@@ -105,44 +107,97 @@ def read_write_ratio(ax, stats):
     ax.set_xticklabels(clients)
     ax.legend()
 
-def bytes_per_operation(ax, stats):
+def client_stats_x_per_y_get_mean_std(stat, x,y):
+        vals=[]
+        for client in stat['clients']:
+            y_val = client['stats'][y]
+            x_val = client['stats'][x]
+            vals.append(float(x_val)/float(y_val))
+        return np.mean(vals), stderr(vals)
+
+def client_stats_x_per_y_get_mean_std_multi_run(stats, x, y):
+    means, stds = [], []
+    for stat in stats:
+        m, s = (client_stats_x_per_y_get_mean_std(stat, x, y))
+        means.append(m)
+        stds.append(s)
+    return means, stds
+
+def get_x_axis(stats, name):
+    if name == "clients":
+        return get_client_x_axis(stats)
+    elif name == "read threshold bytes":
+        return get_read_threshold_x_axis(stats)
+    else:
+        print("unknown x axis: ", name)
+        exit(1)
+
+def get_client_x_axis(stats):
+    if isinstance(stats, dict):
+        stats = [stats]
+    clients = []
+    for stat in stats:
+        clients.append(stat['config']['num_clients'])
+    return clients
+
+def get_read_threshold_x_axis(stats):
+    if isinstance(stats, dict):
+        stats = [stats]
+    read_thresholds = []
+    for stat in stats:
+        read_thresholds.append(stat['config']['read_threshold_bytes'])
+    return read_thresholds
+    
+
+def bytes_per_operation(ax, stats, x_axis="clients"):
     print("BYTES PER OPERATION")
     print("\tTODO make the x axis configurable not just clients")
-    print("\tTODO make the y axis configurable not just bytes")
-
-    #read write ratio should work for both single and multi run
     if isinstance(stats, dict):
         stats = [stats]
 
-    read_bytes=[]
-    read_err=[]
-    write_bytes=[]
-    write_err=[]
-    clients = []
-    for stat in stats:
-        read_bytes_per_op = []
-        write_bytes_per_op = []
-        for client in stat['clients']:
-            reads = client['stats']['completed_read_count']
-            writes = client['stats']['completed_insert_count']
-            read_bytes_per_op.append(float(client['stats']['read_operation_bytes'])/float(reads))
-            write_bytes_per_op.append(float(client['stats']['insert_operation_bytes'])/float(writes))
-        read_bytes.append(np.mean(read_bytes_per_op))
-        read_err.append(stderr(read_bytes_per_op))
-        write_bytes.append(np.mean(write_bytes_per_op))
-        write_err.append(stderr(write_bytes_per_op))
-        clients.append(str(len(stat['clients'])))
+    read_bytes, read_err = client_stats_x_per_y_get_mean_std_multi_run(stats, 'read_operation_bytes', 'completed_read_count')
+    write_bytes, write_err = client_stats_x_per_y_get_mean_std_multi_run(stats, 'insert_operation_bytes', 'completed_insert_count')
+    x_axis_vals = get_x_axis(stats, x_axis)
+    x_pos = np.arange(len(x_axis_vals))
 
-    x_pos = np.arange(len(read_bytes))
     bar_width = 0.35
     ax.bar(x_pos,read_bytes,bar_width,yerr=read_err,align="center", edgecolor='black', label="Read")
-    ax.bar(x_pos+bar_width,write_bytes,bar_width,yerr=write_err,align="center", edgecolor='black', label="Write")
+    ax.bar(x_pos+bar_width,write_bytes,bar_width,yerr=write_err,align="center", edgecolor='black', label="Insert")
     ax.legend()
     ax.set_yscale('log')
     ax.set_ylabel("Bytes per operation")
     ax.set_xlabel("# clients")
     ax.set_xticks(x_pos+bar_width/2)
-    ax.set_xticklabels(clients)
+    ax.set_xticklabels(x_axis_vals)
+
+def messages_per_operation(ax, stats, x_axis="clients"):
+    print("MESSAGES PER OPERATION")
+    print("\tTODO make the x axis configurable not just clients")
+
+    read_messages, read_err = client_stats_x_per_y_get_mean_std_multi_run(stats, 'read_operation_messages', 'completed_read_count')
+    write_messages, write_err = client_stats_x_per_y_get_mean_std_multi_run(stats, 'insert_operation_messages', 'completed_insert_count')
+    x_axis_vals = get_x_axis(stats, x_axis)
+    x_pos = np.arange(len(x_axis_vals))
+    bar_width = 0.35
+
+    h1 = ax.bar(x_pos,read_messages,bar_width,yerr=read_err,align="center", edgecolor='black', color='blue', label="Read")
+
+    axt=ax.twinx()
+    h2 = axt.bar(x_pos+bar_width,write_messages,bar_width,yerr=write_err,align="center", color='orange', edgecolor='black', label="Insert")
+
+    print(type(h1))
+    print(type(h2))
+    bars=[h1]+[h2]
+    labs=[h.get_label() for h in bars]
+
+    axt.legend(bars, labs, loc="upper left")
+    # ax.set_yscale('log')
+    ax.set_ylabel("read - messages/op")
+    axt.set_ylabel("insert - messages/op")
+    ax.set_xlabel(x_axis)
+    ax.set_xticks(x_pos+bar_width/2)
+    ax.set_xticklabels(x_axis_vals)
+
 
 def fill_factor(ax, stats):
     print("FILL FACTOR")
@@ -226,10 +281,9 @@ def hash_factors(stats):
 def table_sizes(stats):
     return ("table size", get_config_list(stats, "indexes"))
 
+def read_thresholds(stats):
+    return ("read thresholds", get_config_list(stats, "read_threshold_bytes"))
 
-    
-
-    
 
 def general_stats(ax, stats):
     print("RUN STATISTICS")
@@ -240,7 +294,8 @@ def general_stats(ax, stats):
         workload_entry,
         clients_entry,
         hash_factors,
-        table_sizes
+        table_sizes,
+        read_thresholds,
     ]
     print(len(stats))
     for f in staistic_functions:

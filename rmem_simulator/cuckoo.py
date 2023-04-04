@@ -781,6 +781,7 @@ class state_machine:
         self.failed_inserts = []
         self.failed_insert_count = 0
         self.insert_operation_bytes = 0
+        self.insert_operation_messages = 0
 
         #read stats
         self.current_read_messages = 0
@@ -790,6 +791,7 @@ class state_machine:
         self.failed_reads = []
         self.failed_read_count = 0
         self.read_operation_bytes = 0
+        self.read_operation_messages = 0
 
     def complete_read_stats(self, success, read_value):
         if success:
@@ -838,6 +840,8 @@ class state_machine:
         stats["failed_inserts"] = self.failed_inserts
         stats["failed_insert_count"] = self.failed_insert_count
         stats["insert_operation_bytes"] = self.insert_operation_bytes
+        stats["insert_operation_messages"] = self.insert_operation_messages
+
 
         stats["messages_per_read"] = self.messages_per_read
         stats["completed_reads"] = self.completed_reads
@@ -845,6 +849,7 @@ class state_machine:
         stats["failed_reads"] = self.failed_reads
         stats["failed_read_count"] = self.failed_read_count
         stats["read_operation_bytes"] = self.read_operation_bytes
+        stats["read_operation_messages"] = self.read_operation_messages
         return stats
 
     def update_message_stats(self, messages):
@@ -861,9 +866,11 @@ class state_machine:
             if self.inserting:
                 self.current_insert_messages += 1
                 self.insert_operation_bytes += size
+                self.insert_operation_messages +=1
             elif self.reading:
                 self.current_read_messages +=1
                 self.read_operation_bytes += size
+                self.read_operation_messages +=1
 
             self.total_bytes += size
             t = message_type(message)

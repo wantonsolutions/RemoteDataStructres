@@ -255,6 +255,7 @@ def plot_general_stats_last_run():
         "cas_success_rate",
         "read_write_ratio",
         "bytes_per_operation",
+        "messages_per_operation",
         "fill_factor"
         ]
     plot_cuckoo.multi_plot_runs(stats, plot_names)
@@ -322,14 +323,59 @@ def insertion_debug():
     runs.append(stats)
     save_statistics(runs)
 
+def read_threshold_experiment():
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator")
+
+    table_size = 128
+    clients=8
+    runs=[]
+    read_thresholds=[32, 64, 128, 256, 512, 1024]
+    for read_threshold in read_thresholds:
+        print("read threshold: ", read_threshold)
+        config = simulator.default_config()
+        sim = simulator.Simulator(config)
+        config['indexes'] = table_size
+        config['num_clients'] = clients
+        config['num_steps'] = 100000
+        config['read_threshold_bytes'] = read_threshold
+        sim = simulator.Simulator(config)
+        # log.set_off()
+        try:
+            sim.run()
+        except Exception as e:
+            print(e)
+            stats = sim.collect_stats()
+            sim.validate_run()
+        sim.validate_run()
+        stats = sim.collect_stats()
+        runs.append(stats)
+    save_statistics(runs)
+
+def plot_read_threshold_experiment():
+    stats = load_statistics()
+    fig, ax = plt.subplots()
+    plot_cuckoo.messages_per_operation(ax, stats, "read threshold bytes")
+    ax.set_title("Messages per operation for different read thresholds")
+    plt.tight_layout()
+    plt.savefig("messages_per_operation_read_threshold.pdf")
+
+
+
+
     
 # global_lock_success_rate()
 # plot_global_lock_success_rate()
 
 # todos()
 
-insertion_debug()
+# insertion_debug()
+# plot_general_stats_last_run()
+
+read_threshold_experiment()
 plot_general_stats_last_run()
+plot_read_threshold_experiment()
+
 # factor_table_size_experiments()
 # plot_factor_table_size_experiments()
 
