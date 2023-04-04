@@ -806,16 +806,16 @@ class state_machine:
         #clear for next time
         self.current_read_messages = 0
 
-    def complete_insert_stats(self, success, insert_value, search_path):
+    def complete_insert_stats(self, success):
         if success:
-            self.completed_inserts.append(insert_value)
+            self.completed_inserts.append(self.current_insert_value)
             self.completed_insert_count += 1
         else:
-            self.failed_inserts.append(insert_value)
+            self.failed_inserts.append(self.current_insert_value)
             self.failed_insert_count += 1
 
         self.insert_path_lengths.append(self.current_insert_length)
-        self.index_range_per_insert.append(path_index_range(search_path))
+        self.index_range_per_insert.append(path_index_range(self.search_path))
         self.messages_per_insert.append(self.current_insert_messages)
 
         #clear for next insert
@@ -1098,6 +1098,71 @@ def aquire_global_lock_masked_cas():
 def release_global_lock_masked_cas():
     return get_unlock_messages([0], 1, 1)[0]
 
+#insert functions
+def next_cas_message(search_path, search_path_index):
+    insert_pe = search_path[search_path_index] 
+    copy_pe = search_path[search_path_index-1]
+    return cas_table_entry_message(insert_pe.bucket_index, insert_pe.bucket_offset, insert_pe.key, copy_pe.key)
+
+def undo_last_cas_message(search_path, search_path_index):
+    last_pe = search_path[search_path_index+1]
+    current_pe = search_path[search_path_index]
+    return cas_table_entry_message(last_pe.bucket_index, last_pe.bucket_offset, current_pe.key, None)
+
+## Read operations
+def keys_contained_in_read_response(key, read):
+    count=0
+    for k in read:
+        if k == None:
+            continue
+        if k == key:
+            count=count+1
+    return count
+
+def get_entries_from_read(key, read):
+    found = []
+    for k in read:
+        if k == key:
+            found.append(k)
+    return found
+
+def single_bucket_read_message(bucket, row_size_bytes):
+    message = Message({})
+    message.payload["function"] = read_table_entry
+    message.payload["function_args"] = {'bucket_id':bucket, 'bucket_offset':0, 'size':row_size_bytes}
+    return message
+
+#single smaller reads for each bucket
+def single_bucket_read_messages(buckets, row_size_bytes):
+    messages = []
+    for bucket in buckets:
+        messages.append(single_bucket_read_message(bucket, row_size_bytes))
+    return messages
+
+def single_read_size_bytes(buckets, row_size_bytes):
+    min_bucket = min(buckets)
+    max_bucket = max(buckets)
+    distance = abs(max_bucket - min_bucket)
+    indexes = (distance + 1) * row_size_bytes
+    return indexes
+
+#one big read for all the buckets    
+def multi_bucket_read_message(buckets, row_size_bytes):
+    min_bucket = min(buckets)
+    size = single_read_size_bytes(buckets, row_size_bytes)
+    message = Message({})
+    message.payload["function"] = read_table_entry
+    message.payload["function_args"] = {'bucket_id':min_bucket, 'bucket_offset':0, 'size':size}
+    return [message]
+
+
+def read_threshold_message(key, read_threshold_bytes, table_size, row_size_bytes):
+    locations = hash.hash_locations(key, table_size)
+    if single_read_size_bytes(locations, row_size_bytes) <= read_threshold_bytes:
+        messages = multi_bucket_read_message(locations, row_size_bytes)
+    else:
+        messages = single_bucket_read_messages(locations, row_size_bytes)
+    return messages
 
 
 class global_lock_a_star_insert_only_state_machine(client_state_machine):
@@ -1123,26 +1188,16 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
 
 
     def aquire_global_lock(self):
-        self.debug("client " + str(self.id) + " Aquiring global lock")
-        #sanity checking
-        if self.table.lock_table.total_locks != 1:
-            self.critical("Attemptying to aquire global locks, but table has " + str(self.table.lock_table.total_locks) + " locks")
-            exit(0)
-        else:
-            index, old, new, mask = aquire_global_lock_masked_cas()
-            masked_cas_message = masked_cas_lock_table_message(index, old, new, mask)
-            return masked_cas_message
+        assert self.table.lock_table.total_locks == 1, "Attemptying to aquire global locks, but table has " + str(self.table.lock_table.total_locks) + " locks"
+        index, old, new, mask = aquire_global_lock_masked_cas()
+        masked_cas_message = masked_cas_lock_table_message(index, old, new, mask)
+        return masked_cas_message
 
     def release_global_lock(self):
-        self.debug("client " + str(self.id) + " Releasing global lock")
-        #sanity checking
-        if self.table.lock_table.total_locks != 1:
-            self.critical("Attemptying to release global locks, but table has " + str(len(self.table.lock_table)) + " locks")
-            exit(0)
-        else:
-            index, old, new, mask = release_global_lock_masked_cas()
-            masked_cas_message = masked_cas_lock_table_message(index, old, new, mask)
-            return masked_cas_message
+        assert self.table.lock_table.total_locks == 1, "Attemptying to aquire global locks, but table has " + str(self.table.lock_table.total_locks) + " locks"
+        index, old, new, mask = release_global_lock_masked_cas()
+        masked_cas_message = masked_cas_lock_table_message(index, old, new, mask)
+        return masked_cas_message
 
     def aquire_global_lock_fsm(self, message):
         output_message = None
@@ -1155,25 +1210,12 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
 
     def release_global_lock_fsm(self, message):
         if message_type(message) == "masked_cas_response":
-            if message.payload["function_args"]["success"] == True:
-                self.state = "idle"
-                self.inserting=False
-            else:
-                self.state = "release_global_lock"
+            if message.payload["function_args"]["success"] == False:
                 self.critical("What the fuck is happening I failed to release a lock")
                 exit(1)
+            self.state = "idle"
+            self.inserting=False
         return None
-    
-    def next_cas_message(self):
-        insert_pe = self.search_path[self.search_path_index] 
-        copy_pe = self.search_path[self.search_path_index-1]
-        return cas_table_entry_message(insert_pe.bucket_index, insert_pe.bucket_offset, insert_pe.key, copy_pe.key)
-
-    def undo_last_cas_message(self):
-        last_pe = self.search_path[self.search_path_index+1]
-        current_pe = self.search_path[self.search_path_index]
-        return cas_table_entry_message(last_pe.bucket_index, last_pe.bucket_offset, current_pe.key, None)
-
 
     def begin_insert(self):
             self.state = "inserting"
@@ -1188,69 +1230,20 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             #todo there are going to be cases where this fails because 
             self.search_path_index = len(self.search_path)-1
             self.current_insert_length=len(self.search_path)
-            return self.next_cas_message()
-
+            return next_cas_message(self.search_path, self.search_path_index)
 
     def end_insert(self):
         self.info("Insert Complete: " + str(self.current_insert_value))
         #update insertion stats
         success=True
-        self.complete_insert_stats(success, self.current_insert_value, self.search_path)
+        self.complete_insert_stats(success)
         #release the lock
         self.state="release_global_lock"
         return self.release_global_lock()
 
-    def single_bucket_read_message(self, bucket):
-        message = Message({})
-        message.payload["function"] = read_table_entry
-        message.payload["function_args"] = {'bucket_id':bucket, 'bucket_offset':0, 'size':self.table.row_size_bytes()}
-        return message
-
-    #single smaller reads for each bucket
-    def single_bucket_read_messages(self, buckets):
-        messages = []
-        for bucket in buckets:
-            messages.append(self.single_bucket_read_message(bucket))
-        return messages
-
-    #one big read for all the buckets    
-    def multi_bucket_read_message(self, buckets):
-        min_bucket = min(buckets)
-        size = self.single_read_size_bytes(buckets)
-        message = Message({})
-        message.payload["function"] = read_table_entry
-        message.payload["function_args"] = {'bucket_id':min_bucket, 'bucket_offset':0, 'size':size}
-        return [message]
-
-
-    # def begin_read(self):
-    #     self.state = "reading"
-    #     self.reading=True
-    #     locations = hash.hash_locations(self.current_read_key, self.table.table_size)
-    #     # self.info("Reading: " + str(self.current_read_key) + " Locations: " + str(locations))
-    #     table_0_message = self.single_bucket_read_message(locations[0])
-    #     table_1_message = self.single_bucket_read_message(locations[1])
-    #     # print("table 0 message: " + str(table_0_message))
-    #     # print("table 1 message: " + str(table_1_message))
-    #     self.outstanding_read_requests = 2
-    #     self.read_values_found = 0
-    #     self.read_values = []
-    #     return [table_0_message, table_1_message]
-
-    def single_read_size_bytes(self, buckets):
-        min_bucket = min(buckets)
-        max_bucket = max(buckets)
-        distance = abs(max_bucket - min_bucket)
-        indexes = (distance + 1) * self.table.row_size_bytes()
-        return indexes
-
     #threshold reads
     def begin_read(self):
-        locations = hash.hash_locations(self.current_read_key, self.table.table_size)
-        if self.single_read_size_bytes(locations) <= self.read_threshold_bytes:
-            messages = self.multi_bucket_read_message(locations)
-        else:
-            messages = self.single_bucket_read_messages(locations)
+        messages = read_threshold_message(self.current_read_key, self.read_threshold_bytes, self.table.table_size, self.table.row_size_bytes())
 
         self.outstanding_read_requests = len(messages)
         self.read_values_found = 0
@@ -1259,35 +1252,6 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         self.reading=True
         return messages
 
-    def read_response_contains_key(self, key, read):
-        for k in read:
-            if k == None:
-                continue
-            if k == key:
-                return True
-        return False
-
-    def keys_contained_in_read_response(self, key, read):
-        count=0
-        for k in read:
-            if k == None:
-                continue
-            if k == key:
-                count=count+1
-        return count
-
-    def get_entry_from_read(self, key, read):
-        for k in read:
-            if k == key:
-                return k
-        return None
-
-    def get_entries_from_read(self, key, read):
-        found = []
-        for k in read:
-            if k == key:
-                found.append(k)
-        return found
 
     def read_fsm(self, message):
         if message == None:
@@ -1298,9 +1262,10 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             args = unpack_read_response(message)
             fill_local_table_with_read_response(self.table, args)
             read = args["read"]
-            keys_found = self.keys_contained_in_read_response(self.current_read_key, read)
+
+            keys_found = keys_contained_in_read_response(self.current_read_key, read)
             self.read_values_found = self.read_values_found + keys_found
-            self.read_values.extend(self.get_entries_from_read(self.current_read_key, read))
+            self.read_values.extend(get_entries_from_read(self.current_read_key, read))
 
             #check if the read is complete
             self.outstanding_read_requests = self.outstanding_read_requests - 1
@@ -1315,7 +1280,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
                     success = True
                     self.duplicates_found = self.duplicates_found + 1
                     self.info("Read Complete: " + str(self.read_values) + " Duplicate Found")
-                    self.info("TODO we likely need a tie breaker here")
+                    #todo we likely need a tie breaker here
 
                 self.state="idle"
                 self.complete_read_stats(success, self.current_read_key)
@@ -1334,10 +1299,12 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             self.state = "complete"
             return None
         elif req.request_type == "put":
+
             self.current_insert_value = req.key
             self.state = "aquire_global_lock"
             self.inserting=True
             return self.aquire_global_lock()
+
         elif req.request_type == "get":
             if req.key < 0:
                 return None
@@ -1364,7 +1331,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         # todo I could optionally consider this an insertion failure
         # uncomment the code below to do so it should work but it's not tested
         # success=False
-        # self.complete_insert_stats(success, self.current_insert_value, self.search_path)
+        # self.complete_insert_stats(success)
         
         self.state = "critical_section"
         return None
@@ -1380,7 +1347,6 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         #If CAS failed, try the insert a second time.
         success = args["success"]
         if not success:
-            self.state = "critical_section"
             # self.critical("Insert Failed: " + str(self.current_insert_value) + "| trying again")
             # self.critical("failed insert path: " + str(self.search_path))
             # self.critical("failed insert path index: " + str(self.search_path_index) + "of  " + str(len(self.search_path) -1 ))
@@ -1395,15 +1361,14 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             else:
                 self.debug("Insertion has failed, but we have issued a CAS, we can backtrack to repair damage")
                 self.state = "undo_last_cas"
-                message = self.undo_last_cas_message()
-                return message
+                return undo_last_cas_message(self.search_path, self.search_path_index)
 
         #Step down the search path a single index
         self.search_path_index -= 1
         if self.search_path_index == 0:
             return self.end_insert()
         else:
-            return self.next_cas_message()
+            return next_cas_message(self.search_path, self.search_path_index)
 
 
     def fsm_logic(self, message = None):
