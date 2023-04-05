@@ -1292,6 +1292,14 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         # print(self.current_locking_messages)
         return self.get_current_locking_message()
 
+    def release_locks(self):
+        self.locking_message_index = 0
+        buckets = lock_indexes_to_buckets(self.locks_held, self.buckets_per_lock)
+        buckets.sort(reverse=True)
+        unlock_messages = get_unlock_messages(buckets, self.buckets_per_lock, self.locks_per_message)
+        self.current_locking_messages = masked_cas_lock_table_messages(unlock_messages)
+        return self.get_current_locking_message()
+
     def aquire_locks_fsm(self, message):
         if message_type(message) == "masked_cas_response":
             if message.payload["function_args"]["success"] == True:
@@ -1347,7 +1355,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
 
     def finish_insert_and_release_locks(self, success):
         self.complete_insert_stats(success)
-        return self.release_global_lock()
+        return self.release_locks()
 
     def complete_insert(self):
         self.info("Insert Complete: " + str(self.current_insert_value))
