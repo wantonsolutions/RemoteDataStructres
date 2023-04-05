@@ -232,7 +232,7 @@ def global_lock_success_rate():
     table_size = 1024
     # client_counts = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
     # client_counts = [1, 2, 4, 8, 16, 32]
-    client_counts = [1, 2, 4, 8]
+    client_counts = [1, 2, 4]
 
 
     runs=[]
@@ -373,7 +373,7 @@ def plot_read_threshold_experiment():
 
 
     
-# global_lock_success_rate()
+global_lock_success_rate()
 # plot_global_lock_success_rate()
 
 # todos()
