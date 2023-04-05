@@ -1058,6 +1058,18 @@ class client_state_machine(state_machine):
 def get_lock_index(buckets, buckets_per_lock):
     return list(set([int(b/buckets_per_lock) for b in buckets]))
 
+def lock_message_to_buckets(message, buckets_per_lock):
+    base=message.payload["function_args"]['lock_index']
+    lock_list=message.payload["function_args"]["mask"]
+    lock_indexes=[]
+    # print(lock_list)
+    for i in range(len(lock_list)):
+        if lock_list[i] == 1:
+            lock_indexes.append(i)
+    buckets = [int((base * buckets_per_lock) +(l*buckets_per_lock)) for l in lock_indexes]
+    # print(buckets)
+    return(buckets)
+
 def lock_array_to_bits(lock_array):
     min_lock_index = min(lock_array)
     lock_array = [l - min_lock_index for l in lock_array]
@@ -1190,12 +1202,50 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         self.read_threshold_bytes = config['read_threshold_bytes']
         assert self.read_threshold_bytes >= self.table.row_size_bytes(), "read threshold is smaller than a single row in the table (this is not allowed)"
 
+        self.locked_buckets = []
+        self.current_locking_messages = []
+        self.locking_message_index = 0
+
+    # def get_locking_messages(self):
+    #     buckets = [pe.bucket_index for pe in self.search_path]
+    #     buckets.sort()
+    #     lock_messages = get_lock_messages(buckets, self.buckets_per_lock, self.locks_per_message)
+    #     return lock_messages
+
+    # def get_unlocking_messages(self):
+    #     buckets = [pe.bucket_index for pe in self.search_path]
+    #     buckets.sort(reverse=True)
+    #     lock_messages = get_unlock_messages(buckets, self.buckets_per_lock, self.locks_per_message)
+    #     return lock_messages
+
+    def all_locks_aquired(self):
+        if self.locking_message_index == len(self.current_locking_messages):
+            return True
+        return False
+
+    def get_current_locking_message(self):
+        return self.current_locking_messages[self.locking_message_index]
+
+    def receieve_successful_locking_message(self, message):
+
+        locked_buckets = lock_message_to_buckets(message, self.buckets_per_lock)
+        self.locked_buckets.extend(locked_buckets)
+        #make unique
+        self.locked_buckets = list(set(self.locked_buckets))
+        # print(message)
+        # print(locked_buckets)
+        # print(self.locked_buckets)
+        # buckets_locked.extend(self.get_current_locking_message().payload['buckets_locked'])
+        self.locking_message_index = self.locking_message_index + 1
 
     def aquire_global_lock(self):
         assert self.table.lock_table.total_locks == 1, "Attemptying to aquire global locks, but table has " + str(self.table.lock_table.total_locks) + " locks"
         index, old, new, mask = aquire_global_lock_masked_cas()
         masked_cas_message = masked_cas_lock_table_message(index, old, new, mask)
-        return masked_cas_message
+
+        self.locking_message_index = 0
+        self.current_locking_messages = [masked_cas_message]
+        return self.get_current_locking_message()
 
     def release_global_lock(self):
         assert self.table.lock_table.total_locks == 1, "Attemptying to aquire global locks, but table has " + str(self.table.lock_table.total_locks) + " locks"
@@ -1204,13 +1254,17 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         return masked_cas_message
 
     def aquire_global_lock_fsm(self, message):
-        output_message = None
         if message_type(message) == "masked_cas_response":
             if message.payload["function_args"]["success"] == True:
-                self.state = "critical_section"
-            else:
-                output_message=self.aquire_global_lock()
-        return output_message
+                self.receieve_successful_locking_message(message)
+                #enter the critical section if we have all of the locks
+                if self.all_locks_aquired():
+                    self.state = "critical_section"
+                    return None
+            #1) retransmit if we did not make process
+            #2) or just select the next message
+            return self.get_current_locking_message()
+        return None
 
     def release_global_lock_fsm(self, message):
         if message_type(message) == "masked_cas_response":
@@ -1237,6 +1291,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         self.info("Search complete aquiring the global lock")
 
         self.state="aquire_global_lock"
+        self.current_locking_messages = self.aquire_global_lock()
         return self.aquire_global_lock()
 
     def begin_insert(self):
