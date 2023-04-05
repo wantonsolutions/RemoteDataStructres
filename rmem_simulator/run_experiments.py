@@ -245,7 +245,11 @@ def global_lock_success_rate():
         config['num_clients'] = client_count
         config["num_steps"] = 1000000
         #global lock config
-        config['buckets_per_lock'] = config['indexes'] / config["bucket_size"]
+
+        # config['buckets_per_lock'] = config['indexes'] / config["bucket_size"]
+        # multi-cas locking
+        config["buckets_per_lock"] = 1
+        config["locks_per_message"] = 64
         sim = simulator.Simulator(config)
         log.set_off()
         sim.run()
@@ -377,12 +381,12 @@ def insertion_debug():
 
 
     
-# global_lock_success_rate()
+global_lock_success_rate()
 # plot_global_lock_success_rate()
 
 # todos()
 
-insertion_debug()
+# insertion_debug()
 # plot_general_stats_last_run()
 
 # read_threshold_experiment()

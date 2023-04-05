@@ -1104,19 +1104,28 @@ def unlock_array_to_bits(lock_array):
     min_lock_index, old, new, mask = lock_array_to_bits(lock_array)
     return (min_lock_index, new, old, mask)
 
-def divide_chunks(l, n): 
-    # looping till length l 
-    for i in range(0, len(l), n):  
-        yield l[i:i + n]
-
 def break_list_to_chunks(lock_array, locks_per_message):
-    return list(divide_chunks(lock_array, locks_per_message))
+    chunks = []
+    current_chunk = []
+    for i in range(len(lock_array)):
+        if len(current_chunk) == 0:
+            min_lock_index = lock_array[i]
+
+        if (lock_array[i] - min_lock_index) < CAS_SIZE and len(current_chunk) < locks_per_message:
+            current_chunk.append(lock_array[i])
+        else:
+            chunks.append(current_chunk)
+            current_chunk = [lock_array[i]]
+            min_lock_index = lock_array[i]
+    chunks.append(current_chunk)
+    return chunks
 
 def get_lock_or_unlock_messages(buckets, buckets_per_lock, locks_per_message, lock=True):
     assert locks_per_message <= CAS_SIZE, "locks_per_message must be <= CAS_SIZE: locks/message-"+str(locks_per_message)+" CAS_SIZE-"+str(CAS_SIZE)
     lock_array = get_lock_index(buckets, buckets_per_lock)
-    print("lock array!: " + str(lock_array))
+    # print("lock array!: " + str(lock_array))
     lock_chunks = break_list_to_chunks(lock_array, locks_per_message)
+    # print("lock_chunks: " + str(lock_chunks))
     if lock:
         lock_messages = [lock_array_to_bits(l) for l in lock_chunks]
     else:
