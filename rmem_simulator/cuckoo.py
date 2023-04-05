@@ -597,6 +597,7 @@ def masked_cas_lock_table(lock_table, lock_index, old, new, mask):
                 #if the old cas value is not the same as the submitted value return the current state of the table
                 current = lock_table.get_cas_range(lock_index)
                 return (False,current)
+        index+=1
 
     #now we just apply. At this point we know that the old value is the same as the current so we can lock and unlock accordingly.
     index = lock_index
@@ -1064,7 +1065,10 @@ class client_state_machine(state_machine):
         return stats
 
 def get_lock_index(buckets, buckets_per_lock):
-    return list(set([int(b/buckets_per_lock) for b in buckets]))
+    locks = list(set([int(b/buckets_per_lock) for b in buckets]))
+    if len(locks) > 0:
+        locks.sort()
+    return locks
 
 def lock_message_to_buckets(message, buckets_per_lock):
     lock_indexes = lock_message_to_lock_indexes(message)
@@ -1111,6 +1115,7 @@ def break_list_to_chunks(lock_array, locks_per_message):
 def get_lock_or_unlock_messages(buckets, buckets_per_lock, locks_per_message, lock=True):
     assert locks_per_message <= CAS_SIZE, "locks_per_message must be <= CAS_SIZE: locks/message-"+str(locks_per_message)+" CAS_SIZE-"+str(CAS_SIZE)
     lock_array = get_lock_index(buckets, buckets_per_lock)
+    print("lock array!: " + str(lock_array))
     lock_chunks = break_list_to_chunks(lock_array, locks_per_message)
     if lock:
         lock_messages = [lock_array_to_bits(l) for l in lock_chunks]
@@ -1250,6 +1255,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
 
     def receieve_successful_locking_message(self, message):
         lock_indexes = lock_message_to_lock_indexes(message)
+        self.info("aquired locks: " + str(lock_indexes))
         self.locks_held.extend(lock_indexes)
         #make unique
         self.locks_held = list(set(self.locks_held))
@@ -1261,6 +1267,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
 
     def receive_successful_unlocking_message(self, message):
         unlocked_locks = lock_message_to_lock_indexes(message)
+        self.info("released locks: " + str(unlocked_locks))
         for lock in unlocked_locks:
             self.locks_held.remove(lock)
         self.locking_message_index = self.locking_message_index + 1
@@ -1285,9 +1292,15 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
 
     def aquire_locks(self):
         buckets = list(set([pe.bucket_index for pe in self.search_path]))
+        buckets.remove(-1)
+
         buckets.sort()
+        self.info("gather locks for buckets: " + str(buckets))
         self.locking_message_index = 0
         lock_messages = get_lock_messages(buckets, self.buckets_per_lock, self.locks_per_message)
+        for m in lock_messages:
+            self.info(str(m))
+
         self.current_locking_messages = masked_cas_lock_table_messages(lock_messages)
         # print(self.current_locking_messages)
         return self.get_current_locking_message()
@@ -1341,7 +1354,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             self.state = "idle"
             return None
 
-        self.info("Search complete aquiring the global lock")
+        self.info("Search complete aquiring locks")
 
         self.state="aquire_locks"
         return self.aquire_locks()

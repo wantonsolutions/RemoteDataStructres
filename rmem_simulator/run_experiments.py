@@ -301,36 +301,6 @@ def plot_global_lock_success_rate():
     plt.savefig("global_lock_aquire.pdf")
 
 
-def insertion_debug():
-    logger = log.setup_custom_logger('root')
-    logger.info("Starting simulator")
-
-    table_size = 256
-    clients=8
-    runs=[]
-    config = simulator.default_config()
-    sim = simulator.Simulator(config)
-    print("table size: ", table_size)
-    config['indexes'] = table_size
-    config['num_clients'] = clients
-    config['num_steps'] = 100000
-    config['read_threshold_bytes'] = 256
-
-    #global lock config
-    config['buckets_per_lock'] = config['indexes'] / config["bucket_size"]
-    sim = simulator.Simulator(config)
-    # log.set_debug()
-    # log.set_off()
-    try:
-        sim.run()
-    except Exception as e:
-        print(e)
-        stats = sim.collect_stats()
-        sim.validate_run()
-    sim.validate_run()
-    stats = sim.collect_stats()
-    runs.append(stats)
-    save_statistics(runs)
 
 def read_threshold_experiment():
     logger = log.setup_custom_logger('root')
@@ -369,16 +339,50 @@ def plot_read_threshold_experiment():
     plt.tight_layout()
     plt.savefig("messages_per_operation_read_threshold.pdf")
 
+def insertion_debug():
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator")
+
+    table_size = 256
+    clients=8
+    runs=[]
+    config = simulator.default_config()
+    sim = simulator.Simulator(config)
+    print("table size: ", table_size)
+    config['indexes'] = table_size
+    config['num_clients'] = clients
+    config['num_steps'] = 1000000
+    config['read_threshold_bytes'] = 256
+
+    #global lock config
+    # config['buckets_per_lock'] = (config['indexes'] / config["bucket_size"])
+    # config['buckets_per_lock'] = (config['indexes'] / config["bucket_size"]) / 4
+    config["buckets_per_lock"] = 1
+    config["locks_per_message"] = 64
+    sim = simulator.Simulator(config)
+    # log.set_debug()
+    # log.set_off()
+    try:
+        sim.run()
+    except Exception as e:
+        print(e)
+        stats = sim.collect_stats()
+        sim.validate_run()
+    sim.validate_run()
+    stats = sim.collect_stats()
+    runs.append(stats)
+    save_statistics(runs)
+
 
 
 
     
-global_lock_success_rate()
+# global_lock_success_rate()
 # plot_global_lock_success_rate()
 
 # todos()
 
-# insertion_debug()
+insertion_debug()
 # plot_general_stats_last_run()
 
 # read_threshold_experiment()
