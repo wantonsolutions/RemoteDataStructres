@@ -1219,7 +1219,13 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
     #     return lock_messages
 
     def all_locks_aquired(self):
-        if self.locking_message_index == len(self.current_locking_messages):
+        if self.locking_message_index == len(self.current_locking_messages) and \
+            len(self.locked_buckets) > 0:
+            return True
+        return False
+
+    def all_locks_released(self):
+        if len(self.locked_buckets) == 0:
             return True
         return False
 
@@ -1227,7 +1233,6 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         return self.current_locking_messages[self.locking_message_index]
 
     def receieve_successful_locking_message(self, message):
-
         locked_buckets = lock_message_to_buckets(message, self.buckets_per_lock)
         self.locked_buckets.extend(locked_buckets)
         #make unique
@@ -1236,6 +1241,12 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         # print(locked_buckets)
         # print(self.locked_buckets)
         # buckets_locked.extend(self.get_current_locking_message().payload['buckets_locked'])
+        self.locking_message_index = self.locking_message_index + 1
+
+    def receive_successful_unlocking_message(self, message):
+        unlocked_buckets = lock_message_to_buckets(message, self.buckets_per_lock)
+        for bucket in unlocked_buckets:
+            self.locked_buckets.remove(bucket)
         self.locking_message_index = self.locking_message_index + 1
 
     def aquire_global_lock(self):
@@ -1251,7 +1262,10 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         assert self.table.lock_table.total_locks == 1, "Attemptying to aquire global locks, but table has " + str(self.table.lock_table.total_locks) + " locks"
         index, old, new, mask = release_global_lock_masked_cas()
         masked_cas_message = masked_cas_lock_table_message(index, old, new, mask)
-        return masked_cas_message
+
+        self.locking_message_index = 0
+        self.current_locking_messages = [masked_cas_message]
+        return self.get_current_locking_message()
 
     def aquire_global_lock_fsm(self, message):
         if message_type(message) == "masked_cas_response":
@@ -1271,12 +1285,18 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             if message.payload["function_args"]["success"] == False:
                 self.critical("What the fuck is happening I failed to release a lock")
                 exit(1)
-            if self.state == "release_global_lock":
-                self.state = "idle"
-                self.inserting=False
-                return None
-            if self.state == "release_global_lock_try_again":
-                return self.search()
+            
+            #successful response
+            self.receive_successful_unlocking_message(message)
+            if self.all_locks_released():
+                if self.state == "release_global_lock":
+                    self.state = "idle"
+                    self.inserting=False
+                    return None
+                if self.state == "release_global_lock_try_again":
+                    return self.search()
+            else:
+                return self.get_current_locking_message()
 
     def search(self, message=None):
         assert message == None, "there should be no message passed to search"
@@ -1291,7 +1311,6 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         self.info("Search complete aquiring the global lock")
 
         self.state="aquire_global_lock"
-        self.current_locking_messages = self.aquire_global_lock()
         return self.aquire_global_lock()
 
     def begin_insert(self):
