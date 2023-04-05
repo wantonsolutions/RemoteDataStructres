@@ -373,7 +373,7 @@ def plot_read_threshold_experiment():
 
 
     
-global_lock_success_rate()
+# global_lock_success_rate()
 # plot_global_lock_success_rate()
 
 # todos()
@@ -383,7 +383,7 @@ global_lock_success_rate()
 
 # read_threshold_experiment()
 plot_general_stats_last_run()
-plot_read_threshold_experiment()
+# plot_read_threshold_experiment()
 
 # factor_table_size_experiments()
 # plot_factor_table_size_experiments()
