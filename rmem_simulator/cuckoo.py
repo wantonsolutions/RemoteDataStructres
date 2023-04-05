@@ -1275,7 +1275,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         self.current_locking_messages = [masked_cas_message]
         return self.get_current_locking_message()
 
-    def aquire_global_lock_fsm(self, message):
+    def aquire_locks_fsm(self, message):
         if message_type(message) == "masked_cas_response":
             if message.payload["function_args"]["success"] == True:
                 self.receieve_successful_locking_message(message)
@@ -1288,7 +1288,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             return self.get_current_locking_message()
         return None
 
-    def release_global_lock_fsm(self, message):
+    def release_locks_fsm(self, message):
         if message_type(message) == "masked_cas_response":
             if message.payload["function_args"]["success"] == False:
                 self.critical("What the fuck is happening I failed to release a lock")
@@ -1297,11 +1297,11 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
             #successful response
             self.receive_successful_unlocking_message(message)
             if self.all_locks_released():
-                if self.state == "release_global_lock":
+                if self.state == "release_locks":
                     self.state = "idle"
                     self.inserting=False
                     return None
-                if self.state == "release_global_lock_try_again":
+                if self.state == "release_locks_try_again":
                     return self.search()
             else:
                 return self.get_current_locking_message()
@@ -1318,7 +1318,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
 
         self.info("Search complete aquiring the global lock")
 
-        self.state="aquire_global_lock"
+        self.state="aquire_locks"
         return self.aquire_global_lock()
 
     def begin_insert(self):
@@ -1334,7 +1334,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         success=True
         self.complete_insert_stats(success)
         #release the lock
-        self.state="release_global_lock"
+        self.state="release_locks"
         return self.release_global_lock()
 
     def fail_insert(self):
@@ -1343,7 +1343,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         success=False
         self.complete_insert_stats(success)
         #release the lock
-        self.state="release_global_lock_try_again"
+        self.state="release_locks_try_again"
         return self.release_global_lock()
 
     #threshold reads
@@ -1477,11 +1477,11 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         if self.state== "idle":
             return self.idle_fsm(message)
 
-        if self.state == "aquire_global_lock":
-            return self.aquire_global_lock_fsm(message)
+        if self.state == "aquire_locks":
+            return self.aquire_locks_fsm(message)
 
-        if self.state == "release_global_lock" or self.state == "release_global_lock_try_again":
-            return self.release_global_lock_fsm(message)
+        if self.state == "release_locks" or self.state == "release_locks_try_again":
+            return self.release_locks_fsm(message)
 
         if self.state == "critical_section":
             return self.begin_insert()
