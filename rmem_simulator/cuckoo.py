@@ -1059,6 +1059,14 @@ def get_lock_index(buckets, buckets_per_lock):
     return list(set([int(b/buckets_per_lock) for b in buckets]))
 
 def lock_message_to_buckets(message, buckets_per_lock):
+    lock_indexes = lock_message_to_lock_indexes(message)
+    buckets = lock_indexes_to_buckets(lock_indexes, buckets_per_lock)
+    return buckets
+
+def lock_indexes_to_buckets(lock_indexes, buckets_per_lock):
+    return [int(buckets_per_lock * l) for l in lock_indexes]
+
+def lock_message_to_lock_indexes(message):
     base=message.payload["function_args"]['lock_index']
     lock_list=message.payload["function_args"]["mask"]
     lock_indexes=[]
@@ -1066,9 +1074,8 @@ def lock_message_to_buckets(message, buckets_per_lock):
     for i in range(len(lock_list)):
         if lock_list[i] == 1:
             lock_indexes.append(i)
-    buckets = [int((base * buckets_per_lock) +(l*buckets_per_lock)) for l in lock_indexes]
-    # print(buckets)
-    return(buckets)
+    lock_indexes = [int((base + l)) for l in lock_indexes]
+    return lock_indexes
 
 def lock_array_to_bits(lock_array):
     min_lock_index = min(lock_array)
@@ -1202,7 +1209,8 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         self.read_threshold_bytes = config['read_threshold_bytes']
         assert self.read_threshold_bytes >= self.table.row_size_bytes(), "read threshold is smaller than a single row in the table (this is not allowed)"
 
-        self.locked_buckets = []
+        # self.locked_buckets = []
+        self.locks_held = []
         self.current_locking_messages = []
         self.locking_message_index = 0
 
@@ -1220,12 +1228,12 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
 
     def all_locks_aquired(self):
         if self.locking_message_index == len(self.current_locking_messages) and \
-            len(self.locked_buckets) > 0:
+            len(self.locks_held) > 0:
             return True
         return False
 
     def all_locks_released(self):
-        if len(self.locked_buckets) == 0:
+        if len(self.locks_held) == 0:
             return True
         return False
 
@@ -1233,10 +1241,10 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         return self.current_locking_messages[self.locking_message_index]
 
     def receieve_successful_locking_message(self, message):
-        locked_buckets = lock_message_to_buckets(message, self.buckets_per_lock)
-        self.locked_buckets.extend(locked_buckets)
+        lock_indexes = lock_message_to_lock_indexes(message)
+        self.locks_held.extend(lock_indexes)
         #make unique
-        self.locked_buckets = list(set(self.locked_buckets))
+        self.locks_held = list(set(self.locks_held))
         # print(message)
         # print(locked_buckets)
         # print(self.locked_buckets)
@@ -1244,9 +1252,9 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         self.locking_message_index = self.locking_message_index + 1
 
     def receive_successful_unlocking_message(self, message):
-        unlocked_buckets = lock_message_to_buckets(message, self.buckets_per_lock)
-        for bucket in unlocked_buckets:
-            self.locked_buckets.remove(bucket)
+        unlocked_locks = lock_message_to_lock_indexes(message)
+        for lock in unlocked_locks:
+            self.locks_held.remove(lock)
         self.locking_message_index = self.locking_message_index + 1
 
     def aquire_global_lock(self):
