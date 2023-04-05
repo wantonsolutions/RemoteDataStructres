@@ -243,7 +243,7 @@ def global_lock_success_rate():
         # print("table size: ", table_size)
         config['indexes'] = table_size
         config['num_clients'] = client_count
-        config["num_steps"] = 100000
+        config["num_steps"] = 1000000
         #global lock config
         config['buckets_per_lock'] = config['indexes'] / config["bucket_size"]
         sim = simulator.Simulator(config)

@@ -298,8 +298,8 @@ class Simulator(Node):
 
         #run simulation
         for i in range(self.config['num_steps']):
-            self.deterministic_simulation_step()
-            # self.random_single_simulation_step()
+            # self.deterministic_simulation_step()
+            self.random_single_simulation_step()
 
             if self.no_events() == True and self.clients_complete() == True:
                 break

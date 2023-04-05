@@ -749,6 +749,14 @@ def masked_cas_lock_table_message(lock_index, old, new, mask):
         message.payload["function_args"] = {'lock_index':lock_index, 'old':old, 'new':new, 'mask':mask}
         return message
 
+def masked_cas_lock_table_messages(lock_messages):
+    messages = []
+    for l in lock_messages:
+        index, old, new, mask = l[0], l[1], l[2], l[3]
+        messages.append(masked_cas_lock_table_message(index,old,new,mask))
+    return messages
+
+
 def unpack_masked_cas_response(message):
         assert message.payload["function"] == fill_lock_table_masked_cas, "client is in inserting state but message is not a cas " + str(message)
         args = message.payload["function_args"]
@@ -1275,6 +1283,15 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         self.current_locking_messages = [masked_cas_message]
         return self.get_current_locking_message()
 
+    def aquire_locks(self):
+        buckets = list(set([pe.bucket_index for pe in self.search_path]))
+        buckets.sort()
+        self.locking_message_index = 0
+        lock_messages = get_lock_messages(buckets, self.buckets_per_lock, self.locks_per_message)
+        self.current_locking_messages = masked_cas_lock_table_messages(lock_messages)
+        # print(self.current_locking_messages)
+        return self.get_current_locking_message()
+
     def aquire_locks_fsm(self, message):
         if message_type(message) == "masked_cas_response":
             if message.payload["function_args"]["success"] == True:
@@ -1319,7 +1336,7 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         self.info("Search complete aquiring the global lock")
 
         self.state="aquire_locks"
-        return self.aquire_global_lock()
+        return self.aquire_locks()
 
     def begin_insert(self):
         self.state = "inserting"
@@ -1328,23 +1345,19 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         self.current_insert_length=len(self.search_path)
         return next_cas_message(self.search_path, self.search_path_index)
 
+    def finish_insert_and_release_locks(self, success):
+        self.complete_insert_stats(success)
+        return self.release_global_lock()
+
     def complete_insert(self):
         self.info("Insert Complete: " + str(self.current_insert_value))
-        #update insertion stats
-        success=True
-        self.complete_insert_stats(success)
-        #release the lock
         self.state="release_locks"
-        return self.release_global_lock()
+        return self.finish_insert_and_release_locks(success=True)
 
     def fail_insert(self):
         self.info("Insert Failed: " + str(self.current_insert_value))
-        #update insertion stats
-        success=False
-        self.complete_insert_stats(success)
-        #release the lock
         self.state="release_locks_try_again"
-        return self.release_global_lock()
+        return self.finish_insert_and_release_locks(success=False)
 
     #threshold reads
     def begin_read(self):
