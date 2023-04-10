@@ -231,8 +231,8 @@ def global_lock_success_rate():
     logger.info("Starting simulator for global locking")
     table_size = 1024
     # client_counts = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
-    # client_counts = [1, 2, 4, 8, 16, 32]
-    client_counts = [1, 2, 4]
+    client_counts = [1, 2, 4, 8, 16, 32]
+    # client_counts = [1, 2, 4]
 
 
     runs=[]
@@ -263,6 +263,7 @@ def plot_general_stats_last_run():
         "general_stats",
         "cas_success_rate",
         "read_write_ratio",
+        "request_success_rate",
         "bytes_per_operation",
         "messages_per_operation",
         "fill_factor"
@@ -306,34 +307,6 @@ def plot_global_lock_success_rate():
 
 
 
-def read_threshold_experiment():
-    logger = log.setup_custom_logger('root')
-    logger.info("Starting simulator")
-
-    table_size = 128
-    clients=8
-    runs=[]
-    read_thresholds=[32, 64, 128, 256, 512, 1024]
-    for read_threshold in read_thresholds:
-        print("read threshold: ", read_threshold)
-        config = simulator.default_config()
-        sim = simulator.Simulator(config)
-        config['indexes'] = table_size
-        config['num_clients'] = clients
-        config['num_steps'] = 100000
-        config['read_threshold_bytes'] = read_threshold
-        sim = simulator.Simulator(config)
-        # log.set_off()
-        try:
-            sim.run()
-        except Exception as e:
-            print(e)
-            stats = sim.collect_stats()
-            sim.validate_run()
-        sim.validate_run()
-        stats = sim.collect_stats()
-        runs.append(stats)
-    save_statistics(runs)
 
 def plot_read_threshold_experiment():
     stats = load_statistics()
@@ -377,20 +350,159 @@ def insertion_debug():
     runs.append(stats)
     save_statistics(runs)
 
+def locks_per_message_experiment():
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator")
+
+    table_size = 2048
+    clients=8
+    runs=[]
+    read_threshold=128
+    locks_per_message_arr=[1, 2, 4, 8, 16, 32, 64]
+    # locks_per_message_arr=[1, 2]
+    for locks_per_message in locks_per_message_arr:
+        print("read threshold: ", read_threshold)
+        config = simulator.default_config()
+        sim = simulator.Simulator(config)
+        config['indexes'] = table_size
+        config['num_clients'] = clients
+        config['num_steps'] = 1000000
+        config['read_threshold_bytes'] = read_threshold
+
+        config["buckets_per_lock"] = 1
+        config["locks_per_message"] = locks_per_message
+        sim = simulator.Simulator(config)
+        log.set_off()
+        try:
+            sim.run()
+        except Exception as e:
+            print(e)
+            stats = sim.collect_stats()
+            sim.validate_run()
+        sim.validate_run()
+        stats = sim.collect_stats()
+        runs.append(stats)
+    save_statistics(runs)
+
+
+def locks_per_message_experiment():
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator")
+
+    table_size = 2048
+    clients=8
+    runs=[]
+    read_threshold=128
+    locks_per_message_arr=[1, 2, 4, 8, 16, 32, 64]
+    # locks_per_message_arr=[1, 2]
+    for locks_per_message in locks_per_message_arr:
+        print("read threshold: ", read_threshold)
+        config = simulator.default_config()
+        sim = simulator.Simulator(config)
+        config['indexes'] = table_size
+        config['num_clients'] = clients
+        config['num_steps'] = 1000000
+        config['read_threshold_bytes'] = read_threshold
+
+        config["buckets_per_lock"] = 1
+        config["locks_per_message"] = locks_per_message
+        sim = simulator.Simulator(config)
+        log.set_off()
+        try:
+            sim.run()
+        except Exception as e:
+            print(e)
+            stats = sim.collect_stats()
+            sim.validate_run()
+        sim.validate_run()
+        stats = sim.collect_stats()
+        runs.append(stats)
+    save_statistics(runs)
+
+def buckets_per_lock_experiment():
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator")
+
+    table_size = 2048
+    clients=8
+    runs=[]
+    read_threshold=128
+    buckets_per_lock_arr=[1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+    locks_per_message=4
+    # locks_per_message_arr=[1, 2]
+    for buckets_per_lock in buckets_per_lock_arr:
+        print("read threshold: ", read_threshold)
+        config = simulator.default_config()
+        sim = simulator.Simulator(config)
+        config['indexes'] = table_size
+        config['num_clients'] = clients
+        config['num_steps'] = 1000000
+        config['read_threshold_bytes'] = read_threshold
+
+        config["buckets_per_lock"] = buckets_per_lock
+        config["locks_per_message"] = locks_per_message
+        sim = simulator.Simulator(config)
+        log.set_off()
+        try:
+            sim.run()
+        except Exception as e:
+            print(e)
+            stats = sim.collect_stats()
+            sim.validate_run()
+        sim.validate_run()
+        stats = sim.collect_stats()
+        runs.append(stats)
+    save_statistics(runs)
+
+
+def read_threshold_experiment():
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator")
+
+    table_size = 2048
+    clients=8
+    runs=[]
+    read_thresholds=[32, 64, 128, 256, 512, 1024, 2048, 4096]
+    for read_threshold in read_thresholds:
+        print("read threshold: ", read_threshold)
+        config = simulator.default_config()
+        sim = simulator.Simulator(config)
+        config['indexes'] = table_size
+        config['num_clients'] = clients
+        config['num_steps'] = 1000000
+        config['read_threshold_bytes'] = read_threshold
+
+        config["buckets_per_lock"] = 16
+        config["locks_per_message"] = 4
+        sim = simulator.Simulator(config)
+        log.set_off()
+        try:
+            sim.run()
+        except Exception as e:
+            print(e)
+            stats = sim.collect_stats()
+            sim.validate_run()
+        sim.validate_run()
+        stats = sim.collect_stats()
+        runs.append(stats)
+    save_statistics(runs)
 
 
 
-    
-global_lock_success_rate()
+
+# locks_per_message_experiment()
+# global_lock_success_rate()
 # plot_global_lock_success_rate()
 
 # todos()
 
-# insertion_debug()
+insertion_debug()
 # plot_general_stats_last_run()
 
 # read_threshold_experiment()
+# buckets_per_lock_experiment()
 plot_general_stats_last_run()
+
 # plot_read_threshold_experiment()
 
 # factor_table_size_experiments()

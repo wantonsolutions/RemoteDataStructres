@@ -5,8 +5,8 @@ import numpy as np
 def multi_plot_runs(runs, plot_names):
     print("plotting ", len(runs), " runs: with", len(plot_names), " plots" + str(plot_names))
 
-    fig_width = 5
-    fig_height = 2
+    fig_width = 8
+    fig_height = 3
     total_height = fig_height * len(plot_names)
     fig, axs = plt.subplots(len(plot_names), 1, figsize=(fig_width, total_height))
     if len(plot_names) == 1:
@@ -25,6 +25,8 @@ def multi_plot_runs(runs, plot_names):
             read_write_ratio(axs[i],runs, x_axis)
         elif plot_name == "bytes_per_operation":
             bytes_per_operation(axs[i],runs, x_axis)
+        elif plot_name == "request_success_rate":
+            request_success_rate(axs[i],runs, x_axis)
         elif plot_name == "messages_per_operation":
             messages_per_operation(axs[i],runs, x_axis)
         elif plot_name == "fill_factor":
@@ -68,12 +70,10 @@ def cas_success_rate(ax, stats, x_axis="clients"):
     ax.set_xticks(x_pos)
     ax.set_xticklabels(x_axis_vals)
     # ax.set_yscale('log')
-    ax.set_title("CAS success rate vs # of clients")
+    # ax.set_title("CAS success rate vs # of clients")
 
 def read_write_ratio(ax, stats, x_axis="clients"):
     print("READ WRITE RATIO")
-    print("\tTODO make the x axis configurable not just clients")
-
     #read write ratio should work for both single and multi run
     if isinstance(stats, dict):
         stats = [stats]
@@ -101,7 +101,7 @@ def read_write_ratio(ax, stats, x_axis="clients"):
     x_pos = np.arange(len(x_axis_vals))
     bar_width = 0.35
     ax.bar(x_pos,read_rates,bar_width,yerr=read_err,align="center", edgecolor='black', label="Read")
-    ax.bar(x_pos+bar_width,write_rates,bar_width,yerr=write_err,align="center", edgecolor='black', label="Write")
+    ax.bar(x_pos+bar_width,write_rates,bar_width,yerr=write_err,align="center", edgecolor='black', label="Insert")
     ax.set_ylabel("Read/Write ratio")
     ax.set_xlabel(x_axis)
     ax.set_xticks(x_pos+bar_width/2)
@@ -110,7 +110,6 @@ def read_write_ratio(ax, stats, x_axis="clients"):
 
 def bytes_per_operation(ax, stats, x_axis="clients"):
     print("BYTES PER OPERATION")
-    print("\tTODO make the x axis configurable not just clients")
     if isinstance(stats, dict):
         stats = [stats]
 
@@ -131,7 +130,6 @@ def bytes_per_operation(ax, stats, x_axis="clients"):
 
 def messages_per_operation(ax, stats, x_axis="clients"):
     print("MESSAGES PER OPERATION")
-    print("\tTODO make the x axis configurable not just clients")
 
     read_messages, read_err = client_stats_x_per_y_get_mean_std_multi_run(stats, 'read_operation_messages', 'completed_read_count')
     write_messages, write_err = client_stats_x_per_y_get_mean_std_multi_run(stats, 'insert_operation_messages', 'completed_insert_count')
@@ -160,7 +158,6 @@ def messages_per_operation(ax, stats, x_axis="clients"):
 
 def fill_factor(ax, stats, x_axis="table size"):
     print("FILL FACTOR")
-    print("\tTODO make the x axis configurable not just table size")
 
     label = str("exp - " + str(stats[0]['hash']['factor']))
     fill_rates = []
@@ -169,24 +166,73 @@ def fill_factor(ax, stats, x_axis="table size"):
     for stat in stats:
         fill_rates.append(stat['memory']['fill'])
 
-    # if len(set(table_sizes)) == 1:
-    #     ax.text(0.5, 0.5, "Warning - table sizes are all the same", horizontalalignment='center', verticalalignment='center', transform=ax.transAxes, color='red')
-    # elif len(set(table_sizes)) != len(table_sizes):
-    #     ax.text(0.5, 0.5, "Warning - table sizes are not unique ", horizontalalignment='center', verticalalignment='center', transform=ax.transAxes, color='red')
-
-
     ax.plot(x_axis_vals, fill_rates, label=str(label), marker='o')
     ax.set_xlabel(x_axis)
     ax.set_ylabel('Fill Rate')
     ax.set_title('Fill Rate vs Table Size')
     ax.legend()
 
+def request_success_rate(ax, stats, x_axis="clients"):
+    print("Request Success Rate")
+    #read write ratio should work for both single and multi run
+    if isinstance(stats, dict):
+        stats = [stats]
+
+    read_rates=[]
+    read_err=[]
+    write_rates=[]
+    write_err=[]
+
+    x_axis_vals = get_x_axis(stats, x_axis)
+    for stat in stats:
+        read_percent = []
+        write_percent = []
+        for client in stat['clients']:
+            reads = client['stats']['completed_read_count']
+            read_failures = client['stats']['failed_read_count']
+            writes = client['stats']['completed_insert_count']
+            write_failures = client['stats']['failed_insert_count']
+
+            if reads == 0:
+                reads_success_rate = 0
+            else:
+                reads_success_rate = float(reads)/(reads+read_failures)
+
+            if writes == 0:
+                writes_success_rate = 0
+            else:
+                writes_success_rate = float(writes)/(writes+write_failures)
+
+            read_percent.append(reads_success_rate)
+            write_percent.append(writes_success_rate)
+
+        read_rates.append(np.mean(read_percent))
+        read_err.append(stderr(read_percent))
+        write_rates.append(np.mean(write_percent))
+        write_err.append(stderr(write_percent))
+
+    x_pos = np.arange(len(x_axis_vals))
+    bar_width = 0.35
+    ax.bar(x_pos,read_rates,bar_width,yerr=read_err,align="center", edgecolor='black', label="Read")
+    ax.bar(x_pos+bar_width,write_rates,bar_width,yerr=write_err,align="center", edgecolor='black', label="Insert")
+    ax.set_ylabel("Success Rate")
+    ax.set_xlabel(x_axis)
+    ax.set_xticks(x_pos+bar_width/2)
+    ax.set_xticklabels(x_axis_vals)
+    ax.legend()
+
+
+
 def client_stats_x_per_y_get_mean_std(stat, x,y):
         vals=[]
         for client in stat['clients']:
             y_val = client['stats'][y]
             x_val = client['stats'][x]
-            vals.append(float(x_val)/float(y_val))
+            if y_val == 0:
+                print("ERROR DIVIDE BY ZERO")
+                vals.append(0)
+            else:
+                vals.append(float(x_val)/float(y_val))
         return np.mean(vals), stderr(vals)
 
 def client_stats_x_per_y_get_mean_std_multi_run(stats, x, y):
@@ -202,12 +248,15 @@ def detect_x_axis(stats):
         "clients",
         "read threshold bytes",
         "table size",
+        "locks per message",
+        "buckets per lock"
     ]
     for axis in x_axis:
-        if len(get_x_axis(stats,axis)) > 1:
+        if len(set(get_x_axis(stats,axis))) > 1:
+            print(axis)
             return axis
 
-    return x_axis[0] #defaul is to return the first option
+    return x_axis[0] #default is to return the first option
 
 def get_x_axis(stats, name):
     if name == "clients":
@@ -216,33 +265,37 @@ def get_x_axis(stats, name):
         return get_read_threshold_x_axis(stats)
     elif name == "table size":
         return get_table_size_x_axis(stats)
+    elif name == "locks per message":
+        return get_locks_per_message_x_axis(stats)
+    elif name == "buckets per lock":
+        return get_buckets_per_lock_x_axis(stats)
     else:
         print("unknown x axis: ", name)
         exit(1)
 
-def get_client_x_axis(stats):
+def get_config_axis(stats,name):
     if isinstance(stats, dict):
         stats = [stats]
     clients = []
     for stat in stats:
-        clients.append(stat['config']['num_clients'])
+        clients.append(stat['config'][name])
     return clients
 
+
+def get_client_x_axis(stats):
+    return get_config_axis(stats,'num_clients')
+
 def get_read_threshold_x_axis(stats):
-    if isinstance(stats, dict):
-        stats = [stats]
-    read_thresholds = []
-    for stat in stats:
-        read_thresholds.append(stat['config']['read_threshold_bytes'])
-    return read_thresholds
+    return get_config_axis(stats,'read_threshold_bytes')
 
 def get_table_size_x_axis(stats):
-    if isinstance(stats,dict):
-        stats = [stats]
-    table_sizes = []
-    for stat in stats:
-        table_sizes.append(stat['config']['indexes'])
-    return table_sizes
+    return get_config_axis(stats,'indexes')
+
+def get_locks_per_message_x_axis(stats):
+    return get_config_axis(stats,'locks_per_message')
+
+def get_buckets_per_lock_x_axis(stats):
+    return get_config_axis(stats,'buckets_per_lock')
     
 
 

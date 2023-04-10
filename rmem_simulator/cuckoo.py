@@ -1048,7 +1048,7 @@ class client_state_machine(state_machine):
         self.state="idle"
 
         workload_config = {
-            "workload": "ycsb-b",
+            "workload": "ycsb-a",
             "total_requests": self.total_inserts,
             "id": self.id,
             "num_clients": config["num_clients"],
