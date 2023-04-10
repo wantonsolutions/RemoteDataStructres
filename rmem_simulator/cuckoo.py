@@ -3,6 +3,7 @@ import logging
 import heapq
 from tqdm import tqdm
 import random
+import json
 
 logger = logging.getLogger('root')
 
@@ -458,7 +459,7 @@ class Table:
         return value in self.table[bucket_index]
 
     def contains(self, value):
-        locations = hash.hash_locations(value, self.table_size)
+        locations = hash.rcuckoo_hash_locations(value, self.table_size)
         for bucket_index in locations:
             if self.bucket_contains(bucket_index, value):
                 return True
@@ -939,6 +940,7 @@ class state_machine:
     def critical(self, message):
         self.logger.critical("[" + self.log_prefix() + "] " + message)
 
+
 class request():
     def __init__(self, request_type, key, value=None):
         self.request_type = request_type
@@ -1063,6 +1065,12 @@ class client_state_machine(state_machine):
         stats = super().get_stats()
         stats["workload_stats"] = self.workload_driver.get_stats()
         return stats
+
+    def get(self):
+        self.critical("Get method should be overwritten")
+
+    def put(self):
+        self.critical("put method should be overwritten")
 
 def get_lock_index(buckets, buckets_per_lock):
     locks = list(set([int(b/buckets_per_lock) for b in buckets]))
@@ -1203,7 +1211,7 @@ def multi_bucket_read_message(buckets, row_size_bytes):
 
 
 def read_threshold_message(key, read_threshold_bytes, table_size, row_size_bytes):
-    locations = hash.hash_locations(key, table_size)
+    locations = hash.rcuckoo_hash_locations(key, table_size)
     if single_read_size_bytes(locations, row_size_bytes) <= read_threshold_bytes:
         messages = multi_bucket_read_message(locations, row_size_bytes)
     else:
@@ -1213,11 +1221,57 @@ def read_threshold_message(key, read_threshold_bytes, table_size, row_size_bytes
 
 class race(client_state_machine):
     def __init__(self, config):
-        super().__init_(config)
+        super().__init__(config)
+
+    def idle_fsm(self, message):
+        return general_idle_fsm(self, message)
+
+    def put(self):
+        self.critical("put not implemented")
+        self.reading = False
+        self.state = "idle"
+        return None
+
+    def get(self):
+        self.inserting = False
+        self.state = "idle"
+        self.critical("get not implemented")
+        return None
 
     def fsm_logic(self, message = None):
-        self.critical("RACE has not yet been implemented")
+        if self.complete and self.state == "idle":
+            return None
+
+        if self.state== "idle":
+            return self.idle_fsm(message)
+
         return None
+
+def general_idle_fsm(fsm, message):
+    if message != None:
+        fsm.critical("Idle state machine received a message" + str(message))
+        return None
+    #get the next operations
+    req = fsm.workload_driver.next()
+    if req == None:
+        fsm.complete=True
+        fsm.state = "complete"
+        return None
+    elif req.request_type == "put":
+
+        fsm.current_insert_value = req.key
+        fsm.inserting=True
+        return fsm.put()
+
+    elif req.request_type == "get":
+        if req.key < 0:
+            return None
+        fsm.current_read_key = req.key
+        fsm.state = "reading"
+        fsm.reading=True
+        return fsm.get()
+    else:
+        raise Exception("No generator for request : " + str(req.request_type))
 
 
 class rcuckoo(client_state_machine):
@@ -1348,7 +1402,7 @@ class rcuckoo(client_state_machine):
     def search(self, message=None):
         assert message == None, "there should be no message passed to search"
 
-        self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.hash_locations, self.current_insert_value)
+        self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.rcuckoo_hash_locations, self.current_insert_value)
         if len(self.search_path) == 0:
             self.info("Search Failed: " + str(self.current_insert_value) + "| unable to continue, client " + str(self.id) + " is done")
             self.complete=True
@@ -1380,6 +1434,12 @@ class rcuckoo(client_state_machine):
         self.info("Insert Failed: " + str(self.current_insert_value))
         self.state="release_locks_try_again"
         return self.finish_insert_and_release_locks(success=False)
+
+    def get(self):
+        return self.begin_read()
+
+    def put(self):
+        return self.search()
 
     #threshold reads
     def begin_read(self):
@@ -1428,30 +1488,7 @@ class rcuckoo(client_state_machine):
 
 
     def idle_fsm(self,message):
-        if message != None:
-            self.critical("Idle state machine received a message" + str(message))
-            return None
-        #get the next operations
-        req = self.workload_driver.next()
-        if req == None:
-            self.complete=True
-            self.state = "complete"
-            return None
-        elif req.request_type == "put":
-
-            self.current_insert_value = req.key
-            self.inserting=True
-            return self.search()
-
-        elif req.request_type == "get":
-            if req.key < 0:
-                return None
-            self.current_read_key = req.key
-            self.state = "reading"
-            self.reading=True
-            return self.begin_read()
-        else:
-            raise Exception("No generator for request : " + str(req.request_type))
+        return general_idle_fsm(self, message)
 
     def undo_last_cas_fsm(self, message):
         if message == None:
@@ -1529,6 +1566,7 @@ class rcuckoo(client_state_machine):
 
         if self.state == "reading":
             return self.read_fsm(message)
+
     
 
 
@@ -1572,27 +1610,3 @@ class basic_memory_state_machine(state_machine):
             
         else:
             self.logger.warning("MEMORY: unknown message type " + str(message))
-
-
-#examples of reading
-# def read_current(self):
-#     locations = hash.hash_locations(self.current_insert, self.table.table_size)
-#     self.info("Inserting: " + str(self.current_insert) + " Locations: " + str(locations))
-#     bucket = locations[0]
-#     message = Message({})
-#     message.payload["function"] = read_table_entry
-#     message.payload["function_args"] = {'bucket_id':bucket, 'bucket_offset':0, 'size':self.table.row_size()}
-#     return message
-
-# def read_path_element(self, pe):
-#     message = Message({})
-#     message.payload["function"] = read_table_entry
-#     message.payload["function_args"] = {'bucket_id':pe.bucket_index, 'bucket_offset':0, 'size':self.table.row_size()}
-#     return message
-
-# def local_table_contains_value(self, value):
-#     locations = hash.hash_locations(value, self.table.table_size)
-#     for bucket_index in locations:
-#         if self.table.bucket_contains(bucket_index, value):
-#             return True
-#     return Fals

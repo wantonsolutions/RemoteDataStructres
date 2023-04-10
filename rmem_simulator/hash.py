@@ -25,7 +25,8 @@ def h3(key):
     val = str(key) + "salty"
     return hashlib.sha1(val.encode('utf-8')).hexdigest()
 
-def primary_location(key, table_size):
+#cuckoo specific hashing
+def rcuckoo_primary_location(key, table_size):
     h = int(h1(key),16)
     h = (h % int(table_size / 2)) * 2
     return h
@@ -48,24 +49,56 @@ def h3_suffix_base(key, base):
     zeros = len(val) - len(val.rstrip('0'))
     return zeros
 
-def secondary_location(key, factor, table_size):
+def rcuckoo_secondary_location(key, factor, table_size):
     base = 2
-    primary = primary_location(key, table_size)
+    primary = rcuckoo_primary_location(key, table_size)
     exp = (h3_suffix_base(key,base) + factor) #use base 2 for key probability
     mod_size = int((factor ** exp)) #generated max suffix size
     secondary = (int(h2(key),16)) % mod_size #perform the modulo
     if secondary % 2 == 0: #make sure that the secondary location is odd
         secondary+=1
-    # secondary = secondary * 2 + 1 #make sure that the secondary location is odd
 
     return (primary + secondary) % table_size
 
-def hash_locations(key, table_size):
+def rcuckoo_hash_locations(key, table_size):
     global factor
-    p = primary_location(key, table_size)
-    s = secondary_location(key, factor, table_size)
-    # print(p,s)
-    if p > s:
-        logger.debug("primary is greater than secondary: " + str(p) + " " + str(s))
+    p = rcuckoo_primary_location(key, table_size)
+    s = rcuckoo_secondary_location(key, factor, table_size)
     return (p,s)
-    # return (primary_location(key, table_size), secondary_location(key, factor, table_size))
+
+## race
+
+def to_race_index_math(index, table_size):
+    if table_size % 3 != 0:
+        table_size -= (table_size % 3) 
+
+    two_thirds_table_size = int( 3 * int(table_size * 2))
+    index = (index % two_thirds_table_size)
+    index_div_two = int(index / 2)
+
+    #even
+    bucket=0
+    if index % 2 == 0:
+        bucket = index + index_div_two
+        overflow = bucket+1
+    else:
+        bucket += index + (index_div_two + 1)
+        overflow = bucket-1
+    return (bucket, overflow)
+
+
+def to_race_index(h, index, table_size):
+    index = int(h(index),16)
+    return to_race_index_math(index, table_size)
+
+
+def race_primary_location(key, table_size):
+    return to_race_index(h1, key, table_size)
+
+def race_secondary_location(key, table_size):
+    return to_race_index(h2, key, table_size)
+
+def race_hash_locations(key, table_size):
+    p = race_primary_location(key, table_size)
+    s = race_secondary_location(key, table_size)
+    return (p,s)

@@ -1,4 +1,5 @@
 import simulator
+import cuckoo
 import json
 import log
 import logging
@@ -187,7 +188,7 @@ def plot_hash_distribution():
     primary = []
     secondary = []
     for i in range(max_value):
-        v1, v2 = hash.hash_locations(i, bins)
+        v1, v2 = hash.rcuckoo_hash_locations(i, bins)
         primary.append(v1)
         secondary.append(v2)
 
@@ -210,7 +211,7 @@ def plot_hash_factor_distance_cdf():
         hash.set_factor(f)
         distances = []
         for i in range(samples):
-            v1, v2 = hash.hash_locations(i, table_size)
+            v1, v2 = hash.rcuckoo_hash_locations(i, table_size)
             distances.append(8 + (abs(v1-v2) * 8))
         x, y = cdf(distances)
         ax.plot(x,y, label=str(f))
@@ -336,6 +337,10 @@ def insertion_debug():
     # config['buckets_per_lock'] = (config['indexes'] / config["bucket_size"]) / 4
     config["buckets_per_lock"] = 1
     config["locks_per_message"] = 64
+
+    config["state_machine"]=cuckoo.race
+    # config["state_machine"]=cuckoo.rcuckoo
+
     sim = simulator.Simulator(config)
     # log.set_debug()
     # log.set_off()
