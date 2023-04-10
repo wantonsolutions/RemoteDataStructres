@@ -1211,7 +1211,16 @@ def read_threshold_message(key, read_threshold_bytes, table_size, row_size_bytes
     return messages
 
 
-class global_lock_a_star_insert_only_state_machine(client_state_machine):
+class race(client_state_machine):
+    def __init__(self, config):
+        super().__init_(config)
+
+    def fsm_logic(self, message = None):
+        self.critical("RACE has not yet been implemented")
+        return None
+
+
+class rcuckoo(client_state_machine):
     def __init__(self, config):
         super().__init__(config)
 
@@ -1231,22 +1240,9 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         self.read_threshold_bytes = config['read_threshold_bytes']
         assert self.read_threshold_bytes >= self.table.row_size_bytes(), "read threshold is smaller than a single row in the table (this is not allowed)"
 
-        # self.locked_buckets = []
         self.locks_held = []
         self.current_locking_messages = []
         self.locking_message_index = 0
-
-    # def get_locking_messages(self):
-    #     buckets = [pe.bucket_index for pe in self.search_path]
-    #     buckets.sort()
-    #     lock_messages = get_lock_messages(buckets, self.buckets_per_lock, self.locks_per_message)
-    #     return lock_messages
-
-    # def get_unlocking_messages(self):
-    #     buckets = [pe.bucket_index for pe in self.search_path]
-    #     buckets.sort(reverse=True)
-    #     lock_messages = get_unlock_messages(buckets, self.buckets_per_lock, self.locks_per_message)
-    #     return lock_messages
 
     def all_locks_aquired(self):
         if self.locking_message_index == len(self.current_locking_messages) and \
@@ -1268,10 +1264,6 @@ class global_lock_a_star_insert_only_state_machine(client_state_machine):
         self.locks_held.extend(lock_indexes)
         #make unique
         self.locks_held = list(set(self.locks_held))
-        # print(message)
-        # print(locked_buckets)
-        # print(self.locked_buckets)
-        # buckets_locked.extend(self.get_current_locking_message().payload['buckets_locked'])
         self.locking_message_index = self.locking_message_index + 1
 
     def receive_successful_unlocking_message(self, message):

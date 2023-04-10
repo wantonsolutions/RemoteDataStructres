@@ -39,15 +39,15 @@ class Client(Node):
         self.debug("Index Args: " + str(index_args)+"\n")
         self.index = index_func(**index_args)
 
-        state_machine_args = config['state_machine_init_args'] 
+        state_machine_args = config['state_machine_args'] 
         state_machine_args['table'] = self.index
         state_machine_args['id'] = self.client_id
         state_machine_args['num_clients'] = config['num_clients']
         state_machine_args['read_threshold_bytes'] = config['read_threshold_bytes']
         state_machine_args['buckets_per_lock'] = config['buckets_per_lock']
         state_machine_args['locks_per_message'] = config['locks_per_message']
-        state_machine_init = config['state_machine_init']
-        self.state_machine = state_machine_init(state_machine_args)
+        state_machine = config['state_machine']
+        self.state_machine = state_machine(state_machine_args)
 
     def __str__(self):
         return "Client: " + str(self.client_id)
@@ -84,10 +84,10 @@ class Memory(Node):
         self.debug("Index Args: " + str(index_args)+"\n")
         self.index = index_func(**index_args)
 
-        state_machine_args = config['state_machine_init_args']
+        state_machine_args = config['state_machine_args']
         state_machine_args['table'] = self.index
-        state_machine_init = config['state_machine_init']
-        self.state_machine = state_machine_init(state_machine_args)
+        state_machine = config['state_machine']
+        self.state_machine = state_machine(state_machine_args)
 
     
     def __str__(self):
@@ -271,9 +271,9 @@ class Simulator(Node):
             client_config['index_init_function'] = Table
             client_config['index_init_args'] = index_init_args
 
-            # client_config['state_machine_init']=lockless_a_star_insert_only_state_machine
-            client_config['state_machine_init']=global_lock_a_star_insert_only_state_machine
-            client_config['state_machine_init_args']={'total_inserts': 10000}
+            # client_config['state_machine']=lockless_a_star_insert_only_state_machine
+            client_config['state_machine']=self.config["state_machine"]
+            client_config['state_machine_args']={'total_inserts': 10000}
             client_config['read_threshold_bytes']=self.config['read_threshold_bytes']
             client_config['buckets_per_lock']=buckets_per_lock
             client_config['locks_per_message']=self.config['locks_per_message']
@@ -288,8 +288,8 @@ class Simulator(Node):
         memory_config['index_init_function'] = Table
         memory_config['index_init_args'] = index_init_args
 
-        memory_config['state_machine_init']=basic_memory_state_machine
-        memory_config['state_machine_init_args']={}
+        memory_config['state_machine']=basic_memory_state_machine
+        memory_config['state_machine_args']={}
         self.memory = Memory(memory_config)
 
         #initialize switch
@@ -367,8 +367,9 @@ def default_config():
     #default is global locking
     config['buckets_per_lock']=config['indexes']
     config['locks_per_message']=1
-
     config['hash_factor']=hash.DEFAULT_FACTOR
+
+    config['state_machine']=rcuckoo
 
     return config
 
