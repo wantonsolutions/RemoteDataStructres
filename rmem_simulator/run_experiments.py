@@ -329,7 +329,7 @@ def insertion_debug():
     print("table size: ", table_size)
     config['indexes'] = table_size
     config['num_clients'] = clients
-    config['num_steps'] = 1000000
+    config['num_steps'] = 100000
     config['read_threshold_bytes'] = 256
 
     #global lock config
@@ -338,8 +338,8 @@ def insertion_debug():
     config["buckets_per_lock"] = 1
     config["locks_per_message"] = 64
 
-    config["state_machine"]=cuckoo.race
-    # config["state_machine"]=cuckoo.rcuckoo
+    # config["state_machine"]=cuckoo.race
+    config["state_machine"]=cuckoo.rcuckoo
 
     sim = simulator.Simulator(config)
     # log.set_debug()

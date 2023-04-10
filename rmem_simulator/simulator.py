@@ -296,6 +296,9 @@ class Simulator(Node):
         switch_config = {'switch_id': 0}
         self.switch = Switch(switch_config)
 
+
+        self.config['state_machine']=str(self.config['state_machine'])
+
         #run simulation
         for i in range(self.config['num_steps']):
             # self.deterministic_simulation_step()

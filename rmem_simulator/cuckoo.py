@@ -1049,6 +1049,14 @@ class client_state_machine(state_machine):
         self.table = config["table"]
         self.state="idle"
 
+
+        #read state machine
+        self.current_read_key = None
+        self.outstanding_read_requests = 0
+        self.read_values_found = 0
+        self.read_values = []
+        self.duplicates_found = 0
+
         workload_config = {
             "workload": "ycsb-a",
             "total_requests": self.total_inserts,
@@ -1057,6 +1065,77 @@ class client_state_machine(state_machine):
         }
         self.workload_config=workload_config
         self.workload_driver = client_workload_driver(workload_config)
+
+
+    def begin_read(self, messages):
+        self.outstanding_read_requests = len(messages)
+        self.read_values_found = 0
+        self.read_values = []
+        self.state = "reading"
+        self.reading=True
+        return messages
+
+
+    def wait_for_read_messages_fsm(self, message):
+        if message == None:
+            return None
+        if message_type(message) == "read_response":
+
+            #unpack and check the response for a valid read
+            args = unpack_read_response(message)
+            fill_local_table_with_read_response(self.table, args)
+            read = args["read"]
+
+            keys_found = keys_contained_in_read_response(self.current_read_key, read)
+            self.read_values_found = self.read_values_found + keys_found
+            self.read_values.extend(get_entries_from_read(self.current_read_key, read))
+
+            #check if the read is complete
+            self.outstanding_read_requests = self.outstanding_read_requests - 1
+            if self.outstanding_read_requests == 0:
+                if self.read_values_found == 0:
+                    success = False
+                    self.info("Read Failed: " + str(self.current_read_key))
+                elif self.read_values_found == 1:
+                    success = True
+                    self.info("Read Complete: " + str(self.read_values))
+                elif self.read_values_found > 1:
+                    success = True
+                    self.duplicates_found = self.duplicates_found + 1
+                    self.info("Read Complete: " + str(self.read_values) + " Duplicate Found")
+                    #todo we likely need a tie breaker here
+
+                self.state="idle"
+                self.complete_read_stats(success, self.current_read_key)
+                self.reading=False
+        return None
+
+
+    def general_idle_fsm(self, message):
+        if message != None:
+            self.critical("Idle state machine received a message" + str(message))
+            return None
+        #get the next operations
+        req = self.workload_driver.next()
+        if req == None:
+            self.complete=True
+            self.state = "complete"
+            return None
+        elif req.request_type == "put":
+
+            self.current_insert_value = req.key
+            self.inserting=True
+            return self.put()
+
+        elif req.request_type == "get":
+            if req.key < 0:
+                return None
+            self.current_read_key = req.key
+            self.state = "reading"
+            self.reading=True
+            return self.get()
+        else:
+            raise Exception("No generator for request : " + str(req.request_type))
 
     def __str__(self):
         return "Client " + str(self.id)
@@ -1224,7 +1303,7 @@ class race(client_state_machine):
         super().__init__(config)
 
     def idle_fsm(self, message):
-        return general_idle_fsm(self, message)
+        return self.general_idle_fsm(message)
 
     def put(self):
         self.critical("put not implemented")
@@ -1247,53 +1326,22 @@ class race(client_state_machine):
 
         return None
 
-def general_idle_fsm(fsm, message):
-    if message != None:
-        fsm.critical("Idle state machine received a message" + str(message))
-        return None
-    #get the next operations
-    req = fsm.workload_driver.next()
-    if req == None:
-        fsm.complete=True
-        fsm.state = "complete"
-        return None
-    elif req.request_type == "put":
-
-        fsm.current_insert_value = req.key
-        fsm.inserting=True
-        return fsm.put()
-
-    elif req.request_type == "get":
-        if req.key < 0:
-            return None
-        fsm.current_read_key = req.key
-        fsm.state = "reading"
-        fsm.reading=True
-        return fsm.get()
-    else:
-        raise Exception("No generator for request : " + str(req.request_type))
 
 
 class rcuckoo(client_state_machine):
     def __init__(self, config):
         super().__init__(config)
 
+        #inserting and locking
         self.current_insert_value = None
         self.search_path = []
         self.search_path_index = 0
 
-        #read state machine
-        self.current_read_key = None
-        self.outstanding_read_requests = 0
-        self.read_values_found = 0
-        self.read_values = []
-        self.duplicates_found = 0
         self.buckets_per_lock = config['buckets_per_lock']
         self.locks_per_message = config['locks_per_message']
 
         self.read_threshold_bytes = config['read_threshold_bytes']
         assert self.read_threshold_bytes >= self.table.row_size_bytes(), "read threshold is smaller than a single row in the table (this is not allowed)"
-
         self.locks_held = []
         self.current_locking_messages = []
         self.locking_message_index = 0
@@ -1436,59 +1484,18 @@ class rcuckoo(client_state_machine):
         return self.finish_insert_and_release_locks(success=False)
 
     def get(self):
-        return self.begin_read()
+        messages = read_threshold_message(self.current_read_key, self.read_threshold_bytes, self.table.table_size, self.table.row_size_bytes())
+        return self.begin_read(messages)
 
     def put(self):
         return self.search()
 
-    #threshold reads
-    def begin_read(self):
-        messages = read_threshold_message(self.current_read_key, self.read_threshold_bytes, self.table.table_size, self.table.row_size_bytes())
 
-        self.outstanding_read_requests = len(messages)
-        self.read_values_found = 0
-        self.read_values = []
-        self.state = "reading"
-        self.reading=True
-        return messages
 
-    def read_fsm(self, message):
-        if message == None:
-            return None
-        if message_type(message) == "read_response":
-
-            #unpack and check the response for a valid read
-            args = unpack_read_response(message)
-            fill_local_table_with_read_response(self.table, args)
-            read = args["read"]
-
-            keys_found = keys_contained_in_read_response(self.current_read_key, read)
-            self.read_values_found = self.read_values_found + keys_found
-            self.read_values.extend(get_entries_from_read(self.current_read_key, read))
-
-            #check if the read is complete
-            self.outstanding_read_requests = self.outstanding_read_requests - 1
-            if self.outstanding_read_requests == 0:
-                if self.read_values_found == 0:
-                    success = False
-                    self.info("Read Failed: " + str(self.current_read_key))
-                elif self.read_values_found == 1:
-                    success = True
-                    self.info("Read Complete: " + str(self.read_values))
-                elif self.read_values_found > 1:
-                    success = True
-                    self.duplicates_found = self.duplicates_found + 1
-                    self.info("Read Complete: " + str(self.read_values) + " Duplicate Found")
-                    #todo we likely need a tie breaker here
-
-                self.state="idle"
-                self.complete_read_stats(success, self.current_read_key)
-                self.reading=False
-        return None
 
 
     def idle_fsm(self,message):
-        return general_idle_fsm(self, message)
+        return self.general_idle_fsm(message)
 
     def undo_last_cas_fsm(self, message):
         if message == None:
@@ -1565,7 +1572,11 @@ class rcuckoo(client_state_machine):
             return self.undo_last_cas_fsm(message)
 
         if self.state == "reading":
-            return self.read_fsm(message)
+            return self.wait_for_read_messages_fsm(message)
+
+    def toJSON(self):
+        return json.dumps(self, default=lambda o: o.__dict__, 
+            sort_keys=True, indent=4)
 
     
 
