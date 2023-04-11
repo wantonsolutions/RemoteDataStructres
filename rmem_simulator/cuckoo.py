@@ -528,7 +528,9 @@ class Table:
     def assert_operation_in_table_bound(self, bucket_id, bucket_offset, size):
         self.assert_read_table_properties(size)
         total_indexs = size/8
-        assert bucket_id * bucket_offset + total_indexs <= self.table_size * self.bucket_size, "operation is outside of the table"
+        max_read=bucket_id * bucket_offset + total_indexs
+        table_bound=self.table_size * self.bucket_size
+        assert max_read <= table_bound, "read is out of bounds " + str(max_read) + " " + str(table_bound)
 
     def assert_read_table_properties(self, read_size):
         assert self.table != None, "table is not initalized"
@@ -1075,7 +1077,6 @@ class client_state_machine(state_machine):
         self.reading=True
         return messages
 
-
     def wait_for_read_messages_fsm(self, message):
         if message == None:
             return None
@@ -1297,6 +1298,19 @@ def read_threshold_message(key, read_threshold_bytes, table_size, row_size_bytes
         messages = single_bucket_read_messages(locations, row_size_bytes)
     return messages
 
+def race_messages(key, table_size, row_size_bytes):
+    print(row_size_bytes)
+    locations = hash.race_hash_locations(key, table_size)
+    #get the min of the overflow and index buckets
+    l1 = min(locations[0])
+    l2 = min(locations[1])
+    double_size = int(row_size_bytes * 2)
+    locations = [l1, l2]
+    messages = single_bucket_read_messages(locations, double_size)
+    return messages
+
+
+
 
 class race(client_state_machine):
     def __init__(self, config):
@@ -1306,23 +1320,26 @@ class race(client_state_machine):
         return self.general_idle_fsm(message)
 
     def put(self):
-        self.critical("put not implemented")
-        self.reading = False
+        self.inserting = False
         self.state = "idle"
+        self.critical("put not implemented")
         return None
 
     def get(self):
-        self.inserting = False
-        self.state = "idle"
-        self.critical("get not implemented")
-        return None
+        messages = race_messages(self.current_read_key, self.table.table_size, self.table.row_size_bytes())
+        return self.begin_read(messages)
 
     def fsm_logic(self, message = None):
+
         if self.complete and self.state == "idle":
             return None
 
         if self.state== "idle":
             return self.idle_fsm(message)
+
+        if self.state == "reading":
+            return self.wait_for_read_messages_fsm(message)
+
 
         return None
 
@@ -1345,6 +1362,14 @@ class rcuckoo(client_state_machine):
         self.locks_held = []
         self.current_locking_messages = []
         self.locking_message_index = 0
+
+
+    def get(self):
+        messages = read_threshold_message(self.current_read_key, self.read_threshold_bytes, self.table.table_size, self.table.row_size_bytes())
+        return self.begin_read(messages)
+
+    def put(self):
+        return self.search()
 
     def all_locks_aquired(self):
         if self.locking_message_index == len(self.current_locking_messages) and \
@@ -1483,19 +1508,6 @@ class rcuckoo(client_state_machine):
         self.state="release_locks_try_again"
         return self.finish_insert_and_release_locks(success=False)
 
-    def get(self):
-        messages = read_threshold_message(self.current_read_key, self.read_threshold_bytes, self.table.table_size, self.table.row_size_bytes())
-        return self.begin_read(messages)
-
-    def put(self):
-        return self.search()
-
-
-
-
-
-    def idle_fsm(self,message):
-        return self.general_idle_fsm(message)
 
     def undo_last_cas_fsm(self, message):
         if message == None:
@@ -1548,6 +1560,9 @@ class rcuckoo(client_state_machine):
             return next_cas_message(self.search_path, self.search_path_index)
 
 
+    def idle_fsm(self,message):
+        return self.general_idle_fsm(message)
+
     def fsm_logic(self, message = None):
 
         if self.complete and self.state == "idle":
@@ -1555,6 +1570,9 @@ class rcuckoo(client_state_machine):
 
         if self.state== "idle":
             return self.idle_fsm(message)
+
+        if self.state == "reading":
+            return self.wait_for_read_messages_fsm(message)
 
         if self.state == "aquire_locks":
             return self.aquire_locks_fsm(message)
@@ -1571,8 +1589,6 @@ class rcuckoo(client_state_machine):
         if self.state == "undo_last_cas":
             return self.undo_last_cas_fsm(message)
 
-        if self.state == "reading":
-            return self.wait_for_read_messages_fsm(message)
 
     def toJSON(self):
         return json.dumps(self, default=lambda o: o.__dict__, 

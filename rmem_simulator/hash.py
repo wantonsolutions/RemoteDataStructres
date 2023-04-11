@@ -72,9 +72,11 @@ def to_race_index_math(index, table_size):
     if table_size % 3 != 0:
         table_size -= (table_size % 3) 
 
-    two_thirds_table_size = int( 3 * int(table_size * 2))
+    two_thirds_table_size = int(int(table_size * 2)/3)
     index = (index % two_thirds_table_size)
     index_div_two = int(index / 2)
+
+    print("index: ", index)
 
     #even
     bucket=0

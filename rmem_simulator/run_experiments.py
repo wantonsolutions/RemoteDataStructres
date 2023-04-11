@@ -338,12 +338,14 @@ def insertion_debug():
     config["buckets_per_lock"] = 1
     config["locks_per_message"] = 64
 
-    # config["state_machine"]=cuckoo.race
-    config["state_machine"]=cuckoo.rcuckoo
+    config["state_machine"]=cuckoo.race
+    # config["state_machine"]=cuckoo.rcuckoo
 
     sim = simulator.Simulator(config)
     # log.set_debug()
     # log.set_off()
+    sim.run()
+
     try:
         sim.run()
     except Exception as e:
