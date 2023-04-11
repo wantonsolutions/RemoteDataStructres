@@ -773,6 +773,8 @@ class state_machine:
     def __init__(self, config):
         self.logger = logging.getLogger("root")
         self.config = config
+        #spiritually these are the high level states of the state machine
+        #these are considered less configurable than the self.state variable I use in the children
         self.complete = False
         self.inserting = False
         self.reading = False
@@ -1077,7 +1079,11 @@ class client_state_machine(state_machine):
         self.reading=True
         return messages
 
-    def wait_for_read_messages_fsm(self, message):
+    def all_messages_received(self):
+        return self.outstanding_read_requests == 0
+
+
+    def wait_for_read_messages_fsm(self, message, key):
         if message == None:
             return None
         if message_type(message) == "read_response":
@@ -1087,16 +1093,16 @@ class client_state_machine(state_machine):
             fill_local_table_with_read_response(self.table, args)
             read = args["read"]
 
-            keys_found = keys_contained_in_read_response(self.current_read_key, read)
+            keys_found = keys_contained_in_read_response(key, read)
             self.read_values_found = self.read_values_found + keys_found
-            self.read_values.extend(get_entries_from_read(self.current_read_key, read))
+            self.read_values.extend(get_entries_from_read(key, read))
 
             #check if the read is complete
             self.outstanding_read_requests = self.outstanding_read_requests - 1
-            if self.outstanding_read_requests == 0:
+            if self.all_messages_received():
                 if self.read_values_found == 0:
                     success = False
-                    self.info("Read Failed: " + str(self.current_read_key))
+                    self.info("Read Failed: " + str(key))
                 elif self.read_values_found == 1:
                     success = True
                     self.info("Read Complete: " + str(self.read_values))
@@ -1106,9 +1112,11 @@ class client_state_machine(state_machine):
                     self.info("Read Complete: " + str(self.read_values) + " Duplicate Found")
                     #todo we likely need a tie breaker here
 
-                self.state="idle"
-                self.complete_read_stats(success, self.current_read_key)
-                self.reading=False
+                #todo this is sloppy, we should move this to outside of the wait for read_messages_fsm
+                if self.reading:
+                    self.state="idle"
+                    self.complete_read_stats(success, key)
+                    self.reading=False
         return None
 
 
@@ -1120,7 +1128,6 @@ class client_state_machine(state_machine):
         req = self.workload_driver.next()
         if req == None:
             self.complete=True
-            self.state = "complete"
             return None
         elif req.request_type == "put":
 
@@ -1132,7 +1139,6 @@ class client_state_machine(state_machine):
             if req.key < 0:
                 return None
             self.current_read_key = req.key
-            self.state = "reading"
             self.reading=True
             return self.get()
         else:
@@ -1319,11 +1325,18 @@ class race(client_state_machine):
     def idle_fsm(self, message):
         return self.general_idle_fsm(message)
 
+
+    def begin_insert(self, messages):
+        self.outstanding_read_requests = len(messages)
+        self.read_values_found = 0
+        self.read_values = []
+        # self.state = "reading"
+        # self.reading=True
+        return messages
+
     def put(self):
-        self.inserting = False
-        self.state = "idle"
-        self.critical("put not implemented")
-        return None
+        messages = race_messages(self.current_read_key, self.table.table_size, self.table.row_size_bytes())
+        return self.begin_insert(messages)
 
     def get(self):
         messages = race_messages(self.current_read_key, self.table.table_size, self.table.row_size_bytes())
@@ -1338,7 +1351,7 @@ class race(client_state_machine):
             return self.idle_fsm(message)
 
         if self.state == "reading":
-            return self.wait_for_read_messages_fsm(message)
+            return self.wait_for_read_messages_fsm(message, self.current_read_key)
 
 
         return None
@@ -1572,7 +1585,7 @@ class rcuckoo(client_state_machine):
             return self.idle_fsm(message)
 
         if self.state == "reading":
-            return self.wait_for_read_messages_fsm(message)
+            return self.wait_for_read_messages_fsm(message, self.current_read_key)
 
         if self.state == "aquire_locks":
             return self.aquire_locks_fsm(message)
