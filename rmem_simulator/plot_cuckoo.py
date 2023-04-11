@@ -45,6 +45,15 @@ def multi_plot_run(run, plot_names):
 def stderr(data):
     return np.std(data) / np.sqrt(np.size(data))
 
+def div_by_zero_to_zero(x, y):
+    if y == 0:
+        print("ERROR - div by zero")
+
+        # raise Exception("Div by zero")
+        return float(0)
+    else:
+        return float(x/y)
+
 def cas_success_rate(ax, stats, x_axis="clients"):
     print("CAS SUCCESS RATE")
     print("\ttodo - label graph with workload")
@@ -57,7 +66,9 @@ def cas_success_rate(ax, stats, x_axis="clients"):
         for client in stat['clients']:
             total_cas = client['stats']['total_cas']
             total_cas_failure = client['stats']['total_cas_failures']
-            success_rate = float(1.0 - float(total_cas_failure)/float(total_cas))
+            ratio = div_by_zero_to_zero(total_cas_failure, total_cas)
+            success_rate = float(1.0 - ratio)
+
             per_client_success_rate.append(success_rate)
 
         success_rates.append(np.mean(per_client_success_rate))
@@ -91,8 +102,9 @@ def read_write_ratio(ax, stats, x_axis="clients"):
             reads = client['stats']['completed_read_count']
             writes = client['stats']['completed_insert_count']
             total_ops = reads + writes
-            read_percent.append(float(reads)/float(total_ops))
-            write_percent.append(float(writes)/float(total_ops))
+
+            read_percent.append(div_by_zero_to_zero(reads, total_ops))
+            write_percent.append(div_by_zero_to_zero(writes, total_ops))
         read_rates.append(np.mean(read_percent))
         read_err.append(stderr(read_percent))
         write_rates.append(np.mean(write_percent))
@@ -228,11 +240,7 @@ def client_stats_x_per_y_get_mean_std(stat, x,y):
         for client in stat['clients']:
             y_val = client['stats'][y]
             x_val = client['stats'][x]
-            if y_val == 0:
-                print("ERROR DIVIDE BY ZERO")
-                vals.append(0)
-            else:
-                vals.append(float(x_val)/float(y_val))
+            vals.append(div_by_zero_to_zero(x_val, y_val))
         return np.mean(vals), stderr(vals)
 
 def client_stats_x_per_y_get_mean_std_multi_run(stats, x, y):
