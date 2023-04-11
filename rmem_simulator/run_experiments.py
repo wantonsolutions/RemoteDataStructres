@@ -321,8 +321,8 @@ def insertion_debug():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
 
-    table_size = 256
-    clients=8
+    table_size = 64
+    clients=1
     runs=[]
     config = simulator.default_config()
     sim = simulator.Simulator(config)
@@ -342,16 +342,17 @@ def insertion_debug():
     # config["state_machine"]=cuckoo.rcuckoo
 
     sim = simulator.Simulator(config)
-    # log.set_debug()
+    log.set_debug()
     # log.set_off()
     sim.run()
 
-    try:
-        sim.run()
-    except Exception as e:
-        print(e)
-        stats = sim.collect_stats()
-        sim.validate_run()
+
+    # try:
+    #     sim.run()
+    # except Exception as e:
+    #     print(e)
+    #     stats = sim.collect_stats()
+    #     sim.validate_run()
     sim.validate_run()
     stats = sim.collect_stats()
     runs.append(stats)
