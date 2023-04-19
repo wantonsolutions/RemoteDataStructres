@@ -402,7 +402,7 @@ class LockTable:
 
 class Table:
     def __init__(self, memory_size, bucket_size, buckets_per_lock):
-        self.number_tables=2
+        # self.number_tables=2
         self.entry_size=8
         self.memory_size=memory_size
         self.bucket_size=bucket_size
@@ -493,16 +493,17 @@ class Table:
         assert total_rows > 1, row_err
 
         #for cuckoo hashing we have two tables, therefore memory size must be a power of two
-        table_div_error = "Memory must divide evenly across tables. Memory:" + str(memory_size) + " Tables:" + str(self.number_tables)
-        assert memory_size % self.number_tables == 0, table_div_error
+
+        # table_div_error = "Memory must divide evenly across tables. Memory:" + str(memory_size) + " Tables:" + str(self.number_tables)
+        # assert memory_size % self.number_tables == 0, table_div_error
 
         #We also need the number of buckets to fit into memory correctly
         bucket_div_error = "Memory must divide evenly across buckets. Memory:" + str(memory_size) + " Buckets:" + str(bucket_size)
-        assert (memory_size/self.number_tables) % bucket_size == 0, bucket_div_error
+        assert (memory_size) % bucket_size == 0, bucket_div_error
 
         #finally each entry in the bucket is 8 bytes
         entry_div_error = "Memory must divide evenly across entries. Memory:" + str(memory_size) + " Entries:" + str(self.entry_size)
-        assert ((memory_size/self.number_tables)/bucket_size % self.entry_size == 0), entry_div_error
+        assert ((memory_size)/bucket_size % self.entry_size == 0), entry_div_error
 
         table = []
         rows = int((memory_size/self.entry_size)/bucket_size)
@@ -771,6 +772,11 @@ def unpack_masked_cas_response(message):
         logger.debug("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["value"]) + str(args["mask"]))
         return args
 
+def get_state_machine_name(state_machine_class_pointer):
+    str_name = str(state_machine_class_pointer)
+    back = str_name.split(".")[1]
+    front = back.split("'")[0]
+    return front
 
 #cuckoo protocols
 class state_machine:
@@ -1060,7 +1066,7 @@ class client_state_machine(state_machine):
         self.duplicates_found = 0
 
         workload_config = {
-            "workload": "ycsb-a",
+            "workload": "ycsb-w",
             "total_requests": self.total_inserts,
             "id": self.id,
             "num_clients": config["num_clients"],
@@ -1300,7 +1306,6 @@ def read_threshold_message(key, read_threshold_bytes, table_size, row_size_bytes
     return messages
 
 def race_messages(key, table_size, row_size_bytes):
-    print(row_size_bytes)
     locations = hash.race_hash_locations(key, table_size)
     #get the min of the overflow and index buckets
     l1 = min(locations[0])
@@ -1309,8 +1314,6 @@ def race_messages(key, table_size, row_size_bytes):
     locations = [l1, l2]
     messages = single_bucket_read_messages(locations, double_size)
     return messages
-
-
 
 
 class race(client_state_machine):
@@ -1339,7 +1342,7 @@ class race(client_state_machine):
     def read_fsm(self,message):
         complete, success = self.wait_for_read_messages_fsm(message, self.current_read_key)
         if complete:
-            print("Race Reading Complete!", success, self.current_read_key)
+            self.debug("Race Reading Complete! success:" + str(success) + " key: " +str(self.current_read_key))
             self.state="idle"
             self.complete_read_stats(success, self.current_read_key)
             self.reading=False
@@ -1378,8 +1381,6 @@ class race(client_state_machine):
     
     def insert_fsm(self, message):
         #there should be a message, otherwise don't do anything
-        self.critical("made it to the insert fsm")
-
         if message == None:
             return None
 
@@ -1426,7 +1427,7 @@ class race(client_state_machine):
 
     def fsm_logic(self, message = None):
 
-        if self.complete and self.state == "idle":
+        if self.complete:
             return None
 
         if self.state== "idle":

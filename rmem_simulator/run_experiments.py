@@ -495,6 +495,72 @@ def read_threshold_experiment():
         runs.append(stats)
     save_statistics(runs)
 
+def client_scalability():
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator")
+
+    table_size = 2048
+    runs=[]
+
+    state_machines = [cuckoo.rcuckoo, cuckoo.race]
+    for state_machine in state_machines:
+        config = simulator.default_config()
+        config['indexes'] = table_size
+        config['num_clients'] = 8
+        config['num_steps'] = 1000000
+        config['read_threshold_bytes'] = 128
+
+        config["buckets_per_lock"] = 16
+        config["locks_per_message"] = 4
+        config["state_machine"]=state_machine
+        sim = simulator.Simulator(config)
+        log.set_off()
+        try:
+            sim.run()
+        except Exception as e:
+            print(e)
+            stats = sim.collect_stats()
+            sim.validate_run()
+        sim.validate_run()
+        stats = sim.collect_stats()
+        runs.append(stats)
+    save_statistics(runs)
+
+def race_bucket_size_fill_factor():
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator")
+
+    table_size = 1680  * 16 #lcm of 3,4,5,6,7,8,10,12,14,16
+    runs=[]
+    bucket_sizes = [3,4,5,6,7,8,10,12,14,16]
+    # bucket_sizes = [3,4]
+
+    # bucket_sizes = [8]
+    for bucket_size in bucket_sizes:
+        config = simulator.default_config()
+        sim = simulator.Simulator(config)
+        config['num_clients'] = 1
+        config['num_steps'] = 1000000000
+        config['bucket_size'] = bucket_size
+        config['read_threshold_bytes'] = config['entry_size'] * bucket_size
+        config['indexes'] = table_size
+        sim = simulator.Simulator(config)
+        log.set_off()
+        try:
+            sim.run()
+        except Exception as e:
+            print(e)
+            stats = sim.collect_stats()
+            sim.validate_run()
+        sim.validate_run()
+        stats = sim.collect_stats()
+        runs.append(stats)
+    save_statistics(runs)
+
+def plot_race_bucket_fill_factor():
+    print("not implemented race bucket fill factor")
+
+
 
 
 
@@ -504,11 +570,15 @@ def read_threshold_experiment():
 
 # todos()
 
-insertion_debug()
+# insertion_debug()
 # plot_general_stats_last_run()
 
 # read_threshold_experiment()
 # buckets_per_lock_experiment()
+# client_scalability()
+
+
+race_bucket_size_fill_factor()
 plot_general_stats_last_run()
 
 # plot_read_threshold_experiment()

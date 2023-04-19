@@ -181,7 +181,7 @@ def fill_factor(ax, stats, x_axis="table size"):
     ax.plot(x_axis_vals, fill_rates, label=str(label), marker='o')
     ax.set_xlabel(x_axis)
     ax.set_ylabel('Fill Rate')
-    ax.set_title('Fill Rate vs Table Size')
+    ax.set_title('Fill Rate vs ' + x_axis)
     ax.legend()
 
 def request_success_rate(ax, stats, x_axis="clients"):
@@ -254,10 +254,12 @@ def client_stats_x_per_y_get_mean_std_multi_run(stats, x, y):
 def detect_x_axis(stats):
     x_axis=[
         "clients",
-        "read threshold bytes",
         "table size",
         "locks per message",
-        "buckets per lock"
+        "buckets per lock",
+        "state machine",
+        "bucket size",
+        "read threshold bytes",
     ]
     for axis in x_axis:
         if len(set(get_x_axis(stats,axis))) > 1:
@@ -269,14 +271,18 @@ def detect_x_axis(stats):
 def get_x_axis(stats, name):
     if name == "clients":
         return get_client_x_axis(stats)
-    elif name == "read threshold bytes":
-        return get_read_threshold_x_axis(stats)
     elif name == "table size":
         return get_table_size_x_axis(stats)
     elif name == "locks per message":
         return get_locks_per_message_x_axis(stats)
     elif name == "buckets per lock":
         return get_buckets_per_lock_x_axis(stats)
+    elif name == "state machine":
+        return get_state_machine_x_axis(stats)
+    elif name == "bucket size":
+        return get_bucket_size_x_axis(stats)
+    elif name == "read threshold bytes":
+        return get_read_threshold_x_axis(stats)
     else:
         print("unknown x axis: ", name)
         exit(1)
@@ -304,8 +310,12 @@ def get_locks_per_message_x_axis(stats):
 
 def get_buckets_per_lock_x_axis(stats):
     return get_config_axis(stats,'buckets_per_lock')
-    
 
+def get_state_machine_x_axis(stats):
+    return get_config_axis(stats,'state_machine')
+
+def get_bucket_size_x_axis(stats):
+    return get_config_axis(stats,'bucket_size')
 
 def calculate_total_runs(stats):
     if isinstance(stats, list):
@@ -374,6 +384,12 @@ def buckets_per_lock(stats):
 def locks_per_message(stats):
     return ("locks_per_message", get_config_list(stats, "locks_per_message"))
 
+def state_machines(stats):
+    return ("state machine", get_config_list(stats, "state_machine"))
+
+def bucket_size(stats):
+    return ("bucket size", get_config_list(stats, "bucket_size"))
+
 
 def general_stats(ax, stats):
     print("RUN STATISTICS")
@@ -388,6 +404,8 @@ def general_stats(ax, stats):
         read_thresholds,
         buckets_per_lock,
         locks_per_message,
+        state_machines,
+        bucket_size,
     ]
     print(len(stats))
     for f in staistic_functions:

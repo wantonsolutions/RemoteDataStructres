@@ -195,7 +195,9 @@ class Simulator(Node):
 
     def clients_complete(self):
         for i in range(len(self.client_list)):
-            if self.client_list[i].state_machine.state != "complete":
+            # if self.client_list[i].state_machine.state != "complete":
+            #     return False
+            if not self.client_list[i].state_machine.complete:
                 return False
         return True
 
@@ -273,7 +275,7 @@ class Simulator(Node):
 
             # client_config['state_machine']=lockless_a_star_insert_only_state_machine
             client_config['state_machine']=self.config["state_machine"]
-            client_config['state_machine_args']={'total_inserts': 10000}
+            client_config['state_machine_args']={'total_inserts': indexes * 20}
             client_config['read_threshold_bytes']=self.config['read_threshold_bytes']
             client_config['buckets_per_lock']=buckets_per_lock
             client_config['locks_per_message']=self.config['locks_per_message']
@@ -297,7 +299,7 @@ class Simulator(Node):
         self.switch = Switch(switch_config)
 
 
-        self.config['state_machine']=str(self.config['state_machine'])
+        self.config['state_machine']=get_state_machine_name(self.config['state_machine'])
 
         #run simulation
         for i in range(self.config['num_steps']):
@@ -368,7 +370,7 @@ def default_config():
     config['read_threshold_bytes']=config['bucket_size'] * config['entry_size']
 
     #default is global locking
-    config['buckets_per_lock']=config['indexes']
+    config['buckets_per_lock']=1
     config['locks_per_message']=1
     config['hash_factor']=hash.DEFAULT_FACTOR
 
