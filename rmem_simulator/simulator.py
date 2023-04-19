@@ -4,6 +4,7 @@ from cuckoo import *
 from hash import *
 from time import sleep
 import json
+from collections import deque
 
 class Node:
     def __init__(self, config):
@@ -128,10 +129,12 @@ class Simulator(Node):
         self.client_list = []
         self.memory = None
         self.switch = None
-        self.client_switch_channel=[]
-        self.switch_client_channel=[]
-        self.switch_memory_channel=[]
-        self.memory_switch_channel=[]
+        self.in_flight_messages = 0
+        self.client_switch_channel=deque()
+        self.switch_client_channel=deque()
+        self.switch_memory_channel=deque()
+        self.memory_switch_channel=deque()
+
     
     
     def __str__(self):
@@ -141,12 +144,14 @@ class Simulator(Node):
         #deliver messages to client
         client = self.client_list[client_id]
         if message != None:
+            self.in_flight_messages -=1
             messages = client.state_machine_step(message)
         else:
             #generate client messages and send to switch
             messages = client.state_machine_step()
 
         if messages is not None:
+            self.in_flight_messages += len(messages)
             self.client_switch_channel.extend(messages)
 
 
@@ -184,14 +189,13 @@ class Simulator(Node):
         #send switch messages to the memory
         while len(self.switch_memory_channel) > 0:
             sm = self.switch_memory_channel.pop()
+            self.in_flight_messages -=1
             mm = self.memory.state_machine_step(sm)
+            self.in_flight_messages += len(mm)
             self.memory_switch_channel.extend(mm)
 
     def no_events(self):
-        return len(self.client_switch_channel) == 0 and \
-            len(self.switch_memory_channel) == 0 and  \
-            len(self.switch_client_channel) == 0 and \
-            len(self.memory_switch_channel) == 0
+        return (self.in_flight_messages == 0)
 
     def clients_complete(self):
         for i in range(len(self.client_list)):
