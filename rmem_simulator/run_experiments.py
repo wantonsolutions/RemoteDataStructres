@@ -1,11 +1,11 @@
 import simulator
 import cuckoo
-import json
 import log
 import logging
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
+from data_management import save_statistics, load_statistics
 
 import plot_cuckoo
 
@@ -29,16 +29,6 @@ def plot_fills(runs):
     ax.plot(table_sizes, fill_rates)
     plt.savefig("fill_rate.pdf")
 
-def save_statistics(statistics, filename="latest_statistics.json"):
-    print(statistics)
-    stats = json.dumps(statistics, indent=4)
-    with open(filename, "w") as f:
-        f.write(stats)
-
-def load_statistics(filename="latest_statistics.json"):
-    with open(filename, "r") as f:
-        stats = json.load(f)
-    return stats
 
 def pow_2_table_sizes(count):
     table_sizes = []
@@ -259,7 +249,7 @@ def global_lock_success_rate():
     save_statistics(runs)
 
 def plot_general_stats_last_run():
-    stats = load_statistics()
+    stats, directory = load_statistics()
     plot_names = [
         "general_stats",
         "cas_success_rate",
@@ -269,7 +259,7 @@ def plot_general_stats_last_run():
         "messages_per_operation",
         "fill_factor"
         ]
-    plot_cuckoo.multi_plot_runs(stats, plot_names)
+    plot_cuckoo.multi_plot_runs(stats, plot_names, directory)
 
 def plot_global_lock_success_rate():
     stats = load_statistics()
@@ -530,9 +520,10 @@ def race_bucket_size_fill_factor():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
 
-    table_size = 1680  * 16 #lcm of 3,4,5,6,7,8,10,12,14,16
+    table_size = 1680  * 1024 #lcm of 3,4,5,6,7,8,10,12,14,16
     runs=[]
     bucket_sizes = [3,4,5,6,7,8,10,12,14,16]
+    # bucket_sizes = [3,4,5,6,7]
     # bucket_sizes = [3,4]
 
     # bucket_sizes = [8]
@@ -540,7 +531,7 @@ def race_bucket_size_fill_factor():
         config = simulator.default_config()
         sim = simulator.Simulator(config)
         config['num_clients'] = 1
-        config['num_steps'] = 1000000000
+        config['num_steps'] = 10000000000
         config['bucket_size'] = bucket_size
         config['read_threshold_bytes'] = config['entry_size'] * bucket_size
         config['indexes'] = table_size
@@ -570,7 +561,7 @@ def plot_race_bucket_fill_factor():
 
 # todos()
 
-# insertion_debug()
+insertion_debug()
 # plot_general_stats_last_run()
 
 # read_threshold_experiment()
@@ -578,7 +569,7 @@ def plot_race_bucket_fill_factor():
 # client_scalability()
 
 
-race_bucket_size_fill_factor()
+# race_bucket_size_fill_factor()
 plot_general_stats_last_run()
 
 # plot_read_threshold_experiment()

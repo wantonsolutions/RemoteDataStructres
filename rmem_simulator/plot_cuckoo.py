@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def multi_plot_runs(runs, plot_names):
+def multi_plot_runs(runs, plot_names, directory=""):
     print("plotting ", len(runs), " runs: with", len(plot_names), " plots" + str(plot_names))
 
     fig_width = 8
@@ -37,7 +37,8 @@ def multi_plot_runs(runs, plot_names):
 
     
     plt.tight_layout()
-    plt.savefig("latest_multi_run.pdf")
+    fig_name = directory + "/general.pdf"
+    plt.savefig(fig_name)
 
 def multi_plot_run(run, plot_names):
     print("plotting ", len(plot_names), " plots" + str(plot_names))
@@ -178,11 +179,17 @@ def fill_factor(ax, stats, x_axis="table size"):
     for stat in stats:
         fill_rates.append(stat['memory']['fill'])
 
-    ax.plot(x_axis_vals, fill_rates, label=str(label), marker='o')
+    fill_rates = [x * 100 for x in fill_rates]
+    print(fill_rates)
+
+    ax.plot(x_axis_vals, fill_rates, label=str(label), marker='^')
+    ax.grid(True, axis='y', linestyle=':')
+    ax.axhline(y=90, color='r', linestyle=':')
+    ax.set_ylim(top=100)
     ax.set_xlabel(x_axis)
-    ax.set_ylabel('Fill Rate')
-    ax.set_title('Fill Rate vs ' + x_axis)
-    ax.legend()
+    ax.set_ylabel('Max Load Factor (%)')
+    ax.set_title('Max Load Factor vs ' + x_axis)
+    # ax.legend()
 
 def request_success_rate(ax, stats, x_axis="clients"):
     print("Request Success Rate")
