@@ -972,6 +972,12 @@ class client_workload_driver():
         self.total_requests=config["total_requests"]
         self.client_id=config['id']
         self.num_clients=config['num_clients']
+        self.non_deterministic=config['non_deterministic']
+
+        if self.non_deterministic:
+            self.random_factor = int(random.random() * 100) + 1
+        else:
+            self.random_factor = 1
         #todo add a line for having a workload passed in as a file
         self.completed_requests=0
         self.completed_puts=0
@@ -1002,14 +1008,14 @@ class client_workload_driver():
             print("Unknown request type! " + str(request))
             exit(1)
 
-    def unique_insert(self, insert, client_id, total_clients):
-        return insert * total_clients + client_id
+    def unique_insert(self, insert, client_id, total_clients, factor):
+        return (insert * total_clients * factor) + client_id
 
-    def unique_get(self, get, client_id, total_clients):
-        return get * total_clients + client_id
+    def unique_get(self, get, client_id, total_clients, factor):
+        return (get * total_clients * factor) + client_id
 
     def next_put(self):
-        next_value = self.unique_insert(self.completed_puts, self.client_id, self.num_clients)
+        next_value = self.unique_insert(self.completed_puts, self.client_id, self.num_clients, self.random_factor)
         req = request("put", next_value, next_value)
         self.last_request = req
         return req
@@ -1017,7 +1023,7 @@ class client_workload_driver():
     def next_get(self):
         index = self.completed_puts - 1
 
-        next_value = self.unique_get(index, self.client_id, self.num_clients)
+        next_value = self.unique_get(index, self.client_id, self.num_clients, self.random_factor)
         req = request("get", next_value)
         self.last_request = req
         return req
@@ -1068,6 +1074,7 @@ class client_state_machine(state_machine):
             "total_requests": self.total_inserts,
             "id": self.id,
             "num_clients": config["num_clients"],
+            "non_deterministic": True,
         }
         self.workload_config=workload_config
         self.workload_driver = client_workload_driver(workload_config)

@@ -212,11 +212,14 @@ def fill_factor(ax, stats, x_axis="table size"):
         fill_rates = []
         for r in stat:
             fill_rates.append(r['memory']['fill'])
+        print("fill-rates", fill_rates)
         fr_avg.append(np.mean(fill_rates))
         fr_err.append(np.std(fill_rates))
 
     fr_avg = [x * 100 for x in fr_avg]
     print(fr_avg)
+    fr_err = [x * 100 for x in fr_err]
+    print(fr_err)
 
     ax.errorbar(x_axis_vals, fr_avg, yerr=fr_err, label=str(label), marker='^')
     ax.grid(True, axis='y', linestyle=':')
