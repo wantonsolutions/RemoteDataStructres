@@ -323,8 +323,6 @@ class Lock:
     def set_bit(self, bit):
         self.lock_state = bit
 
-
-
     def __str__(self):
         if self.is_locked():
             return "L"
