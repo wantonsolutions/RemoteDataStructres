@@ -59,7 +59,6 @@ def make_dir_latest(directory):
     os.symlink(directory, latest_dir)
 
 def save_statistics(statistics):
-    print(statistics)
     stats = json.dumps(statistics, indent=4)
     exp_dir = create_experiment_dir()
     create_info_file(exp_dir)
@@ -67,7 +66,6 @@ def save_statistics(statistics):
     with open(stat_file_name, "w") as f:
         f.write(stats)
     make_dir_latest(exp_dir)
-    #make this new directory the latest directory
 
 def load_statistics(dirname=""):
     if dirname == "":

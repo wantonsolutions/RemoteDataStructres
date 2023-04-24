@@ -48,6 +48,7 @@ class Client(Node):
         state_machine_args['buckets_per_lock'] = config['buckets_per_lock']
         state_machine_args['locks_per_message'] = config['locks_per_message']
         state_machine = config['state_machine']
+        self.critical(str(state_machine))
         self.state_machine = state_machine(state_machine_args)
 
     def __str__(self):

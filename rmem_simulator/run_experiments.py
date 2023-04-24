@@ -348,6 +348,45 @@ def insertion_debug():
     runs.append(stats)
     save_statistics(runs)
 
+def run_trials(config, trials):
+    runs = []
+    for i in range(trials):
+        c=config.copy()
+        sim = simulator.Simulator(c)
+        try:
+            sim.run()
+        except Exception as e:
+            print(e)
+            stats = sim.collect_stats()
+            sim.validate_run()
+        sim.validate_run()
+        stats = sim.collect_stats()
+        runs.append(stats)
+    return runs
+
+
+def avg_run_debug():
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator")
+
+    table_size = 20 * 128
+    runs=[]
+    bucket_sizes = [4,5]
+    trials = 8
+    for bucket_size in bucket_sizes:
+        config = simulator.default_config()
+        config['num_clients'] = 1
+        config['num_steps'] = 10000000000
+        config['bucket_size'] = bucket_size
+        config['read_threshold_bytes'] = config['entry_size'] * bucket_size
+        config['indexes'] = table_size
+        config["state_machine"]=cuckoo.race
+        log.set_off()
+        runs.append(run_trials(config, trials))
+        
+    save_statistics(runs)
+
+
 def locks_per_message_experiment():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
@@ -561,7 +600,7 @@ def plot_race_bucket_fill_factor():
 
 # todos()
 
-insertion_debug()
+# insertion_debug()
 # plot_general_stats_last_run()
 
 # read_threshold_experiment()
@@ -570,6 +609,7 @@ insertion_debug()
 
 
 # race_bucket_size_fill_factor()
+avg_run_debug()
 plot_general_stats_last_run()
 
 # plot_read_threshold_experiment()
