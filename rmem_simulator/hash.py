@@ -1,5 +1,6 @@
 import hashlib
 import logging
+import xxhash
 logger = logging.getLogger('root')
 
 DEFAULT_FACTOR=2.3
@@ -24,6 +25,12 @@ def h2(key):
 def h3(key):
     val = str(key) + "salty"
     return hashlib.sha1(val.encode('utf-8')).hexdigest()
+
+def xxh1(key):
+    return xxhash.xxh64(str(key)).hexdigest()
+
+def xxh2(key):
+    return xxhash.xxh64(str(key) + "salty").hexdigest()
 
 #cuckoo specific hashing
 def rcuckoo_primary_location(key, table_size):
@@ -95,12 +102,13 @@ def to_race_index(h, index, table_size):
 
 
 def race_primary_location(key, table_size):
-    return to_race_index(h1, key, table_size)
+    return to_race_index(xxh1, key, table_size)
 
 def race_secondary_location(key, table_size):
-    return to_race_index(h2, key, table_size)
+    return to_race_index(xxh2, key, table_size)
 
 def race_hash_locations(key, table_size):
     p = race_primary_location(key, table_size)
     s = race_secondary_location(key, table_size)
     return (p,s)
+
