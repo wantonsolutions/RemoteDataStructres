@@ -594,6 +594,39 @@ def race_bucket_size_fill_factor():
         runs.append(run_trials(config))
     save_statistics(runs)
 
+def race_vs_rcuckoo_fill_factor():
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator")
+
+    table_size = 1680  * 2 #lcm of 3,4,5,6,7,8,10,12,14,16
+    # bucket_sizes = [3,4,5,6,7,8,10,12,14,16]
+    # bucket_sizes = [3,4,5,6,7]
+    bucket_sizes = [3,4]
+
+    # bucket_sizes = [8]
+    log.set_off()
+    state_machines = [cuckoo.rcuckoo, cuckoo.race]
+    multi_runs = []
+    for state_machine in state_machines:
+        runs=[]
+        for bucket_size in bucket_sizes:
+            config = get_config()
+            config['num_clients'] = 1
+            config['num_steps'] = 10000000000
+            config['bucket_size'] = bucket_size
+            config['read_threshold_bytes'] = config['entry_size'] * bucket_size
+            config['indexes'] = table_size
+            config['trials'] = 1
+            config['state_machine']=state_machine
+            runs.append(run_trials(config))
+        save_statistics(runs)
+        plot_general_stats_last_run()
+        multi_runs.append(runs)
+
+    plot_cuckoo.single_plot(multi_runs,plot_cuckoo.fill_factor_multi, "race_vs_rcuckoo_fill_factor.pdf")
+
+
+
 def plot_race_bucket_fill_factor():
     print("not implemented race bucket fill factor")
 
@@ -615,9 +648,10 @@ def plot_race_bucket_fill_factor():
 # client_scalability()
 
 
-race_bucket_size_fill_factor()
+race_vs_rcuckoo_fill_factor()
+# race_bucket_size_fill_factor()
 # avg_run_debug()
-plot_general_stats_last_run()
+# plot_general_stats_last_run()
 
 # plot_read_threshold_experiment()
 

@@ -4,7 +4,9 @@ from cuckoo import *
 from hash import *
 from time import sleep
 import json
+import datetime
 from collections import deque
+import git
 
 class Node:
     def __init__(self, config):
@@ -380,6 +382,10 @@ def default_config():
     config['locks_per_message']=1
     config['hash_factor']=hash.DEFAULT_FACTOR
     config['state_machine']=rcuckoo
+
+    config['date']=datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    config['commit']=git.Repo(search_parent_directories=True).head.object.hexsha
+
 
     return config
 
