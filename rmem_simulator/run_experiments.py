@@ -9,6 +9,20 @@ from data_management import save_statistics, load_statistics
 
 import plot_cuckoo
 
+import argparse
+parser = argparse.ArgumentParser(description='Experimental Parameters')
+parser.add_argument('-n', '--exp_name',    type=str, default="", help='name of experiment. will set output file names')
+parser.add_argument('-d', '--description', type=str, default="", help='description of experiment will be embedded in general output')
+
+
+def get_config():
+    args = parser.parse_args()
+    print(args)
+    config = simulator.default_config()
+    config['description'] = args.description
+    config['name'] = args.exp_name
+    return config
+
 
 def plot_fills(runs):
 
@@ -348,8 +362,9 @@ def insertion_debug():
     runs.append(stats)
     save_statistics(runs)
 
-def run_trials(config, trials):
+def run_trials(config):
     runs = []
+    trials = config['trials']
     for i in range(trials):
         c=config.copy()
         sim = simulator.Simulator(c)
@@ -560,22 +575,23 @@ def race_bucket_size_fill_factor():
     logger.info("Starting simulator")
 
     table_size = 1680  * 2 #lcm of 3,4,5,6,7,8,10,12,14,16
-    trials = 10
     runs=[]
-    bucket_sizes = [3,4,5]
+    # bucket_sizes = [3,4,5,6,7,8,10,12,14,16]
     # bucket_sizes = [3,4,5,6,7]
-    # bucket_sizes = [3,4]
+    bucket_sizes = [3,4]
 
     # bucket_sizes = [8]
     log.set_off()
     for bucket_size in bucket_sizes:
-        config = simulator.default_config()
+        config = get_config()
         config['num_clients'] = 1
         config['num_steps'] = 10000000000
         config['bucket_size'] = bucket_size
         config['read_threshold_bytes'] = config['entry_size'] * bucket_size
         config['indexes'] = table_size
-        runs.append(run_trials(config, trials))
+        config['trials'] = 1
+        config['state_machine']=cuckoo.race
+        runs.append(run_trials(config))
     save_statistics(runs)
 
 def plot_race_bucket_fill_factor():

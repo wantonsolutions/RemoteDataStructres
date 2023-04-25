@@ -367,6 +367,7 @@ def default_config():
     config = dict()
     config['num_clients']=1
     config['num_steps']=1000000
+    config['trials']=1
 
     #table settings
     config['bucket_size']=4
@@ -378,7 +379,6 @@ def default_config():
     config['buckets_per_lock']=1
     config['locks_per_message']=1
     config['hash_factor']=hash.DEFAULT_FACTOR
-
     config['state_machine']=rcuckoo
 
     return config
