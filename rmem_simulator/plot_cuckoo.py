@@ -224,7 +224,7 @@ def fill_factor(ax, stats, x_axis="table size"):
     ax.errorbar(x_axis_vals, fr_avg, yerr=fr_err, label=str(label), marker='^')
     ax.grid(True, axis='y', linestyle=':')
     ax.axhline(y=90, color='r', linestyle=':')
-    ax.set_ylim(top=100)
+    ax.set_ylim(top=105)
     ax.set_xlabel(x_axis)
     ax.set_ylabel('Max Load Factor (%)')
     ax.set_title('Max Load Factor vs ' + x_axis)
