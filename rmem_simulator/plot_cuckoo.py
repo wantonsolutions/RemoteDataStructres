@@ -31,7 +31,7 @@ def multi_plot_runs(runs, plot_names, directory=""):
         elif plot_name == "messages_per_operation":
             messages_per_operation(axs[i],runs, x_axis)
         elif plot_name == "fill_factor":
-            fill_factor(axs[i],runs, x_axis)
+            fill_factor_single(axs[i],runs, x_axis)
         else:
             print("unknown plot name: ", plot_name)
         i+=1
@@ -43,6 +43,14 @@ def multi_plot_runs(runs, plot_names, directory=""):
     plt.savefig(fig_name)
     fig_name = "./general.pdf"
     plt.savefig(fig_name)
+
+def single_plot(data, function, filename):
+    fig_width = 8
+    fig_height = 3
+    fig, ax = plt.subplots(1, 1, figsize=(fig_width, fig_height))
+    function(ax, data)
+    plt.tight_layout()
+    plt.savefig(filename)
 
 def multi_plot_run(run, plot_names):
     print("plotting ", len(plot_names), " plots" + str(plot_names))
@@ -202,33 +210,40 @@ def messages_per_operation(ax, stats, x_axis="clients"):
     ax.set_xticklabels(x_axis_vals)
 
 
-def fill_factor(ax, stats, x_axis="table size"):
-    print("FILL FACTOR")
-
-    label = str("exp - " + str(stats[0][0]['hash']['factor']))
+def fill_factor_line(ax, stats, label, x_axis="table size"):
     fr_avg, fr_err = [], []
     x_axis_vals = get_x_axis(stats, x_axis)
     for stat in stats:
         fill_rates = []
         for r in stat:
             fill_rates.append(r['memory']['fill'])
-        print("fill-rates", fill_rates)
+        # print("fill-rates", fill_rates)
         fr_avg.append(np.mean(fill_rates))
         fr_err.append(np.std(fill_rates))
 
     fr_avg = [x * 100 for x in fr_avg]
-    print(fr_avg)
     fr_err = [x * 100 for x in fr_err]
-    print(fr_err)
+    ax.errorbar(x_axis_vals, fr_avg, yerr=fr_err, label=label, marker='^')
 
-    ax.errorbar(x_axis_vals, fr_avg, yerr=fr_err, label=str(label), marker='^')
+def fill_factor_decoration(ax, x_axis):
     ax.grid(True, axis='y', linestyle=':')
     ax.axhline(y=90, color='r', linestyle=':')
     ax.set_ylim(top=100)
     ax.set_xlabel(x_axis)
     ax.set_ylabel('Max Load Factor (%)')
     ax.set_title('Max Load Factor vs ' + x_axis)
-    # ax.legend()
+    ax.legend()
+
+def fill_factor_single(ax, stats, x_axis="bucket size"):
+    state_machine_label = stats[0][0]['config']['state_machine']
+    fill_factor_line(ax, stats, label=state_machine_label, x_axis=x_axis)
+    fill_factor_decoration(ax, x_axis)
+
+def fill_factor_multi(ax, stats, x_axis="bucket size"):
+    for stat in stats:
+        state_machine_label = stat[0][0]['config']['state_machine']
+        fill_factor_line(ax, stat, label=state_machine_label, x_axis=x_axis)
+    fill_factor_decoration(ax, x_axis)
 
 def single_run_request_success_rate(stat):
     read_percent = []
@@ -447,6 +462,12 @@ def get_config_list(stats, key):
 def experiment_description(stats):
     return ("description", get_config_list(stats, "description"))
 
+def experiment_commit(stats):
+    return ("commit", get_config_list(stats, "commit"))
+
+def experiment_date(stats):
+    return ("date", get_config_list(stats, "date"))
+
 def experiment_name(stats):
     return ("name", get_config_list(stats, "name"))
 
@@ -486,6 +507,8 @@ def general_stats(ax, stats):
         experiment_description,
         experiment_name,
         experiment_trials,
+        experiment_commit,
+        experiment_date,
         total_run_entry,
         workload_entry,
         clients_entry,

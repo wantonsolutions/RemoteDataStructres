@@ -27,9 +27,6 @@ def create_info_file(directory):
         f.write("# Git commit: {}\n".format(sha))
         f.write("# Timestamp: {}\n".format(timestamp))
 
-
-
-
 def current_experiment_dir():
     today = date.today()
     d1 = today.strftime("%d-%m-%Y")
