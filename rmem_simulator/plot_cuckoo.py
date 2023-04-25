@@ -444,6 +444,15 @@ def get_config_list(stats, key):
         sklist = sklist + str(k)
     return sklist
 
+def experiment_description(stats):
+    return ("description", get_config_list(stats, "description"))
+
+def experiment_name(stats):
+    return ("name", get_config_list(stats, "name"))
+
+def experiment_trials(stats):
+    return ("trials", get_config_list(stats, "trials"))
+
 def clients_entry(stats):
     return ("clients", get_config_list(stats, "num_clients"))
 
@@ -474,6 +483,9 @@ def general_stats(ax, stats):
     rows=[]
     values=[]
     staistic_functions=[
+        experiment_description,
+        experiment_name,
+        experiment_trials,
         total_run_entry,
         workload_entry,
         clients_entry,
