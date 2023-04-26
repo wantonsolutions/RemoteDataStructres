@@ -264,6 +264,7 @@ def global_lock_success_rate():
 
 def plot_general_stats_last_run():
     stats, directory = load_statistics()
+    print("plot general stats")
     plot_names = [
         "general_stats",
         "cas_success_rate",
@@ -325,41 +326,23 @@ def insertion_debug():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
 
-    table_size = 64
-    clients=1
-    runs=[]
-    config = simulator.default_config()
-    sim = simulator.Simulator(config)
+    table_size = 16
+    runs = []
     print("table size: ", table_size)
+
+    config = get_config()
     config['indexes'] = table_size
-    config['num_clients'] = clients
+    config['num_clients'] = 1
     config['num_steps'] = 100000
     config['read_threshold_bytes'] = 256
-
-    #global lock config
-    # config['buckets_per_lock'] = (config['indexes'] / config["bucket_size"])
-    # config['buckets_per_lock'] = (config['indexes'] / config["bucket_size"]) / 4
     config["buckets_per_lock"] = 1
     config["locks_per_message"] = 64
-
-    config["state_machine"]=cuckoo.race
-    # config["state_machine"]=cuckoo.rcuckoo
-
-    sim = simulator.Simulator(config)
+    config["trials"] = 2
+    config["state_machine"]=cuckoo.rcuckoo
     log.set_debug()
-    # log.set_off()
-    sim.run()
 
+    runs.append(run_trials(config))
 
-    # try:
-    #     sim.run()
-    # except Exception as e:
-    #     print(e)
-    #     stats = sim.collect_stats()
-    #     sim.validate_run()
-    sim.validate_run()
-    stats = sim.collect_stats()
-    runs.append(stats)
     save_statistics(runs)
 
 def run_trials(config):
@@ -640,16 +623,16 @@ def plot_race_bucket_fill_factor():
 
 # todos()
 
-# insertion_debug()
-# plot_general_stats_last_run()
+insertion_debug()
+# race_bucket_size_fill_factor()
+plot_general_stats_last_run()
 
 # read_threshold_experiment()
 # buckets_per_lock_experiment()
 # client_scalability()
 
 
-race_vs_rcuckoo_fill_factor()
-# race_bucket_size_fill_factor()
+# race_vs_rcuckoo_fill_factor()
 # avg_run_debug()
 # plot_general_stats_last_run()
 

@@ -17,10 +17,11 @@ def multi_plot_runs(runs, plot_names, directory=""):
     # runs = get_flattened_stats(runs)
 
     for plot_name in plot_names:
+        # print(runs)
         print(plot_name)
         if plot_name == "general_stats":
             general_stats(axs[i],runs)
-        if plot_name == "cas_success_rate":
+        elif plot_name == "cas_success_rate":
             cas_success_rate(axs[i],runs, x_axis)
         elif plot_name == "read_write_ratio":
             read_write_ratio(axs[i],runs, x_axis)
@@ -366,7 +367,10 @@ def get_flattened_stats(stats):
     # we can have a few different dimensions for the stat file, and the goal is to get the x axis.
     # if we have a single run, then we can just get the x axis from the config
     # if we have a multi run, then we need to get the x axis from the first run of each trial
+    print(stats)
     s = np.array(stats).shape
+    print("shape: ", s)
+    print(s)
     if len(s) == 1:
         if isinstance(stats, dict):
             stats = [stats]

@@ -383,7 +383,7 @@ def default_config():
     config['hash_factor']=hash.DEFAULT_FACTOR
     config['state_machine']=rcuckoo
 
-    config['date']=datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    config['date']=datetime.datetime.now().strftime("%Y-%m-%d")
     config['commit']=git.Repo(search_parent_directories=True).head.object.hexsha
 
 
