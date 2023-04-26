@@ -348,7 +348,7 @@ def insertion_debug():
 def run_trials(config):
     runs = []
     trials = config['trials']
-    for i in range(trials):
+    for i in tqdm(range(trials)):
         c=config.copy()
         sim = simulator.Simulator(c)
         try:
@@ -557,22 +557,22 @@ def race_bucket_size_fill_factor():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
 
-    table_size = 1680  * 2 #lcm of 3,4,5,6,7,8,10,12,14,16
+    table_size = 1680  * 128 #lcm of 3,4,5,6,7,8,10,12,14,16
     runs=[]
-    # bucket_sizes = [3,4,5,6,7,8,10,12,14,16]
+    bucket_sizes = [3,4,5,6,7,8,10,12,14,16]
     # bucket_sizes = [3,4,5,6,7]
-    bucket_sizes = [3,4]
+    # bucket_sizes = [3,4]
 
     # bucket_sizes = [8]
     log.set_off()
     for bucket_size in bucket_sizes:
         config = get_config()
         config['num_clients'] = 1
-        config['num_steps'] = 10000000000
+        config['num_steps'] = 100000000000
         config['bucket_size'] = bucket_size
         config['read_threshold_bytes'] = config['entry_size'] * bucket_size
         config['indexes'] = table_size
-        config['trials'] = 1
+        config['trials'] = 3
         config['state_machine']=cuckoo.race
         runs.append(run_trials(config))
     save_statistics(runs)

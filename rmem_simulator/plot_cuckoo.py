@@ -229,7 +229,7 @@ def fill_factor_line(ax, stats, label, x_axis="table size"):
 def fill_factor_decoration(ax, x_axis):
     ax.grid(True, axis='y', linestyle=':')
     ax.axhline(y=90, color='r', linestyle=':')
-    ax.set_ylim(top=100)
+    ax.set_ylim(top=105)
     ax.set_xlabel(x_axis)
     ax.set_ylabel('Max Load Factor (%)')
     ax.set_title('Max Load Factor vs ' + x_axis)
