@@ -337,8 +337,8 @@ def insertion_debug():
     config['read_threshold_bytes'] = 256
     config["buckets_per_lock"] = 1
     config["locks_per_message"] = 64
-    config["trials"] = 2
-    config["state_machine"]=cuckoo.rcuckoo
+    config["trials"] = 1
+    config["state_machine"]=cuckoo.rcuckoobatch
     log.set_debug()
 
     runs.append(run_trials(config))
@@ -351,6 +351,7 @@ def run_trials(config):
     for i in tqdm(range(trials)):
         c=config.copy()
         sim = simulator.Simulator(c)
+        sim.run()
         try:
             sim.run()
         except Exception as e:

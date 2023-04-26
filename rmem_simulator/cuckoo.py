@@ -799,7 +799,6 @@ class state_machine:
 
         #todo add to a subclass
         #insert stats
-        self.current_insert_length = 0
         self.insert_path_lengths = []
         self.index_range_per_insert = []
         self.current_insert_messages = 0
@@ -924,6 +923,13 @@ class state_machine:
         self.update_message_stats(message)
         #return fsm_wapper
         output_message = self.fsm_logic(message)
+
+        if isinstance(output_message, list):
+            for m in output_message:
+                self.warning("FSM: " + str(message) + " -> " + str(m))
+        else:
+            self.warning("FSM: " + str(message) + " -> " + str(output_message))
+
         self.update_message_stats(output_message)
         return output_message
 
@@ -1074,7 +1080,7 @@ class client_state_machine(state_machine):
             "total_requests": self.total_inserts,
             "id": self.id,
             "num_clients": config["num_clients"],
-            "non_deterministic": True,
+            "non_deterministic": False,
         }
         self.workload_config=workload_config
         self.workload_driver = client_workload_driver(workload_config)
@@ -1266,11 +1272,7 @@ def keys_contained_in_read_response(key, read):
     return count
 
 def get_entries_from_read(key, read):
-    found = []
-    for k in read:
-        if k == key:
-            found.append(k)
-    return found
+    return [k for k in read if k == key]
 
 def single_bucket_read_message(bucket, row_size_bytes):
     message = Message({})
@@ -1301,14 +1303,35 @@ def multi_bucket_read_message(buckets, row_size_bytes):
     message.payload["function_args"] = {'bucket_id':min_bucket, 'bucket_offset':0, 'size':size}
     return [message]
 
-
 def read_threshold_message(key, read_threshold_bytes, table_size, row_size_bytes):
-    locations = hash.rcuckoo_hash_locations(key, table_size)
-    if single_read_size_bytes(locations, row_size_bytes) <= read_threshold_bytes:
-        messages = multi_bucket_read_message(locations, row_size_bytes)
+    buckets = hash.rcuckoo_hash_locations(key, table_size)
+    if single_read_size_bytes(buckets, row_size_bytes) <= read_threshold_bytes:
+        messages = multi_bucket_read_message(buckets, row_size_bytes)
     else:
-        messages = single_bucket_read_messages(locations, row_size_bytes)
+        messages = single_bucket_read_messages(buckets, row_size_bytes)
     return messages
+
+def get_covering_read_from_lock_message(lock_message, buckets_per_lock, row_size_bytes):
+    print(lock_message.payload)
+    base_index = lock_message.payload['function_args']['lock_index'] * buckets_per_lock
+    #calculate the max and min mask index
+    mask = lock_message.payload['function_args']['mask']
+    min_index = -1
+    max_index = -1
+    for i in range(0, len(mask)):
+        if mask[i] == 1:
+            max_index = i
+            if min_index == -1:
+                min_index = i
+    print("min_index: " + str(min_index), "max_index: " + str(max_index))
+    min_index = (min_index * buckets_per_lock) + base_index
+    max_index = (max_index * buckets_per_lock) + base_index
+    print("min_bucket: " + str(min_index), "max_bucket: " + str(max_index))
+    read_message = multi_bucket_read_message([min_index, max_index], row_size_bytes)
+    print(read_message[0].payload)
+    assert len(read_message) == 1, "read message should be length 1"
+    #todo start here after chat, we have just gotten the spanning read message for a lock range
+    return read_message[0]
 
 def race_messages(key, table_size, row_size_bytes):
     locations = hash.race_hash_locations(key, table_size)
@@ -1455,8 +1478,13 @@ class race(client_state_machine):
         return None
 
 
+def search_path_to_buckets(search_path):
+    buckets = list(set([pe.bucket_index for pe in search_path]))
+    buckets.remove(-1)
+    buckets.sort()
+    return buckets
 
-class rcuckoo(client_state_machine):
+class rcuckoobatch(client_state_machine):
     def __init__(self, config):
         super().__init__(config)
 
@@ -1472,6 +1500,7 @@ class rcuckoo(client_state_machine):
         assert self.read_threshold_bytes >= self.table.row_size_bytes(), "read threshold is smaller than a single row in the table (this is not allowed)"
         self.locks_held = []
         self.current_locking_messages = []
+        self.current_lock_read_messages = []
         self.locking_message_index = 0
 
 
@@ -1483,18 +1512,19 @@ class rcuckoo(client_state_machine):
         return self.search()
 
     def all_locks_aquired(self):
-        if self.locking_message_index == len(self.current_locking_messages) and \
-            len(self.locks_held) > 0:
-            return True
-        return False
+        return self.locking_message_index == len(self.current_locking_messages) and len(self.locks_held) > 0
 
     def all_locks_released(self):
-        if len(self.locks_held) == 0:
-            return True
-        return False
+        return len(self.locks_held) == 0
 
     def get_current_locking_message(self):
         return self.current_locking_messages[self.locking_message_index]
+
+    def get_current_locking_message_with_covering_read(self):
+        lock_message = self.current_locking_messages[self.locking_message_index]
+        read_message = get_covering_read_from_lock_message(lock_message, self.buckets_per_lock, self.table.row_size_bytes())
+        self.outstanding_read_requests += 1
+        return [lock_message, read_message]
 
     def receieve_successful_locking_message(self, message):
         lock_indexes = lock_message_to_lock_indexes(message)
@@ -1511,39 +1541,30 @@ class rcuckoo(client_state_machine):
             self.locks_held.remove(lock)
         self.locking_message_index = self.locking_message_index + 1
 
-    def aquire_global_lock(self):
-        assert self.table.lock_table.total_locks == 1, "Attemptying to aquire global locks, but table has " + str(self.table.lock_table.total_locks) + " locks"
-        index, old, new, mask = aquire_global_lock_masked_cas()
-        masked_cas_message = masked_cas_lock_table_message(index, old, new, mask)
+    def search(self, message=None):
+        assert message == None, "there should be no message passed to search"
 
-        self.locking_message_index = 0
-        self.current_locking_messages = [masked_cas_message]
-        return self.get_current_locking_message()
+        self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.rcuckoo_hash_locations, self.current_insert_value)
+        if len(self.search_path) == 0:
+            self.info("Search Failed: " + str(self.current_insert_value) + "| unable to continue, client " + str(self.id) + " is done")
+            self.complete=True
+            self.state = "idle"
+            return None
 
-    def release_global_lock(self):
-        assert self.table.lock_table.total_locks == 1, "Attemptying to aquire global locks, but table has " + str(self.table.lock_table.total_locks) + " locks"
-        index, old, new, mask = release_global_lock_masked_cas()
-        masked_cas_message = masked_cas_lock_table_message(index, old, new, mask)
+        self.info("Search complete aquiring locks")
+        self.state="aquire_locks"
+        return self.aquire_locks()
 
-        self.locking_message_index = 0
-        self.current_locking_messages = [masked_cas_message]
-        return self.get_current_locking_message()
 
     def aquire_locks(self):
-        buckets = list(set([pe.bucket_index for pe in self.search_path]))
-        buckets.remove(-1)
-
-        buckets.sort()
-        self.info("gather locks for buckets: " + str(buckets))
+        #get the unique set of buckets and remove -1 (the root) from the search path
         self.locking_message_index = 0
+
+        buckets = search_path_to_buckets(self.search_path)
+        self.info("gather locks for buckets: " + str(buckets))
         lock_messages = get_lock_messages(buckets, self.buckets_per_lock, self.locks_per_message)
-        for m in lock_messages:
-
-            self.info(str(m))
-
         self.current_locking_messages = masked_cas_lock_table_messages(lock_messages)
-        # print(self.current_locking_messages)
-        return self.get_current_locking_message()
+        return self.get_current_locking_message_with_covering_read()
 
     def release_locks(self):
         self.locking_message_index = 0
@@ -1553,17 +1574,26 @@ class rcuckoo(client_state_machine):
         self.current_locking_messages = masked_cas_lock_table_messages(unlock_messages)
         return self.get_current_locking_message()
 
-    def aquire_locks_fsm(self, message):
+    def aquire_locks_with_reads_fsm(self, message):
         if message_type(message) == "masked_cas_response":
             if message.payload["function_args"]["success"] == True:
                 self.receieve_successful_locking_message(message)
-                #enter the critical section if we have all of the locks
-                if self.all_locks_aquired():
-                    self.state = "critical_section"
-                    return None
             #1) retransmit if we did not make process
             #2) or just select the next message
-            return self.get_current_locking_message()
+            if not self.all_locks_aquired():
+                return self.get_current_locking_message_with_covering_read()
+            return None
+
+        if message_type(message) == "read_response":
+            #unpack and check the response for a valid read
+            args = unpack_read_response(message)
+            fill_local_table_with_read_response(self.table, args)
+            self.outstanding_read_requests = self.outstanding_read_requests - 1
+            #enter the critical section if we have all of the locks
+            #we also want to have all of the reads completed (for now)
+            if self.all_locks_aquired() and self.read_complete():
+                self.state = "critical_section"
+                return None
         return None
 
     def release_locks_fsm(self, message):
@@ -1584,36 +1614,19 @@ class rcuckoo(client_state_machine):
             else:
                 return self.get_current_locking_message()
 
-    def search(self, message=None):
-        assert message == None, "there should be no message passed to search"
-
-        self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.rcuckoo_hash_locations, self.current_insert_value)
-        if len(self.search_path) == 0:
-            self.info("Search Failed: " + str(self.current_insert_value) + "| unable to continue, client " + str(self.id) + " is done")
-            self.complete=True
-            self.state = "idle"
-            return None
-
-        self.info("Search complete aquiring locks")
-
-        self.state="aquire_locks"
-        return self.aquire_locks()
-
     def begin_insert(self):
         self.state = "inserting"
         #todo there are going to be cases where this fails because 
         self.search_path_index = len(self.search_path)-1
-        self.current_insert_length=len(self.search_path)
         return next_cas_message(self.search_path, self.search_path_index)
 
     def complete_insert_stats(self, success):
-        self.insert_path_lengths.append(self.current_insert_length)
+        self.insert_path_lengths.append(len(self.search_path))
         self.index_range_per_insert.append(path_index_range(self.search_path))
         self.messages_per_insert.append(self.current_insert_messages)
 
         #clear for next insert
         self.current_insert_messages = 0
-
         return super().complete_insert_stats(success)
 
     def finish_insert_and_release_locks(self, success):
@@ -1676,11 +1689,245 @@ class rcuckoo(client_state_machine):
 
         #Step down the search path a single index
         self.search_path_index -= 1
-        if self.search_path_index == 0:
+        if self.search_path_index <= 0:
             return self.complete_insert()
         else:
             return next_cas_message(self.search_path, self.search_path_index)
 
+    def idle_fsm(self,message):
+        return self.general_idle_fsm(message)
+
+    def read_fsm(self,message):
+        complete, success = self.wait_for_read_messages_fsm(message, self.current_read_key)
+        if complete:
+            self.state="idle"
+            self.complete_read_stats(success, self.current_read_key)
+            self.reading=False
+        return None
+
+    def fsm_logic(self, message = None):
+
+        if self.complete and self.state == "idle":
+            return None
+
+        if self.state== "idle":
+            return self.idle_fsm(message)
+
+        if self.state == "reading":
+            return self.read_fsm(message)
+
+        if self.state == "aquire_locks":
+            return self.aquire_locks_with_reads_fsm(message)
+
+        if self.state == "release_locks" or self.state == "release_locks_try_again":
+            return self.release_locks_fsm(message)
+
+        if self.state == "critical_section":
+            return self.begin_insert()
+
+        if self.state == "inserting":
+            return self.insert_fsm(message)
+
+        if self.state == "undo_last_cas":
+            return self.undo_last_cas_fsm(message)
+
+
+    def toJSON(self):
+        return json.dumps(self, default=lambda o: o.__dict__, 
+            sort_keys=True, indent=4)
+
+class rcuckoo(client_state_machine):
+    def __init__(self, config):
+        super().__init__(config)
+
+        #inserting and locking
+        self.current_insert_value = None
+        self.search_path = []
+        self.search_path_index = 0
+
+        self.buckets_per_lock = config['buckets_per_lock']
+        self.locks_per_message = config['locks_per_message']
+
+        self.read_threshold_bytes = config['read_threshold_bytes']
+        assert self.read_threshold_bytes >= self.table.row_size_bytes(), "read threshold is smaller than a single row in the table (this is not allowed)"
+        self.locks_held = []
+        self.current_locking_messages = []
+        self.locking_message_index = 0
+
+
+    def get(self):
+        messages = read_threshold_message(self.current_read_key, self.read_threshold_bytes, self.table.table_size, self.table.row_size_bytes())
+        return self.begin_read(messages)
+
+    def put(self):
+        return self.search()
+
+    def all_locks_aquired(self):
+        return self.locking_message_index == len(self.current_locking_messages) and len(self.locks_held) > 0
+
+    def all_locks_released(self):
+        return len(self.locks_held) == 0
+
+    def get_current_locking_message(self):
+        return self.current_locking_messages[self.locking_message_index]
+
+    def receieve_successful_locking_message(self, message):
+        lock_indexes = lock_message_to_lock_indexes(message)
+        self.info("aquired locks: " + str(lock_indexes))
+        self.locks_held.extend(lock_indexes)
+        #make unique
+        self.locks_held = list(set(self.locks_held))
+        self.locking_message_index = self.locking_message_index + 1
+
+    def receive_successful_unlocking_message(self, message):
+        unlocked_locks = lock_message_to_lock_indexes(message)
+        self.info("released locks: " + str(unlocked_locks))
+        for lock in unlocked_locks:
+            self.locks_held.remove(lock)
+        self.locking_message_index = self.locking_message_index + 1
+
+    def search(self, message=None):
+        assert message == None, "there should be no message passed to search"
+
+        self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.rcuckoo_hash_locations, self.current_insert_value)
+        if len(self.search_path) == 0:
+            self.info("Search Failed: " + str(self.current_insert_value) + "| unable to continue, client " + str(self.id) + " is done")
+            self.complete=True
+            self.state = "idle"
+            return None
+
+        self.info("Search complete aquiring locks")
+        self.state="aquire_locks"
+        return self.aquire_locks()
+
+
+    def aquire_locks(self):
+        #get the unique set of buckets and remove -1 (the root) from the search path
+        self.locking_message_index = 0
+        buckets = search_path_to_buckets(self.search_path)
+        self.info("gather locks for buckets: " + str(buckets))
+        lock_messages = get_lock_messages(buckets, self.buckets_per_lock, self.locks_per_message)
+        self.current_locking_messages = masked_cas_lock_table_messages(lock_messages)
+        return self.get_current_locking_message()
+
+    def release_locks(self):
+        self.locking_message_index = 0
+        buckets = lock_indexes_to_buckets(self.locks_held, self.buckets_per_lock)
+        buckets.sort(reverse=True)
+        unlock_messages = get_unlock_messages(buckets, self.buckets_per_lock, self.locks_per_message)
+        self.current_locking_messages = masked_cas_lock_table_messages(unlock_messages)
+        return self.get_current_locking_message()
+
+    def aquire_locks_fsm(self, message):
+        if message_type(message) == "masked_cas_response":
+            if message.payload["function_args"]["success"] == True:
+                self.receieve_successful_locking_message(message)
+                #enter the critical section if we have all of the locks
+                if self.all_locks_aquired():
+                    self.state = "critical_section"
+                    return None
+            #1) retransmit if we did not make process
+            #2) or just select the next message
+            return self.get_current_locking_message()
+        return None
+
+    def release_locks_fsm(self, message):
+        if message_type(message) == "masked_cas_response":
+            if message.payload["function_args"]["success"] == False:
+                self.critical("What the fuck is happening I failed to release a lock")
+                exit(1)
+            
+            #successful response
+            self.receive_successful_unlocking_message(message)
+            if self.all_locks_released():
+                if self.state == "release_locks":
+                    self.state = "idle"
+                    self.inserting=False
+                    return None
+                if self.state == "release_locks_try_again":
+                    return self.search()
+            else:
+                return self.get_current_locking_message()
+
+    def begin_insert(self):
+        self.state = "inserting"
+        #todo there are going to be cases where this fails because 
+        self.search_path_index = len(self.search_path)-1
+        return next_cas_message(self.search_path, self.search_path_index)
+
+    def complete_insert_stats(self, success):
+        self.insert_path_lengths.append(len(self.search_path))
+        self.index_range_per_insert.append(path_index_range(self.search_path))
+        self.messages_per_insert.append(self.current_insert_messages)
+
+        #clear for next insert
+        self.current_insert_messages = 0
+        return super().complete_insert_stats(success)
+
+    def finish_insert_and_release_locks(self, success):
+        self.complete_insert_stats(success)
+        return self.release_locks()
+
+    def complete_insert(self):
+        self.info("Insert Complete: " + str(self.current_insert_value))
+        self.state="release_locks"
+        return self.finish_insert_and_release_locks(success=True)
+
+    def fail_insert(self):
+        self.info("Insert Failed: " + str(self.current_insert_value))
+        self.state="release_locks_try_again"
+        return self.finish_insert_and_release_locks(success=False)
+
+
+    def undo_last_cas_fsm(self, message):
+        if message == None:
+            return None
+
+        args = unpack_cas_response(message)
+        fill_local_table_with_cas_response(self.table, args)
+
+        #If CAS failed, try the insert a second time.
+        success = args["success"]
+        if not success:
+            raise Exception("Failed to undo last cas -- this is a really bad scenario")
+        
+        self.debug("Last CAS was undone, now we are just trying again")
+
+        #this insertion was a failure
+        return self.fail_insert()
+
+    def insert_fsm(self, message):
+        #there should be a message, otherwise don't do anything
+        if message == None:
+            return None
+
+        args = unpack_cas_response(message)
+        fill_local_table_with_cas_response(self.table, args)
+
+        #If CAS failed, try the insert a second time.
+        success = args["success"]
+        if not success:
+            self.debug("Insert Failed: " + str(self.current_insert_value) + "| trying again")
+            self.debug("failed insert path: " + str(self.search_path))
+            self.debug("failed insert path index: " + str(self.search_path_index) + "of  " + str(len(self.search_path) -1 ))
+            self.debug("failed cas: " + str(message))
+            self.debug("cas element: " + str(self.search_path[self.search_path_index]))
+
+            #if we have not issued a successful CAS yet there is nothing to backtrack to.
+            if self.search_path_index == len(self.search_path)-1:
+                self.debug("Insertion has failed but no harm was done, trying again")
+                return self.fail_insert()
+            else:
+                self.debug("Insertion has failed, but we have issued a CAS, we can backtrack to repair damage")
+                self.state = "undo_last_cas"
+                return undo_last_cas_message(self.search_path, self.search_path_index)
+
+        #Step down the search path a single index
+        self.search_path_index -= 1
+        if self.search_path_index <= 0:
+            return self.complete_insert()
+        else:
+            return next_cas_message(self.search_path, self.search_path_index)
 
     def idle_fsm(self,message):
         return self.general_idle_fsm(message)
@@ -1753,14 +2000,14 @@ class basic_memory_state_machine(state_machine):
             success, value = cas_table_entry(self.table, **args)
             response = Message({"function":fill_table_with_cas, "function_args":{"bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "value":value, "success":success}})
 
-            # self.table.print()
+            self.table.print_table()
 
             rargs=response.payload["function_args"]
             self.info("Read Response: " +  "Success: " + str(rargs["success"]) + " Value: " + str(rargs["value"]))
             return response
 
         if message.payload["function"] == masked_cas_lock_table:
-            self.info("Masked CAS in Memory: "+ str(args["lock_index"]) + " Old: " + str(args["old"]) + " New: " + str(args["new"]) + " Mask: " + str(args["mask"]))
+            #self.info("Masked CAS in Memory: "+ str(args["lock_index"]) + " Old: " + str(args["old"]) + " New: " + str(args["new"]) + " Mask: " + str(args["mask"]))
             success, value = masked_cas_lock_table(self.table.lock_table, **args)
             response = Message({"function": fill_lock_table_masked_cas, "function_args":{"lock_index":args["lock_index"], "success":success, "value": value, "mask":args["mask"]}})
             return response
