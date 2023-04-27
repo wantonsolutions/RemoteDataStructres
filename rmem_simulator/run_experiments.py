@@ -1,5 +1,6 @@
 import simulator
 import cuckoo
+import state_machines as sm
 import log
 import logging
 import matplotlib.pyplot as plt
@@ -266,7 +267,7 @@ def insertion_debug():
     config = get_config()
     config['indexes'] = table_size
     config['num_clients'] = 1
-    config['num_steps'] = 100000
+    config['num_steps'] = 50000
     config['read_threshold_bytes'] = 256
     config["buckets_per_lock"] = 1
     config["locks_per_message"] = 64
@@ -311,7 +312,7 @@ def avg_run_debug():
         config['bucket_size'] = bucket_size
         config['read_threshold_bytes'] = config['entry_size'] * bucket_size
         config['indexes'] = table_size
-        config["state_machine"]=cuckoo.race
+        config["state_machine"]=sm.race
         log.set_off()
         runs.append(run_trials(config, trials))
         
@@ -331,7 +332,6 @@ def locks_per_message_experiment():
     for locks_per_message in locks_per_message_arr:
         print("read threshold: ", read_threshold)
         config = simulator.default_config()
-        sim = simulator.Simulator(config)
         config['indexes'] = table_size
         config['num_clients'] = clients
         config['num_steps'] = 1000000
@@ -339,17 +339,8 @@ def locks_per_message_experiment():
 
         config["buckets_per_lock"] = 1
         config["locks_per_message"] = locks_per_message
-        sim = simulator.Simulator(config)
         log.set_off()
-        try:
-            sim.run()
-        except Exception as e:
-            print(e)
-            stats = sim.collect_stats()
-            sim.validate_run()
-        sim.validate_run()
-        stats = sim.collect_stats()
-        runs.append(stats)
+        runs.append(run_trials(config))
     save_statistics(runs)
 
 
@@ -366,7 +357,6 @@ def locks_per_message_experiment():
     for locks_per_message in locks_per_message_arr:
         print("read threshold: ", read_threshold)
         config = simulator.default_config()
-        sim = simulator.Simulator(config)
         config['indexes'] = table_size
         config['num_clients'] = clients
         config['num_steps'] = 1000000
@@ -374,44 +364,9 @@ def locks_per_message_experiment():
 
         config["buckets_per_lock"] = 1
         config["locks_per_message"] = locks_per_message
-        sim = simulator.Simulator(config)
         log.set_off()
-        try:
-            sim.run()
-        except Exception as e:
-            print(e)
-            stats = sim.collect_stats()
-            sim.validate_run()
-        sim.validate_run()
-        stats = sim.collect_stats()
-        runs.append(stats)
-    save_statistics(runs)
-
-def success_rate_contention():
-    logger = log.setup_custom_logger('root')
-    logger.info("Starting simulator")
-
-    table_size = 2048
-    # clients=[1,2,4,8]
-    # clients=[32,64]
-    clients=[16]
-    bucket_size=8
-    runs=[]
-    log.set_off()
-    for c in clients:
-        config = get_config()
-        config['num_clients'] = c
-        config['num_steps'] = 100000000000
-        config['bucket_size'] = bucket_size
-        config['read_threshold_bytes'] = config['entry_size'] * bucket_size
-        config['indexes'] = table_size
-        config['trials'] = 1
-        config['state_machine']=cuckoo.rcuckoobatch
         runs.append(run_trials(config))
     save_statistics(runs)
-
-
-
 
 
 def buckets_per_lock_experiment():
@@ -428,7 +383,6 @@ def buckets_per_lock_experiment():
     for buckets_per_lock in buckets_per_lock_arr:
         print("read threshold: ", read_threshold)
         config = simulator.default_config()
-        sim = simulator.Simulator(config)
         config['indexes'] = table_size
         config['num_clients'] = clients
         config['num_steps'] = 1000000
@@ -436,19 +390,9 @@ def buckets_per_lock_experiment():
 
         config["buckets_per_lock"] = buckets_per_lock
         config["locks_per_message"] = locks_per_message
-        sim = simulator.Simulator(config)
         log.set_off()
-        try:
-            sim.run()
-        except Exception as e:
-            print(e)
-            stats = sim.collect_stats()
-            sim.validate_run()
-        sim.validate_run()
-        stats = sim.collect_stats()
-        runs.append(stats)
+        runs.append(run_trials(config))
     save_statistics(runs)
-
 
 def read_threshold_experiment():
     logger = log.setup_custom_logger('root')
@@ -461,7 +405,6 @@ def read_threshold_experiment():
     for read_threshold in read_thresholds:
         print("read threshold: ", read_threshold)
         config = simulator.default_config()
-        sim = simulator.Simulator(config)
         config['indexes'] = table_size
         config['num_clients'] = clients
         config['num_steps'] = 1000000
@@ -469,17 +412,8 @@ def read_threshold_experiment():
 
         config["buckets_per_lock"] = 16
         config["locks_per_message"] = 4
-        sim = simulator.Simulator(config)
         log.set_off()
-        try:
-            sim.run()
-        except Exception as e:
-            print(e)
-            stats = sim.collect_stats()
-            sim.validate_run()
-        sim.validate_run()
-        stats = sim.collect_stats()
-        runs.append(stats)
+        runs.append(run_trials(config))
     save_statistics(runs)
 
 def client_scalability():
@@ -489,7 +423,7 @@ def client_scalability():
     table_size = 2048
     runs=[]
 
-    state_machines = [cuckoo.rcuckoo, cuckoo.race]
+    state_machines = [cuckoo.rcuckoo, sm.race]
     for state_machine in state_machines:
         config = simulator.default_config()
         config['indexes'] = table_size
@@ -500,17 +434,8 @@ def client_scalability():
         config["buckets_per_lock"] = 16
         config["locks_per_message"] = 4
         config["state_machine"]=state_machine
-        sim = simulator.Simulator(config)
         log.set_off()
-        try:
-            sim.run()
-        except Exception as e:
-            print(e)
-            stats = sim.collect_stats()
-            sim.validate_run()
-        sim.validate_run()
-        stats = sim.collect_stats()
-        runs.append(stats)
+        runs.append(run_trials(config))
     save_statistics(runs)
 
 def race_bucket_size_fill_factor():
@@ -533,7 +458,7 @@ def race_bucket_size_fill_factor():
         config['read_threshold_bytes'] = config['entry_size'] * bucket_size
         config['indexes'] = table_size
         config['trials'] = 3
-        config['state_machine']=cuckoo.race
+        config['state_machine']=sm.race
         runs.append(run_trials(config))
     save_statistics(runs)
 
@@ -548,7 +473,7 @@ def race_vs_rcuckoo_fill_factor():
 
     # bucket_sizes = [8]
     log.set_off()
-    state_machines = [cuckoo.rcuckoo, cuckoo.race]
+    state_machines = [sm.rcuckoo, sm.race]
     multi_runs = []
     for state_machine in state_machines:
         runs=[]
@@ -575,7 +500,7 @@ def success_rate_contention_machines():
     table_size = 1680  * 1 #lcm of 3,4,5,6,7,8,10,12,14,16
     clients=[1,2]
     bucket_size=8
-    state_machines = [cuckoo.rcuckoo,cuckoo.rcuckoobatch,cuckoo.race]
+    state_machines = [cuckoo.rcuckoobatch,sm.race]
     log.set_off()
     for s in state_machines:
         runs=[]
@@ -595,6 +520,29 @@ def success_rate_contention_machines():
     save_statistics(multi_runs)
     # plot_cuckoo.single_plot(multi_runs,plot_cuckoo.success_rate_multi, "race_vs_rcuckoo_fill_factor.pdf")
 
+def success_rate_contention():
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator")
+
+    table_size = 2048
+    # clients=[1,2,4,8]
+    # clients=[32,64]
+    clients=[1,2,4,8]
+    bucket_size=8
+    runs=[]
+    log.set_off()
+    for c in clients:
+        config = get_config()
+        config['num_clients'] = c
+        config['num_steps'] = 100000000000
+        config['bucket_size'] = bucket_size
+        config['read_threshold_bytes'] = config['entry_size'] * bucket_size
+        config['indexes'] = table_size
+        config['trials'] = 1
+        config['state_machine']=cuckoo.rcuckoobatch
+        runs.append(run_trials(config))
+    save_statistics(runs)
+
 
 
 def plot_race_bucket_fill_factor():
@@ -610,9 +558,10 @@ def plot_race_bucket_fill_factor():
 
 # todos()
 
-insertion_debug()
+# insertion_debug()
 
 # success_rate_contention_machines()
+success_rate_contention()
 # race_bucket_size_fill_factor()
 plot_general_stats_last_run()
 
