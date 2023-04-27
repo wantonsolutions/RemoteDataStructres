@@ -744,13 +744,13 @@ def cas_table_entry_message(bucket_index, bucket_offset, old, new):
 def unpack_cas_response(message):
     assert message.payload["function"] == fill_table_with_cas, "client is in inserting state but message is not a cas " + str(message)
     args = message.payload["function_args"]
-    logger.debug("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["value"]))
+    logger.debug("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["value"])) if __debug__ else None
     return args
 
 def unpack_read_response(message):
     assert message.payload["function"] == fill_table_with_read, "client is reading but function was not a read response " + str(message)
     args = message.payload["function_args"]
-    logger.debug("Read Response " + str(args["read"]))
+    logger.debug("Read Response " + str(args["read"])) if __debug__ else None
     return args
     
 
@@ -771,7 +771,7 @@ def masked_cas_lock_table_messages(lock_messages):
 def unpack_masked_cas_response(message):
         assert message.payload["function"] == fill_lock_table_masked_cas, "client is in inserting state but message is not a cas " + str(message)
         args = message.payload["function_args"]
-        logger.debug("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["value"]) + str(args["mask"]))
+        logger.debug("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["value"]) + str(args["mask"]))  if __debug__ else None
         return args
 
 def get_state_machine_name(state_machine_class_pointer):
@@ -927,12 +927,12 @@ class state_machine:
         self.update_message_stats(message)
         #return fsm_wapper
         output_message = self.fsm_logic(message)
-
-        if isinstance(output_message, list):
-            for m in output_message:
-                self.warning("FSM: " + str(message) + " -> " + str(m))
-        else:
-            self.warning("FSM: " + str(message) + " -> " + str(output_message))
+        if __debug__:
+            if isinstance(output_message, list):
+                for m in output_message:
+                    self.warning("FSM: " + str(message) + " -> " + str(m))
+            else:
+                self.warning("FSM: " + str(message) + " -> " + str(output_message))
 
         self.update_message_stats(output_message)
         return output_message
@@ -1104,14 +1104,14 @@ class client_state_machine(state_machine):
     def read_successful(self, key):
         if self.read_values_found == 0:
             success = False
-            self.info("Read Failed: " + str(key))
+            self.info("Read Failed: " + str(key)) if __debug__ else None
         elif self.read_values_found == 1:
             success = True
-            self.info("Read Complete: " + str(self.read_values))
+            self.info("Read Complete: " + str(self.read_values)) if __debug__ else None
         elif self.read_values_found > 1:
             success = True
             self.duplicates_found = self.duplicates_found + 1
-            self.info("Read Complete: " + str(self.read_values) + " Duplicate Found")
+            self.info("Read Complete: " + str(self.read_values) + " Duplicate Found") if __debug__ else None
             #todo we likely need a tie breaker here
         return success
 
@@ -1575,7 +1575,7 @@ class rcuckoobatch(client_state_machine):
         self.locking_message_index = 0
 
         buckets = search_path_to_buckets(self.search_path)
-        self.info("gather locks for buckets: " + str(buckets))
+        self.info("gather locks for buckets: " + str(buckets)) if __debug__ else None
         lock_messages = get_lock_messages(buckets, self.buckets_per_lock, self.locks_per_message)
         self.current_locking_messages = masked_cas_lock_table_messages(lock_messages)
         return self.get_current_locking_message_with_covering_read()
@@ -1641,6 +1641,8 @@ class rcuckoobatch(client_state_machine):
             return self.retry_insert()
         self.search_path_index = len(self.search_path) - 1
         messages = gen_cas_messages(self.search_path)
+
+        #I can add the unlock messages here as well because I know that I'm going to succeed at this point
         return messages
 
     def complete_insert_stats(self, success):
@@ -2017,21 +2019,21 @@ class basic_memory_state_machine(state_machine):
 
         args = message.payload["function_args"]
         if message.payload["function"] == read_table_entry:
-            self.info("Read: " + "Bucket: " + str(args["bucket_id"]) + " Offset: " + str(args["bucket_offset"]) + " Size: " + str(args["size"]))
+            self.info("Read: " + "Bucket: " + str(args["bucket_id"]) + " Offset: " + str(args["bucket_offset"]) + " Size: " + str(args["size"]))  if __debug__ else None
             read = read_table_entry(self.table, **args)
             response = Message({"function":fill_table_with_read, "function_args":{"read":read, "bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "size":args["size"]}})
-            self.info("Read Response: " +  str(response.payload["function_args"]["read"]))
+            self.info("Read Response: " +  str(response.payload["function_args"]["read"])) if __debug__ else None
             return response
 
         if message.payload["function"] == cas_table_entry:
-            self.info("CAS: " + "Bucket: " + str(args["bucket_id"]) + " Offset: " + str(args["bucket_offset"]) + " Old: " + str(args["old"]) + " New: " + str(args["new"]))
+            self.info("CAS: " + "Bucket: " + str(args["bucket_id"]) + " Offset: " + str(args["bucket_offset"]) + " Old: " + str(args["old"]) + " New: " + str(args["new"])) if __debug__ else None
             success, value = cas_table_entry(self.table, **args)
             response = Message({"function":fill_table_with_cas, "function_args":{"bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "value":value, "success":success}})
 
-            # self.table.print_table()
+            # self.table.print_table()  if __debug__ else None
 
             rargs=response.payload["function_args"]
-            self.info("Read Response: " +  "Success: " + str(rargs["success"]) + " Value: " + str(rargs["value"]))
+            self.info("Read Response: " +  "Success: " + str(rargs["success"]) + " Value: " + str(rargs["value"])) if __debug__ else None
             return response
 
         if message.payload["function"] == masked_cas_lock_table:

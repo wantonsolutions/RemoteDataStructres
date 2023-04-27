@@ -610,9 +610,9 @@ def plot_race_bucket_fill_factor():
 
 # todos()
 
-# insertion_debug()
+insertion_debug()
 
-success_rate_contention_machines()
+# success_rate_contention_machines()
 # race_bucket_size_fill_factor()
 plot_general_stats_last_run()
 
