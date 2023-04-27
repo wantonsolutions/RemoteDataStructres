@@ -392,7 +392,9 @@ def success_rate_contention():
     logger.info("Starting simulator")
 
     table_size = 2048
-    clients=[1,2,4,8]
+    # clients=[1,2,4,8]
+    # clients=[32,64]
+    clients=[16]
     bucket_size=8
     runs=[]
     log.set_off()
@@ -407,6 +409,7 @@ def success_rate_contention():
         config['state_machine']=cuckoo.rcuckoobatch
         runs.append(run_trials(config))
     save_statistics(runs)
+
 
 
 
@@ -565,6 +568,33 @@ def race_vs_rcuckoo_fill_factor():
 
     plot_cuckoo.single_plot(multi_runs,plot_cuckoo.fill_factor_multi, "race_vs_rcuckoo_fill_factor.pdf")
 
+def success_rate_contention_machines():
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator")
+    multi_runs=[]
+    table_size = 1680  * 1 #lcm of 3,4,5,6,7,8,10,12,14,16
+    clients=[1,2]
+    bucket_size=8
+    state_machines = [cuckoo.rcuckoo,cuckoo.rcuckoobatch,cuckoo.race]
+    log.set_off()
+    for s in state_machines:
+        runs=[]
+        for c in clients:
+            config = get_config()
+            config['num_clients'] = c
+            config['num_steps'] = 100000000000
+            config['bucket_size'] = bucket_size
+            config['read_threshold_bytes'] = config['entry_size'] * bucket_size
+            config['indexes'] = table_size
+            config['trials'] = 1
+            config['state_machine']=s
+            runs.append(run_trials(config))
+        save_statistics(runs)
+        plot_general_stats_last_run()
+        multi_runs.append(runs)
+    save_statistics(multi_runs)
+    # plot_cuckoo.single_plot(multi_runs,plot_cuckoo.success_rate_multi, "race_vs_rcuckoo_fill_factor.pdf")
+
 
 
 def plot_race_bucket_fill_factor():
@@ -582,7 +612,7 @@ def plot_race_bucket_fill_factor():
 
 # insertion_debug()
 
-success_rate_contention()
+success_rate_contention_machines()
 # race_bucket_size_fill_factor()
 plot_general_stats_last_run()
 
