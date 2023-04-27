@@ -14,6 +14,7 @@ def multi_plot_runs(runs, plot_names, directory=""):
     i=0
 
     x_axis = detect_x_axis(runs)
+    print("detected x_axis: ", x_axis)
     # runs = get_flattened_stats(runs)
 
     for plot_name in plot_names:
@@ -23,16 +24,16 @@ def multi_plot_runs(runs, plot_names, directory=""):
             general_stats(axs[i],runs)
         elif plot_name == "cas_success_rate":
             cas_success_rate(axs[i],runs, x_axis)
-        elif plot_name == "read_write_ratio":
-            read_write_ratio(axs[i],runs, x_axis)
-        elif plot_name == "bytes_per_operation":
-            bytes_per_operation(axs[i],runs, x_axis)
-        elif plot_name == "request_success_rate":
-            request_success_rate(axs[i],runs, x_axis)
-        elif plot_name == "messages_per_operation":
-            messages_per_operation(axs[i],runs, x_axis)
+        # elif plot_name == "read_write_ratio":
+        #     read_write_ratio(axs[i],runs, x_axis)
+        # elif plot_name == "bytes_per_operation":
+        #     bytes_per_operation(axs[i],runs, x_axis)
+        # elif plot_name == "request_success_rate":
+        #     request_success_rate(axs[i],runs, x_axis)
+        # elif plot_name == "messages_per_operation":
+        #     messages_per_operation(axs[i],runs, x_axis)
         elif plot_name == "fill_factor":
-            fill_factor_single(axs[i],runs, x_axis)
+            fill_factor(axs[i],runs, x_axis)
         else:
             print("unknown plot name: ", plot_name)
         i+=1
@@ -77,12 +78,8 @@ def single_run_client_average_cas_success(stat):
         success_rate = float(1.0 - ratio)
         per_client_success_rate.append(success_rate)
     return (np.mean(per_client_success_rate), stderr(per_client_success_rate))
-    
 
-def cas_success_rate(ax, stats, x_axis="clients"):
-    print("CAS SUCCESS RATE")
-    print("\ttodo - label graph with workload")
-    print("\ttodo print locking strategy")
+def cas_success_rate_line(ax,stats,label,x_axis="clients"):
     success_rates = []
     std_errs = []
     x_axis_vals = get_x_axis(stats, x_axis)
@@ -95,17 +92,19 @@ def cas_success_rate(ax, stats, x_axis="clients"):
             single_run_errors.append(e)
         success_rates.append(np.mean(single_run_success_rate))
         std_errs.append(np.mean(single_run_errors))
-    print("cas success rates: ", success_rates)
-    print("cas success std errs: ", std_errs)
+    # x_pos = np.arange(len(success_rates))
+    ax.errorbar(x_axis_vals,success_rates,yerr=std_errs,label=label, marker='o', capsize=3)
 
-    x_pos = np.arange(len(success_rates))
-    ax.bar(x_pos,success_rates,yerr=std_errs,align="center", edgecolor='black')
+def cas_success_rate(ax, stats, x_axis="clients"):
+    stats = correct_stat_shape(stats)
+    for stat in stats:
+        state_machine_label = stat[0][0]['config']['state_machine']
+        cas_success_rate_line(ax, stat, label=state_machine_label, x_axis=x_axis)
+    cas_success_rate_decoration(ax, x_axis)
+
+def cas_success_rate_decoration(ax, x_axis):
     ax.set_ylabel("CAS success rate")
     ax.set_xlabel(x_axis)
-    ax.set_xticks(x_pos)
-    ax.set_xticklabels(x_axis_vals)
-    # ax.set_yscale('log')
-    # ax.set_title("CAS success rate vs # of clients")
 
 def single_run_client_average_read_write_ratio(stat):
 
@@ -235,16 +234,25 @@ def fill_factor_decoration(ax, x_axis):
     ax.set_title('Max Load Factor vs ' + x_axis)
     ax.legend()
 
-def fill_factor_single(ax, stats, x_axis="bucket size"):
-    state_machine_label = stats[0][0]['config']['state_machine']
-    fill_factor_line(ax, stats, label=state_machine_label, x_axis=x_axis)
-    fill_factor_decoration(ax, x_axis)
+def correct_stat_shape(stats):
+    dim = np.shape(stats)
+    if len(dim) == 1:
+        stats = [[stats]]
+    elif len(dim) == 2:
+        stats = [stats]
+    elif len(dim) == 3:
+        pass
+    return stats
 
-def fill_factor_multi(ax, stats, x_axis="bucket size"):
+
+def fill_factor(ax, stats, x_axis="bucket size"):
+    print("fill factor x-axis: ", x_axis)
+    stats = correct_stat_shape(stats)
     for stat in stats:
         state_machine_label = stat[0][0]['config']['state_machine']
         fill_factor_line(ax, stat, label=state_machine_label, x_axis=x_axis)
     fill_factor_decoration(ax, x_axis)
+
 
 def single_run_request_success_rate(stat):
     read_percent = []
@@ -333,8 +341,8 @@ def detect_x_axis(stats):
         "table size",
         "locks per message",
         "buckets per lock",
-        "state machine",
         "bucket size",
+        "state machine",
         "read threshold bytes",
     ]
     for axis in x_axis:
@@ -353,12 +361,12 @@ def get_x_axis(stats, name):
         return get_locks_per_message_x_axis(stats)
     elif name == "buckets per lock":
         return get_buckets_per_lock_x_axis(stats)
-    elif name == "state machine":
-        return get_state_machine_x_axis(stats)
     elif name == "bucket size":
         return get_bucket_size_x_axis(stats)
     elif name == "read threshold bytes":
         return get_read_threshold_x_axis(stats)
+    elif name == "state machine":
+        return get_state_machine_x_axis(stats)
     else:
         print("unknown x axis: ", name)
         exit(1)
@@ -377,6 +385,11 @@ def get_flattened_stats(stats):
         #flatten by getting the first run of each trial
         s_prime = []
         for stat in stats:
+            s_prime.append(stat[0])
+        stats = s_prime
+    elif len(s) == 3:
+        s_prime = []
+        for stat in stats[0]:
             s_prime.append(stat[0])
         stats = s_prime
     else:

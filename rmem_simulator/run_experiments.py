@@ -491,7 +491,7 @@ def race_vs_rcuckoo_fill_factor():
         plot_general_stats_last_run()
         multi_runs.append(runs)
 
-    plot_cuckoo.single_plot(multi_runs,plot_cuckoo.fill_factor_multi, "race_vs_rcuckoo_fill_factor.pdf")
+    plot_cuckoo.single_plot(multi_runs,plot_cuckoo.fill_factor, "race_vs_rcuckoo_fill_factor.pdf")
 
 def success_rate_contention_machines():
     logger = log.setup_custom_logger('root')
@@ -527,7 +527,7 @@ def success_rate_contention():
     table_size = 2048
     # clients=[1,2,4,8]
     # clients=[32,64]
-    clients=[1,2,4,8]
+    clients=[1,2,4,8,16]
     bucket_size=8
     runs=[]
     log.set_off()
@@ -539,7 +539,8 @@ def success_rate_contention():
         config['read_threshold_bytes'] = config['entry_size'] * bucket_size
         config['indexes'] = table_size
         config['trials'] = 1
-        config['state_machine']=cuckoo.rcuckoobatch
+        # config['state_machine']=cuckoo.rcuckoobatch
+        config['state_machine']=sm.race
         runs.append(run_trials(config))
     save_statistics(runs)
 
@@ -561,7 +562,7 @@ def plot_race_bucket_fill_factor():
 # insertion_debug()
 
 # success_rate_contention_machines()
-success_rate_contention()
+# success_rate_contention()
 # race_bucket_size_fill_factor()
 plot_general_stats_last_run()
 
