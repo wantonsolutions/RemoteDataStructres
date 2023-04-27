@@ -196,7 +196,7 @@ def fscore(element, target_index, table_size):
         f_score = g_score + h_score
         return f_score
 
-def a_star_search(table, location_func, value):
+def a_star_search(table, location_func, value, open_buckets=None):
     table_size = table.table_size
     bucket_size = table.bucket_size
     targets = find_closest_target_n_bi_directional(table, location_func, value, 20)
@@ -222,6 +222,10 @@ def a_star_search(table, location_func, value):
             locations = location_func(search_element.pe.key, table_size)
             table_index = next_table_index(search_element.pe.table_index)
             index = locations[table_index]
+
+            if open_buckets != None:
+                if not index in open_buckets:
+                    continue
 
 
             # print("Search: ("+str(table_index)+","+str(search_index) + ")"+ " Closest Target:("+ str(target_table) + "," + str(target_index)+")")
@@ -283,10 +287,10 @@ def a_star_search(table, location_func, value):
     else:
         return []
 
-def bucket_cuckoo_a_star_insert(table, location_func, value):
+def bucket_cuckoo_a_star_insert(table, location_func, value, open_buckets=None):
     if table.full():
         return []
-    insert_paths=a_star_search(table, location_func, value)
+    insert_paths=a_star_search(table, location_func, value, open_buckets)
     if len(insert_paths) == 0:
         return []
     insert_path = insert_paths[random.randint(0, len(insert_paths)-1)]
@@ -1312,7 +1316,7 @@ def read_threshold_message(key, read_threshold_bytes, table_size, row_size_bytes
     return messages
 
 def get_covering_read_from_lock_message(lock_message, buckets_per_lock, row_size_bytes):
-    print(lock_message.payload)
+    # print(lock_message.payload)
     base_index = lock_message.payload['function_args']['lock_index'] * buckets_per_lock
     #calculate the max and min mask index
     mask = lock_message.payload['function_args']['mask']
@@ -1323,12 +1327,12 @@ def get_covering_read_from_lock_message(lock_message, buckets_per_lock, row_size
             max_index = i
             if min_index == -1:
                 min_index = i
-    print("min_index: " + str(min_index), "max_index: " + str(max_index))
+    # print("min_index: " + str(min_index), "max_index: " + str(max_index))
     min_index = (min_index * buckets_per_lock) + base_index
     max_index = (max_index * buckets_per_lock) + base_index
-    print("min_bucket: " + str(min_index), "max_bucket: " + str(max_index))
+    # print("min_bucket: " + str(min_index), "max_bucket: " + str(max_index))
     read_message = multi_bucket_read_message([min_index, max_index], row_size_bytes)
-    print(read_message[0].payload)
+    # print(read_message[0].payload)
     assert len(read_message) == 1, "read message should be length 1"
     #todo start here after chat, we have just gotten the spanning read message for a lock range
     return read_message[0]
@@ -1614,9 +1618,19 @@ class rcuckoobatch(client_state_machine):
             else:
                 return self.get_current_locking_message()
 
+
     def begin_insert(self):
         self.state = "inserting"
-        #todo there are going to be cases where this fails because 
+        #todo there are going to be cases where this fails because
+
+        search_buckets=lock_indexes_to_buckets(self.locks_held, self.buckets_per_lock)
+        self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.rcuckoo_hash_locations, self.current_insert_value, search_buckets)
+        if len(self.search_path) == 0:
+            self.info("Search Failed: " + str(self.current_insert_value) + "| unable to continue, client " + str(self.id) + " is done")
+            # self.complete=True
+            return self.retry_insert()
+
+
         self.search_path_index = len(self.search_path)-1
         return next_cas_message(self.search_path, self.search_path_index)
 
@@ -1642,6 +1656,10 @@ class rcuckoobatch(client_state_machine):
         self.info("Insert Failed: " + str(self.current_insert_value))
         self.state="release_locks_try_again"
         return self.finish_insert_and_release_locks(success=False)
+
+    def retry_insert(self):
+        self.state="release_locks_try_again"
+        return self.release_locks()
 
 
     def undo_last_cas_fsm(self, message):
@@ -1879,6 +1897,7 @@ class rcuckoo(client_state_machine):
         return self.finish_insert_and_release_locks(success=False)
 
 
+
     def undo_last_cas_fsm(self, message):
         if message == None:
             return None
@@ -2000,7 +2019,7 @@ class basic_memory_state_machine(state_machine):
             success, value = cas_table_entry(self.table, **args)
             response = Message({"function":fill_table_with_cas, "function_args":{"bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "value":value, "success":success}})
 
-            self.table.print_table()
+            # self.table.print_table()
 
             rargs=response.payload["function_args"]
             self.info("Read Response: " +  "Success: " + str(rargs["success"]) + " Value: " + str(rargs["value"]))

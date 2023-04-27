@@ -231,37 +231,6 @@ def todos():
     print("Implement A lock aquisition function that grabs a few locks at a time.")
     print("move the table and a* search to a shared file so I can do millions of inserts on the table just like the prior tests")
 
-def global_lock_success_rate():
-    logger = log.setup_custom_logger('root')
-    logger.info("Starting simulator for global locking")
-    table_size = 1024
-    # client_counts = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
-    client_counts = [1, 2, 4, 8, 16, 32]
-    # client_counts = [1, 2, 4]
-
-
-    runs=[]
-    for client_count in client_counts:
-        print("client count: ", client_count)
-        config = simulator.default_config()
-        sim = simulator.Simulator(config)
-        # print("table size: ", table_size)
-        config['indexes'] = table_size
-        config['num_clients'] = client_count
-        config["num_steps"] = 1000000
-        #global lock config
-
-        # config['buckets_per_lock'] = config['indexes'] / config["bucket_size"]
-        # multi-cas locking
-        config["buckets_per_lock"] = 1
-        config["locks_per_message"] = 64
-        sim = simulator.Simulator(config)
-        log.set_off()
-        sim.run()
-        stats = sim.collect_stats()
-        runs.append(stats)
-    save_statistics(runs)
-
 def plot_general_stats_last_run():
     stats, directory = load_statistics()
     print("plot general stats")
@@ -275,42 +244,6 @@ def plot_general_stats_last_run():
         "fill_factor"
         ]
     plot_cuckoo.multi_plot_runs(stats, plot_names, directory)
-
-def plot_global_lock_success_rate():
-    stats = load_statistics()
-    print(stats)
-    success_rates = []
-    std_errs = []
-    clients = []
-    for stat in stats:
-        per_client_success_rate = []
-        for client in stat['clients']:
-            print(client)
-            total_cas = client['stats']['total_cas']
-            total_cas_failure = client['stats']['total_cas_failures']
-            success_rate = float(1.0 - float(total_cas_failure)/float(total_cas))
-            print(total_cas,total_cas_failure,success_rate)
-            per_client_success_rate.append(success_rate)
-        mean =np.mean(per_client_success_rate)
-        std_err = np.std(per_client_success_rate) / np.sqrt(np.size(per_client_success_rate))
-        success_rates.append(mean)
-        std_errs.append(std_err)
-        # print(len(stat['clients']))
-        clients.append(str(len(stat['clients'])))
-
-
-    x_pos = np.arange(len(success_rates))
-    fig, ax = plt.subplots()
-    ax.bar(x_pos,success_rates,yerr=std_errs,align="center", edgecolor='black')
-    ax.set_ylabel("success rate")
-    ax.set_xlabel("# clients")
-    ax.set_xticks(x_pos)
-    ax.set_xticklabels(clients)
-    # ax.set_yscale('log')
-    ax.set_title("Success Rate for global lock aquires")
-    plt.tight_layout()
-    plt.savefig("global_lock_aquire.pdf")
-
 
 
 
@@ -351,7 +284,6 @@ def run_trials(config):
     for i in tqdm(range(trials)):
         c=config.copy()
         sim = simulator.Simulator(c)
-        sim.run()
         try:
             sim.run()
         except Exception as e:
@@ -454,6 +386,30 @@ def locks_per_message_experiment():
         stats = sim.collect_stats()
         runs.append(stats)
     save_statistics(runs)
+
+def success_rate_contention():
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator")
+
+    table_size = 2048
+    clients=[1,2,4,8]
+    bucket_size=8
+    runs=[]
+    log.set_off()
+    for c in clients:
+        config = get_config()
+        config['num_clients'] = c
+        config['num_steps'] = 100000000000
+        config['bucket_size'] = bucket_size
+        config['read_threshold_bytes'] = config['entry_size'] * bucket_size
+        config['indexes'] = table_size
+        config['trials'] = 1
+        config['state_machine']=cuckoo.rcuckoobatch
+        runs.append(run_trials(config))
+    save_statistics(runs)
+
+
+
 
 def buckets_per_lock_experiment():
     logger = log.setup_custom_logger('root')
@@ -624,7 +580,9 @@ def plot_race_bucket_fill_factor():
 
 # todos()
 
-insertion_debug()
+# insertion_debug()
+
+success_rate_contention()
 # race_bucket_size_fill_factor()
 plot_general_stats_last_run()
 
