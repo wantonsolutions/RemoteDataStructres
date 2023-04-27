@@ -1488,6 +1488,16 @@ def search_path_to_buckets(search_path):
     buckets.sort()
     return buckets
 
+
+def gen_cas_messages(search_path):
+    i = len(search_path)-1
+    # print(search_path)
+    messages = []
+    while i > 0:
+        messages.append(next_cas_message(search_path,i))
+        i-=1
+    return messages
+
 class rcuckoobatch(client_state_machine):
     def __init__(self, config):
         super().__init__(config)
@@ -1629,10 +1639,9 @@ class rcuckoobatch(client_state_machine):
             self.info("Search Failed: " + str(self.current_insert_value) + "| unable to continue, client " + str(self.id) + " is done")
             # self.complete=True
             return self.retry_insert()
-
-
-        self.search_path_index = len(self.search_path)-1
-        return next_cas_message(self.search_path, self.search_path_index)
+        self.search_path_index = len(self.search_path) - 1
+        messages = gen_cas_messages(self.search_path)
+        return messages
 
     def complete_insert_stats(self, success):
         self.insert_path_lengths.append(len(self.search_path))
@@ -1655,6 +1664,7 @@ class rcuckoobatch(client_state_machine):
     def fail_insert(self):
         self.info("Insert Failed: " + str(self.current_insert_value))
         self.state="release_locks_try_again"
+        # raise Exception("Insert Failed")
         return self.finish_insert_and_release_locks(success=False)
 
     def retry_insert(self):
@@ -1709,8 +1719,7 @@ class rcuckoobatch(client_state_machine):
         self.search_path_index -= 1
         if self.search_path_index <= 0:
             return self.complete_insert()
-        else:
-            return next_cas_message(self.search_path, self.search_path_index)
+        return None
 
     def idle_fsm(self,message):
         return self.general_idle_fsm(message)
