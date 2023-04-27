@@ -24,8 +24,8 @@ def multi_plot_runs(runs, plot_names, directory=""):
             general_stats(axs[i],runs)
         elif plot_name == "cas_success_rate":
             cas_success_rate(axs[i],runs, x_axis)
-        # elif plot_name == "read_write_ratio":
-        #     read_write_ratio(axs[i],runs, x_axis)
+        elif plot_name == "read_write_ratio":
+            read_write_ratio(axs[i],runs, x_axis)
         # elif plot_name == "bytes_per_operation":
         #     bytes_per_operation(axs[i],runs, x_axis)
         # elif plot_name == "request_success_rate":
@@ -106,61 +106,61 @@ def cas_success_rate_decoration(ax, x_axis):
     ax.set_ylabel("CAS success rate")
     ax.set_xlabel(x_axis)
 
-def single_run_client_average_read_write_ratio(stat):
 
-    read_percent = []
-    write_percent = []
+def get_client_total_ops(client):
+    reads = client['stats']['completed_read_count']
+    writes = client['stats']['completed_insert_count']
+    total_ops = reads + writes
+    return total_ops
+
+
+def single_run_client_average_ops(stat, op):
+    op_percents = []
+    op_string = "completed_" + op + "_count"
     for client in stat['clients']:
-        reads = client['stats']['completed_read_count']
-        writes = client['stats']['completed_insert_count']
-        total_ops = reads + writes
+        ops = client['stats'][op_string]
+        total_ops = get_client_total_ops(client)
+        op_percents.append(div_by_zero_to_zero(ops, total_ops))
 
-        read_percent.append(div_by_zero_to_zero(reads, total_ops))
-        write_percent.append(div_by_zero_to_zero(writes, total_ops))
+    op_ratio = np.mean(op_percents)
+    op_error = stderr(op_percents)
+    return (op_ratio, op_error)
 
-    rr = np.mean(read_percent)
-    re = stderr(read_percent)
-    wr = np.mean(write_percent)
-    we = stderr(write_percent)
-    return (rr, re, wr, we)
 
-def read_write_ratio(ax, stats, x_axis="clients"):
-    print("READ WRITE RATIO")
+def read_write_ratio_line(ax, stats, label, x_axis="clients"):
+    print("Operation RATIO")
     #read write ratio should work for both single and multi run
     if isinstance(stats, dict):
         stats = [stats]
 
-    read_rates=[]
-    read_err=[]
-    write_rates=[]
-    write_err=[]
+    operations = ["read", "insert"]
+    for op in operations:
+        avg_op_rates, avg_op_errors = [], []
+        x_axis_vals = get_x_axis(stats, x_axis)
+        for stat in stats:
+            op_rates, op_errors = [], []
+            for run in stat:
+                o, oe, = single_run_client_average_ops(run, op)
+                op_rates.append(o)
+                op_errors.append(oe)
+            avg_op_rates.append(np.mean(op_rates))
+            avg_op_errors.append(np.mean(op_errors))
+        ax.errorbar(x_axis_vals,avg_op_rates,yerr=avg_op_errors,label=label+"-"+op)
 
-    x_axis_vals = get_x_axis(stats, x_axis)
-    for stat in stats:
-        rr=[]
-        rerr=[]
-        wr=[]
-        werr=[]
-        for run in stat:
-            r, re, w, we = single_run_client_average_read_write_ratio(run)
-            rr.append(r)
-            rerr.append(re)
-            wr.append(w)
-            werr.append(we)
-        read_rates.append(np.mean(rr))
-        read_err.append(np.mean(rerr))
-        write_rates.append(np.mean(wr))
-        write_err.append(np.mean(werr))
-
-    x_pos = np.arange(len(x_axis_vals))
-    bar_width = 0.35
-    ax.bar(x_pos,read_rates,bar_width,yerr=read_err,align="center", edgecolor='black', label="Read")
-    ax.bar(x_pos+bar_width,write_rates,bar_width,yerr=write_err,align="center", edgecolor='black', label="Insert")
+def read_write_ratio_decoration(ax, x_axis):
     ax.set_ylabel("Read/Write ratio")
     ax.set_xlabel(x_axis)
-    ax.set_xticks(x_pos+bar_width/2)
-    ax.set_xticklabels(x_axis_vals)
+    # ax.set_xticks(x_pos+bar_width/2)
+    # ax.set_xticklabels(x_axis_vals)
     ax.legend()
+
+def read_write_ratio(ax, stats, x_axis="clients"):
+    stats = correct_stat_shape(stats)
+    for stat in stats:
+        state_machine_label = stat[0][0]['config']['state_machine']
+        read_write_ratio_line(ax, stat, label=state_machine_label, x_axis=x_axis)
+    read_write_ratio_decoration(ax, x_axis)
+
 
 def bytes_per_operation(ax, stats, x_axis="clients"):
     print("BYTES PER OPERATION")
