@@ -26,12 +26,12 @@ def multi_plot_runs(runs, plot_names, directory=""):
             cas_success_rate(axs[i],runs, x_axis)
         elif plot_name == "read_write_ratio":
             read_write_ratio(axs[i],runs, x_axis)
-        # elif plot_name == "bytes_per_operation":
-        #     bytes_per_operation(axs[i],runs, x_axis)
-        # elif plot_name == "request_success_rate":
-        #     request_success_rate(axs[i],runs, x_axis)
-        # elif plot_name == "messages_per_operation":
-        #     messages_per_operation(axs[i],runs, x_axis)
+        elif plot_name == "bytes_per_operation":
+            bytes_per_operation(axs[i],runs, x_axis)
+        elif plot_name == "request_success_rate":
+            request_success_rate(axs[i],runs, x_axis)
+        elif plot_name == "messages_per_operation":
+            messages_per_operation(axs[i],runs, x_axis)
         elif plot_name == "fill_factor":
             fill_factor(axs[i],runs, x_axis)
         else:
@@ -113,7 +113,6 @@ def get_client_total_ops(client):
     total_ops = reads + writes
     return total_ops
 
-
 def single_run_client_average_ops(stat, op):
     op_percents = []
     op_string = "completed_" + op + "_count"
@@ -126,7 +125,6 @@ def single_run_client_average_ops(stat, op):
     op_error = stderr(op_percents)
     return (op_ratio, op_error)
 
-
 def read_write_ratio_line(ax, stats, label, x_axis="clients"):
     print("Operation RATIO")
     #read write ratio should work for both single and multi run
@@ -134,6 +132,7 @@ def read_write_ratio_line(ax, stats, label, x_axis="clients"):
         stats = [stats]
 
     operations = ["read", "insert"]
+    color=None
     for op in operations:
         avg_op_rates, avg_op_errors = [], []
         x_axis_vals = get_x_axis(stats, x_axis)
@@ -145,13 +144,15 @@ def read_write_ratio_line(ax, stats, label, x_axis="clients"):
                 op_errors.append(oe)
             avg_op_rates.append(np.mean(op_rates))
             avg_op_errors.append(np.mean(op_errors))
-        ax.errorbar(x_axis_vals,avg_op_rates,yerr=avg_op_errors,label=label+"-"+op)
+        if color==None:
+            p=ax.errorbar(x_axis_vals,avg_op_rates,yerr=avg_op_errors,linestyle=op_linestyles[op],marker=op_markers[op],label=label+"-"+op)
+            color=p[0].get_color()
+        else:
+            ax.errorbar(x_axis_vals,avg_op_rates,yerr=avg_op_errors,linestyle=op_linestyles[op],marker=op_markers[op],label=label+"-"+op, color=color)
 
 def read_write_ratio_decoration(ax, x_axis):
     ax.set_ylabel("Read/Write ratio")
     ax.set_xlabel(x_axis)
-    # ax.set_xticks(x_pos+bar_width/2)
-    # ax.set_xticklabels(x_axis_vals)
     ax.legend()
 
 def read_write_ratio(ax, stats, x_axis="clients"):
@@ -163,6 +164,20 @@ def read_write_ratio(ax, stats, x_axis="clients"):
 
 
 def bytes_per_operation(ax, stats, x_axis="clients"):
+    stats = correct_stat_shape(stats)
+    for stat in stats:
+        state_machine_label = stat[0][0]['config']['state_machine']
+        bytes_per_operation_line(ax, stat, label=state_machine_label, x_axis=x_axis)
+    bytes_per_operation_decoration(ax, x_axis)
+
+def bytes_per_operation_decoration(ax, x_axis):
+    ax.set_yscale('log')
+    ax.set_ylabel("Bytes per operation")
+    ax.set_xlabel(x_axis)
+    ax.legend()
+
+def bytes_per_operation_line(ax, stats, label, x_axis="clients"):
+
     print("BYTES PER OPERATION")
     if isinstance(stats, dict):
         stats = [stats]
@@ -170,44 +185,50 @@ def bytes_per_operation(ax, stats, x_axis="clients"):
     read_bytes, read_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'read_operation_bytes', 'completed_read_count')
     write_bytes, write_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'insert_operation_bytes', 'completed_insert_count')
     x_axis_vals = get_x_axis(stats, x_axis)
-    x_pos = np.arange(len(x_axis_vals))
 
-    bar_width = 0.35
-    ax.bar(x_pos,read_bytes,bar_width,yerr=read_err,align="center", edgecolor='black', label="Read")
-    ax.bar(x_pos+bar_width,write_bytes,bar_width,yerr=write_err,align="center", edgecolor='black', label="Insert")
-    ax.legend()
-    ax.set_yscale('log')
-    ax.set_ylabel("Bytes per operation")
+    p = ax.errorbar(x_axis_vals,read_bytes,yerr=read_err,label=label+"-read", marker="s")
+    color = p[0].get_color()
+    ax.errorbar(x_axis_vals,write_bytes,yerr=write_err,label=label+"-insert", marker="o", linestyle=":", color=color)
+
+
+def messages_per_operation_decoration(ax, axt, x_axis):
+    ax.set_ylabel("read - messages/op")
+    axt.set_ylabel("insert - messages/op")
     ax.set_xlabel(x_axis)
-    ax.set_xticks(x_pos+bar_width/2)
-    ax.set_xticklabels(x_axis_vals)
+    ax.set_ylim(bottom=0)
+    axt.set_ylim(bottom=0)
+    ax.legend()
+    axt.legend()
+    # ax.set_xticks(x_pos+bar_width/2)
+    # ax.set_xticklabels(x_axis_vals)
 
-def messages_per_operation(ax, stats, x_axis="clients"):
+op_markers={"read": "s", "insert": "o"}
+op_linestyles={"read": "-", "insert": ":"}
+
+
+def messages_per_operation_line(ax, axt, stats, label, x_axis="clients"):
     print("MESSAGES PER OPERATION")
 
     read_messages, read_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'read_operation_messages', 'completed_read_count')
     write_messages, write_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'insert_operation_messages', 'completed_insert_count')
     x_axis_vals = get_x_axis(stats, x_axis)
-    x_pos = np.arange(len(x_axis_vals))
-    bar_width = 0.35
 
-    h1 = ax.bar(x_pos,read_messages,bar_width,yerr=read_err,align="center", edgecolor='black', color='blue', label="Read")
+    h1 = ax.errorbar(x_axis_vals,read_messages,yerr=read_err, linestyle=op_linestyles['read'], label=label+"-read", marker=op_markers['read'])
+    h2 = axt.errorbar(x_axis_vals,write_messages,yerr=write_err, linestyle=op_linestyles['insert'], marker=op_markers['insert'], label=label+"-insert")
 
-    axt=ax.twinx()
-    h2 = axt.bar(x_pos+bar_width,write_messages,bar_width,yerr=write_err,align="center", color='orange', edgecolor='black', label="Insert")
-
-    print(type(h1))
-    print(type(h2))
     bars=[h1]+[h2]
     labs=[h.get_label() for h in bars]
+    # axt.legend(bars, labs, loc="upper left")
 
-    axt.legend(bars, labs, loc="upper left")
-    # ax.set_yscale('log')
-    ax.set_ylabel("read - messages/op")
-    axt.set_ylabel("insert - messages/op")
-    ax.set_xlabel(x_axis)
-    ax.set_xticks(x_pos+bar_width/2)
-    ax.set_xticklabels(x_axis_vals)
+
+def messages_per_operation(ax, stats, x_axis="clients"):
+    axt=ax.twinx()
+    stats = correct_stat_shape(stats)
+    for stat in stats:
+        state_machine_label = stat[0][0]['config']['state_machine']
+        messages_per_operation_line(ax, axt, stat, label=state_machine_label, x_axis=x_axis)
+    messages_per_operation_decoration(ax, axt, x_axis)
+
 
 
 def fill_factor_line(ax, stats, label, x_axis="table size"):
@@ -254,66 +275,58 @@ def fill_factor(ax, stats, x_axis="bucket size"):
     fill_factor_decoration(ax, x_axis)
 
 
-def single_run_request_success_rate(stat):
-    read_percent = []
-    write_percent = []
+def single_run_op_success_rate(stat, op_string):
+    op_percent = []
     for client in stat['clients']:
-        reads = client['stats']['completed_read_count']
-        read_failures = client['stats']['failed_read_count']
-        writes = client['stats']['completed_insert_count']
-        write_failures = client['stats']['failed_insert_count']
+        ops = client['stats']['completed_'+op_string+'_count']
+        op_failures = client['stats']['failed_'+op_string+'_count']
 
-        if reads == 0:
-            reads_success_rate = 0
-        else:
-            reads_success_rate = float(reads)/(reads+read_failures)
+        op_success_rate = 0
+        if ops != 0:
+            op_success_rate = float(ops)/(ops+op_failures)
+        op_percent.append(op_success_rate)
 
-        if writes == 0:
-            writes_success_rate = 0
-        else:
-            writes_success_rate = float(writes)/(writes+write_failures)
+    return op_percent
 
-        read_percent.append(reads_success_rate)
-        write_percent.append(writes_success_rate)
-    return read_percent, write_percent
-
-def request_success_rate(ax, stats, x_axis="clients"):
-    print("Request Success Rate")
+def request_success_rate_line(ax, stats, label, x_axis="clients"):
     #read write ratio should work for both single and multi run
     if isinstance(stats, dict):
         stats = [stats]
 
-    read_rates=[]
-    read_err=[]
-    write_rates=[]
-    write_err=[]
+    ops = ['read', 'insert']
+    color=None
+    for op in ops:
+        avg_op_rates=[]
+        avg_op_err=[]
+        x_axis_vals = get_x_axis(stats, x_axis)
+        for stat in stats:
+            op_percentages, op_errors = [], []
+            for run in stat:
+                op_percent = single_run_op_success_rate(run, op)
+                op_percentages.append(np.mean(op_percent))
+                op_errors.append(stderr(op_percent))
+            avg_op_rates.append(np.mean(op_percentages))
+            avg_op_err.append(np.mean(op_errors))
 
-    x_axis_vals = get_x_axis(stats, x_axis)
-    for stat in stats:
-        rp, re, wp, we = [], [], [], []
-        for run in stat:
-            read_percent, write_percent = single_run_request_success_rate(run)
-            rp.append(np.mean(read_percent))
-            re.append(stderr(read_percent))
-            wp.append(np.mean(write_percent))
-            we.append(stderr(write_percent))
+        if color==None:
+            p=ax.errorbar(x_axis_vals,avg_op_rates,yerr=avg_op_err,linestyle=op_linestyles[op],marker=op_markers[op],label=label+"-"+op)
+            color=p[0].get_color()
+        else:
+            ax.errorbar(x_axis_vals,avg_op_rates,yerr=avg_op_err,linestyle=op_linestyles[op],marker=op_markers[op],label=label+"-"+op, color=color)
 
-        read_rates.append(np.mean(rp))
-        read_err.append(np.mean(re))
-        write_rates.append(np.mean(wp))
-        write_err.append(np.mean(we))
-
-    x_pos = np.arange(len(x_axis_vals))
-    bar_width = 0.35
-    ax.bar(x_pos,read_rates,bar_width,yerr=read_err,align="center", edgecolor='black', label="Read")
-    ax.bar(x_pos+bar_width,write_rates,bar_width,yerr=write_err,align="center", edgecolor='black', label="Insert")
+def request_success_rate_decoration(ax, x_axis):
     ax.set_ylabel("Success Rate")
     ax.set_xlabel(x_axis)
-    ax.set_xticks(x_pos+bar_width/2)
-    ax.set_xticklabels(x_axis_vals)
+    # ax.set_xticks(x_pos+bar_width/2)
+    # ax.set_xticklabels(x_axis_vals)
     ax.legend()
 
-
+def request_success_rate(ax, stats, x_axis="clients"):
+    stats = correct_stat_shape(stats)
+    for stat in stats:
+        state_machine_label = stat[0][0]['config']['state_machine']
+        request_success_rate_line(ax, stat, label=state_machine_label, x_axis=x_axis)
+    request_success_rate_decoration(ax, x_axis)
 
 def client_stats_x_per_y_get_mean_std(stat, x,y):
         vals=[]
