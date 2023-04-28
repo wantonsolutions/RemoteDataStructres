@@ -497,8 +497,8 @@ def success_rate_contention_machines():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
     multi_runs=[]
-    table_size = 1680  * 1 #lcm of 3,4,5,6,7,8,10,12,14,16
-    clients=[1,2]
+    table_size = 1680  * 4 #lcm of 3,4,5,6,7,8,10,12,14,16
+    clients=[1,2,4,8,16]
     bucket_size=8
     state_machines = [cuckoo.rcuckoobatch,sm.race]
     log.set_off()
@@ -518,6 +518,7 @@ def success_rate_contention_machines():
         plot_general_stats_last_run()
         multi_runs.append(runs)
     save_statistics(multi_runs)
+    plot_general_stats_last_run()
     # plot_cuckoo.single_plot(multi_runs,plot_cuckoo.success_rate_multi, "race_vs_rcuckoo_fill_factor.pdf")
 
 def success_rate_contention():
@@ -561,7 +562,7 @@ def plot_race_bucket_fill_factor():
 
 # insertion_debug()
 
-# success_rate_contention_machines()
+success_rate_contention_machines()
 # success_rate_contention()
 # race_bucket_size_fill_factor()
 plot_general_stats_last_run()

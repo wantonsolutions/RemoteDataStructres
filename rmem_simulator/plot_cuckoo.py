@@ -105,6 +105,7 @@ def cas_success_rate(ax, stats, x_axis="clients"):
 def cas_success_rate_decoration(ax, x_axis):
     ax.set_ylabel("CAS success rate")
     ax.set_xlabel(x_axis)
+    ax.set_ylim(bottom=0, top=1.1)
 
 
 def get_client_total_ops(client):
@@ -171,6 +172,7 @@ def bytes_per_operation(ax, stats, x_axis="clients"):
     bytes_per_operation_decoration(ax, x_axis)
 
 def bytes_per_operation_decoration(ax, x_axis):
+    ax.set_ylim(bottom=10)
     ax.set_yscale('log')
     ax.set_ylabel("Bytes per operation")
     ax.set_xlabel(x_axis)
@@ -249,7 +251,7 @@ def fill_factor_line(ax, stats, label, x_axis="table size"):
 def fill_factor_decoration(ax, x_axis):
     ax.grid(True, axis='y', linestyle=':')
     ax.axhline(y=90, color='r', linestyle=':')
-    ax.set_ylim(top=105)
+    ax.set_ylim(top=105, bottom=0)
     ax.set_xlabel(x_axis)
     ax.set_ylabel('Max Load Factor (%)')
     ax.set_title('Max Load Factor vs ' + x_axis)
