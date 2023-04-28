@@ -272,7 +272,8 @@ def insertion_debug():
     config["buckets_per_lock"] = 1
     config["locks_per_message"] = 64
     config["trials"] = 1
-    config["state_machine"]=cuckoo.rcuckoobatch
+    # config["state_machine"]=cuckoo.rcuckoobatch
+    config["state_machine"]=sm.race
     log.set_debug()
 
     runs.append(run_trials(config))
@@ -501,6 +502,7 @@ def success_rate_contention_machines():
     clients=[1,2,4,8,16]
     bucket_size=8
     state_machines = [cuckoo.rcuckoobatch,sm.race]
+    # state_machines = [sm.race]
     log.set_off()
     for s in state_machines:
         runs=[]
@@ -513,7 +515,7 @@ def success_rate_contention_machines():
             config['indexes'] = table_size
             config['trials'] = 1
             config['state_machine']=s
-            config['max_fill']= 50
+            config['max_fill']= 90
             runs.append(run_trials(config))
         save_statistics(runs)
         plot_general_stats_last_run()
@@ -529,7 +531,7 @@ def success_rate_contention():
     table_size = 2048
     # clients=[1,2,4,8]
     # clients=[32,64]
-    clients=[1,2,4,8,16]
+    clients=[1,2,4,8,16, 32, 64]
     bucket_size=8
     runs=[]
     log.set_off()

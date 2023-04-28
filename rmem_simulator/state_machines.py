@@ -15,8 +15,16 @@ class race(client_state_machine):
         self.state = "inserting-read-first"
         return messages
 
+    def begin_insert_second_read(self):
+        messages = race_messages(self.current_insert_value, self.table.table_size, self.table.row_size_bytes())
+        self.outstanding_read_requests = len(messages)
+        self.read_values_found = 0
+        self.read_values = []
+        self.state = "inserting-read-second"
+        return messages
+
     def put(self):
-        messages = race_messages(self.current_read_key, self.table.table_size, self.table.row_size_bytes())
+        messages = race_messages(self.current_insert_value, self.table.table_size, self.table.row_size_bytes())
         return self.begin_insert(messages)
 
     def get(self):
@@ -78,10 +86,7 @@ class race(client_state_machine):
             #try again
             return self.insert_cas()
         else:
-            self.complete_insert_stats(success)
-            self.state="idle"
-            self.inserting=False
-            return None
+            return self.begin_insert_second_read()
 
     def insert_cas(self):
         bucket, offset = self.power_of_two_cas_location(self.current_insert_value, self.table.table_size)
@@ -98,16 +103,31 @@ class race(client_state_machine):
     def first_read_insert_fsm(self, message):
         complete, success = self.wait_for_read_messages_fsm(message, self.current_insert_value)
         if complete:
-            self.info("Race Reading Complete - first insert!: " + str(success) + str(self.current_read_key))
+            self.info("Race Reading Complete - first insert!: " + str(success) + " " + str(self.current_insert_value))
             if success:
                 self.critical("we found a duplicate value in the table, so we are not going to insert")
                 self.state="idle"
-                self.complete_insert_stats(False, self.current_insert_value)
+                self.complete_insert_stats(False)
                 self.inserting=False
                 return None
             else:
                 return self.insert_cas()
-            
+    
+
+    def second_read_insert_fsm(self, message):
+        complete, success = self.wait_for_read_messages_fsm(message, self.current_insert_value)
+        if complete:
+            self.info("Race Reading Complete - second insert!: " + str(success) + " " + str(self.current_insert_value))
+            if success:
+                #TODO check for duplicates
+                # self.critical("Insertion complete (todo check for duplicates")
+                self.state="idle"
+                self.complete_insert_stats(True)
+                self.inserting=False
+                return None
+            else:
+                raise Exception("We should never get here, because we should have already inserted the value (FAILED INSERT)")
+
 
     def fsm_logic(self, message = None):
 
@@ -125,6 +145,9 @@ class race(client_state_machine):
 
         if self.state == "inserting":
             return self.insert_fsm(message)
+
+        if self.state == "inserting-read-second":
+            return self.second_read_insert_fsm(message)
 
         #todo re-read to check for duplicates
         # if self.state == "inserting-read-second":
