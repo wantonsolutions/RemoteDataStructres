@@ -80,6 +80,7 @@ class Memory(Node):
         self.config = config
         self.memory_id = config['memory_id']
         self.bucket_size = config['bucket_size']
+        self.max_fill = config['max_fill']
 
         #create the index structure
         self.debug("Initializing memory Index")
@@ -92,6 +93,8 @@ class Memory(Node):
         state_machine_args = config['state_machine_args']
         state_machine_args['table'] = self.index
         state_machine = config['state_machine']
+
+
         self.state_machine = state_machine(state_machine_args)
 
     
@@ -302,7 +305,7 @@ class Simulator(Node):
         memory_config['index_init_args'] = index_init_args
 
         memory_config['state_machine']=basic_memory_state_machine
-        memory_config['state_machine_args']={}
+        memory_config['state_machine_args']={'max_fill': self.config['max_fill']}
         self.memory = Memory(memory_config)
 
         #initialize switch
@@ -380,6 +383,9 @@ def default_config():
     config['entry_size']=8
     config['indexes']=32
     config['read_threshold_bytes']=config['bucket_size'] * config['entry_size']
+
+    #memory settings
+    config["max_fill"]=100.0
 
     #default is global locking
     config['buckets_per_lock']=1

@@ -378,11 +378,15 @@ class basic_memory_state_machine(state_machine):
         super().__init__(config)
         self.table = config["table"]
         self.state = "memory... state not being used"
+        self.max_fill = config["max_fill"]
+
 
     def __str__(self):
         return "Memory"
     
     def fsm_logic(self, message=None):
+
+        print("max fill: " + str(self.max_fill))
         if message == None:
             return None
 
