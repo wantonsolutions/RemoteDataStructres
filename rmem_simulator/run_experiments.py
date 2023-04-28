@@ -513,6 +513,7 @@ def success_rate_contention_machines():
             config['indexes'] = table_size
             config['trials'] = 1
             config['state_machine']=s
+            config['max_fill']= 50
             runs.append(run_trials(config))
         save_statistics(runs)
         plot_general_stats_last_run()

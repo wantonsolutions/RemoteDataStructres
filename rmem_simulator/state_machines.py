@@ -386,7 +386,8 @@ class basic_memory_state_machine(state_machine):
     
     def fsm_logic(self, message=None):
 
-        print("max fill: " + str(self.max_fill))
+        if self.table.get_fill_percentage() * 100 > self.max_fill:
+            raise Exception("Table has reached max fill rate")
         if message == None:
             return None
 

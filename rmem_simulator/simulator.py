@@ -80,7 +80,6 @@ class Memory(Node):
         self.config = config
         self.memory_id = config['memory_id']
         self.bucket_size = config['bucket_size']
-        self.max_fill = config['max_fill']
 
         #create the index structure
         self.debug("Initializing memory Index")

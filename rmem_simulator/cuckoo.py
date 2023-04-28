@@ -472,9 +472,9 @@ class Table:
         return False
 
     def get_fill_percentage(self):
-        print("fill: ",self.fill)
-        print("table size: ", self.table_size)
-        print("bucket size: ", self.bucket_size)
+        # print("fill: ",self.fill)
+        # print("table size: ", self.table_size)
+        # print("bucket size: ", self.bucket_size)
         return float(self.fill)/float(self.table_size * self.bucket_size)
 
     def full(self):
