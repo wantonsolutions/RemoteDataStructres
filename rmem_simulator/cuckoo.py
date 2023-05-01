@@ -595,6 +595,7 @@ def cas_table_entry(table, bucket_id, bucket_offset, old, new):
     else:
         return (False, v)
 
+inverted_mask_index_global = [0] * CAS_SIZE
 def masked_cas_lock_table(lock_table, lock_index, old, new, mask):
     #sanity check
     assert len(old) == CAS_SIZE, "old must be 64 bytes"
@@ -604,35 +605,25 @@ def masked_cas_lock_table(lock_table, lock_index, old, new, mask):
     assert lock_table != None, "lock table is not initalized"
     assert lock_index < lock_table.total_locks, "lock index is out of bounds"
 
-    index = lock_index
-    i=0
 
-    if lock_index + CAS_SIZE >= lock_table.total_locks:
-        itt_limit = lock_table.total_locks - lock_index
+    #create an inverted index of the mask, to reduce the indexes we needto check.
+    #i've pre
+    global inverted_mask_index_global
+    c=0
+    for i in range(len(mask)):
+        if mask[i] == 1:
+            inverted_mask_index_global[0]=i
+            c+=1
 
+    inverted_mask_index = inverted_mask_index_global[0:c]
     #XOR check that the old value in the cas matches the existing lock table.
-    while i < itt_limit:
-        #if the index steps out of the range of the lock table break, we have not learned anything by this
-        # if index >= lock_table.total_locks:
-        #     break
-        if mask[i] == 1:
-            #we actually want to check the lock
-            if not lock_table.locks[index].equals(old[i]):
-                lock_table.fill_cas_range(lock_index, old)
-                return(False, old)
-        index+=1
-        i+=1
-
+    for v in inverted_mask_index:
+        if not lock_table.locks[lock_index+v].equals(old[v]):
+            return (False, old)
+    
     #now we just apply. At this point we know that the old value is the same as the current so we can lock and unlock accordingly.
-    index = lock_index
-    i=0
-    while i < itt_limit:
-        # if index >= lock_table.total_locks:
-        #     break
-        if mask[i] == 1:
-            lock_table.locks[index].set_bit(new[i])
-        index+=1
-        i=i+1
+    for v in inverted_mask_index:
+        lock_table.locks[lock_index+v].set_bit(new[v])
     return (True, new)
 
 def fill_lock_table_masked_cas(lock_table, lock_index, success, value, mask):

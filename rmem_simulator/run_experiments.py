@@ -549,6 +549,37 @@ def success_rate_contention():
     save_statistics(runs)
 
 
+def fill_factor_limit_experiment():
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator")
+    multi_runs=[]
+    table_size = 1680  * 4 #lcm of 3,4,5,6,7,8,10,12,14,16
+    clients = 4
+    bucket_size=8
+    fill_factors = [10, 20, 30, 40, 50, 60, 70, 80, 90]
+    state_machines = [cuckoo.rcuckoobatch,sm.race]
+    # state_machines = [sm.race]
+    log.set_off()
+    for s in state_machines:
+        runs=[]
+        for f in fill_factors:
+            config = get_config()
+            config['num_clients'] = clients
+            config['num_steps'] = 100000000000
+            config['bucket_size'] = bucket_size
+            config['read_threshold_bytes'] = config['entry_size'] * bucket_size
+            config['indexes'] = table_size
+            config['trials'] = 1
+            config['state_machine']=s
+            config['max_fill']= f
+            runs.append(run_trials(config))
+        save_statistics(runs)
+        plot_general_stats_last_run()
+        multi_runs.append(runs)
+    save_statistics(multi_runs)
+    plot_general_stats_last_run()
+
+
 
 def plot_race_bucket_fill_factor():
     print("not implemented race bucket fill factor")
@@ -565,9 +596,10 @@ def plot_race_bucket_fill_factor():
 
 # insertion_debug()
 
-success_rate_contention_machines()
+# success_rate_contention_machines()
 # success_rate_contention()
 # race_bucket_size_fill_factor()
+# fill_factor_limit_experiment()
 plot_general_stats_last_run()
 
 # read_threshold_experiment()

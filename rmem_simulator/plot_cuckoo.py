@@ -172,7 +172,7 @@ def bytes_per_operation(ax, stats, x_axis="clients"):
     bytes_per_operation_decoration(ax, x_axis)
 
 def bytes_per_operation_decoration(ax, x_axis):
-    ax.set_ylim(bottom=10)
+    ax.set_ylim(bottom=100)
     ax.set_yscale('log')
     ax.set_ylabel("Bytes per operation")
     ax.set_xlabel(x_axis)
@@ -193,14 +193,15 @@ def bytes_per_operation_line(ax, stats, label, x_axis="clients"):
     ax.errorbar(x_axis_vals,write_bytes,yerr=write_err,label=label+"-insert", marker="o", linestyle=":", color=color)
 
 
-def messages_per_operation_decoration(ax, axt, x_axis):
-    ax.set_ylabel("read - messages/op")
-    axt.set_ylabel("insert - messages/op")
+def messages_per_operation_decoration(ax, axt, x_axis, lines):
+    ax.set_ylabel("insert - messages/op")
+    axt.set_ylabel("read - messages/op")
     ax.set_xlabel(x_axis)
     ax.set_ylim(bottom=0)
     axt.set_ylim(bottom=0)
-    ax.legend()
-    axt.legend()
+    labs = [l.get_label() for l in lines]
+    ax.legend(lines, labs)
+    # axt.legend()
     # ax.set_xticks(x_pos+bar_width/2)
     # ax.set_xticklabels(x_axis_vals)
 
@@ -215,21 +216,24 @@ def messages_per_operation_line(ax, axt, stats, label, x_axis="clients"):
     write_messages, write_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'insert_operation_messages', 'completed_insert_count')
     x_axis_vals = get_x_axis(stats, x_axis)
 
-    h1 = ax.errorbar(x_axis_vals,read_messages,yerr=read_err, linestyle=op_linestyles['read'], label=label+"-read", marker=op_markers['read'])
-    h2 = axt.errorbar(x_axis_vals,write_messages,yerr=write_err, linestyle=op_linestyles['insert'], marker=op_markers['insert'], label=label+"-insert")
+    h1 = ax.errorbar(x_axis_vals,write_messages,yerr=write_err, linestyle=op_linestyles['insert'], marker=op_markers['insert'], label=label+"-insert")
+    h2 = axt.errorbar(x_axis_vals,read_messages,yerr=read_err, linestyle=op_linestyles['read'], label=label+"-read", marker=op_markers['read'])
 
-    bars=[h1]+[h2]
-    labs=[h.get_label() for h in bars]
+    lines = [h1, h2] 
+    # labs=[h.get_label() for h in bars]
+    return lines
     # axt.legend(bars, labs, loc="upper left")
 
 
 def messages_per_operation(ax, stats, x_axis="clients"):
     axt=ax.twinx()
     stats = correct_stat_shape(stats)
+    lines = []
     for stat in stats:
         state_machine_label = stat[0][0]['config']['state_machine']
-        messages_per_operation_line(ax, axt, stat, label=state_machine_label, x_axis=x_axis)
-    messages_per_operation_decoration(ax, axt, x_axis)
+        l = messages_per_operation_line(ax, axt, stat, label=state_machine_label, x_axis=x_axis)
+        lines.extend(l)
+    messages_per_operation_decoration(ax, axt, x_axis, lines)
 
 
 
@@ -354,6 +358,7 @@ def detect_x_axis(stats):
     x_axis=[
         "clients",
         "table size",
+        "max fill",
         "locks per message",
         "buckets per lock",
         "bucket size",
@@ -380,6 +385,8 @@ def get_x_axis(stats, name):
         return get_bucket_size_x_axis(stats)
     elif name == "read threshold bytes":
         return get_read_threshold_x_axis(stats)
+    elif name == "max fill":
+        return get_max_fill_x_axis(stats)
     elif name == "state machine":
         return get_state_machine_x_axis(stats)
     else:
@@ -441,6 +448,9 @@ def get_state_machine_x_axis(stats):
 
 def get_bucket_size_x_axis(stats):
     return get_config_axis(stats,'bucket_size')
+
+def get_max_fill_x_axis(stats):
+    return get_config_axis(stats,'max_fill')
 
 def calculate_total_runs(stats):
     s = np.array(stats).shape
@@ -527,6 +537,9 @@ def state_machines(stats):
 def bucket_size(stats):
     return ("bucket size", get_config_list(stats, "bucket_size"))
 
+def max_fill(stats):
+    return ("max fill", get_config_list(stats, "max_fill"))
+
 
 def general_stats(ax, stats):
     print("RUN STATISTICS")
@@ -548,6 +561,7 @@ def general_stats(ax, stats):
         locks_per_message,
         state_machines,
         bucket_size,
+        max_fill
     ]
     print(len(stats))
     for f in staistic_functions:
