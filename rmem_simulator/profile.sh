@@ -5,7 +5,10 @@
 # pid="$!"
 # sudo "$pyflame" -p $pid
 
-python3 -m cProfile -o profile.prof run_experiments.py
+# test_file=run_experiments.py
+test_file=test_lock_table_perf.py
+
+python3 -O -m cProfile -o profile.prof $test_file
 flameprof profile.prof > profile.svg
 
 

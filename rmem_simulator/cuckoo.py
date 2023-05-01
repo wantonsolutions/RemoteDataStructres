@@ -391,6 +391,16 @@ class LockTable:
             index += 1
         return locks
 
+    def fill_cas_range(self, starting_index, locks):
+        index = starting_index
+        for i in range(CAS_SIZE):
+            if index >= len(self.locks):
+                break
+            locks[i] = self.locks[index]
+            index += 1
+        # return locks
+
+
 
 
 
@@ -595,31 +605,35 @@ def masked_cas_lock_table(lock_table, lock_index, old, new, mask):
     assert lock_index < lock_table.total_locks, "lock index is out of bounds"
 
     index = lock_index
+    i=0
+
+    if lock_index + CAS_SIZE >= lock_table.total_locks:
+        itt_limit = lock_table.total_locks - lock_index
 
     #XOR check that the old value in the cas matches the existing lock table.
-    for o, m in zip(old,mask):
+    while i < itt_limit:
         #if the index steps out of the range of the lock table break, we have not learned anything by this
-        if index >= lock_table.total_locks:
-            break
-        if m == 1:
+        # if index >= lock_table.total_locks:
+        #     break
+        if mask[i] == 1:
             #we actually want to check the lock
-            if not lock_table.locks[index].equals(o):
-                #if the old cas value is not the same as the submitted value return the current state of the table
-                current = lock_table.get_cas_range(lock_index)
-                return (False,current)
+            if not lock_table.locks[index].equals(old[i]):
+                lock_table.fill_cas_range(lock_index, old)
+                return(False, old)
         index+=1
+        i+=1
 
     #now we just apply. At this point we know that the old value is the same as the current so we can lock and unlock accordingly.
     index = lock_index
-    for n, m in zip(new,mask):
-        if index >= lock_table.total_locks:
-            break
-        #If this value is part of the mask, set it to the cas value
-        if m == 1:
-            lock_table.locks[index].set_bit(n)
-        index += 1
-    current = lock_table.get_cas_range(lock_index)
-    return (True, current)
+    i=0
+    while i < itt_limit:
+        # if index >= lock_table.total_locks:
+        #     break
+        if mask[i] == 1:
+            lock_table.locks[index].set_bit(new[i])
+        index+=1
+        i=i+1
+    return (True, new)
 
 def fill_lock_table_masked_cas(lock_table, lock_index, success, value, mask):
     #sanity check
