@@ -818,6 +818,10 @@ class state_machine:
         self.failed_insert_count = 0
         self.insert_operation_bytes = 0
         self.insert_operation_messages = 0
+        #track rtt
+        self.current_insert_rtt = 0
+        self.insert_rtt = []
+        self.insert_rtt_count = 0
 
         #read stats
         self.current_read_messages = 0
@@ -828,6 +832,9 @@ class state_machine:
         self.failed_read_count = 0
         self.read_operation_bytes = 0
         self.read_operation_messages = 0
+        self.current_read_rtt = 0
+        self.read_rtt = []
+        self.read_rtt_count = 0
 
     def complete_read_stats(self, success, read_value):
         if success:
@@ -837,9 +844,12 @@ class state_machine:
             self.failed_read_count += 1
             self.failed_reads.append(read_value)
         self.messages_per_read.append(self.current_read_messages)
+        self.read_rtt.append(self.current_read_rtt)
+        self.read_rtt_count += self.current_read_rtt
 
         #clear for next time
         self.current_read_messages = 0
+        self.current_read_rtt=0
 
     def complete_insert_stats(self, success):
         if success:
@@ -848,6 +858,11 @@ class state_machine:
         else:
             self.failed_inserts.append(self.current_insert_value)
             self.failed_insert_count += 1
+        self.messages_per_insert.append(self.current_insert_messages)
+        self.insert_rtt.append(self.current_insert_rtt)
+        self.insert_rtt_count += self.current_insert_rtt
+        self.current_insert_rtt = 0
+        self.current_insert_messages = 0
 
 
     def get_stats(self):
@@ -871,6 +886,8 @@ class state_machine:
         stats["failed_insert_count"] = self.failed_insert_count
         stats["insert_operation_bytes"] = self.insert_operation_bytes
         stats["insert_operation_messages"] = self.insert_operation_messages
+        stats["insert_rtt"] = self.insert_rtt
+        stats["insert_rtt_count"] = self.insert_rtt_count
 
 
         stats["messages_per_read"] = self.messages_per_read
@@ -880,6 +897,8 @@ class state_machine:
         stats["failed_read_count"] = self.failed_read_count
         stats["read_operation_bytes"] = self.read_operation_bytes
         stats["read_operation_messages"] = self.read_operation_messages
+        stats["read_rtt"] = self.read_rtt
+        stats["read_rtt_count"] = self.read_rtt_count
         return stats
 
     def update_message_stats(self, messages):
@@ -1396,6 +1415,7 @@ class rcuckoobatch(client_state_machine):
         return self.begin_read(messages)
 
     def put(self):
+        self.current_insert_rtt += 1
         return self.search()
 
     def all_locks_aquired(self):
@@ -1454,6 +1474,7 @@ class rcuckoobatch(client_state_machine):
             #1) retransmit if we did not make process
             #2) or just select the next message
             if not self.all_locks_aquired():
+                self.current_insert_rtt += 1
                 return self.get_current_locking_message_with_covering_read()
 
         if message_type(message) == "read_response":
@@ -1506,6 +1527,7 @@ class rcuckoobatch(client_state_machine):
         self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.rcuckoo_hash_locations, self.current_insert_value, search_buckets)
         if len(self.search_path) == 0:
             self.info("Search Failed: " + str(self.current_insert_value) + "| unable to continue, client " + str(self.id) + " is done") if __debug__ else None
+            self.current_insert_rtt += 1
             return self.retry_insert()
         self.search_path_index = len(self.search_path) - 1
 
@@ -1514,16 +1536,14 @@ class rcuckoobatch(client_state_machine):
 
         insert_messages.extend(unlock_messages)
 
-        #I can add the unlock messages here as well because I know that I'm going to succeed at this point
+        self.current_insert_rtt+=1
         return insert_messages
 
     def complete_insert_stats(self, success):
         self.insert_path_lengths.append(len(self.search_path))
         self.index_range_per_insert.append(path_index_range(self.search_path))
-        self.messages_per_insert.append(self.current_insert_messages)
 
         #clear for next insert
-        self.current_insert_messages = 0
         return super().complete_insert_stats(success)
 
     def complete_insert(self):

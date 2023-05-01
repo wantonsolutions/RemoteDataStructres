@@ -32,6 +32,8 @@ def multi_plot_runs(runs, plot_names, directory=""):
             request_success_rate(axs[i],runs, x_axis)
         elif plot_name == "messages_per_operation":
             messages_per_operation(axs[i],runs, x_axis)
+        elif plot_name == "rtt_per_operation":
+            rtt_per_operation(axs[i],runs, x_axis)
         elif plot_name == "fill_factor":
             fill_factor(axs[i],runs, x_axis)
         else:
@@ -105,7 +107,7 @@ def cas_success_rate(ax, stats, x_axis="clients"):
 def cas_success_rate_decoration(ax, x_axis):
     ax.set_ylabel("CAS success rate")
     ax.set_xlabel(x_axis)
-    ax.set_ylim(bottom=0, top=1.1)
+    # ax.set_ylim(bottom=0, top=1.1)
 
 
 def get_client_total_ops(client):
@@ -234,6 +236,38 @@ def messages_per_operation(ax, stats, x_axis="clients"):
         l = messages_per_operation_line(ax, axt, stat, label=state_machine_label, x_axis=x_axis)
         lines.extend(l)
     messages_per_operation_decoration(ax, axt, x_axis, lines)
+
+def rtt_per_operation_decoration(ax, axt, x_axis, lines):
+    ax.set_ylabel("insert - rtt/op")
+    axt.set_ylabel("read - rtt/op")
+    ax.set_xlabel(x_axis)
+    ax.set_ylim(bottom=0)
+    axt.set_ylim(bottom=0)
+    labs = [l.get_label() for l in lines]
+    ax.legend(lines, labs)
+
+def rtt_per_operation_line(ax, axt, stats, label, x_axis="clients"):
+    print("RTT PER OPERATION")
+
+    read_rtt, read_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'read_rtt_count', 'completed_read_count')
+    insert_rtt, insert_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'insert_rtt_count', 'completed_insert_count')
+    x_axis_vals = get_x_axis(stats, x_axis)
+
+    h1 = ax.errorbar(x_axis_vals,insert_rtt,yerr=insert_err, linestyle=op_linestyles['insert'], marker=op_markers['insert'], label=label+"-insert")
+    h2 = axt.errorbar(x_axis_vals,read_rtt,yerr=read_err, linestyle=op_linestyles['read'], label=label+"-read", marker=op_markers['read'])
+
+    lines = [h1, h2] 
+    return lines
+
+def rtt_per_operation(ax, stats, x_axis="clients"):
+    axt=ax.twinx()
+    stats = correct_stat_shape(stats)
+    lines = []
+    for stat in stats:
+        state_machine_label = stat[0][0]['config']['state_machine']
+        l = rtt_per_operation_line(ax, axt, stat, label=state_machine_label, x_axis=x_axis)
+        lines.extend(l)
+    rtt_per_operation_decoration(ax, axt, x_axis, lines)
 
 
 

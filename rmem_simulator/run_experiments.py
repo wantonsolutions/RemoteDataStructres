@@ -240,6 +240,7 @@ def plot_general_stats_last_run():
         "cas_success_rate",
         "read_write_ratio",
         "request_success_rate",
+        "rtt_per_operation",
         "bytes_per_operation",
         "messages_per_operation",
         "fill_factor"
@@ -267,13 +268,13 @@ def insertion_debug():
     config = get_config()
     config['indexes'] = table_size
     config['num_clients'] = 1
-    config['num_steps'] = 50000
+    config['num_steps'] = 5000000
     config['read_threshold_bytes'] = 256
     config["buckets_per_lock"] = 1
     config["locks_per_message"] = 64
     config["trials"] = 1
-    # config["state_machine"]=cuckoo.rcuckoobatch
-    config["state_machine"]=sm.race
+    config["state_machine"]=cuckoo.rcuckoobatch
+    # config["state_machine"]=sm.race
     log.set_debug()
 
     runs.append(run_trials(config))
@@ -554,7 +555,7 @@ def fill_factor_limit_experiment():
     logger.info("Starting simulator")
     multi_runs=[]
     table_size = 1680  * 4 #lcm of 3,4,5,6,7,8,10,12,14,16
-    clients = 4
+    clients = 8
     bucket_size=8
     fill_factors = [10, 20, 30, 40, 50, 60, 70, 80, 90]
     state_machines = [cuckoo.rcuckoobatch,sm.race]
@@ -599,7 +600,7 @@ def plot_race_bucket_fill_factor():
 # success_rate_contention_machines()
 # success_rate_contention()
 # race_bucket_size_fill_factor()
-# fill_factor_limit_experiment()
+fill_factor_limit_experiment()
 plot_general_stats_last_run()
 
 # read_threshold_experiment()

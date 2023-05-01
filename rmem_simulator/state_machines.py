@@ -25,6 +25,7 @@ class race(client_state_machine):
 
     def put(self):
         messages = race_messages(self.current_insert_value, self.table.table_size, self.table.row_size_bytes())
+        self.current_insert_rtt+=1
         return self.begin_insert(messages)
 
     def get(self):
@@ -81,6 +82,8 @@ class race(client_state_machine):
 
         #If CAS failed, try the insert a second time.
         success = args["success"]
+        #increment the rtt fdor both cases
+        self.current_insert_rtt+=1
         if not success:
             self.debug("Insert Failed: " + str(self.current_insert_value) + "| trying again")
             #try again
@@ -111,6 +114,7 @@ class race(client_state_machine):
                 self.inserting=False
                 return None
             else:
+                self.current_insert_rtt+=1
                 return self.insert_cas()
     
 
