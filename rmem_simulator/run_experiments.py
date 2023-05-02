@@ -201,12 +201,17 @@ def plot_hash_distribution():
     ax.hist(secondary, bins=bins)
     plt.savefig("hash_distribution.pdf")
 
+def distance_to_bytes(a, b, bucket_size, entry_size):
+    bucket_width = bucket_size * entry_size
+    return abs(a-b)*bucket_width
 
 def plot_hash_factor_distance_cdf():
     import hash
-    factors = [1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.0]
+    # factors = [1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.0]
+    factors = [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
     samples = 10000
     table_size = 512
+    bucket_size = 8
     fig, ax = plt.subplots()
     ax.set_xlabel('Read Size (Bytes)')
     ax.set_ylabel('CDF')
@@ -217,10 +222,10 @@ def plot_hash_factor_distance_cdf():
         distances = []
         for i in range(samples):
             v1, v2 = hash.rcuckoo_hash_locations(i, table_size)
-            distances.append(8 + (abs(v1-v2) * 8))
+            distances.append(distance_to_bytes(v1, v2, bucket_size, 8))
         x, y = cdf(distances)
         ax.plot(x,y, label=str(f))
-    ax.set_xlim(0,1500)
+    ax.set_xlim(0,4096)
     ax.legend()
     plt.tight_layout()
     plt.savefig("hash_factor_distance_cdf.pdf")
@@ -321,29 +326,6 @@ def avg_run_debug():
     save_statistics(runs)
 
 
-def locks_per_message_experiment():
-    logger = log.setup_custom_logger('root')
-    logger.info("Starting simulator")
-
-    table_size = 2048
-    clients=8
-    runs=[]
-    read_threshold=128
-    locks_per_message_arr=[1, 2, 4, 8, 16, 32, 64]
-    # locks_per_message_arr=[1, 2]
-    for locks_per_message in locks_per_message_arr:
-        print("read threshold: ", read_threshold)
-        config = simulator.default_config()
-        config['indexes'] = table_size
-        config['num_clients'] = clients
-        config['num_steps'] = 1000000
-        config['read_threshold_bytes'] = read_threshold
-
-        config["buckets_per_lock"] = 1
-        config["locks_per_message"] = locks_per_message
-        log.set_off()
-        runs.append(run_trials(config))
-    save_statistics(runs)
 
 
 def locks_per_message_experiment():
@@ -500,7 +482,7 @@ def success_rate_contention_machines():
     logger.info("Starting simulator")
     multi_runs=[]
     table_size = 1680  * 4 #lcm of 3,4,5,6,7,8,10,12,14,16
-    clients=[1,2,4,8,16]
+    clients=[1,2,4,8,16,32]
     bucket_size=8
     state_machines = [cuckoo.rcuckoobatch,sm.race]
     # state_machines = [sm.race]
@@ -532,7 +514,7 @@ def success_rate_contention():
     table_size = 2048
     # clients=[1,2,4,8]
     # clients=[32,64]
-    clients=[1,2,4,8,16, 32, 64]
+    clients=[1]
     bucket_size=8
     runs=[]
     log.set_off()
@@ -580,6 +562,29 @@ def fill_factor_limit_experiment():
     save_statistics(multi_runs)
     plot_general_stats_last_run()
 
+def locks_per_message_experiment():
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator")
+
+    runs=[]
+    locks_per_message_arr=[1, 2, 4, 8, 16, 32, 64]
+    log.set_off()
+    # locks_per_message_arr=[1, 2]
+    for locks_per_message in locks_per_message_arr:
+        config = get_config()
+        config["locks_per_message"] = locks_per_message
+        config['indexes'] = 4098 * 32
+        config['num_clients'] = 1
+        config['num_steps'] = 100000000
+        config['read_threshold_bytes'] = 128
+        config['trials'] = 1
+        config["buckets_per_lock"] = 1
+        config["state_machine"] = cuckoo.rcuckoobatch
+        config['max_fill']=100
+        config['bucket_size']=8
+        runs.append(run_trials(config))
+    save_statistics(runs)
+
 
 
 def plot_race_bucket_fill_factor():
@@ -589,18 +594,19 @@ def plot_race_bucket_fill_factor():
 
 
 
-# locks_per_message_experiment()
+locks_per_message_experiment()
 # global_lock_success_rate()
 # plot_global_lock_success_rate()
 
 # todos()
 
 # insertion_debug()
+# plot_hash_factor_distance_cdf()
 
 # success_rate_contention_machines()
 # success_rate_contention()
 # race_bucket_size_fill_factor()
-fill_factor_limit_experiment()
+# fill_factor_limit_experiment()
 plot_general_stats_last_run()
 
 # read_threshold_experiment()

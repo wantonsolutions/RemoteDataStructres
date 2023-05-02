@@ -200,6 +200,8 @@ def a_star_search(table, location_func, value, open_buckets=None):
     table_size = table.table_size
     bucket_size = table.bucket_size
     targets = find_closest_target_n_bi_directional(table, location_func, value, 20)
+    # targets = list(set(targets))
+    # print(targets)
 
     while (len(targets) > 0):
         target_index = targets.pop(0)

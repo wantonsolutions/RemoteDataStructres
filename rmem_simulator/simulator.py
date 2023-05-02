@@ -310,9 +310,9 @@ class Simulator(Node):
         #initialize switch
         switch_config = {'switch_id': 0}
         self.switch = Switch(switch_config)
-
-
         self.config['state_machine']=get_state_machine_name(self.config['state_machine'])
+
+        print(self.config)
 
         #run simulation
         for i in range(self.config['num_steps']):

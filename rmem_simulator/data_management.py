@@ -2,9 +2,10 @@ import os
 from datetime import date, datetime
 import json
 import git
+import gzip
 
 DATA_DIR="data"
-STATISTICS_FILE="statistics.json"
+STATISTICS_FILE="statistics.json.gz"
 INFO_FILE="info.md"
 
 def check_and_create_data_dir():
@@ -61,8 +62,9 @@ def save_statistics(statistics):
     exp_dir = create_experiment_dir()
     create_info_file(exp_dir)
     stat_file_name = os.path.join(exp_dir, STATISTICS_FILE)
-    with open(stat_file_name, "w") as f:
-        f.write(stats)
+    with gzip.open(stat_file_name, "w") as f:
+        f.write(stats.encode('utf-8'))
+        f.close()
     make_dir_latest(exp_dir)
 
 def load_statistics(dirname=""):
@@ -71,7 +73,7 @@ def load_statistics(dirname=""):
 
     filename = os.path.join(DATA_DIR, dirname, STATISTICS_FILE)
     dir = os.path.join(DATA_DIR, dirname)
-    with open(filename, "r") as f:
+    with gzip.open(filename, "r") as f:
         stats = json.load(f)
     return stats, dir
 
