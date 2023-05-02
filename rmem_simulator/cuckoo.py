@@ -40,7 +40,17 @@ class path_element:
     def __sub__(self, other):
         return self.bucket_index - other.bucket_index
 
-def random_dfs_search(table, location_func, pe, path, open_buckets):
+DEPTH_LIMIT = 100
+def random_dfs_search(table, location_func, path, open_buckets, visited):
+    if len(path) > DEPTH_LIMIT:
+        return False, path
+
+    pe = path[-1]
+    if pe.key in visited:
+        return False, path
+    else:
+        visited[pe.key] = True
+
     table_index, index = next_search_location(pe, location_func, table)
     #search for an empty slot in this bucket
 
@@ -57,13 +67,22 @@ def random_dfs_search(table, location_func, pe, path, open_buckets):
     
     #here we have a full bucket we need to evict a candidate
     #randomly select an eviction candidate
-    evict_index = random.randint(0, table.bucket_size-1)
-    pe = path_element(table.get_entry(index,evict_index), table_index, index, evict_index)
-    if key_causes_a_path_loop(path, pe.key):
-        path = []
-    else:
-        path.append(pe)
-    
+    indicies = list(range(0, table.bucket_size))
+    random.shuffle(indicies)
+    for evict_index in indicies:
+        pe = path_element(table.get_entry(index,evict_index), table_index, index, evict_index)
+        if not key_causes_a_path_loop(path, pe.key):
+            path.append(pe)
+        else:
+            continue
+        
+        success, path = random_dfs_search(table, location_func, path, open_buckets, visited)
+
+        if success:
+            return True, path
+        else:
+            path.pop()
+        
     return False, path
 
 
@@ -71,10 +90,11 @@ def bucket_cuckoo_insert(table, location_func, value, open_buckets=None):
     success=False
     pe = path_element(value, -1,-1,-1)
     path=[pe]
-    while not success:
-        success, path = random_dfs_search(table, location_func, path[-1], path, open_buckets)
-        if path == []:
-            break
+    visited = dict()
+    success, path = random_dfs_search(table, location_func, path, open_buckets, visited)
+    if not success:
+        print("failed insert")
+        path=[]
     return path
 
 
@@ -358,7 +378,6 @@ def bucket_cuckoo_random_insert(table, location_func, value, open_buckets=None):
     insert_path=bucket_cuckoo_insert(table, location_func, value, open_buckets)
     if len(insert_path) == 0:
         return []
-    # insert_path = insert_paths[random.randint(0, len(insert_paths)-1)]
     return insert_path
 
 class Message:
@@ -1474,6 +1493,19 @@ class rcuckoobatch(client_state_machine):
         self.current_lock_read_messages = []
         self.locking_message_index = 0
 
+        self.set_search_function(config)
+
+    def set_search_function(self, config):
+        search_function = config['search_function']
+        if search_function == "a_star":
+            self.table_search_function = self.a_star_insert_self
+        elif search_function == "random":
+            self.table_search_function = self.random_insert_self
+        else:
+            raise Exception("unknown search function")
+
+
+
 
     def get(self):
         messages = read_threshold_message(self.current_read_key, self.read_threshold_bytes, self.table.table_size, self.table.row_size_bytes())
@@ -1571,10 +1603,17 @@ class rcuckoobatch(client_state_machine):
     def a_star_insert_self(self, limit_to_buckets=None):
         return bucket_cuckoo_a_star_insert(self.table, hash.rcuckoo_hash_locations, self.current_insert_value, limit_to_buckets)
 
+    def random_insert_self(self, limit_to_buckets=None):
+        return bucket_cuckoo_random_insert(self.table, hash.rcuckoo_hash_locations, self.current_insert_value, limit_to_buckets)
+
+    def table_search_function(self, limit_to_buckets=None):
+        # return self.a_star_insert_self(limit_to_buckets)
+        raise Exception("This function should be overloaded with a search function for example", str(self.a_star_insert_self))
+
     def search(self, message=None):
         assert message == None, "there should be no message passed to search"
 
-        self.search_path=self.a_star_insert_self()
+        self.search_path=self.table_search_function()
         if len(self.search_path) == 0:
             self.info("Search Failed: " + str(self.current_insert_value) + "| unable to continue, client " + str(self.id) + " is done")
             self.complete=True
@@ -1591,7 +1630,7 @@ class rcuckoobatch(client_state_machine):
         #todo there are going to be cases where this fails because
 
         search_buckets=lock_indexes_to_buckets(self.locks_held, self.buckets_per_lock)
-        self.search_path=self.a_star_insert_self(search_buckets)
+        self.search_path=self.table_search_function(search_buckets)
         if len(self.search_path) == 0:
             self.info("Search Failed: " + str(self.current_insert_value) + "| unable to continue, client " + str(self.id) + " is done") if __debug__ else None
             self.current_insert_rtt += 1

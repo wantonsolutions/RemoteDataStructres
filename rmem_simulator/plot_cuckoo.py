@@ -574,6 +574,9 @@ def bucket_size(stats):
 def max_fill(stats):
     return ("max fill", get_config_list(stats, "max_fill"))
 
+def search_function(stats):
+    return ("search function", get_config_list(stats, "search_function"))
+
 
 def general_stats(ax, stats):
     print("RUN STATISTICS")
@@ -595,7 +598,8 @@ def general_stats(ax, stats):
         locks_per_message,
         state_machines,
         bucket_size,
-        max_fill
+        max_fill,
+        search_function,
     ]
     print(len(stats))
     for f in staistic_functions:
