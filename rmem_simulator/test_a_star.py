@@ -108,6 +108,23 @@ def factor_debug(memory_size, bucket_size, buckets_per_lock):
             table.print_table()
         # table.print_table()
 
+
+def random_search_debug(memory_size, bucket_size, buckets_per_lock):
+    table = Table(memory_size, bucket_size, buckets_per_lock)
+    inserts = deterministic_inserts(memory_size)
+    factor=1.8
+    hash.set_factor(factor)
+    for i in tqdm(range(len(inserts))):
+        search_path=bucket_cuckoo_random_insert(table, hash.rcuckoo_hash_locations, inserts[i])
+        print(search_path)
+        if len(search_path) == 0:
+            print("Search Failed: " + str(inserts[i]), hash.rcuckoo_hash_locations(inserts[i],(int((memory_size/bucket_size)/8))))
+            break
+        insert_cuckoo_path(search_path, table)
+        table.print_table()
+    # table.print_table()
+
 memory_size=1024
-factor_debug(memory_size, bucket_size, buckets_per_lock)
+# factor_debug(memory_size, bucket_size, buckets_per_lock)
+random_search_debug(memory_size, bucket_size, buckets_per_lock)
 

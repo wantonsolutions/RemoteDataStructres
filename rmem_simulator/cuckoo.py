@@ -40,6 +40,58 @@ class path_element:
     def __sub__(self, other):
         return self.bucket_index - other.bucket_index
 
+def random_dfs_search(table, location_func, pe, path, open_buckets):
+    table_index, index = next_search_location(pe, location_func, table)
+    #search for an empty slot in this bucket
+
+    if open_buckets != None:
+        if not index in open_buckets:
+            return False, path
+
+    if table.bucket_has_empty(index):
+        # print("Found Slot:" + str(search_element.pe))
+        bucket_index = table.get_first_empty_index(index)
+        pe = path_element(table.get_entry(index,bucket_index),table_index,index,bucket_index)
+        path.append(pe)
+        return True, path
+    
+    #here we have a full bucket we need to evict a candidate
+    #randomly select an eviction candidate
+    evict_index = random.randint(0, table.bucket_size-1)
+    pe = path_element(table.get_entry(index,evict_index), table_index, index, evict_index)
+    if key_causes_a_path_loop(path, pe.key):
+        path = []
+    else:
+        path.append(pe)
+    
+    return False, path
+
+
+def bucket_cuckoo_insert(table, location_func, value, open_buckets=None):
+    success=False
+    pe = path_element(value, -1,-1,-1)
+    path=[pe]
+    while not success:
+        success, path = random_dfs_search(table, location_func, path[-1], path, open_buckets)
+        if path == []:
+            break
+    return path
+
+
+def next_search_location(pe, location_func, table):
+    locations = location_func(pe.key, table.table_size)
+    table_index = next_table_index(pe.table_index)
+    #here the index is the row in the table
+    index = locations[table_index]
+    return table_index, index
+
+def key_causes_a_path_loop(path, key):
+    for pe in path:
+        if pe.key == key:
+            return True
+    return False
+
+
 #print a list of path elements
 #todo refactor to create a class called path
 def print_path(path):
@@ -196,6 +248,8 @@ def fscore(element, target_index, table_size):
         f_score = g_score + h_score
         return f_score
 
+
+
 def a_star_search(table, location_func, value, open_buckets=None):
     table_size = table.table_size
     bucket_size = table.bucket_size
@@ -296,6 +350,15 @@ def bucket_cuckoo_a_star_insert(table, location_func, value, open_buckets=None):
     if len(insert_paths) == 0:
         return []
     insert_path = insert_paths[random.randint(0, len(insert_paths)-1)]
+    return insert_path
+
+def bucket_cuckoo_random_insert(table, location_func, value, open_buckets=None):
+    if table.full():
+        return []
+    insert_path=bucket_cuckoo_insert(table, location_func, value, open_buckets)
+    if len(insert_path) == 0:
+        return []
+    # insert_path = insert_paths[random.randint(0, len(insert_paths)-1)]
     return insert_path
 
 class Message:
@@ -1505,11 +1568,13 @@ class rcuckoobatch(client_state_machine):
                     return self.search()
             return None
 
+    def a_star_insert_self(self, limit_to_buckets=None):
+        return bucket_cuckoo_a_star_insert(self.table, hash.rcuckoo_hash_locations, self.current_insert_value, limit_to_buckets)
 
     def search(self, message=None):
         assert message == None, "there should be no message passed to search"
 
-        self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.rcuckoo_hash_locations, self.current_insert_value)
+        self.search_path=self.a_star_insert_self()
         if len(self.search_path) == 0:
             self.info("Search Failed: " + str(self.current_insert_value) + "| unable to continue, client " + str(self.id) + " is done")
             self.complete=True
@@ -1526,7 +1591,7 @@ class rcuckoobatch(client_state_machine):
         #todo there are going to be cases where this fails because
 
         search_buckets=lock_indexes_to_buckets(self.locks_held, self.buckets_per_lock)
-        self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.rcuckoo_hash_locations, self.current_insert_value, search_buckets)
+        self.search_path=self.a_star_insert_self(search_buckets)
         if len(self.search_path) == 0:
             self.info("Search Failed: " + str(self.current_insert_value) + "| unable to continue, client " + str(self.id) + " is done") if __debug__ else None
             self.current_insert_rtt += 1
