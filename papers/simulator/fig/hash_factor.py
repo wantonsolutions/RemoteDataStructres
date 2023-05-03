@@ -32,7 +32,7 @@ def gen_hash_factor_distance_cdf():
 
 def plot_hash_factor_distance_cdf():
     global factors
-    fig, ax = plt.subplots(1,1,figsize=(5,2.5))
+    fig, ax = plt.subplots(1,1,figsize=(4,2.5))
     all_distances = dm.load_statistics(dirname=data_dir)
     all_distances = all_distances[0]
     print("all distance post load: ", len(all_distances))
@@ -44,7 +44,8 @@ def plot_hash_factor_distance_cdf():
         ax.plot(x,y, label="f="+str(f))
 
     x = [32, 64, 128, 256, 512, 1024, 2048, 4096]
-    x_str = [ str(i) for i in x]
+    x_str = ["32", "64", "128", "256", "512", "1K", "2K", "4K"]
+    # x_str = [ str(i) for i in x]
 
     ax.set_xlabel('Distance (Bytes)')
     ax.set_ylabel('CDF')
