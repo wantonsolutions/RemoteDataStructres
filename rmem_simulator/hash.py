@@ -50,6 +50,10 @@ def to_base(n, base):
         nums.append(str(r))
     return ''.join(reversed(nums))
 
+def distance_to_bytes(a, b, bucket_size, entry_size):
+    bucket_width = bucket_size * entry_size
+    return abs(a-b)*bucket_width
+
 def h3_suffix_base(key, base):
     val = int(h3(key),16)
     val = to_base(val,base)

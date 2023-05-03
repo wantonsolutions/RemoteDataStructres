@@ -211,6 +211,22 @@ op_markers={"read": "s", "insert": "o"}
 op_linestyles={"read": "-", "insert": ":"}
 
 
+def cdf(data):
+    high = max(data)
+    low = min(data)
+    # norm = plt.colors.Normalize(low,high)
+
+    #print(data)
+    count, bins_count = np.histogram(data, bins = 100000 )
+    pdf = count / sum(count)
+    
+    y = np.cumsum(pdf)
+    x = bins_count[1:]
+
+    y= np.insert(y,0,0)
+    x= np.insert(x,0,x[0])
+    return x, y
+
 def messages_per_operation_line(ax, axt, stats, label, x_axis="clients"):
     print("MESSAGES PER OPERATION")
 

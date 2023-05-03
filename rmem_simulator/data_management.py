@@ -8,13 +8,16 @@ DATA_DIR="data"
 STATISTICS_FILE="statistics.json.gz"
 INFO_FILE="info.md"
 
-def check_and_create_data_dir():
+def check_and_create_data_dir(dirname=""):
+
+    if dirname == "":
+        dirname = DATA_DIR
     """Check if the data directory exists, and if not, create it."""
-    if not os.path.exists(DATA_DIR):
-        os.makedirs(DATA_DIR)
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
 
     #verify that the directory exists
-    if not os.path.exists(DATA_DIR):
+    if not os.path.exists(dirname):
         raise Exception("Could not create the data directory.")
 
     print("Data directory exists.")
@@ -37,7 +40,7 @@ def current_experiment_dir():
     current_directory = os.path.join(DATA_DIR, d1 + "_" + suffix)
     return current_directory
 
-def create_experiment_dir():
+def create_experiment_dir(dirname=""):
     print("TODO make a function that archives all the directories older than 1 day")
     check_and_create_data_dir()
     """Create a new directory for the current experiment."""
@@ -56,22 +59,28 @@ def make_dir_latest(directory):
     print(directory, latest_dir)
     os.symlink(directory, latest_dir)
 
-def save_statistics(statistics):
-    print(statistics)
+def save_statistics(statistics, dirname=""):
+    # print(statistics)
     stats = json.dumps(statistics, indent=4)
-    exp_dir = create_experiment_dir()
+    if dirname == "":
+        exp_dir=current_experiment_dir()
+    else:
+        exp_dir=dirname
+    # exp_dir = create_experiment_dir()
     create_info_file(exp_dir)
     stat_file_name = os.path.join(exp_dir, STATISTICS_FILE)
     with gzip.open(stat_file_name, "w") as f:
         f.write(stats.encode('utf-8'))
         f.close()
-    make_dir_latest(exp_dir)
+    if dirname == "":
+        make_dir_latest(exp_dir)
 
 def load_statistics(dirname=""):
     if dirname == "":
         dirname = "latest"
-
-    filename = os.path.join(DATA_DIR, dirname, STATISTICS_FILE)
+        filename = os.path.join(DATA_DIR, dirname, STATISTICS_FILE)
+    else:
+        filename = os.path.join(dirname, STATISTICS_FILE)
     dir = os.path.join(DATA_DIR, dirname)
     with gzip.open(filename, "r") as f:
         stats = json.load(f)

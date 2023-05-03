@@ -123,21 +123,6 @@ def plot_factor_table_size_experiments():
     plt.savefig("factor_fill_rate.pdf")
 
 
-def cdf(data):
-    high = max(data)
-    low = min(data)
-    # norm = plt.colors.Normalize(low,high)
-
-    #print(data)
-    count, bins_count = np.histogram(data, bins = 100000 )
-    pdf = count / sum(count)
-    
-    y = np.cumsum(pdf)
-    x = bins_count[1:]
-
-    y= np.insert(y,0,0)
-    x= np.insert(x,0,x[0])
-    return x, y
 
 def plot_insertion_range_cdf():
     table_size = 1024
@@ -201,15 +186,12 @@ def plot_hash_distribution():
     ax.hist(secondary, bins=bins)
     plt.savefig("hash_distribution.pdf")
 
-def distance_to_bytes(a, b, bucket_size, entry_size):
-    bucket_width = bucket_size * entry_size
-    return abs(a-b)*bucket_width
 
 def plot_hash_factor_distance_cdf():
     import hash
     # factors = [1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.0]
     factors = [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
-    samples = 10000
+    samples = 100000
     table_size = 512
     bucket_size = 8
     fig, ax = plt.subplots()
@@ -595,20 +577,20 @@ def plot_race_bucket_fill_factor():
 
 
 
-locks_per_message_experiment()
+# locks_per_message_experiment()
 # global_lock_success_rate()
 # plot_global_lock_success_rate()
 
 # todos()
 
 # insertion_debug()
-# plot_hash_factor_distance_cdf()
+plot_hash_factor_distance_cdf()
 
 # success_rate_contention_machines()
 # success_rate_contention()
 # race_bucket_size_fill_factor()
 # fill_factor_limit_experiment()
-plot_general_stats_last_run()
+# plot_general_stats_last_run()
 
 # read_threshold_experiment()
 # buckets_per_lock_experiment()
