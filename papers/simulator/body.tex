@@ -1,0 +1,86 @@
+\section{Introduction}
+\label{sec:intro}
+
+
+\section{Background}
+\label{sec:background}
+
+\subsection{RDMA}
+
+RDMA is a networking technology which allows client machines
+to directly access the memory of a remote server. RDMA is an
+enabling technology for memory disaggregation as
+\textit{memory servers} do not need any computation
+resources (save setting up the RDMA memory initially).
+
+One sided RDMA verbs (read, write, atomic) are used to
+access remote memory without any memory side computation.
+One sided verbs require RDMA reliable connections which
+guarantee in-order delivery of operations.
+
+
+\subsection{Remote Memory Data Structures}
+
+\section{Problems}
+\label{sec:problems}
+
+Designing data structures for remote memory is hard. The
+primary reason is that there is no centralized serialization
+point to guard access to remote memory. Traditional key
+value stores (Memcached~\cite{memcached}), and even RDMA
+based Key-value stores~\cite{herd,erpc,pilaf} use a mixture
+of one-sided and two-sided verbs. Normally writes are two
+sided, and the memory-side CPU performs locking close to
+memory and ensures that all writes are issued in order.
+
+In remote memory, no such CPU exists. To get serialization
+expensive RDMA atomic operations like \textit{compare and
+swap}(CAS) must be used. Atomic operations are by no means a
+silver bullet. With a CPU close to memory critical sections
+are small. Consider inserts into a cuckoo hash table with a
+long path. The CPU acquires some number of locks in memory
+then performs a series of reads and wites to commit the path
+before unlocking. Reads writes and locking only consumes a
+memory access ~50ns which keeps the critical section small.
+In contrast locking with RDMA atomic operations and
+performing multiple lookups is very expensive.
+
+First, acquiring a lock means a round trip. If the table has
+a single lock, then a client is guaranteed to be able to
+gather all the locks it requires in a single round trip.
+However a single lock does not scale as only a single writer
+can write at a time. This matter is made worse by the fact
+that the critical section of the lock is larger in remote
+memory. Breaking the table up into subtables each with it's
+own lock has it's own problems. An insertion with a long
+path will potentially need to acquire many locks. Each of
+which requires a round trip. Therefore using fine grained
+locking increases the tables scalability but increases it's
+base case insertion time.
+
+Reading is the most common case operation, and should be
+optimized for at the time of writing no remote memory hash
+tables guarantee a read in a single round trip. Race
+requires two, the first round trip is to read the hash index
+and the second is to read the value from the out of table
+data. Race can not inline data into the hash table because
+all of it's index updates must occur in a single CAS
+operation. In the case of locks the size of the index
+structure is arbitrary.
+
+
+\section{Design}
+\label{sec:design}
+
+\subsection{Locality Hashing}
+
+\subsection{Locking}
+
+\subsection{Protocol}
+
+
+\section{Evaluation}
+\label{sec:eval}
+
+\section{Conclusion}
+\label{sec:conclusion}
