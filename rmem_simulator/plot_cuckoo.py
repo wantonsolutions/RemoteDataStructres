@@ -249,12 +249,17 @@ def rtt_per_operation_decoration(ax, axt, x_axis, lines):
 def rtt_per_operation_line(ax, axt, stats, label, x_axis="clients"):
     print("RTT PER OPERATION")
 
-    read_rtt, read_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'read_rtt_count', 'completed_read_count')
-    insert_rtt, insert_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'insert_rtt_count', 'completed_insert_count')
+    # read_rtt, read_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'read_rtt_count', 'completed_read_count')
+    # insert_rtt, insert_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'insert_rtt_count', 'completed_insert_count')
+    percentile = 99
+    read_rtt, read_err = client_stats_get_percentile_err_trials(stats, 'read_rtt', percentile)
+    insert_rtt, insert_err = client_stats_get_percentile_err_trials(stats, 'insert_rtt', percentile)
+
+
     x_axis_vals = get_x_axis(stats, x_axis)
 
-    h1 = ax.errorbar(x_axis_vals,insert_rtt,yerr=insert_err, linestyle=op_linestyles['insert'], marker=op_markers['insert'], label=label+"-insert")
-    h2 = axt.errorbar(x_axis_vals,read_rtt,yerr=read_err, linestyle=op_linestyles['read'], label=label+"-read", marker=op_markers['read'])
+    h1 = ax.errorbar(x_axis_vals,insert_rtt,yerr=insert_err, linestyle=op_linestyles['insert'], marker=op_markers['insert'], label=label+"-insert-p"+str(percentile))
+    h2 = axt.errorbar(x_axis_vals,read_rtt,yerr=read_err, linestyle=op_linestyles['read'], label=label+"-read-p"+str(percentile), marker=op_markers['read'])
 
     lines = [h1, h2] 
     return lines
@@ -375,6 +380,9 @@ def client_stats_x_per_y_get_mean_std(stat, x,y):
             x_val = client['stats'][x]
             vals.append(div_by_zero_to_zero(x_val, y_val))
         return np.mean(vals), stderr(vals)
+        # print("90th percentile: ", np.percentile(vals,99))
+        # return np.percentile(vals,99), stderr(vals)
+
 
 def client_stats_x_per_y_get_mean_std_multi_run_trials(stats, x, y):
     means, stds = [], []
@@ -384,6 +392,29 @@ def client_stats_x_per_y_get_mean_std_multi_run_trials(stats, x, y):
             m, s = (client_stats_x_per_y_get_mean_std(run, x, y))
             r_means.append(m)
             r_stds.append(s)
+        means.append(np.mean(r_means))
+        stds.append(np.mean(r_stds))
+    return means, stds
+
+def client_stats_get_percentile_err(stat, key, percentile):
+    vals = []
+    for client in stat['clients']:
+        vals.extend(client['stats'][key])
+    print(vals)
+    if len(vals) == 0:
+        return 0, 0
+    print("PERCENTILE: ",np.percentile(vals, percentile))
+    return np.percentile(vals, percentile), stderr(vals)
+
+def client_stats_get_percentile_err_trials(stats, key, percentile):
+    means, stds = [], []
+    for stat in stats:
+        r_means, r_stds = [], []
+        for run in stat:
+            m, s = (client_stats_get_percentile_err(run, key, percentile))
+            r_means.append(m)
+            r_stds.append(s)
+        print("MEANS!!!: ", r_means)
         means.append(np.mean(r_means))
         stds.append(np.mean(r_stds))
     return means, stds

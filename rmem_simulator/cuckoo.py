@@ -1494,6 +1494,8 @@ class rcuckoobatch(client_state_machine):
         self.locking_message_index = 0
 
         self.set_search_function(config)
+        self.location_function = hash.rcuckoo_hash_locations
+        # self.location_function = hash.rcuckoo_hash_locations_independent
 
     def set_search_function(self, config):
         search_function = config['search_function']
@@ -1601,10 +1603,10 @@ class rcuckoobatch(client_state_machine):
             return None
 
     def a_star_insert_self(self, limit_to_buckets=None):
-        return bucket_cuckoo_a_star_insert(self.table, hash.rcuckoo_hash_locations, self.current_insert_value, limit_to_buckets)
+        return bucket_cuckoo_a_star_insert(self.table, self.location_function, self.current_insert_value, limit_to_buckets)
 
     def random_insert_self(self, limit_to_buckets=None):
-        return bucket_cuckoo_random_insert(self.table, hash.rcuckoo_hash_locations, self.current_insert_value, limit_to_buckets)
+        return bucket_cuckoo_random_insert(self.table, self.location_function, self.current_insert_value, limit_to_buckets)
 
     def table_search_function(self, limit_to_buckets=None):
         # return self.a_star_insert_self(limit_to_buckets)

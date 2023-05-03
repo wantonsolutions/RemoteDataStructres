@@ -573,7 +573,7 @@ def locks_per_message_experiment():
     for locks_per_message in locks_per_message_arr:
         config = get_config()
         config["locks_per_message"] = locks_per_message
-        config['indexes'] = 2048
+        config['indexes'] = 4096 * 4
         config['num_clients'] = 1
         config['num_steps'] = 100000000
         config['read_threshold_bytes'] = 128
@@ -582,6 +582,7 @@ def locks_per_message_experiment():
         config["state_machine"] = cuckoo.rcuckoobatch
         config['max_fill']=100
         config['bucket_size']=8
+        config['search_function']="a_star"
         runs.append(run_trials(config))
     save_statistics(runs)
 
@@ -594,13 +595,13 @@ def plot_race_bucket_fill_factor():
 
 
 
-# locks_per_message_experiment()
+locks_per_message_experiment()
 # global_lock_success_rate()
 # plot_global_lock_success_rate()
 
 # todos()
 
-insertion_debug()
+# insertion_debug()
 # plot_hash_factor_distance_cdf()
 
 # success_rate_contention_machines()

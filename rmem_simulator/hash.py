@@ -67,11 +67,24 @@ def rcuckoo_secondary_location(key, factor, table_size):
 
     return (primary + secondary) % table_size
 
+def rcuckoo_secondary_location_independent(key, factor, table_size):
+    h = int(h2(key),16)
+    h = (h % int(table_size / 2)) * 2 + 1
+    return h
+
 def rcuckoo_hash_locations(key, table_size):
     global factor
     p = rcuckoo_primary_location(key, table_size)
     s = rcuckoo_secondary_location(key, factor, table_size)
     return (p,s)
+
+def rcuckoo_hash_locations_independent(key, table_size):
+    global factor
+    p = rcuckoo_primary_location(key, table_size)
+    s = rcuckoo_secondary_location_independent(key, factor, table_size)
+    return (p,s)
+
+
 
 ## race
 
