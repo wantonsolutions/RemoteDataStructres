@@ -122,7 +122,25 @@ enables some pairs to act as ~\textit{waypoints} to other
 regions of the table. This method, paired with associative
 in the cuckoo hash enables high fill rates while keeping the
 region of the table any given key can inhabit
-small.~\todo{Show a figure of the CDF of the hash
+small.
+
+\begin{figure}
+    \includegraphics[width=0.99\linewidth]{fig/hash_factor.pdf}
+    \vspace{-1em}
+    \caption{CDF of distances between cuckoo locations dependent hashing on different exponential factors.}
+    \label{fig:hash_factor}
+\vskip -1em
+\end{figure}
+
+\begin{figure}
+\begin{align*}
+    L_1 &= h_1(k) \\
+    L_2 &= L_1 + h_2(k) \% f^{f + log_2(h_3(k))}
+\end{align*}
+\caption{Locality based hashing for factor $f$}
+\end{figure}
+
+~\todo{Show a figure of the CDF of the hash
 functions.}
 
 ~\todo{Show a figure of the hashing and how it relates to the table.}
