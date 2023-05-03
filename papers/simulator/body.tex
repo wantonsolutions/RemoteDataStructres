@@ -58,21 +58,74 @@ which requires a round trip. Therefore using fine grained
 locking increases the tables scalability but increases it's
 base case insertion time.
 
-Reading is the most common case operation, and should be
-optimized for at the time of writing no remote memory hash
-tables guarantee a read in a single round trip. Race
-requires two, the first round trip is to read the hash index
-and the second is to read the value from the out of table
-data. Race can not inline data into the hash table because
-all of it's index updates must occur in a single CAS
-operation. In the case of locks the size of the index
-structure is arbitrary.
+\textbf{Read Optimization} Most data center workloads are
+read heavy, therefore read operations should be the most
+highly optimized~\cite{datacenter-workloads}. Prior
+approaches such as RACE require two RDMA round trips per
+read. The first is a hash index lookup, the second round
+trip reads the actual key-value block. RACE must perform two
+round trips because entries in the hash index are limited to
+64 bits (CAS width). This is commonly not enough to store
+both key and value so RACE can not inline both keys and
+values in the index structure. Clover~\cite{clover} enables
+single round trips reads. However under contention Clovers
+reads require pointer chasing which is known to be expensive
+due to each pointer resolution requiring a round
+trip~\cite{clio,clover,pointer-chaising}. Ideally we would
+be able to ensure that reads complete in a single round
+trip.
 
 
 \section{Design}
 \label{sec:design}
 
 \subsection{Locality Hashing}
+
+Cuckoo hashing and Hopscotch hashing are both read optimized
+hash tables. Cuckoo hashing ensures that all reads are at
+most two memory accesses~\cite{cuckoo}, while hopscotch
+hashing ensures that a read is within a bounded range of
+it's hash index~\cite{hopscotch}. Both of these properties
+have been noticed by the RDMA key-value store, and far
+memory communities for their fast
+reads~\cite{memc3,cuckoo-improvements,pilaf,farm}.
+
+Our approach aims to combine the bounded reads of cuckoo
+hashing, with the locality properties of hopscotch hashing.
+To do so we bound the distance between cuckoo hash
+locations. Traditional cuckoo hashing calls for two
+independent hash functions. We instead make our two hash
+functions dependent. The first hash function determines the
+location a key will be hashed to. The second hash function
+determines the maximum distance the second value can have
+from the first. A third hash function determines a random
+location between the first location, and the bound imposed by
+the second.
+
+A strawman implementation of locality based hashing would
+use the first hash function to find a location, and the
+second to find a random location within a fixed bound. This
+approach quickly leads to failed insertions. Due to the
+birthday paradox the probability of a collision is high, and
+on large tables the probability that one region of the hash
+table will become full, and have not viable path to an open
+slot is high. ~\todo{Insert a figure of one of my failed
+insertion experiments on a big table}.
+
+Rather than use a static bound we use a dynamic logarithmic
+bound. The bound set by the second hash function is
+determine by counting the suffix zeros of the resultant hash
+and rasing it by an exponential factor. In the common case
+the bound is small, but on an exponentially decrease rate
+some pairs of values are spaced far apart. This design
+enables some pairs to act as ~\textit{waypoints} to other
+regions of the table. This method, paired with associative
+in the cuckoo hash enables high fill rates while keeping the
+region of the table any given key can inhabit
+small.~\todo{Show a figure of the CDF of the hash
+functions.}
+
+~\todo{Show a figure of the hashing and how it relates to the table.}
 
 \subsection{Locking}
 
