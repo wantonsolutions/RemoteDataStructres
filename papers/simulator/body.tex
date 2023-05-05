@@ -268,7 +268,7 @@ with locality hashing ensures that in most cases insertions
 (as well as deletes and updates) are performed in two round
 trips.
 
-Our protocol saves round trips in comparision to RACE, which
+Our protocol saves round trips in comparison to RACE, which
 uses three round trips in the common case. On inserts RACE
 must re-read the hash table to ensure that concurrent CAS
 operations did no insert duplicates. With our algorithm we
@@ -284,6 +284,59 @@ further enables us to store values in the index enabling
 single RTT reads. This strategy increase our common case
 read size in excahnge for latency~\todo{evaluation section}.
 This same pattern is true in RACE for deletes. 
+\todo{insert protocol message figure}
+
+\subsection{Search}
+Cuckoo hashing insert traditionally uses random
+replacement~\cite{cuckoo}. Random replacement requires
+little computation, however at high fill rates it leads to
+long cuckoo paths which require many locks, and reduce
+concurrent throughput. BFS search finds the shortest path
+and has been demonstrated to increase system throughput with
+fine grained locking~\cite{algorithmic-improvements}.
+
+BFS search is computationally intensive. Locality based
+hashing enables us to leverage more efficient search
+strategies. Because locality hashing increases the
+probability that a cuckoo hashing location is close we can
+use an informed search algorithm to find open slots close to
+bucket a key hashes to. 
+
+In the case of BFS the target bucket is unknown, therefore
+all paths must be explored. We use A* search, an algorithm
+which takes a goal location, and a distance heuristic as
+input. A* is known to find shortest paths in much better
+average case times than BFS. A* requires two additional
+inputs, a distance heuristic and a goal location.
+
+\textbf{goal location}: Locality hashing increases the
+probability that an open slot near the insertion target
+location can terminate a cuckoo path. Our algorithm collects
+open slots near the original hash location as candidate goal
+locations. By default we set the number of candidate goal
+locations to 5. Gloal locations are collected by starting at
+the $h_1(k)$ location and iterating through the hash
+table both forward and backwards through the table one index
+at a time. Buckets with open slots are added to the
+candidate list until the limit is reached. \todo{I could
+improve this search time by tracking the list of open
+buckets and using binary search on them.}.
+
+\textbf{Search Heuristic}: A* requires a heuristic for
+distance which is a strict underestimate of the true
+distance to a goal. A typical heuristic for search is the
+euclidean distance between two points. A * guarantees that
+if the search heuristic is a strict underestimate of the
+true distance to the goal then the path found will be the
+shortest path. In our case we use the distance between a
+goal state and a current state is unknown as the distance
+between any two buckets is the result of our locality
+hashing function which has no upper bound. However we can
+estimate the distance between two buckets by using the mean
+distance of our locality hash function. This approach does
+not guarantee that we find the shortest path, however it
+does find short paths in the common case, and results in
+very short search times.
 
 
 \section{Evaluation}
