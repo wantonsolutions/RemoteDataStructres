@@ -18,45 +18,104 @@ access remote memory without any memory side computation.
 One sided verbs require RDMA reliable connections which
 guarantee in-order delivery of operations.
 
+\subsection{Resource Disaggregation}
+
+\subsection{Cuckoo Hashing}
+
+%%path length and locking
+A colision when inserting into a cuckoo hash table requires
+displacing some number of keys. The sequence of displaced
+keys called a \textit{cuckoo
+path}~\cite{cuckoo-improvements}.
+
 
 \subsection{Remote Memory Data Structures}
 
 \section{Problems}
 \label{sec:problems}
 
-Designing data structures for remote memory is hard. The
-primary reason is that there is no centralized serialization
-point to guard access to remote memory. Traditional key
-value stores (Memcached~\cite{memcached}), and even RDMA
-based Key-value stores~\cite{herd,erpc,pilaf} use a mixture
-of one-sided and two-sided verbs. Normally writes are two
-sided, and the memory-side CPU performs locking close to
-memory and ensures that all writes are issued in order.
+%concurrent data structures round trips
+Concurrent data structure design for remote memory is hard.
+Access latency to remote memory is high so round trips per
+operation must be minimized to achieve efficiency.
+Serialization is particularly hard because there is no
+centralized serialization point to guard access to remote
+memory. With RDMA NIC's provide atomic verbs such as
+compare-and swap (CAS), but these are by no means a silver
+bullet.  Each atomic request takes a round trip from client
+to server to execute. In the best case lock/unlock requires
+two round trips, if multiple locks are required, or locks
+are contested the number of round trips increases.
 
-In remote memory, no such CPU exists. To get serialization
-expensive RDMA atomic operations like \textit{compare and
-swap}(CAS) must be used. Atomic operations are by no means a
-silver bullet. With a CPU close to memory critical sections
-are small. Consider inserts into a cuckoo hash table with a
-long path. The CPU acquires some number of locks in memory
-then performs a series of reads and wites to commit the path
-before unlocking. Reads writes and locking only consumes a
-memory access ~50ns which keeps the critical section small.
-In contrast locking with RDMA atomic operations and
-performing multiple lookups is very expensive.
+%cpu locking vs rdma
+In traditional key value stores (Memcached~\cite{memcached})
+the CPU coordinates table access for read, write, and lock
+instructions. RDMA based Key-value
+stores~\cite{herd,erpc,pilaf} use a mixture of one-sided (no
+cpu) and two-sided (cpu involved) verbs.  Writes are
+typically two sided so memory-side CPU can orchestrate
+serialized operations (e.g. locking) with main memory access
+latency (50-100ns). These small access times keep critical
+sections small for CPU based locking, and dramatically
+increase them for one-sided RDMA based locking
+schemes~\cite{clover, sherman}.
 
-First, acquiring a lock means a round trip. If the table has
-a single lock, then a client is guaranteed to be able to
-gather all the locks it requires in a single round trip.
-However a single lock does not scale as only a single writer
-can write at a time. This matter is made worse by the fact
-that the critical section of the lock is larger in remote
-memory. Breaking the table up into subtables each with it's
-own lock has it's own problems. An insertion with a long
-path will potentially need to acquire many locks. Each of
-which requires a round trip. Therefore using fine grained
-locking increases the tables scalability but increases it's
-base case insertion time.
+%cuckoo hashing optimistic vs locks
+\textbf{Critical Sections:} Consider executing an insert
+into a concurrent cuckoo hash stored in remote memory. A
+client may have little or very stale information about the
+state of the hash table. To insert the client must gather
+information by reading buckets to compute a cuckoo path.
+With concurrent clients this leads to a chicken and egg
+problem when acquiring locks vs making reads.
+
+%% optimistic inserts
+A client can perform inserts opportunistically by executing
+lockless read to learn about the hash table, calculating a
+cuckoo path, and executing a sequence of dependent CAS
+operations for each step in the path. This approach is
+scalable as it has no critical section and is only limited
+by RDMA atomic operation
+throughput~\cite{design-guidelines}. However, Paths can
+become invalid as other clients running concurrent inserts
+invalidate the paths.~\todo{Figure todo} Shows the path
+insertion failure rate as the number of concurrent clients
+grows. This approach minimizes round trips as dependent CAS
+operations can be batched thanks to in order delivery
+provided by RDMA reliable connections. Unfortunately failed
+inserts require additional round trips to both fix the state
+of the table, and retry the insert.
+
+% lock based inserts
+Alternatively to get synchronized information the client can
+lock the table, then issue reads. However acquiring locks
+without knowledge of the table is hard. A global lock
+ensures that all reads are synchronized, but bottlenecks
+hash table throughput.~\todo{Figure ref global shows how
+concurrent performance scales with lock granularity.}
+Alternatively per bucket locks enable high throughput but
+calculating which buckets to lock requires knowledge of the
+table. A long cuckoo path may require locking many buckets
+and many round trips to gather information about the hash
+table.
+%%
+An ideal protocol would enable clients to perform inserts
+without bottlenecks the insert performance of the hash
+table, while requiring the fewest round trips to construct
+and execute the cuckoo path.
+
+% First, acquiring a lock means a round trip. If the table has
+% a single lock, then a client is guaranteed to be able to
+% gather all the locks it requires in a single round trip.
+% However a single lock does not scale as only a single writer
+% can write at a time. This matter is made worse by the fact
+% that the critical section of the lock is larger in remote
+% memory. Breaking the table up into subtables each with it's
+% own lock has it's own problems. An insertion with a long
+% path will potentially need to acquire many locks. Each of
+% which requires a round trip. Therefore using fine grained
+% locking increases the tables scalability but increases it's
+% base case insertion time.
 
 \textbf{Read Optimization} Most data center workloads are
 read heavy, therefore read operations should be the most
