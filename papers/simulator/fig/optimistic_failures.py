@@ -30,8 +30,6 @@ def plot_general_stats_last_run():
         ]
     pc.multi_plot_runs(stats, plot_names, directory)
 
-def plot_success_rate():
-
 def success_rate_contention_machines():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
