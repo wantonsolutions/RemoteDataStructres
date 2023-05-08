@@ -34,6 +34,32 @@ path}~\cite{cuckoo-improvements}.
 \section{Problems}
 \label{sec:problems}
 
+\begin{figure*}[t]
+    \centering
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/optimistic_failures.pdf}
+        % \label{fig:optimistic_failures}
+        % \caption{}
+    \end{subfigure}
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/optimistic_failures.pdf}
+        % \label{fig:optimistic_failures}
+        % \caption{}
+    \end{subfigure}
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/optimistic_failures.pdf}
+        % \label{fig:optimistic_failures}
+        % \caption{}
+    \end{subfigure}
+    \vspace{-1em}
+    \caption{
+    \textbf{(a)} Failure rate of optimistic cuckoo insertions.
+    \textbf{(b)} ~\todo{make}
+    \textbf{(c)} ~\todo{make}
+    }
+    \label{fig:problems}
+\end{figure*}
+
 %concurrent data structures round trips
 Concurrent data structure design for remote memory is hard.
 Access latency to remote memory is high so round trips per
@@ -78,7 +104,7 @@ scalable as it has no critical section and is only limited
 by RDMA atomic operation
 throughput~\cite{design-guidelines}. However, Paths can
 become invalid as other clients running concurrent inserts
-invalidate the paths.~\todo{Figure todo} Shows the path
+invalidate the paths.Figure~\ref{fig:problems}(a) shows the path
 insertion failure rate as the number of concurrent clients
 grows. This approach minimizes round trips as dependent CAS
 operations can be batched thanks to in order delivery
@@ -173,26 +199,26 @@ trip.
 
 \end{figure*}
 
-Cuckoo hashing and Hopscotch hashing are both read optimized
-hash tables. Cuckoo hashing ensures that all reads are at
-most two memory accesses~\cite{cuckoo}, while hopscotch
-hashing ensures that a read is within a bounded range of
-it's hash index~\cite{hopscotch}. Both of these properties
-have been noticed by the RDMA key-value store, and far
-memory communities for their fast
+Both cuckoo~\cite{cuckoo} and hopscotch~\cite{hopscotch}
+hashing are optimized for reads. Cuckoo hashing ensures
+constant time reads, while hopscotch hashing ensures that a
+read is within a bounded range of it's hash index. Both of
+these properties have been noticed by the RDMA key-value
+store, and far memory communities for their fast
 reads~\cite{memc3,cuckoo-improvements,pilaf,farm}.
 
 Our approach aims to combine the bounded reads of cuckoo
 hashing, with the locality properties of hopscotch hashing.
 To do so we bound the distance between cuckoo hash
-locations. Traditional cuckoo hashing calls for two
-independent hash functions. We instead make our two hash
+locations.~\todo{Add the read size vs latency chart from
+your thesis proposal} Traditional cuckoo hashing calls for
+two independent hash functions. We instead make our two hash
 functions dependent. The first hash function determines the
 location a key will be hashed to. The second hash function
 determines the maximum distance the second value can have
 from the first. A third hash function determines a random
-location between the first location, and the bound imposed by
-the second.
+location between the first location, and the bound imposed
+by the second.
 
 A strawman implementation of locality based hashing would
 use the first hash function to find a location, and the
