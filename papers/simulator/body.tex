@@ -84,7 +84,11 @@ grows. This approach minimizes round trips as dependent CAS
 operations can be batched thanks to in order delivery
 provided by RDMA reliable connections. Unfortunately failed
 inserts require additional round trips to both fix the state
-of the table, and retry the insert.
+of the table, and retry the insert.\sg{Further - Issuing CAS as a
+batch leads to complex path failure cases such a single
+element in the path failing while others further down the
+path succeed. Assesing and fixing such insertion failures
+without locks is very hard.}
 
 % lock based inserts
 Alternatively to get synchronized information the client can
