@@ -268,22 +268,6 @@ def insertion_debug():
 
     save_statistics(runs)
 
-def run_trials(config):
-    runs = []
-    trials = config['trials']
-    for i in tqdm(range(trials)):
-        c=config.copy()
-        sim = simulator.Simulator(c)
-        try:
-            sim.run()
-        except Exception as e:
-            print(e)
-            stats = sim.collect_stats()
-            sim.validate_run()
-        sim.validate_run()
-        stats = sim.collect_stats()
-        runs.append(stats)
-    return runs
 
 
 def avg_run_debug():
@@ -463,11 +447,15 @@ def success_rate_contention_machines():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
     multi_runs=[]
-    table_size = 1680  * 4 #lcm of 3,4,5,6,7,8,10,12,14,16
-    clients=[1,2,4,8,16,32]
+    # table_size = 1680  * 4 #lcm of 3,4,5,6,7,8,10,12,14,16
+    table_size = 1680  * 1 #lcm of 3,4,5,6,7,8,10,12,14,16
+    # clients=[1,2,4,8,16,32]
+    clients=[1,2,4,8]
+    # clients=[32]
     bucket_size=8
-    state_machines = [cuckoo.rcuckoobatch,sm.race]
+    # state_machines = [cuckoo.rcuckoobatch,sm.rcuckoo,sm.race]
     # state_machines = [sm.race]
+    state_machines = [sm.rcuckoo]
     log.set_off()
     for s in state_machines:
         runs=[]
@@ -480,7 +468,7 @@ def success_rate_contention_machines():
             config['indexes'] = table_size
             config['trials'] = 1
             config['state_machine']=s
-            config['max_fill']= 90
+            config['max_fill']= 100
             runs.append(run_trials(config))
         save_statistics(runs)
         plot_general_stats_last_run()
@@ -584,13 +572,13 @@ def plot_race_bucket_fill_factor():
 # todos()
 
 # insertion_debug()
-plot_hash_factor_distance_cdf()
+# plot_hash_factor_distance_cdf()
 
-# success_rate_contention_machines()
+success_rate_contention_machines()
 # success_rate_contention()
 # race_bucket_size_fill_factor()
 # fill_factor_limit_experiment()
-# plot_general_stats_last_run()
+plot_general_stats_last_run()
 
 # read_threshold_experiment()
 # buckets_per_lock_experiment()

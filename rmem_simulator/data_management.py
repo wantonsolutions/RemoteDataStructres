@@ -63,10 +63,9 @@ def save_statistics(statistics, dirname=""):
     # print(statistics)
     stats = json.dumps(statistics, indent=4)
     if dirname == "":
-        exp_dir=current_experiment_dir()
+        exp_dir = create_experiment_dir()
     else:
         exp_dir=dirname
-    # exp_dir = create_experiment_dir()
     create_info_file(exp_dir)
     stat_file_name = os.path.join(exp_dir, STATISTICS_FILE)
     with gzip.open(stat_file_name, "w") as f:
@@ -79,11 +78,12 @@ def load_statistics(dirname=""):
     if dirname == "":
         dirname = "latest"
         filename = os.path.join(DATA_DIR, dirname, STATISTICS_FILE)
+        dirname = os.path.join(DATA_DIR, dirname)
     else:
         filename = os.path.join(dirname, STATISTICS_FILE)
-    dir = os.path.join(DATA_DIR, dirname)
+
     with gzip.open(filename, "r") as f:
         stats = json.load(f)
-    return stats, dir
+    return stats, dirname
 
 

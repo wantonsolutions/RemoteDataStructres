@@ -401,6 +401,23 @@ def default_config():
 
     return config
 
+def run_trials(config):
+    runs = []
+    trials = config['trials']
+    for i in tqdm(range(trials)):
+        c=config.copy()
+        sim = Simulator(c)
+        try:
+            sim.run()
+        except Exception as e:
+            print(e)
+            stats = sim.collect_stats()
+            sim.validate_run()
+        sim.validate_run()
+        stats = sim.collect_stats()
+        runs.append(stats)
+    return runs
+
 
 def main():
     #test_hashes()
