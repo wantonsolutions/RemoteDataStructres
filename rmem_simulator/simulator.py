@@ -51,6 +51,7 @@ class Client(Node):
         state_machine_args['buckets_per_lock'] = config['buckets_per_lock']
         state_machine_args['locks_per_message'] = config['locks_per_message']
         state_machine_args['search_function'] = config['search_function']
+        state_machine_args['location_function'] = config['location_function']
         state_machine = config['state_machine']
         self.critical(str(state_machine))
         self.state_machine = state_machine(state_machine_args)
@@ -294,6 +295,7 @@ class Simulator(Node):
             client_config['buckets_per_lock']=buckets_per_lock
             client_config['locks_per_message']=self.config['locks_per_message']
             client_config['search_function']=self.config['search_function']
+            client_config['location_function']=self.config['location_function']
 
             c = Client(client_config)
 
@@ -394,6 +396,7 @@ def default_config():
     config['hash_factor']=hash.DEFAULT_FACTOR
     config['state_machine']=rcuckoo
     config['search_function']="a_star"
+    config['location_function']="dependent"
 
     config['date']=datetime.datetime.now().strftime("%Y-%m-%d")
     config['commit']=git.Repo(search_parent_directories=True).head.object.hexsha

@@ -126,17 +126,15 @@ def plot_factor_table_size_experiments():
 
 def plot_insertion_range_cdf():
     table_size = 1024
-    config = simulator.default_config()
-    sim = simulator.Simulator(config)
+    config = get_config()
     config['indexes'] = table_size
     sim = simulator.Simulator(config)
     log.set_off()
-    sim.run()
-    stats = sim.collect_stats()
-    c0_stats = stats['clients'][0]
+    stats = simulator.run_trials(config)
+    c0_stats = stats[0]['clients'][0]
     print(c0_stats)
     ranges = c0_stats['stats']['index_range_per_insert']
-    x, y = cdf(ranges)
+    x, y = plot_cuckoo.cdf(ranges)
     fig, (ax1, ax2) = plt.subplots(2,1)
 
     ax1.plot(x,y)
@@ -264,7 +262,7 @@ def insertion_debug():
     # config["state_machine"]=sm.race
     log.set_debug()
 
-    runs.append(run_trials(config))
+    runs.append(simulator.run_trials(config))
 
     save_statistics(runs)
 
@@ -287,7 +285,7 @@ def avg_run_debug():
         config['indexes'] = table_size
         config["state_machine"]=sm.race
         log.set_off()
-        runs.append(run_trials(config, trials))
+        runs.append(simulator.run_trials(config, trials))
         
     save_statistics(runs)
 
@@ -315,34 +313,10 @@ def locks_per_message_experiment():
         config["buckets_per_lock"] = 1
         config["locks_per_message"] = locks_per_message
         log.set_off()
-        runs.append(run_trials(config))
+        runs.append(simulator.run_trials(config))
     save_statistics(runs)
 
 
-def buckets_per_lock_experiment():
-    logger = log.setup_custom_logger('root')
-    logger.info("Starting simulator")
-
-    table_size = 2048
-    clients=8
-    runs=[]
-    read_threshold=128
-    buckets_per_lock_arr=[1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
-    locks_per_message=4
-    # locks_per_message_arr=[1, 2]
-    for buckets_per_lock in buckets_per_lock_arr:
-        print("read threshold: ", read_threshold)
-        config = simulator.default_config()
-        config['indexes'] = table_size
-        config['num_clients'] = clients
-        config['num_steps'] = 1000000
-        config['read_threshold_bytes'] = read_threshold
-
-        config["buckets_per_lock"] = buckets_per_lock
-        config["locks_per_message"] = locks_per_message
-        log.set_off()
-        runs.append(run_trials(config))
-    save_statistics(runs)
 
 def read_threshold_experiment():
     logger = log.setup_custom_logger('root')
@@ -363,7 +337,7 @@ def read_threshold_experiment():
         config["buckets_per_lock"] = 16
         config["locks_per_message"] = 4
         log.set_off()
-        runs.append(run_trials(config))
+        runs.append(simulator.run_trials(config))
     save_statistics(runs)
 
 def client_scalability():
@@ -385,7 +359,7 @@ def client_scalability():
         config["locks_per_message"] = 4
         config["state_machine"]=state_machine
         log.set_off()
-        runs.append(run_trials(config))
+        runs.append(simulator.run_trials(config))
     save_statistics(runs)
 
 def race_bucket_size_fill_factor():
@@ -409,7 +383,7 @@ def race_bucket_size_fill_factor():
         config['indexes'] = table_size
         config['trials'] = 3
         config['state_machine']=sm.race
-        runs.append(run_trials(config))
+        runs.append(simulator.run_trials(config))
     save_statistics(runs)
 
 def race_vs_rcuckoo_fill_factor():
@@ -436,7 +410,7 @@ def race_vs_rcuckoo_fill_factor():
             config['indexes'] = table_size
             config['trials'] = 1
             config['state_machine']=state_machine
-            runs.append(run_trials(config))
+            runs.append(simulator.run_trials(config))
         save_statistics(runs)
         plot_general_stats_last_run()
         multi_runs.append(runs)
@@ -469,7 +443,7 @@ def success_rate_contention_machines():
             config['trials'] = 1
             config['state_machine']=s
             config['max_fill']= 100
-            runs.append(run_trials(config))
+            runs.append(simulator.run_trials(config))
         save_statistics(runs)
         plot_general_stats_last_run()
         multi_runs.append(runs)
@@ -498,7 +472,7 @@ def success_rate_contention():
         config['trials'] = 1
         # config['state_machine']=cuckoo.rcuckoobatch
         config['state_machine']=sm.race
-        runs.append(run_trials(config))
+        runs.append(simulator.run_trials(config))
     save_statistics(runs)
 
 
@@ -525,7 +499,7 @@ def fill_factor_limit_experiment():
             config['trials'] = 1
             config['state_machine']=s
             config['max_fill']= f
-            runs.append(run_trials(config))
+            runs.append(simulator.run_trials(config))
         save_statistics(runs)
         plot_general_stats_last_run()
         multi_runs.append(runs)
@@ -553,9 +527,114 @@ def locks_per_message_experiment():
         config['max_fill']=100
         config['bucket_size']=8
         config['search_function']="a_star"
-        runs.append(run_trials(config))
+        runs.append(simulator.run_trials(config))
     save_statistics(runs)
 
+def buckets_per_lock_experiment():
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator")
+
+    table_size = 2048
+    clients=8
+    runs=[]
+    read_threshold=128
+    # buckets_per_lock_arr=[1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+    buckets_per_lock_arr=[1, 2]
+    locks_per_message=4
+    log.set_off()
+    # locks_per_message_arr=[1, 2]
+    for buckets_per_lock in buckets_per_lock_arr:
+        config = get_config()
+        config['indexes'] = table_size
+        config['num_clients'] = clients
+        config['num_steps'] = 1000000
+        config['read_threshold_bytes'] = read_threshold
+
+        config["buckets_per_lock"] = buckets_per_lock
+        config["locks_per_message"] = locks_per_message
+        runs.append(simulator.run_trials(config))
+    save_statistics(runs)
+
+def run_insertion_range_protocol_cdf():
+    table_size = 1024 * 128
+    configs = [ 
+                ("a_star", "independent"),
+                ("a_star", "dependent"),
+            ]
+    runs = []
+    for c in configs:
+        config = get_config()
+        search = c[0]
+        dependent = c[1]
+        config['indexes'] = table_size
+        config['search_function'] = search
+        config['location_function'] = dependent
+        config['read_threshold_bytes'] = 128
+        config['max_fill'] = 90
+        config['bucket_size']=8
+        config['num_steps'] = 100000000
+        config['state_machine'] = cuckoo.rcuckoobatch
+
+        sim = simulator.Simulator(config)
+        log.set_off()
+        runs.append(simulator.run_trials(config))
+    save_statistics(runs)
+
+
+
+def plot_insertion_range_protocol_cdf():
+    import matplotlib.ticker as mticker
+    stats = load_statistics()
+    fig, ax1 = plt.subplots(1,1, figsize=(6,3))
+    buckets=True
+    for stat in stats[0]:
+        # exit(0)
+        c0_stats = stat[0]['clients'][0]
+        config = stat[0]['config']
+
+        ranges = c0_stats['stats']['index_range_per_insert']
+
+        if not buckets:
+            bucket_size = config['bucket_size']
+            entry_size = config['entry_size']
+            bucket_bytes = bucket_size * entry_size
+            ranges = [ (r * bucket_bytes) + bucket_bytes for r in ranges]
+        else:
+            ranges = [ (r + 1) for r in ranges]
+
+
+
+        # print(ranges)
+        x, y = plot_cuckoo.cdf(ranges)
+
+        search = config['search_function']
+        dependent = config['location_function']
+        ax1.plot(x,y, label=str(dependent))
+        if dependent == "dependent":
+            nf=0
+            nn=0
+            for j in y:
+                if j < 0.95:
+                    nf+=1
+                if j < 0.99:
+                    nn+=1
+
+            ax1.vlines(x[nf], 0, 1, color='red', linestyle='--', label="95% dependent")
+            ax1.vlines(x[nn], 0, 1, color='black', linestyle='--', label="99% dependent")
+
+    
+    ax1.set_xscale('log')
+    # ax1.xaxis.set_minor_formatter(mticker.ScalarFormatter())
+    if not buckets:
+        ax1.set_xlabel('Insertion Span (bytes)')
+    else:
+        ax1.set_xlabel('Insertion Span (buckets)')
+    # ax1.set_title('Insertion Range CDF')
+    ax1.legend()
+
+
+    plt.tight_layout()
+    plt.savefig("insertion_span.pdf")
 
 
 def plot_race_bucket_fill_factor():
@@ -563,7 +642,9 @@ def plot_race_bucket_fill_factor():
 
 
 
-
+# plot_insertion_range_cdf()
+# run_insertion_range_protocol_cdf()
+plot_insertion_range_protocol_cdf()
 
 # locks_per_message_experiment()
 # global_lock_success_rate()
@@ -574,11 +655,12 @@ def plot_race_bucket_fill_factor():
 # insertion_debug()
 # plot_hash_factor_distance_cdf()
 
-success_rate_contention_machines()
+# success_rate_contention_machines()
 # success_rate_contention()
 # race_bucket_size_fill_factor()
 # fill_factor_limit_experiment()
-plot_general_stats_last_run()
+# buckets_per_lock_experiment()
+# plot_general_stats_last_run()
 
 # read_threshold_experiment()
 # buckets_per_lock_experiment()

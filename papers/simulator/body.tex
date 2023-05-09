@@ -199,6 +199,35 @@ trip.
 
 \end{figure*}
 
+
+\begin{figure*}[t]
+    \centering
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/rdma_latency.pdf}
+        % \label{fig:rdma_latency}
+        % \caption{}
+    \end{subfigure}.
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/rdma_latency.pdf}
+        % \label{fig:hash_fill}
+        % \caption{}
+    \end{subfigure}.
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/rdma_latency.pdf}
+        % \label{fig:hash_fill}
+        % \caption{}
+    \end{subfigure}.
+    \vspace{-1em}
+    \caption{
+    \textbf{(a)} CX5 RDMA latency~\cite{rdma-latency}
+    \textbf{(b)} \todo{something}
+    \textbf{(c)} \todo{something}
+    }
+    \label{fig:rdma}
+
+\end{figure*}
+
+
 Both cuckoo~\cite{cuckoo} and hopscotch~\cite{hopscotch}
 hashing are optimized for reads. Cuckoo hashing ensures
 constant time reads, while hopscotch hashing ensures that a
@@ -210,8 +239,18 @@ reads~\cite{memc3,cuckoo-improvements,pilaf,farm}.
 Our approach aims to combine the bounded reads of cuckoo
 hashing, with the locality properties of hopscotch hashing.
 To do so we bound the distance between cuckoo hash
-locations.~\todo{Add the read size vs latency chart from
-your thesis proposal} Traditional cuckoo hashing calls for
+locations. Figure~\ref{fig:rdma}(a) shows the tradeoff
+between message size and latency for a ConnectX-5 RDMA NIC.
+The latency of small messages (2-128 Bytes) are nearly
+identical, and the size of a message must be larger than 1K
+before it's latency is 2x that of a small message. Bandwidth
+is increasingly available in modern networks with 800Gbps on
+the horizon, we tradeoff bandwidth for latency by opting for
+larger single messages and fewer round trips. In essence we
+make large sloppy reads, and leave it to the client to
+reconstruct a result.
+
+Traditional cuckoo hashing calls for
 two independent hash functions. We instead make our two hash
 functions dependent. The first hash function determines the
 location a key will be hashed to. The second hash function

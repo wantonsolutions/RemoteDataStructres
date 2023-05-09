@@ -1494,7 +1494,8 @@ class rcuckoobatch(client_state_machine):
         self.locking_message_index = 0
 
         self.set_search_function(config)
-        self.location_function = hash.rcuckoo_hash_locations
+        self.set_location_function(config)
+        # self.location_function = hash.rcuckoo_hash_locations
         # self.location_function = hash.rcuckoo_hash_locations_independent
 
     def set_search_function(self, config):
@@ -1505,6 +1506,16 @@ class rcuckoobatch(client_state_machine):
             self.table_search_function = self.random_insert_self
         else:
             raise Exception("unknown search function")
+
+    def set_location_function(self, config):
+        location_function = config['location_function']
+        if location_function == "dependent":
+            self.location_function = hash.rcuckoo_hash_locations
+        elif location_function == "independent":
+            self.location_function = hash.rcuckoo_hash_locations_independent
+        else:
+            raise Exception("unknown location function")
+
 
 
 
