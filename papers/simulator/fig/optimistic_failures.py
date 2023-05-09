@@ -1,6 +1,7 @@
-import sys
-# caution: path[0] is reserved for script path (or '' in REPL)
-sys.path.insert(1, '/home/ena/RemoteDataStructres/rmem_simulator')
+
+import lib
+lib.import_rmem_simulator()
+
 import plot_cuckoo as pc
 import log as log
 import state_machines as sm
@@ -11,6 +12,7 @@ import cuckoo as cuck
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
+
 import random
 
 data_dir = "optimistic_failures"
@@ -35,9 +37,10 @@ def success_rate_contention_machines():
     logger.info("Starting simulator")
     multi_runs=[]
     # table_size = 1680  * 4 #lcm of 3,4,5,6,7,8,10,12,14,16
-    table_size = 1680  * 1 #lcm of 3,4,5,6,7,8,10,12,14,16
+    # table_size = 1680  * 64 #lcm of 3,4,5,6,7,8,10,12,14,16
+    table_size = (8 * 1024) * 16
     # clients=[1,2,4,8,16,32]
-    clients=[1,2,4,8]
+    clients=[1,2,4,8,16,32,64,128]
     # clients=[1]
     # clients=[32]
     bucket_size=8
@@ -55,7 +58,7 @@ def success_rate_contention_machines():
         config['indexes'] = table_size
         config['trials'] = 1
         config['state_machine']=sm.rcuckoo
-        config['max_fill']= 100
+        config['max_fill']= 50
         runs.append(sim.run_trials(config))
     dm.save_statistics(runs, dirname=data_dir)
 
@@ -118,6 +121,6 @@ def plot_request_success_rate():
 
 
 
-# success_rate_contention_machines()
-# plot_general_stats_last_run()
+success_rate_contention_machines()
+plot_general_stats_last_run()
 plot_request_success_rate()
