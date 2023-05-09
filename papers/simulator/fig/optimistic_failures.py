@@ -57,7 +57,7 @@ def success_rate_contention_machines():
         config['indexes'] = table_size
         config['trials'] = 1
         config['state_machine']=sm.rcuckoo
-        config['max_fill']= 50
+        config['max_fill']= 90
         runs.append(sim.run_trials(config))
     dm.save_statistics(runs, dirname=data_dir)
 
