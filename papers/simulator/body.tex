@@ -204,23 +204,23 @@ trip.
     \centering
     \begin{subfigure}{0.3\linewidth}
         \includegraphics[width=0.99\linewidth]{fig/rdma_latency.pdf}
-        % \label{fig:rdma_latency}
+        \label{fig:rdma_latency}
+        % \caption{}
+    \end{subfigure}.
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/insertion_span.pdf}
+        \label{fig:insertion_span}
         % \caption{}
     \end{subfigure}.
     \begin{subfigure}{0.3\linewidth}
         \includegraphics[width=0.99\linewidth]{fig/rdma_latency.pdf}
-        % \label{fig:hash_fill}
-        % \caption{}
-    \end{subfigure}.
-    \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/rdma_latency.pdf}
-        % \label{fig:hash_fill}
+        \label{fig:tbd}
         % \caption{}
     \end{subfigure}.
     \vspace{-1em}
     \caption{
     \textbf{(a)} CX5 RDMA latency~\cite{rdma-latency}
-    \textbf{(b)} \todo{something}
+    \textbf{(b)} CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path.
     \textbf{(c)} \todo{something}
     }
     \label{fig:rdma}
@@ -327,21 +327,32 @@ limits throughput as many clinets will contest the same
 locks.
 
 Locality hashing enables very efficient locking due to RDMA
-masked CAS operations~\todo{cite rdma masked cas}. Without
+masked CAS
+operations~\cite{advanced-transport,scalable-locks}. Without
 local hashing fine grained locks would be scattered
 throughout the hash table. Locality hashing increases the
 probability that an insertion path is within a bounded
-reigon of the hash table ~todo{insert the cdf of path
-distances}. This means that a lock table with lock locations
-corresponding to physical locations in the hash table will
-be near one another.  RDMA masked CAS operations allow a
-client to set a 64 bit mask along with the new, and old
-values of the cas operation. This enables the client to
-atomically set up to 64 contiguous locks. Using these
-operations clients can dramatically decrease the number of
-round trips required to aquire locks. Figure~\todo{insert a
-lock range figure which shows the number of random lock
-locations and the number of locally bounded locations}.
+region of the hash table.  This means that a lock table with
+lock locations corresponding to physical locations in the
+hash table will be near one another.  
+%%
+Figure~\ref{fig:rdma}(b) shows the insert span in buckets
+using both dependent and independent hashing on a table with
+500K entries and 8 entry buckets. A span is calculated as
+the distance between the lowest index and the highest index
+in a cuckoo path. Past 50\% independent hashing spans a
+random range in the table (whenever a displacement occurs on
+insert). With dependent locality based hashing 95\% of
+inserts span less than 32 buckets, and 99\% less than 256.
+%%
+RDMA masked CAS operations allow a client to set a 64 bit
+mask along with the new, and old values of the cas
+operation. This enables the client to atomically set up to
+64 contiguous locks. Using these operations clients can
+dramatically decrease the number of round trips required to
+aquire locks. Figure~\todo{insert a lock range figure which
+shows the number of random lock locations and the number of
+locally bounded locations}.
 
 RDMA atomic throughput is highly
 limited~\cite{design-guidelines}~\todo{[swordbox]}. Reducing

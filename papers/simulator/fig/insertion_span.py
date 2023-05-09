@@ -16,10 +16,10 @@ from tqdm import tqdm
 data_dir = "insertion_span"
 
 def run_insertion_range_protocol_cdf():
-    table_size = 1024 * 1
+    table_size = 1024 * 512
     configs = [ 
-                ("a_star", "independent"),
                 ("a_star", "dependent"),
+                ("a_star", "independent"),
             ]
     runs = []
     for c in configs:
@@ -45,7 +45,7 @@ def run_insertion_range_protocol_cdf():
 def plot_insertion_range_protocol_cdf():
     import matplotlib.ticker as mticker
     stats = dm.load_statistics(data_dir)
-    fig, ax1 = plt.subplots(1,1, figsize=(6,3))
+    fig, ax1 = plt.subplots(1,1, figsize=(4,2.5))
     buckets=True
     for stat in stats[0]:
         # exit(0)
@@ -69,7 +69,7 @@ def plot_insertion_range_protocol_cdf():
 
         search = config['search_function']
         dependent = config['location_function']
-        ax1.plot(x,y, label=str(dependent))
+        ax1.plot(x,y, label=str(dependent), linewidth=2)
         if dependent == "dependent":
             nf=0
             nn=0
@@ -83,18 +83,21 @@ def plot_insertion_range_protocol_cdf():
             ax1.vlines(x[nn], 0, 1, color='black', linestyle='--', label="99% dependent")
 
     
-    ax1.set_xscale('log')
+    ax1.set_xscale('log', base=2)
     # ax1.xaxis.set_minor_formatter(mticker.ScalarFormatter())
     if not buckets:
         ax1.set_xlabel('Insertion Span (bytes)')
     else:
         ax1.set_xlabel('Insertion Span (buckets)')
     # ax1.set_title('Insertion Range CDF')
-    ax1.legend()
+    ax1.legend(prop={'size': 8})
+    ax1.set_ylim(0,1.05)
+    ax1.set_ylabel('CDF')
+    plt.grid()
 
 
     plt.tight_layout()
     plt.savefig("insertion_span.pdf")
 
-run_insertion_range_protocol_cdf()
+# run_insertion_range_protocol_cdf()
 plot_insertion_range_protocol_cdf()
