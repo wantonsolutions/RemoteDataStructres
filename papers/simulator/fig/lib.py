@@ -1,6 +1,7 @@
 import sys
 import os
 import numpy as np
+import matplotlib as matplotlib
 
 def import_rmem_simulator():
     home_directory = os.path.expanduser( '~' )

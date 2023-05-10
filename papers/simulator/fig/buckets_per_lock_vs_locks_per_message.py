@@ -9,6 +9,7 @@ import simulator as simulator
 import data_management as dm
 import cuckoo as cuckoo
 import matplotlib.pyplot as plt
+import matplotlib as matplotlib
 import numpy as np
 from tqdm import tqdm
 
@@ -111,5 +112,5 @@ def plot_buckets_per_lock_vs_locks_per_message_experiment():
     plt.tight_layout()
     plt.savefig("buckets_per_lock_vs_locks_per_message.pdf")
 
-buckets_per_lock_vs_locks_per_message_experiment()
+# buckets_per_lock_vs_locks_per_message_experiment()
 plot_buckets_per_lock_vs_locks_per_message_experiment()

@@ -89,45 +89,44 @@ schemes~\cite{clover, sherman}.
 %cuckoo hashing optimistic vs locks
 \textbf{Critical Sections:} Consider executing an insert
 into a concurrent cuckoo hash stored in remote memory. A
-client may have little or very stale information about the
-state of the hash table. To insert the client must gather
-information by reading buckets to compute a cuckoo path.
-With concurrent clients this leads to a chicken and egg
-problem when acquiring locks vs making reads.
+client with a cached index may have little or very stale
+information about the state of the hash table. To insert the
+client must gather information by reading buckets to compute
+a cuckoo path. With concurrent clients this leads to a
+chicken and egg problem when acquiring locks vs making
+reads.
 
 %% optimistic inserts
 A client can perform inserts opportunistically by executing
 lockless read to learn about the hash table, calculating a
 cuckoo path, and executing a sequence of dependent CAS
 operations for each step in the path. This approach is
-scalable as it has no critical section and is only limited
-by RDMA atomic operation
+scalable as its critical section is only the lenght of a CAS
+instruction and is only limited by RDMA atomic operation
 throughput~\cite{design-guidelines}. However, Paths can
 become invalid as other clients running concurrent inserts
-invalidate the paths.Figure~\ref{fig:problems}(a) shows the path
-insertion failure rate as the number of concurrent clients
-grows. This approach minimizes round trips as dependent CAS
-operations can be batched thanks to in order delivery
-provided by RDMA reliable connections. Unfortunately failed
-inserts require additional round trips to both fix the state
-of the table, and retry the insert.\sg{Further - Issuing CAS as a
-batch leads to complex path failure cases such a single
-element in the path failing while others further down the
-path succeed. Assesing and fixing such insertion failures
-without locks is very hard.}
+invalidate the paths. Figure~\ref{fig:problems}(a) shows the
+path insertion failure rate as the number of concurrent
+clients grows. This approach minimizes round trips as
+dependent CAS operations can be batched thanks to in order
+delivery provided by RDMA reliable connections.
+Unfortunately failed inserts require additional round trips
+to both fix the state of the table, and retry the
+insert.\sg{Further - Issuing CAS as a batch leads to complex
+path failure cases such a single element in the path failing
+while others further down the path succeed. Assesing and
+fixing such insertion failures without locks is very hard.}
 
 % lock based inserts
 Alternatively to get synchronized information the client can
 lock the table, then issue reads. However acquiring locks
 without knowledge of the table is hard. A global lock
 ensures that all reads are synchronized, but bottlenecks
-hash table throughput.~\todo{Figure ref global shows how
-concurrent performance scales with lock granularity.}
-Alternatively per bucket locks enable high throughput but
-calculating which buckets to lock requires knowledge of the
-table. A long cuckoo path may require locking many buckets
-and many round trips to gather information about the hash
-table.
+hash table throughput.  Alternatively per bucket locks
+enable high throughput but calculating which buckets to lock
+requires knowledge of the table. A long cuckoo path may
+require locking many buckets and many round trips to gather
+information about the hash table.
 %%
 An ideal protocol would enable clients to perform inserts
 without bottlenecks the insert performance of the hash
@@ -229,7 +228,7 @@ trip.
 
 
 Both cuckoo~\cite{cuckoo} and hopscotch~\cite{hopscotch}
-hashing are optimized for reads. Cuckoo hashing ensures
+hashes are optimized for reads. Cuckoo hashing ensures
 constant time reads, while hopscotch hashing ensures that a
 read is within a bounded range of it's hash index. Both of
 these properties have been noticed by the RDMA key-value
@@ -250,14 +249,15 @@ larger single messages and fewer round trips. In essence we
 make large sloppy reads, and leave it to the client to
 reconstruct a result.
 
-Traditional cuckoo hashing calls for
-two independent hash functions. We instead make our two hash
-functions dependent. The first hash function determines the
+Traditional cuckoo hashing calls for two independent hash
+functions. We instead make our two hash functions
+\textit{dependent}. The first hash function determines the
 location a key will be hashed to. The second hash function
 determines the maximum distance the second value can have
 from the first. A third hash function determines a random
 location between the first location, and the bound imposed
-by the second.
+by the second. Figure~\ref{fig:locality-hashing}(a) shows
+the formula for our dependent hashing function.
 
 A strawman implementation of locality based hashing would
 use the first hash function to find a location, and the
@@ -270,36 +270,43 @@ slot is high. ~\todo{Insert a figure of one of my failed
 insertion experiments on a big table}.
 
 Rather than use a static bound we use a dynamic logarithmic
-bound. The bound set by the second hash function is
-determine by counting the suffix zeros of the resultant hash
-and rasing it by an exponential factor. In the common case
-the bound is small, but on an exponentially decrease rate
-some pairs of values are spaced far apart. This design
-enables some pairs to act as ~\textit{waypoints} to other
-regions of the table. This method, paired with associative
-in the cuckoo hash enables high fill rates while keeping the
-region of the table any given key can inhabit
-small.
+bound with a third hash function. The bound set by the
+third hash function is determine by counting the suffix
+zeros of the resultant hash and rasing it by an exponential
+factor. In the common case the bound is small, but on an
+exponentially decrease rate some pairs of values are spaced
+far apart. This design enables some pairs to act
+as~\textit{waypoints} to other regions of the table. This
+method, paired with associative in the cuckoo hash enables
+high fill rates while keeping the region of the table any
+given key can inhabit small.
 
-Figure~\ref{fig:locality-hashing} illustrates the tradeoff
-between locality and maximum fill factor. 
+The tradeoff between the exponential factor and the mean
+distance is fill factor.
+Figure~\ref{fig:locality-hashing}(b) illustrates how
+increasing the exponential factor shifts the distribution of
+distances between cuckoo hash locations.
+Figure~\ref{fig:locality-hashing}(c) shows how these same
+factors effect the max fill rate of the table before an item
+cannot be inserted.
+
 
 \subsection{Locking}
 
 Traditional wisdom would suggest that because cuckoo hashing
 can have long insertion paths it is a poor candidate for
 remote memory. Augmenting an insertion path requires making
-many modifications to the hash table.  There are two
-approaches for making path modifcations. The first is to
+many modifications to the hash table. There are two
+approaches for making path modifications. The first is to
 perform a set of compare and swap modification which migrate
 an open slot down a path to a location where the new value
-is inserted. In this case the client aquires no locks,
+is inserted. In this case the client acquires no locks,
 however it has no guarantee that it's insertion path with
 remain valid as concurrent processes can modify the hash
 table with insertions of their own. In this case the client
-can opprotunisitically attempt an insertion path using its
+can opportunistically attempt an insertion path using its
 cached information about the table. This strategy has the
-potential to fail frequently, and the reuqires potentially
+potential to fail frequently, and the requires potentially
 many reads to be issued for the client to keep it's path
 information up to date. ~\todo{insert a plot which shows
 path lengths and failure rates from the cukoo approach with
@@ -309,21 +316,21 @@ Alternatively a client can aquire locks for the table. Locks
 typically have poor performance for disaggregated algorithms
 because each lock and unlock operation requires a round
 trip. This means that any locking algorithm will have a lock
-aquisition phase in which all required locks are collected,
+acquisition phase in which all required locks are collected,
 followed by a critical section in which the operations are
-exected, and a lock release stage. Using a course graied
+executed, and a lock release stage. Using a course grained
 locks this approach leads to throughput bottlenecks as it
 does not scale with the number of clients. However course
 grained locks have the advantage that there are few locks to
-aquire, threfore a lock aquisition and release algorithm
-takes less round trips. A typical lock aquisition policy
-works by aquiring locks in a predfined incremental order to
+aquire, therefore a lock acquisition and release algorithm
+takes less round trips. A typical lock acquisition policy
+works by acquiring locks in a predefined incremental order to
 avoid deadlock. The tradeoff between fine grained and course
 locking is clear - fine grained locking allows higher
 degrees of parallelism and throughput, while adding higher
 latency due to a more complex lock aquire and release stage.
 Course locking has lower latency aquire and release, but
-limits throughput as many clinets will contest the same
+limits throughput as many clients will contest the same
 locks.
 
 Locality hashing enables very efficient locking due to RDMA
