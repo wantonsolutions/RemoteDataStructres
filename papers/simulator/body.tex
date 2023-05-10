@@ -540,6 +540,17 @@ either bucket then no duplicates exist as the successful
 lock ensures that no other client is currently moving the
 key to another location as part of a concurrent insert.
 
+
+\textbf{Reading:} For inlined reads client complete reads in
+a single round trip. We trade off latency for bandwidth by
+issuing a single read rather than two for reads which span a
+small enough range to fit into a single message. This
+increases bandwidth consumption per read, but drops the
+overall processing required by the memory NIC. Our reading
+threshold is configurable. We chose to read up to 512 bytes
+in a single read as this covers over 50\% of all reads for
+64 bit table entries~\ref{fig:locality-hashing}.
+
 \subsection{Search}
 Cuckoo hashing insert traditionally uses random
 replacement~\cite{cuckoo}. Random replacement requires
@@ -636,6 +647,12 @@ filling the table. Steps do not correlate directly to time,
 however the less time a client spends blocking, and the
 fewer steps required to complete an operation are a proxy
 for real system throughput.
+
+All of our evaluations are carried out on hash tables with
+buckets of size 8, and key-value pairs with 32bit keys and
+16bit values. On hash tables with 1 million entries. We
+tuned for a locality factor of 2.3 and use a read threshold
+of 512 bytes.
 
 \subsection{System Breakdown}
 
