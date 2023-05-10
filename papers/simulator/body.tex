@@ -425,6 +425,32 @@ highly constrained~\todo{4MB CX5,CX6}, it removes the need
 for a PCIe round trip thereby reducing lock aquisition
 latency by aproximatly 2x.
 
+\subsection{Table Design}
+
+We design our table with flexibility in mind. Unlike RACE
+which is constrained to 64bit table entries due to CAS width
+we can store table entires of arbitrary size as table
+updates are made with locks and RDMA writes. We support
+inlined values in the index for small keys and values to
+support single round trip reads. We support a second format
+using extents for variable sized values.
+Figure~\ref{fig:table-diagram} illustrates our table design.
+Each entry includes an extent bit to indicate if the entry
+is inlined or stored in an extent.  We make use of device
+mapped memory on recent RDMA NIC's (ConnectX-5+) to reduce
+locking latency~\cite{sherman} and enable higher throughput.
+Device mapped locking avoids an expensive PCIe round trip,
+and reduces on NIC blocking when acquiring locks.
+
+
+\begin{figure}[t]
+    \includegraphics[width=0.99\linewidth]{fig/table-diagram.pdf}
+    \caption{Rcuckoo's table design}
+    \label{fig:table-diagram}
+\end{figure}.
+
+
+
 
 \subsection{Protocol}
 
