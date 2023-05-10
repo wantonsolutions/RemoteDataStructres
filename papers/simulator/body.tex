@@ -250,7 +250,7 @@ requiring additional overheads.
     \caption{
     \textbf{(a)} CX5 RDMA latency vs message size~\cite{rdma-latency}
     \textbf{(b)} CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path.
-    \textbf{(c)} Round trips (99th percentile) required per insert while filling a table to 100\% while varying the lock per message, and buckets per lock.
+    \textbf{(c)} Round trips (99th percentile) required per insert while filling a table to 100\% while varying the lock per message, and buckets per lock. (\todo{subtract one from each current values include unlocks})
     }
     \label{fig:rdma}
 
@@ -650,9 +650,7 @@ for real system throughput.
 
 All of our evaluations are carried out on hash tables with
 buckets of size 8, and key-value pairs with 32bit keys and
-16bit values. On hash tables with 1 million entries. We
-tuned for a locality factor of 2.3 and use a read threshold
-of 512 bytes.
+16bit values. On hash tables with 1 million entries.
 
 \subsection{System Breakdown}
 
