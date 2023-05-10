@@ -23,6 +23,15 @@ class race(client_state_machine):
         self.state = "inserting-read-second"
         return messages
 
+    def begin_extent_read(self):
+        #todo read an extent, this currently just reads the table again
+        messages = race_message_read_key_location(self.current_insert_value, self.table.table_size, self.table.row_size_bytes(),0)
+        self.outstanding_read_requests = len(messages)
+        self.read_values_found = 0
+        self.read_values = []
+        self.state = "reading-extent"
+        return messages
+
     def put(self):
         messages = race_messages(self.current_insert_value, self.table.table_size, self.table.row_size_bytes())
         self.current_insert_rtt+=1
@@ -30,12 +39,26 @@ class race(client_state_machine):
 
     def get(self):
         messages = race_messages(self.current_read_key, self.table.table_size, self.table.row_size_bytes())
+        self.current_read_rtt+=1
         return self.begin_read(messages)
 
-    def read_fsm(self,message):
+    def first_read_fsm(self,message):
         complete, success = self.wait_for_read_messages_fsm(message, self.current_read_key)
         if complete:
             self.debug("Race Reading Complete! success:" + str(success) + " key: " +str(self.current_read_key))
+            self.current_read_rtt+=1
+            return self.begin_extent_read()
+        return None
+        #     self.state="idle"
+        #     self.complete_read_stats(success, self.current_read_key)
+        #     self.reading=False
+        # return None
+
+    
+    def extent_read_fsm(self,message):
+        complete, success = self.wait_for_read_messages_fsm(message, self.current_read_key)
+        if complete:
+            self.debug("Race Extent Reading Complete! success:" + str(success) + " key: " +str(self.current_read_key))
             self.state="idle"
             self.complete_read_stats(success, self.current_read_key)
             self.reading=False
@@ -142,7 +165,10 @@ class race(client_state_machine):
             return self.idle_fsm(message)
 
         if self.state == "reading":
-            return self.read_fsm(message)
+            return self.first_read_fsm(message)
+
+        if self.state == "reading-extent":
+            return self.extent_read_fsm(message)
 
         if self.state == "inserting-read-first":
             return self.first_read_insert_fsm(message)

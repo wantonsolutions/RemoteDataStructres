@@ -12,6 +12,7 @@ import git
 class Node:
     def __init__(self, config):
         self.logger = logging.getLogger("root")
+        self.steps=0
 
     def log_prefix(self):
         return "{:<9}".format(str(self))
@@ -27,6 +28,12 @@ class Node:
 
     def critical(self, message):
         self.logger.critical("[" + self.log_prefix() + "] " + message)
+
+    def increment_step(self):
+        self.steps += 1
+
+    def get_steps(self):
+        return self.steps
 
 class Client(Node):
     def __init__(self, config):
@@ -48,10 +55,12 @@ class Client(Node):
         state_machine_args['id'] = self.client_id
         state_machine_args['num_clients'] = config['num_clients']
         state_machine_args['read_threshold_bytes'] = config['read_threshold_bytes']
+        state_machine_args['deterministic'] = config['deterministic']
         state_machine_args['buckets_per_lock'] = config['buckets_per_lock']
         state_machine_args['locks_per_message'] = config['locks_per_message']
         state_machine_args['search_function'] = config['search_function']
         state_machine_args['location_function'] = config['location_function']
+        state_machine_args['workload'] = config['workload']
         state_machine = config['state_machine']
         self.critical(str(state_machine))
         self.state_machine = state_machine(state_machine_args)
@@ -61,6 +70,7 @@ class Client(Node):
 
 
     def state_machine_step(self, message=None):
+        self.increment_step()
         messages = []
         if message == None:
             m = self.state_machine.fsm()
@@ -103,6 +113,7 @@ class Memory(Node):
         return "Memory: " + str(self.memory_id)
 
     def state_machine_step(self, message):
+        self.increment_step()
         responses = []
         response = self.state_machine.fsm(message)
         responses = messages_append_or_extend(responses, response)
@@ -122,6 +133,7 @@ class Switch(Node):
         return "Switch"
 
     def process_message(self, message):
+        self.increment_step()
         # p = message.payload
         # dest = p["dest"]
         # src = p["src"]
@@ -274,6 +286,7 @@ class Simulator(Node):
         memory_size=entry_size * indexes
         index_init_function=Table
         index_init_args={'memory_size': memory_size, 'bucket_size': bucket_size, 'buckets_per_lock': buckets_per_lock}
+        deterministic = self.config['deterministic']
 
         #initialize hash function
         hash.set_factor(self.config['hash_factor'])
@@ -296,6 +309,8 @@ class Simulator(Node):
             client_config['locks_per_message']=self.config['locks_per_message']
             client_config['search_function']=self.config['search_function']
             client_config['location_function']=self.config['location_function']
+            client_config['workload']=self.config['workload']
+            client_config['deterministic']=self.config['deterministic']
 
             c = Client(client_config)
 
@@ -320,8 +335,10 @@ class Simulator(Node):
 
         #run simulation
         for i in range(self.config['num_steps']):
-            # self.deterministic_simulation_step()
-            self.random_single_simulation_step()
+            if deterministic:
+                self.deterministic_simulation_step()
+            else:
+                self.random_single_simulation_step()
 
             if self.no_events() == True and self.clients_complete() == True:
                 break
@@ -349,11 +366,14 @@ class Simulator(Node):
         #simulator stats
         statistics['config'] = dict()
         statistics['config'] = self.config
+        statistics['simulator'] = dict()
+        statistics['simulator']['steps'] = self.step
 
         #memory stats
         statistics['memory'] = dict()
         fill = self.memory.index.get_fill_percentage()
         statistics['memory']['fill'] = fill
+        statistics['memory']['steps'] = self.memory.get_steps()
         self.memory.index.print_table()
 
         statistics['hash'] = dict()
@@ -362,11 +382,13 @@ class Simulator(Node):
         #client stats
         statistics['clients'] = []
 
+
         for i in range(len(self.client_list)):
             client = self.client_list[i]
             client_stats = dict()
             client_stats['client_id'] = client.client_id
             client_stats['stats'] = client.state_machine.get_stats()
+            client_stats['steps'] = client.get_steps()
             statistics['clients'].append(client_stats)
 
         #TODO start here after lunch, we are calculating the path lenght and number of messages
@@ -380,6 +402,7 @@ def default_config():
     config['num_clients']=1
     config['num_steps']=1000000
     config['trials']=1
+    config['deterministic']=False
 
     #table settings
     config['bucket_size']=4
@@ -393,6 +416,7 @@ def default_config():
     #default is global locking
     config['buckets_per_lock']=1
     config['locks_per_message']=1
+    config['workload']="ycsb-w"
     config['hash_factor']=hash.DEFAULT_FACTOR
     config['state_machine']=rcuckoo
     config['search_function']="a_star"

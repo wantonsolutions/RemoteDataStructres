@@ -1090,12 +1090,12 @@ class client_workload_driver():
         self.total_requests=config["total_requests"]
         self.client_id=config['id']
         self.num_clients=config['num_clients']
-        self.non_deterministic=config['non_deterministic']
+        self.deterministic=config['deterministic']
 
-        if self.non_deterministic:
-            self.random_factor = int(random.random() * 100) + 1
-        else:
+        if self.deterministic:
             self.random_factor = 1
+        else:
+            self.random_factor = int(random.random() * 100) + 1
         #todo add a line for having a workload passed in as a file
         self.completed_requests=0
         self.completed_puts=0
@@ -1188,11 +1188,11 @@ class client_state_machine(state_machine):
         self.duplicates_found = 0
 
         workload_config = {
-            "workload": "ycsb-w",
+            "workload": config["workload"],
             "total_requests": self.total_inserts,
             "id": self.id,
             "num_clients": config["num_clients"],
-            "non_deterministic": False,
+            "deterministic": config["deterministic"],
         }
         self.workload_config=workload_config
         self.workload_driver = client_workload_driver(workload_config)
@@ -1468,6 +1468,14 @@ def race_messages(key, table_size, row_size_bytes):
     messages = single_bucket_read_messages(locations, double_size)
     return messages
 
+def race_message_read_key_location(key, table_size, row_size_bytes, location):
+    locations = hash.race_hash_locations(key, table_size)
+    #get the min of the overflow and index buckets
+    l = min(locations[location])
+    double_size = int(row_size_bytes * 2)
+    locations = [l]
+    messages = single_bucket_read_messages(locations, double_size)
+    return messages
 
 
 
@@ -1534,6 +1542,7 @@ class rcuckoobatch(client_state_machine):
 
 
     def get(self):
+        self.current_read_rtt +=1
         messages = read_threshold_message(self.current_read_key, self.read_threshold_bytes, self.table.table_size, self.table.row_size_bytes())
         return self.begin_read(messages)
 
@@ -1608,7 +1617,7 @@ class rcuckoobatch(client_state_machine):
             #enter the critical section if we have all of the locks
             #we also want to have all of the reads completed (for now)
             if self.all_locks_aquired() and self.read_complete():
-                self.state = "critical_section"
+                return self.begin_insert()
         return None
 
     def release_locks_fsm(self, message):
@@ -1752,9 +1761,6 @@ class rcuckoobatch(client_state_machine):
 
         if self.state == "release_locks_try_again":
             return self.release_locks_fsm(message)
-
-        if self.state == "critical_section":
-            return self.begin_insert()
 
         if self.state == "inserting":
             return self.insert_and_release_fsm(message)

@@ -36,6 +36,8 @@ def multi_plot_runs(runs, plot_names, directory=""):
             rtt_per_operation(axs[i],runs, x_axis)
         elif plot_name == "fill_factor":
             fill_factor(axs[i],runs, x_axis)
+        elif plot_name == "throughput_approximation":
+            throughput_approximation(axs[i],runs, x_axis)
         else:
             print("unknown plot name: ", plot_name)
         i+=1
@@ -70,6 +72,125 @@ def div_by_zero_to_zero(x, y):
         return float(0)
     else:
         return float(x/y)
+
+def heatmap(data, row_labels, col_labels, ax=None,
+            cbar_kw=None, cbarlabel="", **kwargs):
+    """
+    Create a heatmap from a numpy array and two lists of labels.
+
+    Parameters
+    ----------
+    data
+        A 2D numpy array of shape (M, N).
+    row_labels
+        A list or array of length M with the labels for the rows.
+    col_labels
+        A list or array of length N with the labels for the columns.
+    ax
+        A `matplotlib.axes.Axes` instance to which the heatmap is plotted.  If
+        not provided, use current axes or create a new one.  Optional.
+    cbar_kw
+        A dictionary with arguments to `matplotlib.Figure.colorbar`.  Optional.
+    cbarlabel
+        The label for the colorbar.  Optional.
+    **kwargs
+        All other arguments are forwarded to `imshow`.
+    """
+
+    if ax is None:
+        ax = plt.gca()
+
+    if cbar_kw is None:
+        cbar_kw = {}
+    cbar_kw["fraction"]=0.03
+
+    # Plot the heatmap
+    im = ax.imshow(data, **kwargs)
+
+    # Create colorbar
+    cbar = ax.figure.colorbar(im, ax=ax, **cbar_kw)
+    cbar.ax.set_ylabel(cbarlabel, rotation=-90, va="bottom")
+
+    # Show all ticks and label them with the respective list entries.
+    ax.set_xticks(np.arange(data.shape[1]), labels=col_labels)
+    ax.set_yticks(np.arange(data.shape[0]), labels=row_labels)
+
+    # Let the horizontal axes labeling appear on top.
+    # ax.tick_params(top=False, bottom=True,
+    #                labeltop=False, labelbottom=True)
+
+    # Rotate the tick labels and set their alignment.
+    # plt.setp(ax.get_xticklabels(), rotation=-30, ha="right",
+    #          rotation_mode="anchor")
+
+    # Turn spines off and create white grid.
+    ax.spines[:].set_visible(False)
+
+    ax.set_xticks(np.arange(data.shape[1]+1)-.5, minor=True)
+    ax.set_yticks(np.arange(data.shape[0]+1)-.5, minor=True)
+    ax.grid(which="minor", color="w", linestyle='-', linewidth=3)
+    ax.tick_params(which="minor", bottom=False, left=False)
+
+    return im, cbar
+
+
+def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
+                     textcolors=("black", "white"),
+                     threshold=None, **textkw):
+    """
+    A function to annotate a heatmap.
+
+    Parameters
+    ----------
+    im
+        The AxesImage to be labeled.
+    data
+        Data used to annotate.  If None, the image's data is used.  Optional.
+    valfmt
+        The format of the annotations inside the heatmap.  This should either
+        use the string format method, e.g. "$ {x:.2f}", or be a
+        `matplotlib.ticker.Formatter`.  Optional.
+    textcolors
+        A pair of colors.  The first is used for values below a threshold,
+        the second for those above.  Optional.
+    threshold
+        Value in data units according to which the colors from textcolors are
+        applied.  If None (the default) uses the middle of the colormap as
+        separation.  Optional.
+    **kwargs
+        All other arguments are forwarded to each call to `text` used to create
+        the text labels.
+    """
+
+    if not isinstance(data, (list, np.ndarray)):
+        data = im.get_array()
+
+    # Normalize the threshold to the images color range.
+    if threshold is not None:
+        threshold = im.norm(threshold)
+    else:
+        threshold = im.norm(data.max())/2.
+
+    # Set default alignment to center, but allow it to be
+    # overwritten by textkw.
+    kw = dict(horizontalalignment="center",
+              verticalalignment="center")
+    kw.update(textkw)
+
+    # Get the formatter in case a string is supplied
+    if isinstance(valfmt, str):
+        valfmt = matplotlib.ticker.StrMethodFormatter(valfmt)
+
+    # Loop over the data and create a `Text` for each "pixel".
+    # Change the text's color depending on the data.
+    texts = []
+    for i in range(data.shape[0]):
+        for j in range(data.shape[1]):
+            kw.update(color=textcolors[int(im.norm(data[i, j]) > threshold)])
+            text = im.axes.text(j, i, valfmt(data[i, j], None), **kw)
+            texts.append(text)
+
+    return texts
 
 def single_run_client_average_cas_success(stat):
     per_client_success_rate = []
@@ -334,6 +455,54 @@ def fill_factor(ax, stats, x_axis="bucket size"):
         state_machine_label = stat[0][0]['config']['state_machine']
         fill_factor_line(ax, stat, label=state_machine_label, x_axis=x_axis)
     fill_factor_decoration(ax, x_axis)
+
+def single_run_approx_throughput(stat):
+    # per_client_steps = []
+    # approx_throughput =  stat['config']['num_clients'] / (stat['simulator']['steps']/3)
+    # approx_throughput = sim_steps/
+    # memory_steps=stat['memory']['steps']
+    normal_rtts = []
+    for client in stat['clients']:
+        read_rtt = client['stats']['read_rtt_count']
+        insert_rtt = client['stats']['insert_rtt_count']
+        total_rtt = read_rtt + insert_rtt
+        normal_rtt = 1 / total_rtt
+        normal_rtts.append(normal_rtt)
+    mean, std = np.mean(normal_rtts), np.std(normal_rtts)
+    return mean, std
+    # return (np.mean(per_client_success_rate), stderr(per_client_success_rate))
+
+def approximate_throughput_line(ax,stats,label,x_axis="clients"):
+    throughputs = []
+    std_errs = []
+    x_axis_vals = get_x_axis(stats, x_axis)
+    for stat in stats:
+        single_run_throughput=[]
+        single_run_errors=[]
+        for r in stat:
+            s, e = single_run_approx_throughput(r)
+            single_run_throughput.append(s)
+            single_run_errors.append(e)
+        throughputs.append(np.mean(single_run_throughput))
+        std_errs.append(np.mean(single_run_errors))
+    # x_pos = np.arange(len(success_rates))
+    ax.errorbar(x_axis_vals,throughputs,yerr=std_errs,label=label, marker='o', capsize=3)
+
+
+
+def approximate_throughput_decoration(ax, x_axis):
+    ax.set_xlabel(x_axis)
+    ax.set_ylabel('Approx Throughput')
+    ax.set_title('Approximate Throughput vs ' + x_axis)
+    ax.legend()
+
+def throughput_approximation(ax, stats, x_axis='clients'):
+    print("throughput approx x-axis: ", x_axis)
+    stats = correct_stat_shape(stats)
+    for stat in stats:
+        state_machine_label = stat[0][0]['config']['state_machine']
+        approximate_throughput_line(ax, stat, label=state_machine_label, x_axis=x_axis)
+    approximate_throughput_decoration(ax, x_axis)
 
 
 def single_run_op_success_rate(stat, op_string):
@@ -624,6 +793,9 @@ def max_fill(stats):
 def search_function(stats):
     return ("search function", get_config_list(stats, "search_function"))
 
+def is_deterministic(stats):
+    return ("deterministic", get_config_list(stats, "deterministic"))
+
 
 def general_stats(ax, stats):
     print("RUN STATISTICS")
@@ -647,6 +819,7 @@ def general_stats(ax, stats):
         bucket_size,
         max_fill,
         search_function,
+        is_deterministic,
     ]
     print(len(stats))
     for f in staistic_functions:
