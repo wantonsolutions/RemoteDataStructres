@@ -24,7 +24,7 @@ def buckets_per_lock_vs_locks_per_message_experiment():
     all_runs=[]
     read_threshold=128
     buckets_per_lock_arr=[1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
-    locks_per_message=[1,2,4]
+    locks_per_message=[1,2,4,8,16,32,64]
     log.set_off()
     # locks_per_message_arr=[1, 2]
     for lpm in locks_per_message:
@@ -40,7 +40,7 @@ def buckets_per_lock_vs_locks_per_message_experiment():
             config["buckets_per_lock"] = buckets_per_lock
             config["locks_per_message"] = lpm
             config["state_machine"] = cuckoo.rcuckoobatch
-            config["max_fill"] = 90
+            config["max_fill"] = 100
             runs.append(simulator.run_trials(config))
         all_runs.append(runs)
     dm.save_statistics(all_runs,dirname=data_dir)
@@ -112,5 +112,5 @@ def plot_buckets_per_lock_vs_locks_per_message_experiment():
     plt.tight_layout()
     plt.savefig("buckets_per_lock_vs_locks_per_message.pdf")
 
-# buckets_per_lock_vs_locks_per_message_experiment()
+buckets_per_lock_vs_locks_per_message_experiment()
 plot_buckets_per_lock_vs_locks_per_message_experiment()
