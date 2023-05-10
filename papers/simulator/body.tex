@@ -637,14 +637,28 @@ however the less time a client spends blocking, and the
 fewer steps required to complete an operation are a proxy
 for real system throughput.
 
-\subsection{Latency}
+\subsection{System Breakdown}
 
-\subsection{Throughput}
+Breakdown of insertion performance 
 
-\subsection{Bandwidth}
+\subsection{System Performance}
 
-\subsection{Operations per second}
+YCSB-A, YCSB-B, and YCSB-C, YCSB-W, for latency.
+YCSB-A, YCSB-B, and YCSB-C, YCSB-W, for throughput.
+YCSB-A, YCSB-B, and YCSB-C, YCSB-W, for operations per second
+YCSB-a, YCSB-b, and YCSB-c, YCSB-w, for bandwidth.
 
+\subsection{Search Performance:}
+
+\textbf{Hashing Algoritms:} Rcuckoo hashing requires
+executing many hash compuations. We evalute our A* search
+alorithm abolute performacne on various hash functions and
+show how this values effect our overall fill factors.
+
+\textbf{A* search vs BFS:} We compare the performance of A*
+vs BFS for locally computed insertions. A* performance
+directly effects system throughput as this algorithm is run
+twice on every insert.
 
 
 \section{Conclusion}
