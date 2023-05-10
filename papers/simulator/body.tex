@@ -212,7 +212,7 @@ trip.
         % \caption{}
     \end{subfigure}.
     \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/buckets_per_lock_vs_locks_per_message_copy.pdf}
+        \includegraphics[width=0.99\linewidth]{fig/buckets_per_lock_vs_locks_per_message.pdf}
         \label{fig:tbd}
         % \caption{}
     \end{subfigure}.
@@ -220,7 +220,7 @@ trip.
     \caption{
     \textbf{(a)} CX5 RDMA latency vs message size~\cite{rdma-latency}
     \textbf{(b)} CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path.
-    \textbf{(c)} Round trips required for locking with different lock configurations and locality hashing (99th percentile) - locks per message and buckets per lock.
+    \textbf{(c)} Round trips (99th percentile) required per insert while filling a table to 100\% while varying the lock per message, and buckets per lock.
     }
     \label{fig:rdma}
 
