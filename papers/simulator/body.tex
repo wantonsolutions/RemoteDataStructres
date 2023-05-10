@@ -450,8 +450,6 @@ and reduces on NIC blocking when acquiring locks.
 \end{figure}.
 
 
-
-
 \subsection{Protocol}
 
 Using locks instead of opportunistic concurrency greatly
@@ -594,9 +592,60 @@ not guarantee that we find the shortest path, however it
 does find short paths in the common case, and results in
 very short search times.
 
+\section{Implementation} We implement our algorithm in
+Python and emulate client based RDMA using a custom built
+simulator consisting of 1k lines of python. 
+
+\textbf{Simulator:} Our simulator is event based and does
+not emulate network transit time, processing time, or failed
+packets. Clients, memory, and switches are modeled as finite
+state machines, and the network as FIFO queues. Events are
+scheduled randomly, between clients, memory, and the
+network. RDMA verbs are modeled as function pointers with
+arguments passed by the client.
+
+\textbf{Rcuckoo:} Cuckoo is implemented in 1.2k lines of
+python. A* is implemented by hand, with the use of python's
+standard heap library for priority queuing. Clients store
+complete copies of the remote hash table index locally, and
+none of the extent in simulation. In practice for better
+resource utilization cached pages of the index could be
+released using LRU. Our current implementation does not
+include extents, all table accesses are inlined.
+
+\textbf{RACE:} We implement RACE~\cite{race} to the best of
+our abilities as no publicly available implementation is
+available. We only model the RACE index. In cases where
+blocking calls are made to RACE's extent we assume they
+succeed and simply reissue a read to the index to model the
+round trip incurred by the extent lookup. We model RACE's
+blocking behavior exactly in this way. We reached out to
+RACE's authors to check our implementation's correctness and
+were able to correlate our fill factor results with theirs.
 
 \section{Evaluation}
 \label{sec:eval}
+
+Our evaluation is run entirely in simulation. The goal of
+our evaluation is to demonstrate the practicality of Rcuckoo
+by showing by proxy that it supports low latency and high
+throughput operations. We measure blocking round trip's as a
+proxy for latency to measure throughput we normalize the
+number of simulation steps each client runs for before
+filling the table. Steps do not correlate directly to time,
+however the less time a client spends blocking, and the
+fewer steps required to complete an operation are a proxy
+for real system throughput.
+
+\subsection{Latency}
+
+\subsection{Throughput}
+
+\subsection{Bandwidth}
+
+\subsection{Operations per second}
+
+
 
 \section{Conclusion}
 \label{sec:conclusion}
