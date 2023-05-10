@@ -4,6 +4,7 @@ import state_machines as sm
 import log
 import logging
 import matplotlib.pyplot as plt
+import matplotlib as matplotlib
 import numpy as np
 from tqdm import tqdm
 from data_management import save_statistics, load_statistics
@@ -14,6 +15,125 @@ import argparse
 parser = argparse.ArgumentParser(description='Experimental Parameters')
 parser.add_argument('-n', '--exp_name',    type=str, default="", help='name of experiment. will set output file names')
 parser.add_argument('-d', '--description', type=str, default="", help='description of experiment will be embedded in general output')
+
+def heatmap(data, row_labels, col_labels, ax=None,
+            cbar_kw=None, cbarlabel="", **kwargs):
+    """
+    Create a heatmap from a numpy array and two lists of labels.
+
+    Parameters
+    ----------
+    data
+        A 2D numpy array of shape (M, N).
+    row_labels
+        A list or array of length M with the labels for the rows.
+    col_labels
+        A list or array of length N with the labels for the columns.
+    ax
+        A `matplotlib.axes.Axes` instance to which the heatmap is plotted.  If
+        not provided, use current axes or create a new one.  Optional.
+    cbar_kw
+        A dictionary with arguments to `matplotlib.Figure.colorbar`.  Optional.
+    cbarlabel
+        The label for the colorbar.  Optional.
+    **kwargs
+        All other arguments are forwarded to `imshow`.
+    """
+
+    if ax is None:
+        ax = plt.gca()
+
+    if cbar_kw is None:
+        cbar_kw = {}
+    cbar_kw["fraction"]=0.03
+
+    # Plot the heatmap
+    im = ax.imshow(data, **kwargs)
+
+    # Create colorbar
+    cbar = ax.figure.colorbar(im, ax=ax, **cbar_kw)
+    cbar.ax.set_ylabel(cbarlabel, rotation=-90, va="bottom")
+
+    # Show all ticks and label them with the respective list entries.
+    ax.set_xticks(np.arange(data.shape[1]), labels=col_labels)
+    ax.set_yticks(np.arange(data.shape[0]), labels=row_labels)
+
+    # Let the horizontal axes labeling appear on top.
+    # ax.tick_params(top=False, bottom=True,
+    #                labeltop=False, labelbottom=True)
+
+    # Rotate the tick labels and set their alignment.
+    # plt.setp(ax.get_xticklabels(), rotation=-30, ha="right",
+    #          rotation_mode="anchor")
+
+    # Turn spines off and create white grid.
+    ax.spines[:].set_visible(False)
+
+    ax.set_xticks(np.arange(data.shape[1]+1)-.5, minor=True)
+    ax.set_yticks(np.arange(data.shape[0]+1)-.5, minor=True)
+    ax.grid(which="minor", color="w", linestyle='-', linewidth=3)
+    ax.tick_params(which="minor", bottom=False, left=False)
+
+    return im, cbar
+
+
+def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
+                     textcolors=("black", "white"),
+                     threshold=None, **textkw):
+    """
+    A function to annotate a heatmap.
+
+    Parameters
+    ----------
+    im
+        The AxesImage to be labeled.
+    data
+        Data used to annotate.  If None, the image's data is used.  Optional.
+    valfmt
+        The format of the annotations inside the heatmap.  This should either
+        use the string format method, e.g. "$ {x:.2f}", or be a
+        `matplotlib.ticker.Formatter`.  Optional.
+    textcolors
+        A pair of colors.  The first is used for values below a threshold,
+        the second for those above.  Optional.
+    threshold
+        Value in data units according to which the colors from textcolors are
+        applied.  If None (the default) uses the middle of the colormap as
+        separation.  Optional.
+    **kwargs
+        All other arguments are forwarded to each call to `text` used to create
+        the text labels.
+    """
+
+    if not isinstance(data, (list, np.ndarray)):
+        data = im.get_array()
+
+    # Normalize the threshold to the images color range.
+    if threshold is not None:
+        threshold = im.norm(threshold)
+    else:
+        threshold = im.norm(data.max())/2.
+
+    # Set default alignment to center, but allow it to be
+    # overwritten by textkw.
+    kw = dict(horizontalalignment="center",
+              verticalalignment="center")
+    kw.update(textkw)
+
+    # Get the formatter in case a string is supplied
+    if isinstance(valfmt, str):
+        valfmt = matplotlib.ticker.StrMethodFormatter(valfmt)
+
+    # Loop over the data and create a `Text` for each "pixel".
+    # Change the text's color depending on the data.
+    texts = []
+    for i in range(data.shape[0]):
+        for j in range(data.shape[1]):
+            kw.update(color=textcolors[int(im.norm(data[i, j]) > threshold)])
+            text = im.axes.text(j, i, valfmt(data[i, j], None), **kw)
+            texts.append(text)
+
+    return texts
 
 
 def get_config():
@@ -534,13 +654,14 @@ def buckets_per_lock_experiment():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
 
-    table_size = 2048
+    table_size = 4096
     clients=8
     runs=[]
     read_threshold=128
     # buckets_per_lock_arr=[1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
-    buckets_per_lock_arr=[1, 2]
-    locks_per_message=4
+    buckets_per_lock_arr=[1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+    # buckets_per_lock_arr=[8]
+    locks_per_message=64
     log.set_off()
     # locks_per_message_arr=[1, 2]
     for buckets_per_lock in buckets_per_lock_arr:
@@ -550,10 +671,115 @@ def buckets_per_lock_experiment():
         config['num_steps'] = 1000000
         config['read_threshold_bytes'] = read_threshold
 
+        config['bucket_size']=8
         config["buckets_per_lock"] = buckets_per_lock
         config["locks_per_message"] = locks_per_message
+        config["state_machine"] = cuckoo.rcuckoobatch
+        config["max_fill"] = 90
         runs.append(simulator.run_trials(config))
     save_statistics(runs)
+
+def buckets_per_lock_vs_locks_per_message_experiment():
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator")
+
+    table_size = 4096
+    clients=8
+    all_runs=[]
+    read_threshold=128
+    # buckets_per_lock_arr=[1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+    buckets_per_lock_arr=[1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+    # buckets_per_lock_arr=[8]
+    locks_per_message=[1,2,4,8,16,32,64]
+    log.set_off()
+    # locks_per_message_arr=[1, 2]
+    for lpm in locks_per_message:
+        runs=[]
+        for buckets_per_lock in buckets_per_lock_arr:
+            config = get_config()
+            config['indexes'] = table_size
+            config['num_clients'] = clients
+            config['num_steps'] = 1000000
+            config['read_threshold_bytes'] = read_threshold
+
+            config['bucket_size']=8
+            config["buckets_per_lock"] = buckets_per_lock
+            config["locks_per_message"] = lpm
+            config["state_machine"] = cuckoo.rcuckoobatch
+            config["max_fill"] = 90
+            runs.append(simulator.run_trials(config))
+        all_runs.append(runs)
+    save_statistics(all_runs)
+
+def plot_buckets_per_lock_vs_locks_per_message_experiment():
+    stats = load_statistics()
+    # fig, ax = plt.subplots()
+
+    rtt_matrix=[]
+    stats = stats[0]
+    for stat in stats:
+        rtt_row=[]
+        for s_full in stat:
+            s = s_full[0]
+            print(s)
+            config=s['config']
+            buckets_per_lock=config['buckets_per_lock']
+            locks_per_message=config['locks_per_message']
+
+            percentile = 99
+            insert_rtt, insert_err = plot_cuckoo.client_stats_get_percentile_err(s, 'insert_rtt', percentile)
+
+            # print("buckets per lock: ", buckets_per_lock, " locks per message: ", locks_per_message, " fill: ", fill)
+            rtt_row.append((buckets_per_lock, locks_per_message,insert_rtt))
+        rtt_matrix.append(rtt_row)
+    print(rtt_matrix)
+
+    x_axis_buckets_per_lock = []
+    for i in range(len(rtt_matrix[0])):
+        x_axis_buckets_per_lock.append(rtt_matrix[0][i][0])
+    print(x_axis_buckets_per_lock)
+
+    y_axis_locks_per_message = []
+    for i in range(len(rtt_matrix)):
+        y_axis_locks_per_message.append(rtt_matrix[i][0][1])
+    print(y_axis_locks_per_message)
+
+    z_axis_rtt = []
+    for i in range(len(rtt_matrix)):
+        row=[]
+        for j in range(len(rtt_matrix[0])):
+            row.append(rtt_matrix[i][j][2])
+        z_axis_rtt.append(row)
+    print(z_axis_rtt)
+
+
+
+    # ax.imshow(z_axis_rtt, cmap='summer', interpolation='nearest')
+    # for i in range(len(y_axis_locks_per_message)):
+    #     for j in range(len(x_axis_buckets_per_lock)):
+    #         v = int(round(z_axis_rtt[i][j],1))
+    #         text = ax.text(j, i, v,
+    #                     ha="center", va="center", color="w")
+
+    factor = 1.5
+    fig, ax = plt.subplots(1,1, figsize=(3*factor,2*factor))
+
+    z_axis_rtt = np.array(z_axis_rtt)
+    im, cbar = heatmap(z_axis_rtt, y_axis_locks_per_message, x_axis_buckets_per_lock, ax=ax,
+                    cmap="YlGn", cbarlabel="Lock Aquire RTT")
+    texts = annotate_heatmap(im, valfmt="{x:.0f}")
+
+    # ax.colorbar()
+    # plt.yticks(np.arange(len(y_axis_locks_per_message)), y_axis_locks_per_message)
+    # plt.xticks(np.arange(len(x_axis_buckets_per_lock)), x_axis_buckets_per_lock)
+    ax.set_xlabel("Buckets per lock")
+    ax.set_ylabel("Locks per message")
+    fig.tight_layout()
+    plt.tight_layout()
+    plt.savefig("buckets_per_lock_vs_locks_per_message.pdf")
+
+
+
 
 def run_insertion_range_protocol_cdf():
     table_size = 1024 * 128
@@ -632,8 +858,8 @@ def plot_insertion_range_protocol_cdf():
     # ax1.set_title('Insertion Range CDF')
     ax1.legend()
 
-
-    plt.tight_layout()
+    fig.tight_layout()
+    # plt.tight_layout()
     plt.savefig("insertion_span.pdf")
 
 
@@ -641,14 +867,18 @@ def plot_race_bucket_fill_factor():
     print("not implemented race bucket fill factor")
 
 
+# buckets_per_lock_vs_locks_per_message_experiment()
+plot_buckets_per_lock_vs_locks_per_message_experiment()
+# plot_general_stats_last_run()
 
 # plot_insertion_range_cdf()
 # run_insertion_range_protocol_cdf()
-plot_insertion_range_protocol_cdf()
+# plot_insertion_range_protocol_cdf()
 
 # locks_per_message_experiment()
 # global_lock_success_rate()
 # plot_global_lock_success_rate()
+# buckets_per_lock_experiment()
 
 # todos()
 
@@ -663,13 +893,11 @@ plot_insertion_range_protocol_cdf()
 # plot_general_stats_last_run()
 
 # read_threshold_experiment()
-# buckets_per_lock_experiment()
 # client_scalability()
 
 
 # race_vs_rcuckoo_fill_factor()
 # avg_run_debug()
-# plot_general_stats_last_run()
 
 # plot_read_threshold_experiment()
 

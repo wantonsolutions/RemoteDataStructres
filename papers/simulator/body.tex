@@ -213,15 +213,15 @@ trip.
         % \caption{}
     \end{subfigure}.
     \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/rdma_latency.pdf}
+        \includegraphics[width=0.99\linewidth]{fig/buckets_per_lock_vs_locks_per_message_copy.pdf}
         \label{fig:tbd}
         % \caption{}
     \end{subfigure}.
     \vspace{-1em}
     \caption{
-    \textbf{(a)} CX5 RDMA latency~\cite{rdma-latency}
+    \textbf{(a)} CX5 RDMA latency vs message size~\cite{rdma-latency}
     \textbf{(b)} CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path.
-    \textbf{(c)} \todo{something}
+    \textbf{(c)} Round trips required for locking with different lock configurations and locality hashing (99th percentile) - locks per message and buckets per lock.
     }
     \label{fig:rdma}
 
@@ -350,11 +350,29 @@ mask along with the new, and old values of the cas
 operation. This enables the client to atomically set up to
 64 contiguous locks. Using these operations clients can
 dramatically decrease the number of round trips required to
-aquire locks. Figure~\todo{insert a lock range figure which
-shows the number of random lock locations and the number of
-locally bounded locations}.
+acquire locks.
+%%
+Lock granularity effects performance under contention. Using
+values from Figure~\ref{fig:rdma}(b) if locks are per bucket
+96\% of lock acquisitions can be completed with a single RTT
+masked cas. If locks span 4 buckets 99\% of requests can be
+completed in a single round trip.
+%%
+Figure~\ref{fig:rdma}(c) Shows the tradeoff between lock
+granularity and the number of locks which can be set in a
+single message with locality hashing turned on. The values
+reported are the 99th percentile number of round trips
+required to acquire locks up to a 90\% fill factor on a
+table with 4096 entries and 8 entries per bucket, and 8
+concurrent clients. The biggest factor in round trip times
+is the number of locks per bucket. On the far right side of
+the heatmap (512) only a single global lock exists. Further
+the benefit in terms of locks per message falls off quickly
+after 1. RDMA masked CAS are beneficial as they allow for
+fine grained locking, but setting 3 or more locks per
+message has little effect up to 90\% fill rate.
 
-RDMA atomic throughput is highly
+RDMA atomic throughput is
 limited~\cite{design-guidelines}~\todo{[swordbox]}. Reducing
 the number of atomic messuages also reduces hardware
 limitations on the number of operations. Our lock table is

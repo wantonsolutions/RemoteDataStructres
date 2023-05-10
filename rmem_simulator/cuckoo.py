@@ -1294,7 +1294,13 @@ def lock_message_to_buckets(message, buckets_per_lock):
     return buckets
 
 def lock_indexes_to_buckets(lock_indexes, buckets_per_lock):
-    return [int(buckets_per_lock * l) for l in lock_indexes]
+
+    base_indicies = [int(buckets_per_lock * l) for l in lock_indexes]
+    indicies = []
+    for base in base_indicies:
+        indicies.extend(list(range(base, base + buckets_per_lock)))
+    return indicies
+
 
 def lock_message_to_lock_indexes(message):
     base=message.payload["function_args"]['lock_index']
@@ -1425,7 +1431,7 @@ def read_threshold_message(key, read_threshold_bytes, table_size, row_size_bytes
 
 def get_covering_read_from_lock_message(lock_message, buckets_per_lock, row_size_bytes):
     # print(lock_message.payload)
-    base_index = lock_message.payload['function_args']['lock_index'] * buckets_per_lock
+    base_index = lock_message.payload['function_args']['lock_index']
     #calculate the max and min mask index
     mask = lock_message.payload['function_args']['mask']
     min_index = -1
@@ -1436,8 +1442,15 @@ def get_covering_read_from_lock_message(lock_message, buckets_per_lock, row_size
             if min_index == -1:
                 min_index = i
     # print("min_index: " + str(min_index), "max_index: " + str(max_index))
-    min_index = (min_index * buckets_per_lock) + base_index
-    max_index = (max_index * buckets_per_lock) + base_index
+
+    # min_index = (min_index * buckets_per_lock) + base_index
+    # max_index = (max_index * buckets_per_lock) + base_index
+
+    min_index = (min_index + base_index) * buckets_per_lock
+    max_index = ((max_index + base_index) * buckets_per_lock) + (buckets_per_lock - 1)
+
+    # print("base_index: " + str(base_index) + " min_index: " + str(min_index), "max_index: " + str(max_index))
+
     # print("min_bucket: " + str(min_index), "max_bucket: " + str(max_index))
     read_message = multi_bucket_read_message([min_index, max_index], row_size_bytes)
     # print(read_message[0].payload)
@@ -1643,9 +1656,10 @@ class rcuckoobatch(client_state_machine):
         #todo there are going to be cases where this fails because
 
         search_buckets=lock_indexes_to_buckets(self.locks_held, self.buckets_per_lock)
+        self.info("locked buckets: " + str(search_buckets)) if __debug__ else None
         self.search_path=self.table_search_function(search_buckets)
         if len(self.search_path) == 0:
-            self.info("Search Failed: " + str(self.current_insert_value) + "| unable to continue, client " + str(self.id) + " is done") if __debug__ else None
+            self.info("Second Search Failed: " + str(self.current_insert_value) + "| unable to continue, client " + str(self.id) + " is done") if __debug__ else None
             self.current_insert_rtt += 1
             return self.retry_insert()
         self.search_path_index = len(self.search_path) - 1
@@ -1684,6 +1698,9 @@ class rcuckoobatch(client_state_machine):
         #If CAS failed, try the insert a second time.
         success = args["success"]
         if not success:
+            self.info("CAS Failed: " + str(self.current_insert_value)) if __debug__ else None
+            self.warning("FAILED CAS MESSAGE: " + str(message))
+            self.warning("FAILED CAS MESSAGE PAYLOAD: " + str(message.payload))
             raise Exception("Failed Cas on Insert path -- we should not have failures here")
 
         #Step down the search path a single index
