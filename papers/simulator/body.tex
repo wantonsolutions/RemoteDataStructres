@@ -66,8 +66,8 @@ Access latency to remote memory is high so round trips per
 operation must be minimized to achieve efficiency.
 Serialization is particularly hard because there is no
 centralized serialization point to guard access to remote
-memory. With RDMA NIC's provide atomic verbs such as
-compare-and swap (CAS), but these are by no means a silver
+memory. RDMA NIC's provide atomic verbs such as
+compare-and-swap (CAS), but these are by no means a silver
 bullet.  Each atomic request takes a round trip from client
 to server to execute. In the best case lock/unlock requires
 two round trips, if multiple locks are required, or locks
@@ -76,15 +76,36 @@ are contested the number of round trips increases.
 %cpu locking vs rdma
 In traditional key value stores (Memcached~\cite{memcached})
 the CPU coordinates table access for read, write, and lock
-instructions. RDMA based Key-value
+instructions. In contrast RDMA based Key-value
 stores~\cite{herd,erpc,pilaf} use a mixture of one-sided (no
-cpu) and two-sided (cpu involved) verbs.  Writes are
-typically two sided so memory-side CPU can orchestrate
-serialized operations (e.g. locking) with main memory access
-latency (50-100ns). These small access times keep critical
-sections small for CPU based locking, and dramatically
-increase them for one-sided RDMA based locking
-schemes~\cite{clover, sherman}.
+cpu) and two-sided (cpu involved) verbs to alleviate the CPU
+bottleneck. Reads are typically one sided to bypass the CPU
+bottleneck~\cite{pilaf,cell} while writes are typically two
+sided so memory-side CPU can orchestrate serialized
+operations (e.g. locking) with main memory access latency
+(50-100ns).  These small access times keep critical sections
+small for CPU based locking, and dramatically increase them
+for one-sided RDMA based locking schemes~\cite{clover,
+sherman}.
+
+\textbf{Caching:} Modifying a remote data structure requires
+clients to have synchronized caches. The cache can either be
+accumulated per operation and be discarded or persist across
+operations.  Accumulating a cache per operation is slow,
+clients must aquire locks, read, then release potentially
+many times to complete an operation if the locks are fine
+grained. Alternatively clients can persist a cache across
+requests in the hope that it will be valid for future
+operations.  Clover (a remote memory key value store) caches
+pointers to values on clients to enable fast reads when
+values are looked up multiple times~\cite{clover}.
+Optimistic caching threads a fine line as issuing optimistic
+operations which commonly fail may be worse than acquiring
+the correct locks.  An ideal caching strategy would enable
+clients to succeed in their operations frequently while not
+requiring much overhead to maintain. 
+
+
 
 %cuckoo hashing optimistic vs locks
 \textbf{Critical Sections:} Consider executing an insert
@@ -101,7 +122,7 @@ A client can perform inserts opportunistically by executing
 lockless read to learn about the hash table, calculating a
 cuckoo path, and executing a sequence of dependent CAS
 operations for each step in the path. This approach is
-scalable as its critical section is only the lenght of a CAS
+scalable as its critical section is only the length of a CAS
 instruction and is only limited by RDMA atomic operation
 throughput~\cite{design-guidelines}. However, Paths can
 become invalid as other clients running concurrent inserts
@@ -122,7 +143,7 @@ Alternatively to get synchronized information the client can
 lock the table, then issue reads. However acquiring locks
 without knowledge of the table is hard. A global lock
 ensures that all reads are synchronized, but bottlenecks
-hash table throughput.  Alternatively per bucket locks
+hash table throughput. Alternatively per bucket locks
 enable high throughput but calculating which buckets to lock
 requires knowledge of the table. A long cuckoo path may
 require locking many buckets and many round trips to gather
@@ -146,7 +167,7 @@ and execute the cuckoo path.
 % locking increases the tables scalability but increases it's
 % base case insertion time.
 
-\textbf{Read Optimization} Most data center workloads are
+\textbf{Read Optimization:} Most data center workloads are
 read heavy, therefore read operations should be the most
 highly optimized~\cite{datacenter-workloads}. Prior
 approaches such as RACE require two RDMA round trips per
@@ -162,6 +183,15 @@ due to each pointer resolution requiring a round
 trip~\cite{clio,clover,pointer-chaising}. Ideally we would
 be able to ensure that reads complete in a single round
 trip.
+
+\textbf{Duplicate Keys:} Clients may issue concurrent
+inserts for the same key, given that keys may occupy
+multiple location detecting and dealing with duplicate keys
+is tricky while maintaining high performance. RACE requires
+an extra round trip after each insert to check if a
+duplicate key was inserted simultaneously~\cite{race}. An
+ideal algorithm would prevent key duplication without
+requiring additional overheads.
 
 
 \section{Design}
@@ -473,6 +503,18 @@ single RTT reads. This strategy increase our common case
 read size in excahnge for latency~\todo{evaluation section}.
 This same pattern is true in RACE for deletes. 
 \todo{insert protocol message figure}
+
+\textbf{Key Duplication:} Unlike RACE our algorithm can
+prevent duplicate keys easily on insert. Cuckoo hashing
+inserts to exactly one bucket, which is read during the lock
+acquisition phase. If a duplicate key is found the client
+can abort. If the bucket is full, a duplicate key may exist
+in it's alternative bucket. Our clients issue a read to the
+inserted keys alternative bucket during lock acquisition. If
+the lock returns successfully and no duplicate exists in
+either bucket then no duplicates exist as the successful
+lock ensures that no other client is currently moving the
+key to another location as part of a concurrent insert.
 
 \subsection{Search}
 Cuckoo hashing insert traditionally uses random
