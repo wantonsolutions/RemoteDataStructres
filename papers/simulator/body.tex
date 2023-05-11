@@ -637,6 +637,12 @@ were able to correlate our fill factor results with theirs.
 \section{Evaluation}
 \label{sec:eval}
 
+\begin{figure*}[ht]
+    \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_throughput.pdf}
+    \caption{race vs rcuckoo simulated throughput}
+    \label{fig:ycsb_throughput}
+\end{figure*}
+
 Our evaluation is run entirely in simulation. The goal of
 our evaluation is to demonstrate the practicality of Rcuckoo
 by showing by proxy that it supports low latency and high
@@ -658,10 +664,15 @@ Breakdown of insertion performance
 
 \subsection{System Performance}
 
+
+Figure~\ref{fig:ycsb_throughput} shows the throughput of race vs rcuckoo for YCSB workloads.
+
 YCSB-A, YCSB-B, and YCSB-C, YCSB-W, for latency.
 YCSB-A, YCSB-B, and YCSB-C, YCSB-W, for throughput.
 YCSB-A, YCSB-B, and YCSB-C, YCSB-W, for operations per second
 YCSB-a, YCSB-b, and YCSB-c, YCSB-w, for bandwidth.
+
+
 
 \subsection{Search Performance:}
 
