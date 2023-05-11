@@ -790,14 +790,35 @@ def run_hero_ycsb():
         save_statistics(multi_runs, dirname=dirname)
         plot_general_stats_last_run(dirname=dirname)
 
+def plot_hero_ycsb():
+    workloads = ["ycsb-a", "ycsb-b", "ycsb-w"]
+
+    fig, axs = plt.subplots(1,len(workloads), figsize=(12,3))
+    for i in range(len(workloads)):
+        dirname="data/hero-"+workloads[i]
+        ax = axs[i]
+        stats = load_statistics(dirname=dirname)
+        stats=stats[0]
+        plot_cuckoo.throughput_approximation(ax, stats, decoration=False)
+        ax.legend()
+        ax.set_xlabel("clients")
+        ax.set_title(workloads[i])
+        ax.set_ylabel("throughput \n(ops/rtts)*clients")
+
+    plt.tight_layout()
+    plt.savefig("hero_ycsb.pdf")
+
+
+
 
 
 
 # buckets_per_lock_vs_locks_per_message_experiment()
 # plot_buckets_per_lock_vs_locks_per_message_experiment()
 
-run_hero_ycsb()
-
+# run_hero_ycsb()
+plot_hero_ycsb()
+# 
 
 # plot_insertion_range_cdf()
 # run_insertion_range_protocol_cdf()

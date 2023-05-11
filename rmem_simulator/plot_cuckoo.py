@@ -461,14 +461,21 @@ def single_run_approx_throughput(stat):
     # approx_throughput =  stat['config']['num_clients'] / (stat['simulator']['steps']/3)
     # approx_throughput = sim_steps/
     # memory_steps=stat['memory']['steps']
-    normal_rtts = []
+    normal_throughputs = []
     for client in stat['clients']:
         read_rtt = client['stats']['read_rtt_count']
         insert_rtt = client['stats']['insert_rtt_count']
+        read_operations = client['stats']['completed_read_count']
+        insert_operations = client['stats']['completed_insert_count']
+
+        total_operations = read_operations + insert_operations
         total_rtt = read_rtt + insert_rtt
-        normal_rtt = div_by_zero_to_zero(1, total_rtt)
-        normal_rtts.append(normal_rtt)
-    mean, std = np.mean(normal_rtts), np.std(normal_rtts)
+
+        normal_throughput = div_by_zero_to_zero(total_operations, total_rtt)
+        normal_throughputs.append(normal_throughput)
+    mean, std = np.mean(normal_throughputs), np.std(normal_throughputs)
+    mean = mean * stat['config']['num_clients']
+    std = std * stat['config']['num_clients']
     return mean, std
     # return (np.mean(per_client_success_rate), stderr(per_client_success_rate))
 
@@ -496,13 +503,13 @@ def approximate_throughput_decoration(ax, x_axis):
     ax.set_title('Approximate Throughput vs ' + x_axis)
     ax.legend()
 
-def throughput_approximation(ax, stats, x_axis='clients'):
-    print("throughput approx x-axis: ", x_axis)
+def throughput_approximation(ax, stats, x_axis='clients', decoration=True):
     stats = correct_stat_shape(stats)
     for stat in stats:
         state_machine_label = stat[0][0]['config']['state_machine']
         approximate_throughput_line(ax, stat, label=state_machine_label, x_axis=x_axis)
-    approximate_throughput_decoration(ax, x_axis)
+    if decoration:
+        approximate_throughput_decoration(ax, x_axis)
 
 
 def single_run_op_success_rate(stat, op_string):
