@@ -65,6 +65,7 @@ def save_statistics(statistics, dirname=""):
     if dirname == "":
         exp_dir = create_experiment_dir()
     else:
+        os.makedirs(dirname, exist_ok=True)
         exp_dir=dirname
     create_info_file(exp_dir)
     stat_file_name = os.path.join(exp_dir, STATISTICS_FILE)

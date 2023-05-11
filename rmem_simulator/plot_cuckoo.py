@@ -466,7 +466,7 @@ def single_run_approx_throughput(stat):
         read_rtt = client['stats']['read_rtt_count']
         insert_rtt = client['stats']['insert_rtt_count']
         total_rtt = read_rtt + insert_rtt
-        normal_rtt = 1 / total_rtt
+        normal_rtt = div_by_zero_to_zero(1, total_rtt)
         normal_rtts.append(normal_rtt)
     mean, std = np.mean(normal_rtts), np.std(normal_rtts)
     return mean, std

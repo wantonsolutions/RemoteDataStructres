@@ -219,8 +219,8 @@ def todos():
     print("Implement A lock aquisition function that grabs a few locks at a time.")
     print("move the table and a* search to a shared file so I can do millions of inserts on the table just like the prior tests")
 
-def plot_general_stats_last_run():
-    stats, directory = load_statistics()
+def plot_general_stats_last_run(dirname=""):
+    stats, directory = load_statistics(dirname=dirname)
     print("plot general stats")
     plot_names = [
         "general_stats",
@@ -751,39 +751,44 @@ def plot_race_bucket_fill_factor():
     print("not implemented race bucket fill factor")
 
 
-def hero():
+def run_hero_ycsb():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
-    multi_runs=[]
-    table_size = 1680  * 512 #lcm of 3,4,5,6,7,8,10,12,14,16
+    table_size = 1680  * 512
+    # table_size=420
     clients = [1,2,4,8,16,32,64,128]
     # clients = [1,2]
-    bucket_size=8
-    read_threshold=512
-    fill_factor = 90
-    trials=1
     state_machines = [cuckoo.rcuckoobatch,sm.race]
-    # state_machines = [sm.race]
+
+    master_config = get_config()
+    master_config["bucket_size"]=8
+    master_config['num_steps'] = 100000000000
+    master_config['bucket_size'] = 8
+    master_config['read_threshold_bytes'] = 512
+    master_config['indexes'] = table_size
+    master_config['trials'] = 1
+    master_config['max_fill']= 90
+    # workloads = ["ycsb-a", "ycsb-b","ycsb-c", "ycsb-w"]
+    workloads = ["ycsb-a", "ycsb-b", "ycsb-w"]
     log.set_off()
-    for s in state_machines:
-        runs=[]
-        for c in clients:
-            config = get_config()
-            config['num_clients'] = c
-            config['num_steps'] = 100000000000
-            config['bucket_size'] = bucket_size
-            config['read_threshold_bytes'] = 512
-            config['indexes'] = table_size
-            config['trials'] = trials
-            config['state_machine']=s
-            config['max_fill']= fill_factor
-            config['workload']="ycsb-a"
-            runs.append(simulator.run_trials(config))
-        save_statistics(runs)
-        plot_general_stats_last_run()
-        multi_runs.append(runs)
-    save_statistics(multi_runs)
-    plot_general_stats_last_run()
+
+    #ycsb-a
+    for workload in workloads:
+        multi_runs=[]
+        for s in state_machines:
+            runs=[]
+            for c in clients:
+                config = master_config.copy()
+                config['num_clients'] = c
+                config['state_machine']=s
+                config['workload']=workload
+                runs.append(simulator.run_trials(config))
+            save_statistics(runs)
+            plot_general_stats_last_run()
+            multi_runs.append(runs)
+        dirname="data/hero-"+workload
+        save_statistics(multi_runs, dirname=dirname)
+        plot_general_stats_last_run(dirname=dirname)
 
 
 
@@ -791,7 +796,8 @@ def hero():
 # buckets_per_lock_vs_locks_per_message_experiment()
 # plot_buckets_per_lock_vs_locks_per_message_experiment()
 
-hero()
+run_hero_ycsb()
+
 
 # plot_insertion_range_cdf()
 # run_insertion_range_protocol_cdf()
