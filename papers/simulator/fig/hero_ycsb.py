@@ -15,10 +15,10 @@ from tqdm import tqdm
 def run_hero_ycsb():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
-    # table_size = 1680  * 512
-    table_size=420
+    table_size = 1680  * 512
+    # table_size=1680
     clients = [1,2,4,8,16,32,64,128]
-    # clients = [1,2]
+    # clients = [100]
     state_machines = [cuckoo.rcuckoobatch,sm.race]
 
     master_config = lib.get_config()
@@ -26,11 +26,13 @@ def run_hero_ycsb():
     master_config['num_steps'] = 100000000000
     master_config['bucket_size'] = 8
     master_config['read_threshold_bytes'] = 512
+    master_config['locks_per_message'] = 64
     master_config['indexes'] = table_size
     master_config['trials'] = 1
     master_config['max_fill']= 90
     # workloads = ["ycsb-a", "ycsb-b","ycsb-c", "ycsb-w"]
-    workloads = ["ycsb-a", "ycsb-b", "ycsb-w"]
+    # workloads = ["ycsb-a", "ycsb-b", "ycsb-w"]
+    workloads = ["ycsb-c"]
     log.set_off()
 
     #ycsb-a
@@ -43,7 +45,13 @@ def run_hero_ycsb():
                 config['num_clients'] = c
                 config['state_machine']=s
                 config['workload']=workload
-                runs.append(simulator.run_trials(config))
+
+                if workload == "ycsb-c":
+                    steps = 1000000
+                    r = simulator.fill_then_run_trials(config, fill_to=config['max_fill'], max_fill=config['max_fill']+1, max_steps=steps)
+                else:
+                    r= simulator.run_trials(config)
+                runs.append(r)
             dm.save_statistics(runs)
             # plot_cuckoo.plot_general_stats_last_run()
             multi_runs.append(runs)
@@ -52,9 +60,13 @@ def run_hero_ycsb():
         # plot_cuckoo.plot_general_stats_last_run(dirname=dirname)
 
 def plot_hero_ycsb_throughput():
-    workloads = ["ycsb-a", "ycsb-b", "ycsb-w"]
+    workloads = ["ycsb-w", "ycsb-a", "ycsb-b", "ycsb-c"]
+    # workloads = ["ycsb-a", "ycsb-b", "ycsb-w", "ycsb-c"]
+    # workloads = ["ycsb-c"]
 
-    fig, axs = plt.subplots(1,len(workloads), figsize=(12,3))
+    fig, axs = plt.subplots(1,len(workloads), figsize=(15,3))
+    if len(workloads) == 1:
+        axs = [axs]
     for i in range(len(workloads)):
         dirname="hero_ycsb/"+workloads[i]
         ax = axs[i]

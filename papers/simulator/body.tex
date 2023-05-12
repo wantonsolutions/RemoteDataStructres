@@ -169,7 +169,7 @@ and execute the cuckoo path.
 
 \textbf{Read Optimization:} Most data center workloads are
 read heavy, therefore read operations should be the most
-highly optimized~\cite{datacenter-workloads}. Prior
+highly optimized~\cite{datacenter-workloads,facebook-memcached}. Prior
 approaches such as RACE require two RDMA round trips per
 read. The first is a hash index lookup, the second round
 trip reads the actual key-value block. RACE must perform two
