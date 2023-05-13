@@ -452,6 +452,16 @@ and reduces on NIC blocking when acquiring locks.
 
 \subsection{Protocol}
 
+\begin{figure}[t]
+\includegraphics[width=0.99\linewidth]{fig/message_diagram.pdf}
+
+\caption{Rcuckoo's protocol for reads, inserts, deletes and
+updates. Blue lines are index accesses, and red lines are
+extent accesses. Solid lines are reads, dotted lines are
+CAS, and curved dashed lines are writes. }
+
+\label{fig:message_diagram} \end{figure}.
+
 Using locks instead of opportunistic concurrency greatly
 reduces the round trips required to perform operations.
 Insertions into a cuckoo hash require one message for each
