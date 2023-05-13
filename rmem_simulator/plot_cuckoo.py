@@ -539,11 +539,18 @@ def fill_vs_latency_line(ax, stats, label, x_axis="max fill"):
     read_rtt, read_err = client_stats_get_mean_err_trials(stats, 'read_rtt')
     insert_rtt, insert_err = client_stats_get_mean_err_trials(stats, 'insert_rtt')
 
-    average_latency = [a+b/2 for a,b in zip(read_rtt,insert_rtt)] 
-    average_err = [a+b/2 for a,b in zip(read_err,insert_err)] 
+    # average_latency = [a+b/2 for a,b in zip(read_rtt,insert_rtt)] 
+    # average_err = [a+b/2 for a,b in zip(read_err,insert_err)] 
     x_axis_vals = get_x_axis(stats, x_axis)
 
-    ax.errorbar(x_axis_vals,average_latency,yerr=average_err, marker="o", label=label)
+    color=None
+    if insert_rtt[0] != 0:
+        h1 = ax.errorbar(x_axis_vals,insert_rtt,yerr=insert_err, linestyle=op_linestyles['insert'], marker=op_markers['insert'], label=label+"-insert")
+        color = h1[0].get_color()
+    if read_rtt[0] != 0:
+        h2 = ax.errorbar(x_axis_vals,read_rtt,yerr=read_err, linestyle=op_linestyles['read'], label=label+"-read", marker=op_markers['read'], color=color)
+
+    # ax.errorbar(x_axis_vals,average_latency,yerr=average_err, marker="o", label=label)
 
 
 def fill_vs_latency_decoration(ax, x_axis):
