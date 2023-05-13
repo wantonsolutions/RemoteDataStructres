@@ -1,15 +1,15 @@
-import simulator
-import cuckoo
+import simulator as simulator
+import cuckoo  as cuckoo
 import state_machines as sm
-import log
-import logging
+import log as log
 import matplotlib.pyplot as plt
 import matplotlib as matplotlib
 import numpy as np
 from tqdm import tqdm
-from data_management import save_statistics, load_statistics
+# from data_management import dm.save_statistics, load_statistics
+import data_management as dm
 
-import plot_cuckoo
+import plot_cuckoo as plot_cuckoo
 
 import argparse
 parser = argparse.ArgumentParser(description='Experimental Parameters')
@@ -75,7 +75,7 @@ def table_size_experiment():
         stats = sim.collect_stats()
         runs.append(stats)
 
-    save_statistics(runs)
+    dm.save_statistics(runs)
 
 
 def plot_table_size_experiment():
@@ -99,7 +99,7 @@ def factor_table_size_experiments():
             stats = sim.collect_stats()
             runs.append(stats)
         factor_runs.append(runs)
-    save_statistics(factor_runs)
+    dm.save_statistics(factor_runs)
 
 def plot_factor_table_size_experiments():
     factor_runs = load_statistics()
@@ -268,7 +268,7 @@ def insertion_debug():
 
     runs.append(simulator.run_trials(config))
 
-    save_statistics(runs)
+    dm.save_statistics(runs)
 
 
 
@@ -291,7 +291,7 @@ def avg_run_debug():
         log.set_off()
         runs.append(simulator.run_trials(config, trials))
         
-    save_statistics(runs)
+    dm.save_statistics(runs)
 
 
 
@@ -318,7 +318,7 @@ def locks_per_message_experiment():
         config["locks_per_message"] = locks_per_message
         log.set_off()
         runs.append(simulator.run_trials(config))
-    save_statistics(runs)
+    dm.save_statistics(runs)
 
 
 
@@ -342,7 +342,7 @@ def read_threshold_experiment():
         config["locks_per_message"] = 4
         log.set_off()
         runs.append(simulator.run_trials(config))
-    save_statistics(runs)
+    dm.save_statistics(runs)
 
 def client_scalability():
     logger = log.setup_custom_logger('root')
@@ -364,7 +364,7 @@ def client_scalability():
         config["state_machine"]=state_machine
         log.set_off()
         runs.append(simulator.run_trials(config))
-    save_statistics(runs)
+    dm.save_statistics(runs)
 
 def race_bucket_size_fill_factor():
     logger = log.setup_custom_logger('root')
@@ -388,7 +388,7 @@ def race_bucket_size_fill_factor():
         config['trials'] = 3
         config['state_machine']=sm.race
         runs.append(simulator.run_trials(config))
-    save_statistics(runs)
+    dm.save_statistics(runs)
 
 def race_vs_rcuckoo_fill_factor():
     logger = log.setup_custom_logger('root')
@@ -415,7 +415,7 @@ def race_vs_rcuckoo_fill_factor():
             config['trials'] = 1
             config['state_machine']=state_machine
             runs.append(simulator.run_trials(config))
-        save_statistics(runs)
+        dm.save_statistics(runs)
         plot_general_stats_last_run()
         multi_runs.append(runs)
 
@@ -448,10 +448,10 @@ def success_rate_contention_machines():
             config['state_machine']=s
             config['max_fill']= 100
             runs.append(simulator.run_trials(config))
-        save_statistics(runs)
+        dm.save_statistics(runs)
         plot_general_stats_last_run()
         multi_runs.append(runs)
-    save_statistics(multi_runs)
+    dm.save_statistics(multi_runs)
     plot_general_stats_last_run()
     # plot_cuckoo.single_plot(multi_runs,plot_cuckoo.success_rate_multi, "race_vs_rcuckoo_fill_factor.pdf")
 
@@ -477,7 +477,7 @@ def success_rate_contention():
         # config['state_machine']=cuckoo.rcuckoobatch
         config['state_machine']=sm.race
         runs.append(simulator.run_trials(config))
-    save_statistics(runs)
+    dm.save_statistics(runs)
 
 
 def fill_factor_limit_experiment():
@@ -504,10 +504,10 @@ def fill_factor_limit_experiment():
             config['state_machine']=s
             config['max_fill']= f
             runs.append(simulator.run_trials(config))
-        save_statistics(runs)
+        dm.save_statistics(runs)
         plot_general_stats_last_run()
         multi_runs.append(runs)
-    save_statistics(multi_runs)
+    dm.save_statistics(multi_runs)
     plot_general_stats_last_run()
 
 def locks_per_message_experiment():
@@ -532,7 +532,7 @@ def locks_per_message_experiment():
         config['bucket_size']=8
         config['search_function']="a_star"
         runs.append(simulator.run_trials(config))
-    save_statistics(runs)
+    dm.save_statistics(runs)
 
 def buckets_per_lock_experiment():
     logger = log.setup_custom_logger('root')
@@ -561,7 +561,7 @@ def buckets_per_lock_experiment():
         config["state_machine"] = cuckoo.rcuckoobatch
         config["max_fill"] = 90
         runs.append(simulator.run_trials(config))
-    save_statistics(runs)
+    dm.save_statistics(runs)
 
 def buckets_per_lock_vs_locks_per_message_experiment():
     logger = log.setup_custom_logger('root')
@@ -593,7 +593,7 @@ def buckets_per_lock_vs_locks_per_message_experiment():
             config["max_fill"] = 90
             runs.append(simulator.run_trials(config))
         all_runs.append(runs)
-    save_statistics(all_runs)
+    dm.save_statistics(all_runs)
 
 def plot_buckets_per_lock_vs_locks_per_message_experiment():
     stats = load_statistics()
@@ -688,7 +688,7 @@ def run_insertion_range_protocol_cdf():
         sim = simulator.Simulator(config)
         log.set_off()
         runs.append(simulator.run_trials(config))
-    save_statistics(runs)
+    dm.save_statistics(runs)
 
 
 
@@ -783,11 +783,11 @@ def run_hero_ycsb():
                 config['state_machine']=s
                 config['workload']=workload
                 runs.append(simulator.run_trials(config))
-            save_statistics(runs)
+            dm.save_statistics(runs)
             plot_general_stats_last_run()
             multi_runs.append(runs)
         dirname="data/hero-"+workload
-        save_statistics(multi_runs, dirname=dirname)
+        dm.save_statistics(multi_runs, dirname=dirname)
         plot_general_stats_last_run(dirname=dirname)
 
 def plot_hero_ycsb():
@@ -811,13 +811,126 @@ def plot_hero_ycsb():
 
 
 
+def fill_then_measure():
+    print("START HERE TOMORROW!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!, you need to be able to stop and start simulations mid run.")
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator")
+    multi_runs=[]
+    table_size = 1680 # * 4 #lcm of 3,4,5,6,7,8,10,12,14,16
+    clients = 8
+    bucket_size=8
+    fill_factors = [10, 20, 30, 40, 50, 60, 70, 80, 90]
+    # fill_factors=[10]
+    # state_machines = [cuckoo.rcuckoobatch]
+    # state_machines = [sm.race]
+    log.set_off()
+    runs=[]
+    for f in fill_factors:
+        config = get_config()
+        config['num_clients'] = clients
+        config['num_steps'] = 100000000000
+        config['bucket_size'] = bucket_size
+        config['read_threshold_bytes'] = config['entry_size'] * bucket_size
+        config['indexes'] = table_size
+        config['locks_per_message'] = 64
+        config['buckets_per_lock'] = 1
+        config['trials'] = 1
+        # config['deterministic']=True
+        config['state_machine']=cuckoo.rcuckoobatch
+        config['max_fill']= f
+        run = simulator.fill_then_run_trials(config, f-10, f)
+        runs.append(run)
+
+    dm.save_statistics(runs)
+    plot_general_stats_last_run()
+
+
+def run_hero_ycsb_fill_latency():
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator")
+    # table_size = 1680  * 512
+    table_size=1680
+    clients = 128
+    fills = [10, 20, 30, 40, 50, 60, 70, 80, 90]
+    # fills = [10, 20]
+    # clients = [100]
+    state_machines = [cuckoo.rcuckoobatch,sm.race]
+
+    master_config = get_config()
+    master_config["bucket_size"]=8
+    master_config['num_steps'] = 100000000000
+    master_config['bucket_size'] = 8
+    master_config['read_threshold_bytes'] = 512
+    master_config['locks_per_message'] = 64
+    master_config['indexes'] = table_size
+    master_config['trials'] = 1
+    workloads = ["ycsb-a", "ycsb-b","ycsb-c", "ycsb-w"]
+    # workloads = ["ycsb-a", "ycsb-b", "ycsb-w"]
+    # workloads = ["ycsb-c"]
+    log.set_off()
+
+    #ycsb-a
+    for workload in workloads:
+        multi_runs=[]
+        for s in state_machines:
+            runs=[]
+            for fill in fills:
+                config = master_config.copy()
+                config['num_clients'] = clients
+                config['state_machine']=s
+                config['workload']=workload
+                config['max_fill']=fill
+                steps = 100000
+                r = simulator.fill_then_run_trials(config, fill_to=config['max_fill'], max_fill=config['max_fill']+5, max_steps=steps)
+                runs.append(r)
+            # dm.save_statistics(runs)
+            # plot_cuckoo.plot_general_stats_last_run()
+            multi_runs.append(runs)
+        dirname="data/hero_ycsb_latency/"+workload
+        dm.save_statistics(multi_runs, dirname=dirname)
+        # plot_cuckoo.plot_general_stats_last_run(dirname=dirname)
+
+def plot_hero_ycsb_fill_latency():
+    # workloads = ["ycsb-w", "ycsb-a", "ycsb-b", "ycsb-c"]
+    workloads = [ "ycsb-w", "ycsb-a", "ycsb-b", "ycsb-c"]
+    # workloads = [ "ycsb-w"]
+    # workloads = ["ycsb-c"]
+
+    fig, axs = plt.subplots(1,len(workloads), figsize=(12,3))
+    if len(workloads) == 1:
+        axs = [axs]
+    for i in range(len(workloads)):
+        dirname="data/hero_ycsb_latency/"+workloads[i]
+        ax = axs[i]
+        stats = dm.load_statistics(dirname=dirname)
+        stats=stats[0]
+        # import json
+        # print(json.dumps(stats, indent=4))
+        # exit(1)
+        plot_cuckoo.fill_vs_latency(ax, stats, decoration=False)
+        ax.legend()
+        # ax.set_xlabel("clients")
+        ax.set_title(workloads[i])
+        ax.set_ylabel("average rtt")
+
+    plt.tight_layout()
+    plt.savefig("hero_ycsb_fill_latency.pdf")
+
+run_hero_ycsb_fill_latency()
+plot_hero_ycsb_fill_latency()
+# plot_hero_ycsb_throughput()
+
+
+
+
+# fill_then_measure()
 
 
 # buckets_per_lock_vs_locks_per_message_experiment()
 # plot_buckets_per_lock_vs_locks_per_message_experiment()
 
 # run_hero_ycsb()
-plot_hero_ycsb()
+# plot_hero_ycsb()
 # 
 
 # plot_insertion_range_cdf()
@@ -832,7 +945,7 @@ plot_hero_ycsb()
 # todos()
 
 # insertion_debug()
-plot_general_stats_last_run()
+# plot_general_stats_last_run()
 # plot_hash_factor_distance_cdf()
 
 # success_rate_contention_machines()

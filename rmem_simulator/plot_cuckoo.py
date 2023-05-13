@@ -461,6 +461,7 @@ def single_run_approx_throughput(stat):
     # approx_throughput =  stat['config']['num_clients'] / (stat['simulator']['steps']/3)
     # approx_throughput = sim_steps/
     # memory_steps=stat['memory']['steps']
+    print(stat)
     normal_throughputs = []
     for client in stat['clients']:
         read_rtt = client['stats']['read_rtt_count']
@@ -510,6 +511,39 @@ def throughput_approximation(ax, stats, x_axis='clients', decoration=True):
         approximate_throughput_line(ax, stat, label=state_machine_label, x_axis=x_axis)
     if decoration:
         approximate_throughput_decoration(ax, x_axis)
+
+
+def fill_vs_latency_line(ax, stats, label, x_axis="max fill"):
+    print("RTT PER OPERATION")
+
+    # read_rtt, read_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'read_rtt_count', 'completed_read_count')
+    # insert_rtt, insert_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'insert_rtt_count', 'completed_insert_count')
+    # percentile = 50
+    # read_rtt, read_err = client_stats_get_percentile_err_trials(stats, 'read_rtt', percentile)
+    # insert_rtt, insert_err = client_stats_get_percentile_err_trials(stats, 'insert_rtt', percentile)
+    read_rtt, read_err = client_stats_get_mean_err_trials(stats, 'read_rtt')
+    insert_rtt, insert_err = client_stats_get_mean_err_trials(stats, 'insert_rtt')
+
+    average_latency = [a+b/2 for a,b in zip(read_rtt,insert_rtt)] 
+    average_err = [a+b/2 for a,b in zip(read_err,insert_err)] 
+    x_axis_vals = get_x_axis(stats, x_axis)
+
+    ax.errorbar(x_axis_vals,average_latency,yerr=average_err, marker="o", label=label)
+
+
+def fill_vs_latency_decoration(ax, x_axis):
+    ax.set_xlabel(x_axis)
+    ax.set_ylabel('RTT')
+    ax.set_title('RTT vs ' + x_axis)
+    ax.legend()
+
+def fill_vs_latency(ax, stats, x_axis='max fill', decoration=True):
+    stats = correct_stat_shape(stats)
+    for stat in stats:
+        state_machine_label = stat[0][0]['config']['state_machine']
+        fill_vs_latency_line(ax, stat, label=state_machine_label, x_axis=x_axis)
+    if decoration:
+        fill_vs_latency_decoration(ax, x_axis)
 
 
 def single_run_op_success_rate(stat, op_string):
@@ -592,7 +626,6 @@ def client_stats_get_percentile_err(stat, key, percentile):
     vals = []
     for client in stat['clients']:
         vals.extend(client['stats'][key])
-    print(vals)
     if len(vals) == 0:
         return 0, 0
     print("PERCENTILE: ",np.percentile(vals, percentile))
@@ -604,6 +637,28 @@ def client_stats_get_percentile_err_trials(stats, key, percentile):
         r_means, r_stds = [], []
         for run in stat:
             m, s = (client_stats_get_percentile_err(run, key, percentile))
+            r_means.append(m)
+            r_stds.append(s)
+        print("MEANS!!!: ", r_means)
+        means.append(np.mean(r_means))
+        stds.append(np.mean(r_stds))
+    return means, stds
+
+def client_stats_get_mean_err(stat, key):
+    vals = []
+    for client in stat['clients']:
+        vals.extend(client['stats'][key])
+    if len(vals) == 0:
+        return 0, 0
+    print("MEAN: ",np.mean(vals))
+    return np.mean(vals), stderr(vals)
+
+def client_stats_get_mean_err_trials(stats, key):
+    means, stds = [], []
+    for stat in stats:
+        r_means, r_stds = [], []
+        for run in stat:
+            m, s = (client_stats_get_mean_err(run, key))
             r_means.append(m)
             r_stds.append(s)
         print("MEANS!!!: ", r_means)

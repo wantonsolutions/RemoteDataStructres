@@ -60,6 +60,8 @@ class race(client_state_machine):
         if complete:
             self.debug("Race Extent Reading Complete! success:" + str(success) + " key: " +str(self.current_read_key))
             self.state="idle"
+            self.critical("we are assuming all reads are successful in race for extents") if __debug__ else None
+            success=True
             self.complete_read_stats(success, self.current_read_key)
             self.reading=False
         return None

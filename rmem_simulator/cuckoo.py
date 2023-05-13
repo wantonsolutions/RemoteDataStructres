@@ -115,14 +115,17 @@ def key_causes_a_path_loop(path, key):
 #print a list of path elements
 #todo refactor to create a class called path
 def print_path(path):
-    print("Printing Path")
+    print(path_to_string(path))
+
+def path_to_string(path):
     if path == None:
-        print("No path")
-        return
+        return("No path")
+    string=""
     for i in range(len(path)):
         value = path[i]
         prefix = str(i)
-        print(prefix + ") " + str(value))
+        string += prefix + " - " + str(value) + ", "
+    return string
 
 def path_index_range(path):
     max_index = -1
@@ -432,6 +435,10 @@ class LockTable:
         # print("Lock Table Locks:" + str(self.total_locks))
         self.locks = [Lock() for i in range(self.total_locks)]
 
+    def unlock_all(self):
+        for i in range(len(self.locks)):
+            self.locks[i].unlock()
+
 
         # print(self)
 
@@ -509,6 +516,8 @@ class Table:
         self.lock_table = LockTable(memory_size, self.entry_size, bucket_size, self.buckets_per_lock)
         self.fill = 0
 
+    def unlock_all(self):
+        self.lock_table.unlock_all()
 
     def print_table(self):
         for i in range(0, self.table_size):
@@ -871,11 +880,8 @@ def get_state_machine_name(state_machine_class_pointer):
 
 #cuckoo protocols
 class state_machine:
-    def __init__(self, config):
-        self.logger = logging.getLogger("root")
-        self.config = config
-        #spiritually these are the high level states of the state machine
-        #these are considered less configurable than the self.state variable I use in the children
+
+    def clear_statistics(self):
         self.complete = False
         self.inserting = False
         self.reading = False
@@ -919,6 +925,13 @@ class state_machine:
         self.current_read_rtt = 0
         self.read_rtt = []
         self.read_rtt_count = 0
+
+    def __init__(self, config):
+        self.logger = logging.getLogger("root")
+        self.config = config
+        self.clear_statistics()
+        #spiritually these are the high level states of the state machine
+        #these are considered less configurable than the self.state variable I use in the children
 
     def complete_read_stats(self, success, read_value):
         if success:
@@ -1086,7 +1099,7 @@ workload_write_percentage={
 
 class client_workload_driver():
     def __init__(self, config):
-        self.workload=config["workload"]
+        self.set_workload(config["workload"])
         self.total_requests=config["total_requests"]
         self.client_id=config['id']
         self.num_clients=config['num_clients']
@@ -1139,18 +1152,27 @@ class client_workload_driver():
         return req
 
     def next_get(self):
-        index = self.completed_puts - 1
+        if self.deterministic:
+            index = self.completed_puts - 1
+        else:
+            if self.completed_puts <= 1:
+                index = 0
+            else:
+                index = int(random.random()*1000000) % (self.completed_puts-1)
 
         next_value = self.unique_get(index, self.client_id, self.num_clients, self.random_factor)
         req = request("get", next_value)
         self.last_request = req
         return req
 
-
-    def gen_next_operation(self, workload):
+    def set_workload(self, workload):
         if not workload in workload_write_percentage:
             print("Unknown workload! " + workload)
             exit(1)
+        self.workload = workload
+
+
+    def gen_next_operation(self, workload):
         percentage = workload_write_percentage[workload]
         # if int(random.random() * 100) < percentage:
         if ((self.completed_requests * 1337) % 100) < percentage:
@@ -1174,6 +1196,7 @@ class client_workload_driver():
 class client_state_machine(state_machine):
     def __init__(self, config):
         super().__init__(config)
+        self.config = config
         self.total_inserts = config["total_inserts"]
         self.id = config["id"]
         self.table = config["table"]
@@ -1196,6 +1219,20 @@ class client_state_machine(state_machine):
         }
         self.workload_config=workload_config
         self.workload_driver = client_workload_driver(workload_config)
+
+    def clear_statistics(self):
+        self.state="idle"
+        #read state machine
+        self.current_read_key = None
+        self.outstanding_read_requests = 0
+        self.read_values_found = 0
+        self.read_values = []
+        self.duplicates_found = 0
+        return super().clear_statistics()
+
+    def set_workload(self, workload):
+        self.workload_driver.set_workload(workload)
+        self.config["workload"] = workload
 
 
     def begin_read(self, messages):
@@ -1250,8 +1287,10 @@ class client_state_machine(state_machine):
             return None
         #get the next operations
         req = self.workload_driver.next()
+        self.info("Workload Request: " + str(req)) if __debug__ else None
         if req == None:
             self.complete=True
+            self.info("Workload Complete")
             return None
         elif req.request_type == "put":
 
@@ -1500,24 +1539,34 @@ class rcuckoobatch(client_state_machine):
         super().__init__(config)
 
         #inserting and locking
-        self.current_insert_value = None
-        self.search_path = []
-        self.search_path_index = 0
+        # self.current_insert_value = None
+        # self.search_path = []
+        # self.search_path_index = 0
+        self.clear_statistics()
 
         self.buckets_per_lock = config['buckets_per_lock']
         self.locks_per_message = config['locks_per_message']
 
         self.read_threshold_bytes = config['read_threshold_bytes']
         assert self.read_threshold_bytes >= self.table.row_size_bytes(), "read threshold is smaller than a single row in the table (this is not allowed)"
+        # self.locks_held = []
+        # self.current_locking_messages = []
+        # self.current_lock_read_messages = []
+        # self.locking_message_index = 0
+
+        self.set_search_function(config)
+        self.set_location_function(config)
+
+    
+    def clear_statistics(self):
+        super().clear_statistics()
+        self.current_insert_value = None
+        self.search_path = []
+        self.search_path_index = 0
         self.locks_held = []
         self.current_locking_messages = []
         self.current_lock_read_messages = []
         self.locking_message_index = 0
-
-        self.set_search_function(config)
-        self.set_location_function(config)
-        # self.location_function = hash.rcuckoo_hash_locations
-        # self.location_function = hash.rcuckoo_hash_locations_independent
 
     def set_search_function(self, config):
         search_function = config['search_function']
@@ -1655,7 +1704,7 @@ class rcuckoobatch(client_state_machine):
             self.state = "idle"
             return None
 
-        self.info("Search complete aquiring locks") if __debug__ else None
+        self.info("Successful local search for [key: " + str(self.current_insert_value) + "] [path: " +path_to_string(self.search_path) + "]") if __debug__ else None
         self.state="aquire_locks"
         return self.aquire_locks()
 

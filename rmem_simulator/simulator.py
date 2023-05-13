@@ -68,6 +68,8 @@ class Client(Node):
     def __str__(self):
         return "Client: " + str(self.client_id)
 
+    def clear_statistics(self):
+        self.state_machine.clear_statistics()
 
     def state_machine_step(self, message=None):
         self.increment_step()
@@ -123,6 +125,9 @@ class Memory(Node):
                 responses[i].payload['dest'] = message.payload['src']
         return responses
 
+    def clear_statistics(self):
+        self.state_machine.clear_statistics()
+
 class Switch(Node):
     def __init__(self, config):
         super().__init__(config)
@@ -142,9 +147,12 @@ class Switch(Node):
 
 
 class Simulator(Node):
+
+
     def __init__(self, config):
         self.logger = logging.getLogger('root')
         self.step=0
+        self.config_set = False
         self.config = config
         self.client_list = []
         self.memory = None
@@ -155,7 +163,11 @@ class Simulator(Node):
         self.switch_memory_channel=deque()
         self.memory_switch_channel=deque()
 
-    
+    def drop_all_messages(self):    
+        self.client_switch_channel=deque()
+        self.switch_client_channel=deque()
+        self.switch_memory_channel=deque()
+        self.memory_switch_channel=deque()
     
     def __str__(self):
         return "Simulator"
@@ -276,9 +288,7 @@ class Simulator(Node):
 
         self.step = self.step+1
 
-
-    def run(self):
-
+    def set_config(self):
         bucket_size=self.config['bucket_size']
         entry_size=self.config['entry_size']
         indexes=self.config['indexes']
@@ -286,7 +296,7 @@ class Simulator(Node):
         memory_size=entry_size * indexes
         index_init_function=Table
         index_init_args={'memory_size': memory_size, 'bucket_size': bucket_size, 'buckets_per_lock': buckets_per_lock}
-        deterministic = self.config['deterministic']
+        self.deterministic = self.config['deterministic']
 
         #initialize hash function
         hash.set_factor(self.config['hash_factor'])
@@ -332,10 +342,16 @@ class Simulator(Node):
         self.config['state_machine']=get_state_machine_name(self.config['state_machine'])
 
         print(self.config)
+        self.config_set = True
 
+
+    def run(self):
+
+        if self.config_set == False:
+            self.set_config()
         #run simulation
         for i in range(self.config['num_steps']):
-            if deterministic:
+            if self.deterministic:
                 self.deterministic_simulation_step()
             else:
                 self.random_single_simulation_step()
@@ -359,6 +375,28 @@ class Simulator(Node):
                 if self.memory.index.contains(value) == False:
                     self.critical("Memory does not contain value: " + str(value) + "inserted by " + str(client.client_id))
                     return False
+
+    def clear_statistics(self):
+        for i in range(len(self.client_list)):
+            self.client_list[i].clear_statistics()
+        self.memory.clear_statistics()
+        self.memory.index.unlock_all()
+
+        self.drop_all_messages()
+
+    def set_workload(self, workload):
+        self.config['workload'] = workload
+        for i in range(len(self.client_list)):
+            self.client_list[i].state_machine.set_workload(workload)
+
+
+    def set_max_fill(self, fill):
+        self.memory.state_machine.max_fill = fill
+        self.config['max_fill'] = fill
+    
+    def reset_step_max(self, max_steps):
+        self.config['num_steps'] = max_steps
+        self.step=0
 
     def collect_stats(self):
         statistics = dict()
@@ -415,7 +453,7 @@ def default_config():
 
     #default is global locking
     config['buckets_per_lock']=1
-    config['locks_per_message']=1
+    config['locks_per_message']=64
     config['workload']="ycsb-w"
     config['hash_factor']=hash.DEFAULT_FACTOR
     config['state_machine']=rcuckoo
@@ -444,6 +482,46 @@ def run_trials(config):
         stats = sim.collect_stats()
         runs.append(stats)
     return runs
+
+
+def fill_then_run(config, fill_to, max_fill, run_steps=1000000000):
+    c=config.copy()
+    c['max_fill'] = fill_to
+    original_workload = c['workload']
+    c['workload'] = 'ycsb-w'
+    sim = Simulator(c)
+    able_to_fill=False
+    try:
+        sim.run()
+    except Exception as e:
+        #we trigger a fill rate exit based on this. so if we don't have this happen we should exit
+        able_to_fill=True
+
+    if not able_to_fill:
+        print("unable to fill")
+        return exit(0)
+
+    print("Table filled to ", fill_to, " starting measurement")
+    sim.clear_statistics()
+    sim.reset_step_max(run_steps)
+    sim.set_workload(original_workload)
+    sim.set_max_fill(max_fill)
+
+    try:
+        sim.run()
+    except Exception as e:
+        print(e)
+
+    stats = sim.collect_stats()
+    return stats
+
+def fill_then_run_trials(config, fill_to, max_fill, max_steps=1000000000):
+    runs = []
+    trials = config['trials']
+    for i in tqdm(range(trials)):
+        runs.append(fill_then_run(config, fill_to, max_fill, max_steps))
+    return runs
+
 
 
 def main():

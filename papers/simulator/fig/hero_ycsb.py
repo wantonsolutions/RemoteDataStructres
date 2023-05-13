@@ -52,7 +52,7 @@ def run_hero_ycsb():
                 else:
                     r= simulator.run_trials(config)
                 runs.append(r)
-            dm.save_statistics(runs)
+            # dm.save_statistics(runs)
             # plot_cuckoo.plot_general_stats_last_run()
             multi_runs.append(runs)
         dirname="hero_ycsb/"+workload
