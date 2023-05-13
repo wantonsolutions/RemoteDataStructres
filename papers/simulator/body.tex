@@ -37,10 +37,10 @@ path}~\cite{cuckoo-improvements}.
 \begin{figure*}[t]
     \centering
     \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/optimistic_failures.pdf}
-        % \label{fig:optimistic_failures}
+        \includegraphics[width=0.99\linewidth]{fig/rdma_latency.pdf}
+        \label{fig:rdma_latency}
         % \caption{}
-    \end{subfigure}
+    \end{subfigure}.
     \begin{subfigure}{0.3\linewidth}
         \includegraphics[width=0.99\linewidth]{fig/optimistic_failures.pdf}
         % \label{fig:optimistic_failures}
@@ -53,7 +53,7 @@ path}~\cite{cuckoo-improvements}.
     \end{subfigure}
     \vspace{-1em}
     \caption{
-    \textbf{(a)} Failure rate of optimistic cuckoo insertions.
+    \textbf{(a)} CX5 RDMA latency vs message size~\cite{rdma-latency}
     \textbf{(b)} ~\todo{make}
     \textbf{(c)} ~\todo{make}
     }
@@ -232,10 +232,10 @@ requiring additional overheads.
 \begin{figure*}[t]
     \centering
     \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/rdma_latency.pdf}
-        \label{fig:rdma_latency}
+        \includegraphics[width=0.99\linewidth]{fig/optimistic_failures.pdf}
+        % \label{fig:optimistic_failures}
         % \caption{}
-    \end{subfigure}.
+    \end{subfigure}
     \begin{subfigure}{0.3\linewidth}
         \includegraphics[width=0.99\linewidth]{fig/insertion_span.pdf}
         \label{fig:insertion_span}
@@ -248,7 +248,7 @@ requiring additional overheads.
     \end{subfigure}.
     \vspace{-1em}
     \caption{
-    \textbf{(a)} CX5 RDMA latency vs message size~\cite{rdma-latency}
+    \textbf{(a)} Failure rate of optimistic cuckoo insertions.
     \textbf{(b)} CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path.
     \textbf{(c)} Round trips (99th percentile) required per insert while filling a table to 100\% while varying the lock per message, and buckets per lock. (\todo{subtract one from each current values include unlocks})
     }
