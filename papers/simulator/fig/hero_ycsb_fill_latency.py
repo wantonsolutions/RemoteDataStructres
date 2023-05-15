@@ -82,7 +82,7 @@ def plot_hero_ycsb_fill_latency():
         # ax.set_xlabel("clients")
         ax.set_title(workloads[i])
         ax.set_ylabel("average rtt")
-        ax.set_ylim(bottom=0, top=3.5)
+        ax.set_ylim(bottom=0, top=5.0)
         ax.set_xlim(left=5, right=100)
         ax.set_xlabel("fill factor")
 
