@@ -16,12 +16,12 @@ from tqdm import tqdm
 def run_search_dependence():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
-    table_size = 1680 * 8
+    table_size = 1680 * 512
 
     locks_per_message = [1, 2, 4, 8, 16, 32, 64]
 
     master_config = lib.get_config()
-    master_config['clients'] = 1
+    master_config['num_clients'] = 120
     master_config["bucket_size"]=8
     master_config['num_steps'] = 100000000000
     master_config['bucket_size'] = 8
@@ -90,5 +90,5 @@ def plot_search_dependence():
     plt.tight_layout()
     plt.savefig("search_dependence.pdf")
 
-# run_search_dependence()
+run_search_dependence()
 plot_search_dependence()
