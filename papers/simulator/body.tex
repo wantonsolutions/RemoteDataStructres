@@ -67,7 +67,6 @@ bits independently, this however is not a general solution
 as it still demands data locality for items being
 independently updated.
 
-% \subsection{Resource Disaggregation}
 
 \subsection{RDMA Key-Value Stores}
 
@@ -285,7 +284,6 @@ requiring additional overheads.
 \section{Design}
 \label{sec:design}
 
-\subsection{Locality Hashing}
 \begin{figure*}[t]
     \centering
     \begin{subfigure}{0.3\linewidth}
@@ -345,6 +343,7 @@ requiring additional overheads.
 \end{figure*}
 
 
+\subsection{Locality Hashing}
 Both cuckoo~\cite{cuckoo} and hopscotch~\cite{hopscotch}
 hashes are optimized for reads. Cuckoo hashing ensures
 constant time reads, while hopscotch hashing ensures that a
@@ -355,27 +354,15 @@ reads~\cite{memc3,cuckoo-improvements,pilaf,farm}.
 
 Our approach aims to combine the bounded reads of cuckoo
 hashing, with the locality properties of hopscotch hashing.
-To do so we bound the distance between cuckoo hash
-locations. Figure~\ref{fig:rdma}(a) shows the tradeoff
-between message size and latency for a ConnectX-5 RDMA NIC.
-The latency of small messages (2-128 Bytes) are nearly
-identical, and the size of a message must be larger than 1K
-before it's latency is 2x that of a small message. Bandwidth
-is increasingly available in modern networks with 800Gbps on
-the horizon, we tradeoff bandwidth for latency by opting for
-larger single messages and fewer round trips. In essence we
-make large sloppy reads, and leave it to the client to
-reconstruct a result.
-
-Traditional cuckoo hashing calls for two independent hash
-functions. We instead make our two hash functions
-\textit{dependent}. The first hash function determines the
-location a key will be hashed to. The second hash function
-determines the maximum distance the second value can have
-from the first. A third hash function determines a random
-location between the first location, and the bound imposed
-by the second. Figure~\ref{fig:locality-hashing}(a) shows
-the formula for our dependent hashing function.
+To do so we make our two hash functions \textbf{dependent}
+and bound the distance between cuckoo hash locations.  The
+first hash function determines the location a key will be
+hashed to. The second hash function determines the maximum
+distance the second value can have from the first. A third
+hash function determines a random location between the first
+location, and the bound imposed by the second.
+Figure~\ref{fig:locality-hashing}(a) shows the formula for
+our dependent hashing function.
 
 A strawman implementation of locality based hashing would
 use the first hash function to find a location, and the
@@ -387,26 +374,27 @@ table will become full, and have not viable path to an open
 slot is high. ~\todo{Insert a figure of one of my failed
 insertion experiments on a big table}.
 
-Rather than use a static bound we use a dynamic logarithmic
-bound with a third hash function. The bound set by the
-third hash function is determine by counting the suffix
-zeros of the resultant hash and rasing it by an exponential
-factor. In the common case the bound is small, but on an
-exponentially decrease rate some pairs of values are spaced
-far apart. This design enables some pairs to act
-as~\textit{waypoints} to other regions of the table. This
-method, paired with associative in the cuckoo hash enables
-high fill rates while keeping the region of the table any
-given key can inhabit small.
+Instead of a static bound we use a dynamic exponential bound
+with a third hash function. The bound set by the third hash
+is determine by counting the suffix zeros of the resultant
+hash and rasing it by an exponential factor. In the common
+case the bound is small, but at an exponentially decrease
+rate some pairs of values are spaced exponentially far
+apart. This design enables some pairs to act
+as~\textit{waypoints} to other regions of the table when
+constructing cuckoo paths. This method, paired with bucket
+associativity enables high fill rates while keeping the
+region of the table any given key can inhabit small.
 
-The tradeoff between the exponential factor and the mean
-distance is fill factor.
+There is a tradeoff between locality and fill factor.
 Figure~\ref{fig:locality-hashing}(b) illustrates how
 increasing the exponential factor shifts the distribution of
 distances between cuckoo hash locations.
 Figure~\ref{fig:locality-hashing}(c) shows how these same
 factors effect the max fill rate of the table before an item
-cannot be inserted.
+cannot be inserted. As will be shown in the following
+sections read, and insert performance improve with better
+locality.
 
 
 \subsection{Locking}
