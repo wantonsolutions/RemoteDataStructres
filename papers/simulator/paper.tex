@@ -97,11 +97,25 @@
 
 \section*{Abstract}
 
-Far memory data structures cant use locks because they are
-too expensive. In this work we show that with careful
-algorithm and protocol design traditional data structures
-can be ported to remote memory. We demonstrate this by
-developing a remote memory cuckoo hash (rcuckoo).
+Far memory data structures eschew locks in favor of
+optimistic concurrency as locks increase critical section
+size and messages. Optimistic concurrency unfortunately
+comes at the cost of high failure rates, complex protocols,
+and the need to perform data updates at small fixed sizes
+(64 bits for compare and swap). In this work we show that
+with careful data structure and protocol design, as well as
+the architecture of modern RDMA NICs traditional locking
+strategies can perform better than state of the art
+optimistic concurrency algorithm. We demonstrate this
+through the design of a remote memory key value store based
+on cuckoo hashing. Our cuckoo hashing algorithm (rcuckoo)
+uses dependent, rather than independent hash functions to
+increase the probability that a keys two buckets are close
+in the hash table. This locality enables fast lock
+acquisition and release. We demonstrate that rcuckoo
+outperforms optimistic concurrency algorithms by 2x in
+terms of throughput and up to a 2x improvement on read
+latency, as well as achieving higher fill factors.
 
 \input{body}
 
