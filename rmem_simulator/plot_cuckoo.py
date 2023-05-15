@@ -287,12 +287,13 @@ def read_write_ratio(ax, stats, x_axis="clients"):
     read_write_ratio_decoration(ax, x_axis)
 
 
-def bytes_per_operation(ax, stats, x_axis="clients"):
+def bytes_per_operation(ax, stats, x_axis="clients", decoration=True):
     stats = correct_stat_shape(stats)
     for stat in stats:
         state_machine_label = stat[0][0]['config']['state_machine']
         bytes_per_operation_line(ax, stat, label=state_machine_label, x_axis=x_axis)
-    bytes_per_operation_decoration(ax, x_axis)
+    if decoration:
+        bytes_per_operation_decoration(ax, x_axis)
 
 def bytes_per_operation_decoration(ax, x_axis):
     ax.set_ylim(bottom=100)
@@ -316,17 +317,6 @@ def bytes_per_operation_line(ax, stats, label, x_axis="clients"):
     ax.errorbar(x_axis_vals,write_bytes,yerr=write_err,label=label+"-insert", marker="o", linestyle=":", color=color)
 
 
-def messages_per_operation_decoration(ax, axt, x_axis, lines):
-    ax.set_ylabel("insert - messages/op")
-    axt.set_ylabel("read - messages/op")
-    ax.set_xlabel(x_axis)
-    ax.set_ylim(bottom=0)
-    axt.set_ylim(bottom=0)
-    labs = [l.get_label() for l in lines]
-    ax.legend(lines, labs)
-    # axt.legend()
-    # ax.set_xticks(x_pos+bar_width/2)
-    # ax.set_xticklabels(x_axis_vals)
 
 op_markers={"read": "s", "insert": "o"}
 op_linestyles={"read": "-", "insert": ":"}
@@ -348,31 +338,57 @@ def cdf(data):
     x= np.insert(x,0,x[0])
     return x, y
 
-def messages_per_operation_line(ax, axt, stats, label, x_axis="clients"):
+def messages_per_operation_line(axs, stats, label, x_axis="clients"):
     print("MESSAGES PER OPERATION")
+
+    if len(axs) == 2:
+        ax = axs[0]
+        axt = axs[1]
+    else:
+        ax = axs[0]
+        axt = axs[0]
 
     read_messages, read_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'read_operation_messages', 'completed_read_count')
     write_messages, write_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'insert_operation_messages', 'completed_insert_count')
     x_axis_vals = get_x_axis(stats, x_axis)
 
+    #half the values because we count two messages for each sent message
+    read_messages = [x/2 for x in read_messages]
+    write_messages = [x/2 for x in write_messages]
+    read_err = [x/2 for x in read_err]
+    write_err = [x/2 for x in write_err]
+
     h1 = ax.errorbar(x_axis_vals,write_messages,yerr=write_err, linestyle=op_linestyles['insert'], marker=op_markers['insert'], label=label+"-insert")
-    h2 = axt.errorbar(x_axis_vals,read_messages,yerr=read_err, linestyle=op_linestyles['read'], label=label+"-read", marker=op_markers['read'])
+    color = h1[0].get_color()
+    h2 = axt.errorbar(x_axis_vals,read_messages,yerr=read_err, linestyle=op_linestyles['read'], label=label+"-read", marker=op_markers['read'], color=color)
 
     lines = [h1, h2] 
-    # labs=[h.get_label() for h in bars]
     return lines
-    # axt.legend(bars, labs, loc="upper left")
 
+def messages_per_operation_decoration(ax, axt, x_axis, lines):
+    ax.set_ylabel("insert - messages/op")
+    axt.set_ylabel("read - messages/op")
+    ax.set_xlabel(x_axis)
+    ax.set_ylim(bottom=0)
+    axt.set_ylim(bottom=0)
+    labs = [l.get_label() for l in lines]
+    ax.legend(lines, labs)
 
-def messages_per_operation(ax, stats, x_axis="clients"):
-    axt=ax.twinx()
+def messages_per_operation(ax, stats, x_axis="clients", decoration=True, twin=True):
+    if twin:
+        axt=ax.twinx()
+        axs = [ax, axt]
+    else:
+        axs = [ax]
+
     stats = correct_stat_shape(stats)
     lines = []
     for stat in stats:
         state_machine_label = stat[0][0]['config']['state_machine']
-        l = messages_per_operation_line(ax, axt, stat, label=state_machine_label, x_axis=x_axis)
+        l = messages_per_operation_line(axs, stat, label=state_machine_label, x_axis=x_axis)
         lines.extend(l)
-    messages_per_operation_decoration(ax, axt, x_axis, lines)
+    if decoration:
+        messages_per_operation_decoration(axs, axt, x_axis, lines)
 
 def rtt_per_operation_decoration(ax, axt, x_axis, lines):
     ax.set_ylabel("insert - rtt/op")
@@ -515,7 +531,6 @@ def throughput_approximation(ax, stats, x_axis='clients', decoration=True):
 
 def fill_vs_latency_line(ax, stats, label, x_axis="max fill"):
     print("RTT PER OPERATION")
-
     # read_rtt, read_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'read_rtt_count', 'completed_read_count')
     # insert_rtt, insert_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'insert_rtt_count', 'completed_insert_count')
     # percentile = 50
@@ -524,11 +539,18 @@ def fill_vs_latency_line(ax, stats, label, x_axis="max fill"):
     read_rtt, read_err = client_stats_get_mean_err_trials(stats, 'read_rtt')
     insert_rtt, insert_err = client_stats_get_mean_err_trials(stats, 'insert_rtt')
 
-    average_latency = [a+b/2 for a,b in zip(read_rtt,insert_rtt)] 
-    average_err = [a+b/2 for a,b in zip(read_err,insert_err)] 
+    # average_latency = [a+b/2 for a,b in zip(read_rtt,insert_rtt)] 
+    # average_err = [a+b/2 for a,b in zip(read_err,insert_err)] 
     x_axis_vals = get_x_axis(stats, x_axis)
 
-    ax.errorbar(x_axis_vals,average_latency,yerr=average_err, marker="o", label=label)
+    color=None
+    if insert_rtt[0] != 0:
+        h1 = ax.errorbar(x_axis_vals,insert_rtt,yerr=insert_err, linestyle=op_linestyles['insert'], marker=op_markers['insert'], label=label+"-insert")
+        color = h1[0].get_color()
+    if read_rtt[0] != 0:
+        h2 = ax.errorbar(x_axis_vals,read_rtt,yerr=read_err, linestyle=op_linestyles['read'], label=label+"-read", marker=op_markers['read'], color=color)
+
+    # ax.errorbar(x_axis_vals,average_latency,yerr=average_err, marker="o", label=label)
 
 
 def fill_vs_latency_decoration(ax, x_axis):
@@ -544,7 +566,6 @@ def fill_vs_latency(ax, stats, x_axis='max fill', decoration=True):
         fill_vs_latency_line(ax, stat, label=state_machine_label, x_axis=x_axis)
     if decoration:
         fill_vs_latency_decoration(ax, x_axis)
-
 
 def single_run_op_success_rate(stat, op_string):
     op_percent = []

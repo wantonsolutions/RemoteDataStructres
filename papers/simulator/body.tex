@@ -37,25 +37,25 @@ path}~\cite{cuckoo-improvements}.
 \begin{figure*}[t]
     \centering
     \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/optimistic_failures.pdf}
+        \includegraphics[width=0.99\linewidth]{fig/rdma_latency.pdf}
+        \label{fig:rdma_latency}
+        % \caption{}
+    \end{subfigure}.
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/rdma_concur.pdf}
         % \label{fig:optimistic_failures}
         % \caption{}
     \end{subfigure}
     \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/optimistic_failures.pdf}
-        % \label{fig:optimistic_failures}
-        % \caption{}
-    \end{subfigure}
-    \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/optimistic_failures.pdf}
+        \includegraphics[width=0.99\linewidth]{fig/rdma_cas_throughput.pdf}
         % \label{fig:optimistic_failures}
         % \caption{}
     \end{subfigure}
     \vspace{-1em}
     \caption{
-    \textbf{(a)} Failure rate of optimistic cuckoo insertions.
-    \textbf{(b)} ~\todo{make}
-    \textbf{(c)} ~\todo{make}
+    \textbf{(a)} CX5 RDMA latency vs message size~\cite{rdma-latency}
+    \textbf{(b)} RDMA operation scalability
+    \textbf{(c)} Compare and swap performance. Device memory vs main memory.
     }
     \label{fig:problems}
 \end{figure*}
@@ -232,10 +232,10 @@ requiring additional overheads.
 \begin{figure*}[t]
     \centering
     \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/rdma_latency.pdf}
-        \label{fig:rdma_latency}
+        \includegraphics[width=0.99\linewidth]{fig/optimistic_failures.pdf}
+        % \label{fig:optimistic_failures}
         % \caption{}
-    \end{subfigure}.
+    \end{subfigure}
     \begin{subfigure}{0.3\linewidth}
         \includegraphics[width=0.99\linewidth]{fig/insertion_span.pdf}
         \label{fig:insertion_span}
@@ -248,7 +248,7 @@ requiring additional overheads.
     \end{subfigure}.
     \vspace{-1em}
     \caption{
-    \textbf{(a)} CX5 RDMA latency vs message size~\cite{rdma-latency}
+    \textbf{(a)} Failure rate of optimistic cuckoo insertions.
     \textbf{(b)} CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path.
     \textbf{(c)} Round trips (99th percentile) required per insert while filling a table to 100\% while varying the lock per message, and buckets per lock. (\todo{subtract one from each current values include unlocks})
     }
@@ -452,6 +452,16 @@ and reduces on NIC blocking when acquiring locks.
 
 \subsection{Protocol}
 
+\begin{figure}[t]
+\includegraphics[width=0.99\linewidth]{fig/message_diagram.pdf}
+
+\caption{Rcuckoo's protocol for reads, inserts, deletes and
+updates. Blue lines are index accesses, and red lines are
+extent accesses. Solid lines are reads, dotted lines are
+CAS, and curved dashed lines are writes. \todo{talk to this figure}}
+
+\label{fig:message_diagram} \end{figure}.
+
 Using locks instead of opportunistic concurrency greatly
 reduces the round trips required to perform operations.
 Insertions into a cuckoo hash require one message for each
@@ -639,52 +649,162 @@ were able to correlate our fill factor results with theirs.
 
 \begin{figure*}[ht]
     \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_throughput.pdf}
-    \caption{race vs rcuckoo simulated throughput}
+    \caption{race vs rcuckoo simulated throughput \todo{rerun ycsb-b numbers don't look quite right}}
     \label{fig:ycsb_throughput}
 \end{figure*}
 
+\begin{figure*}[ht]
+    \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill_latency.pdf}
+    \caption{race vs rcuckoo workload fill latency}
+    \label{fig:ycsb_fill_latency}
+\end{figure*}
+
+\begin{figure}[ht]
+    \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill_ops_bw.pdf}
+    \caption{YCSB-A workload messages and bandwidth per operation as a function of fill factor}
+    \label{fig:ycsb_fill_ops_bw}
+\end{figure}
+
+\begin{figure}[ht]
+    \includegraphics[width=0.99\linewidth]{fig/search_dependence.pdf}
+
+    \caption{Round trips per insert operation compared
+    across search functions and hash functions. Dependent
+    hash functions with A* have the shortest search times.}
+
+    \label{fig:search_dependence}
+\end{figure}
+
 Our evaluation is run entirely in simulation. The goal of
 our evaluation is to demonstrate the practicality of Rcuckoo
-by showing by proxy that it supports low latency and high
-throughput operations. We measure blocking round trip's as a
-proxy for latency to measure throughput we normalize the
-number of simulation steps each client runs for before
-filling the table. Steps do not correlate directly to time,
-however the less time a client spends blocking, and the
-fewer steps required to complete an operation are a proxy
-for real system throughput.
+by showing through simulation that it supports low latency
+and high throughput operations. We measure blocking round
+trip's as a proxy for latency.  To approximate throughput we
+measure the total number of blocking round trips required to
+fill the table, and divide by the number of concurrent
+clients.  All of our evaluations are carried out on hash
+tables with buckets of size 8, and key-value pairs with
+32bit keys and 16bit values. On hash tables with 1 million
+entries. Rcuckoo is set with a read threshold of 512 bytes.
 
-All of our evaluations are carried out on hash tables with
-buckets of size 8, and key-value pairs with 32bit keys and
-16bit values. On hash tables with 1 million entries.
+In each experiment clients operate on a shared remote hash
+table, but insert and read independent sets of keys. Using
+independent keys prevents clients from reading absent keys,
+and inserting duplicate keys.  However it does not prevent
+interference due to hash collisions or conflicting cuckoo
+paths.
 
-\subsection{System Breakdown}
-
-Breakdown of insertion performance 
 
 \subsection{System Performance}
 
+\textbf{Throughput:} Figure~\ref{fig:ycsb_throughput} shows
+the throughput of race vs rcuckoo for YCSB workloads. YCSB-W
+is a 100\% write workload. YCSB-A is a 50\% read 50\% write
+workload. YCSB-B is 95\% read and 5\% write, and YCSB-C is
+100\% read.  In each experiment clients fill the hash table
+from empty to 90\% full. For read only workloads the hash
+table is first filled to 90\% and then clients read from the
+table.  Note that on large tables rcuckoo inserts scale
+almost linearly as the number of path collisions on inserts
+remains low due to the short cuckoo range.  Read heavy
+workloads (ycsb-b, c) have the highest throughput due to
+fewer round trips. In the case of ycsb-c Rcuckoo achieves 2x
+the read throughput of RACE.
 
-Figure~\ref{fig:ycsb_throughput} shows the throughput of race vs rcuckoo for YCSB workloads.
+\textbf{Latency:} Rcuckoo's operation latency is not static
+across fill factors. Because cuckoo paths are likely to be
+longer at higher table saturations inserts are more likely
+to require more round trips when obtaining locks. We measure
+the round trips as a proxy for latency at incremental fill
+factors. In each experiment the table is filled to the
+specificed fill factor and requests are executed untill the
+table reaches an additional 5\% fill or in the case of read
+only 500k. Each experiment is run with 128 clients.
+requests are issued. 
+%%
+Figure~\ref{fig:ycsb_fill_latency}, shows the average
+operation latency for each workload. Here average RTT is the
+average between both reads, and writes. Race incurs
+additional round trips from reading from it's extent and
+from verifying it's successful inserts. Race has very few
+collisions as its critical section for insertion is the
+duration of a single RDMA CAS. Because of this few inserts
+fail and it retains near constant latency for read and
+writes across all fill factors. The same is true for Rcuckoo
+reads which remain at a single round trip. Rcuckoo inserts
+are subject to additional round trips as the table fills.
+Most additional round trips are caused by locks being spaced
+further than the span of an RDMA CAS on the lock table. Some
+are caused by contention. The small improvement of ycsb-a
+and ycsb-b over ycsb-w inserts are due to reduced write
+contention from the workload.
 
-YCSB-A, YCSB-B, and YCSB-C, YCSB-W, for latency.
-YCSB-A, YCSB-B, and YCSB-C, YCSB-W, for throughput.
-YCSB-A, YCSB-B, and YCSB-C, YCSB-W, for operations per second
-YCSB-a, YCSB-b, and YCSB-c, YCSB-w, for bandwidth.
+\textbf{Bandwidth, and messages:} Rcuckoo design trades off
+bandwidth for latency by increases the size of reads for all
+operations. We measure the effect of fill factor on the
+bandwidth and messages required per operation with the same
+experiment used to measure latency.
+Figure~\ref{fig:ycsb_fill_ops_bw} shows how Rcuckoo and
+RACE's messages and bandwidth respond to fill factor. At low
+fill rates (less than 50\%) Rcuckoo uses less bandwidth per operation
+and less messages per operation than RACE. Above 50\%
+collisions in the hash table increase the cost of
+insertions. While the size of the cuckoo path does not
+directly relate to the number of round trips, it does
+directly relate to messages. High fill factors nearly double
+the number of insert messages required to perform insertions
+with Rcuckoo, and bandwith can increase by up to a factor of
+4. \todo{In the future we could perform very large writes to
+reduce the number of messages at the cost of more bandwidth.}
+
+\textbf{Locks Per message and independence:} 
+
+Hash function locality hash a major impact in rcuckoo's
+performance. Acquiring locks can only be done in a few round
+trips when the locks are clustered together tightly in the
+lock table. Furthermore, the search function used to
+determine the cuckoo path has a large impact on the locality
+of the locks necessary to lock the path. We evaluate
+dependent hashing and independent hashing as well as random
+and a* search. We measure the number of round trips required
+for each control as a function of the number of locks which
+can be acquired per round trip.
+
+Figure~\ref{fig:search_dependence} shows the performance
+improvements gained by both locality hashing and a* search.
+In this experiment the table is filled from 0 to 90\% full
+with a ycsb-w workload. We measure the 99th percentile of
+round trips for these workloads. Random search with
+independent hashing leads to a large number of round trips
+as locks are scattered throughout the table. RDMA masked CAS
+operation do little here to reduce the round trips as they
+can rarely aquire more than one lock in a round trip. With
+dependent hashing and random search RDMA CAS operation are
+almost sufficent to reduce round trips, however the absolute
+number of locks required per insert is high which leads to
+greater contention. A* search with dependent hashing has
+cuckoo paths that are both short, and clustered together.
 
 
 
 \subsection{Search Performance:}
 
-\textbf{Hashing Algoritms:} Rcuckoo hashing requires
+\todo{\textbf{Hashing Algoritms:} Rcuckoo hashing requires
 executing many hash compuations. We evalute our A* search
 alorithm abolute performacne on various hash functions and
-show how this values effect our overall fill factors.
+show how this values effect our overall fill factors.}
 
-\textbf{A* search vs BFS:} We compare the performance of A*
+\todo{\textbf{A* search vs BFS:} We compare the performance of A*
 vs BFS for locally computed insertions. A* performance
 directly effects system throughput as this algorithm is run
-twice on every insert.
+twice on every insert.}
+
+\subsection{Read Threshold Performance} 
+
+\todo{Show how it reduces messages per operation. This is not that
+important of an experiment as I can't show the latency
+overhead of two batched messages vs one at the moment.}
+%%
 
 
 \section{Conclusion}

@@ -75,13 +75,19 @@ def plot_hero_ycsb_fill_latency():
         # print(json.dumps(stats, indent=4))
         # exit(1)
         plot_cuckoo.fill_vs_latency(ax, stats, decoration=False)
-        ax.legend()
+        if workloads[i] == "ycsb-a" or workloads[i] == "ycsb-b":
+            ax.legend(fontsize=6, ncol=2)
+        else:
+            ax.legend(fontsize=8)
         # ax.set_xlabel("clients")
         ax.set_title(workloads[i])
         ax.set_ylabel("average rtt")
+        ax.set_ylim(bottom=0, top=3.5)
+        ax.set_xlim(left=5, right=100)
+        ax.set_xlabel("fill factor")
 
     plt.tight_layout()
     plt.savefig("hero_ycsb_fill_latency.pdf")
 
-run_hero_ycsb_fill_latency()
+# run_hero_ycsb_fill_latency()
 plot_hero_ycsb_fill_latency()
