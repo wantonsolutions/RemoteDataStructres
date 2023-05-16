@@ -354,7 +354,7 @@ reads~\cite{memc3,cuckoo-improvements,pilaf,farm}.
 
 Our approach aims to combine the bounded reads of cuckoo
 hashing, with the locality properties of hopscotch hashing.
-To do so we make our two hash functions \textbf{dependent}
+To do so we make our two hash functions \textit{dependent}
 and bound the distance between cuckoo hash locations.  The
 first hash function determines the location a key will be
 hashed to. The second hash function determines the maximum
@@ -371,20 +371,24 @@ approach quickly leads to failed insertions. Due to the
 birthday paradox the probability of a collision is high, and
 on large tables the probability that one region of the hash
 table will become full, and have not viable path to an open
-slot is high. ~\todo{Insert a figure of one of my failed
-insertion experiments on a big table}.
+slot is high. ~\sg{Perhaps this justifies a figure, please
+advise.}.
 
-Instead of a static bound we use a dynamic exponential bound
-with a third hash function. The bound set by the third hash
-is determine by counting the suffix zeros of the resultant
-hash and rasing it by an exponential factor. In the common
-case the bound is small, but at an exponentially decrease
-rate some pairs of values are spaced exponentially far
-apart. This design enables some pairs to act
-as~\textit{waypoints} to other regions of the table when
-constructing cuckoo paths. This method, paired with bucket
-associativity enables high fill rates while keeping the
-region of the table any given key can inhabit small.
+We use a dynamic exponential bound rather than a static one.
+The dynamic bound is set by raising a constant factor $f$ by
+an exponent determined by a third hash function. Using the
+third hash on the key we count the number of suffix zeros
+and raise the constant factor by itself plus the zero count.
+This distribution generates exponential distances between
+hash locations at exponentially less frequency and is
+tunable with the single parameter $f$.
+%%
+In the common case the bound is small. Exponentially few key
+are spaced far apart and act as~\textit{waypoints} to other
+regions of the table when constructing cuckoo paths. This
+method, paired with bucket associativity enables high fill
+rates while keeping the region of the table any given key
+can inhabit small.
 
 There is a tradeoff between locality and fill factor.
 Figure~\ref{fig:locality-hashing}(b) illustrates how
@@ -394,84 +398,72 @@ Figure~\ref{fig:locality-hashing}(c) shows how these same
 factors effect the max fill rate of the table before an item
 cannot be inserted. As will be shown in the following
 sections read, and insert performance improve with better
-locality.
+locality. Therefore fill factor and performance can be
+traded off directly by changing the exponential factor. In
+our evaluation we found an exponential factor of 2.3 to give
+the best results in terms of end to end performance and
+bandwidth consumption.
 
 
 \subsection{Locking}
 
 Traditional wisdom would suggest that because cuckoo hashing
 can have long insertion paths it is a poor candidate for
-remote memory. Augmenting an insertion path requires making
-many modifications to the hash table. There are two
-approaches for making path modifications. The first is to
-perform a set of compare and swap modification which migrate
-an open slot down a path to a location where the new value
-is inserted. In this case the client acquires no locks,
-however it has no guarantee that it's insertion path with
-remain valid as concurrent processes can modify the hash
-table with insertions of their own. In this case the client
-can opportunistically attempt an insertion path using its
-cached information about the table. This strategy has the
-potential to fail frequently, and the requires potentially
-many reads to be issued for the client to keep it's path
-information up to date. ~\todo{insert a plot which shows
-path lengths and failure rates from the cukoo approach with
-no batching.}
-
-Alternatively a client can aquire locks for the table. Locks
-typically have poor performance for disaggregated algorithms
-because each lock and unlock operation requires a round
-trip. This means that any locking algorithm will have a lock
-acquisition phase in which all required locks are collected,
-followed by a critical section in which the operations are
-executed, and a lock release stage. Using a course grained
-locks this approach leads to throughput bottlenecks as it
-does not scale with the number of clients. However course
-grained locks have the advantage that there are few locks to
-aquire, therefore a lock acquisition and release algorithm
-takes less round trips. A typical lock acquisition policy
-works by acquiring locks in a predefined incremental order to
-avoid deadlock. The tradeoff between fine grained and course
-locking is clear - fine grained locking allows higher
-degrees of parallelism and throughput, while adding higher
-latency due to a more complex lock aquire and release stage.
-Course locking has lower latency aquire and release, but
-limits throughput as many clients will contest the same
-locks.
-
-Locality hashing enables very efficient locking due to RDMA
-masked CAS
-operations~\cite{advanced-transport,scalable-locks}. Without
-local hashing fine grained locks would be scattered
-throughout the hash table. Locality hashing increases the
-probability that an insertion path is within a bounded
-region of the hash table.  This means that a lock table with
-lock locations corresponding to physical locations in the
-hash table will be near one another.  
+remote memory. Both opportunistic, and lock based approaches
+have significant drawbacks.
 %%
-Figure~\ref{fig:rdma}(b) shows the insert span in buckets
-using both dependent and independent hashing on a table with
-500K entries and 8 entry buckets. A span is calculated as
-the distance between the lowest index and the highest index
-in a cuckoo path. Past 50\% independent hashing spans a
-random range in the table (whenever a displacement occurs on
-insert). With dependent locality based hashing 95\% of
-inserts span less than 32 buckets, and 99\% less than 256.
+As an example consider an opportunistic approach in which
+many clients are inserting concurrently to a table. Clients
+making inserts first make reads of the table to locally
+calculate a cuckoo path for their insertion. After the reads
+complete the client constructs a cuckoo path and starting
+from the open slot issues dependent CAS requests migrating
+the open slot backwards to the insertion bucket.
+%%
+Figure~\ref{fig:cuckoo-problems}(a) shows the failure rate
+of this insertion scheme as a factor of clients running
+inserts on a table with 500K entries with a bucket
+associativity 8. Cuckoo paths calculated from client caches
+quickly become invalid as the number of clients grows.
+%%
+Alternatively deadlock free lock acquisition requires more
+round trips and has larger critical sections. Each lock must
+be acquired in order with a dependent CAS request which
+incurs an additional round trip per lock. Using course
+grained locks reduces the number of acquisitions but
+throttles throughput as concurrent insertions are more
+likely to contend shared locks.
+
+Locality hashing increases the probability that an insertion
+path is within a small region of the hash table which in
+turn increases the probability that fine grained locks will
+be near one another. 
+%%
+Figure~\ref{fig:cuckoo-problems}(b) shows the insert span in
+buckets using both dependent and independent hashing on a
+table with 500K entries and an associativity of 8. A span is
+calculated as the distance between the lowest index and the
+highest index in a cuckoo path. Past 50\% independent
+hashing spans a random range in the table (whenever a
+displacement occurs on insert). With dependent locality
+based hashing 95\% of inserts span less than 32 buckets, and
+99\% less than 256.
 %%
 RDMA masked CAS operations allow a client to set a 64 bit
 mask along with the new, and old values of the cas
-operation. This enables the client to atomically set up to
-64 contiguous locks. Using these operations clients can
-dramatically decrease the number of round trips required to
-acquire locks.
-%%
+operation. So locks can be acquired with minimal knowledge
+of the remote lock table. This enables the client to
+atomically set up to 64 contiguous locks independently which
+dramatically reduces the round trips required to aquire
+locks.
+
 Lock granularity effects performance under contention. Using
-values from Figure~\ref{fig:rdma}(b) if locks are per bucket
-96\% of lock acquisitions can be completed with a single RTT
-masked cas. If locks span 4 buckets 99\% of requests can be
-completed in a single round trip.
+values from Figure~\ref{fig:rdma-benchmarks}(b) if locks are
+per bucket 96\% of lock acquisitions can be completed with a
+single RTT masked cas. If locks span 4 buckets 99\% of
+requests can be completed in a single round trip.
 %%
-Figure~\ref{fig:rdma}(c) Shows the tradeoff between lock
+Figure~\ref{fig:rdma}(c) shows the tradeoff between lock
 granularity and the number of locks which can be set in a
 single message with locality hashing turned on. The values
 reported are the 99th percentile number of round trips
@@ -483,23 +475,20 @@ the heatmap (512) only a single global lock exists. Further
 the benefit in terms of locks per message falls off quickly
 after 1. RDMA masked CAS are beneficial as they allow for
 fine grained locking, but setting 3 or more locks per
-message has little effect up to 90\% fill rate.
+message has little effect up to 90\% fill rate. Reducing
+atomic operations in turn reduces the effect of the RDMA
+atomic bottleneck.
 
-RDMA atomic throughput is
-limited~\cite{design-guidelines}~\todo{[swordbox]}. Reducing
-the number of atomic messuages also reduces hardware
-limitations on the number of operations. Our lock table is
-also small in compairision to the true hash table, each lock
-is a single bit, and bits can correspond to multiple rows of
-the table if we need to save space~\todo{lock size, vs locks
-per message figure}. Because we can save lock space due to
-masked cas we can also make use device mapped memory for
-faster lock aquisition~\cite{sherman}. RDMA device mapped
-memory reduces request latency by executing RDMA operations
-onto memory which resides on the RDMA NIC. This memory is
-highly constrained~\todo{4MB CX5,CX6}, it removes the need
-for a PCIe round trip thereby reducing lock aquisition
-latency by aproximatly 2x.
+Our lock table is small in comparison to the true hash
+table. At it's most fine grained each lock corresponds to
+one bucket (8 entries). Each lock is 1 bit, a lock table for
+a 100 million entry hash table is ~160KB, with a lock
+granularity of 4 buckets this drops to 40KB. This tight
+layout enables us to use device mapped memory to hold our
+lock table~\cite{design-guidelines,sherman}. This enables up
+to 3x better throughput on contested locks (see
+Figure~\ref{fig:rdma-benchmarks}(c)), and reduces latency
+for locking.
 
 \subsection{Table Design}
 
