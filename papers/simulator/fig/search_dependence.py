@@ -61,7 +61,7 @@ def plot_search_dependence():
     a_star_dependent, _ = dm.load_statistics("search_dependence/a_star_dependent")
 
     percentile=99
-    fig, ax = plt.subplots(1, 1, figsize=(4, 3))
+    fig, ax = plt.subplots(1, 1, figsize=(6, 3))
 
     x_axis=plot_cuckoo.detect_x_axis(random_independent)
     x_axis_vals = plot_cuckoo.get_x_axis(random_independent, x_axis)
@@ -90,5 +90,5 @@ def plot_search_dependence():
     plt.tight_layout()
     plt.savefig("search_dependence.pdf")
 
-run_search_dependence()
+# run_search_dependence()
 plot_search_dependence()

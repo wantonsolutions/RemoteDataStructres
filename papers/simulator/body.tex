@@ -71,17 +71,16 @@ Bandwidth capabilities of RDMA NICs have increased
 disproportionately to their latency improvement. The
 bandwidth difference between CX3 and CX7 NICs is 10x and yet
 intra rack round trips of small RDMA packets has only shrunk
-by around 1.5x (~\todo{cite design guidelins and some
-connectx 7 spreadsheets}). Comparatively bandwidth is
-cheaper than latency. ~\ref{fig:rdma-benchmarks} (a) shows
-the tradeoff between NIC to NIC round trips times on CX5
-RDMA NICs for write operations. All packets up to 128 bytes
-have comparable round trip latencies, and packet sizes must
-grow to above 1K before the cost of the large packet exceeds
-the cost of two round trips for smaller packets. In a
-network with surplus bandwidth if single large messages can
-be used to achieve the work of two dependent smaller
-messages system latency can be improved.
+by around 1.5x. Comparatively bandwidth is cheaper than
+latency. ~\ref{fig:rdma-benchmarks}(a) shows the tradeoff
+between NIC to NIC round trips times on CX5 RDMA NICs for
+write operations. All packets up to 128 bytes have
+comparable round trip latencies, and packet sizes must grow
+to above 1K before the cost of the large packet exceeds the
+cost of two round trips for smaller packets. In a network
+with surplus bandwidth if single large messages can be used
+to achieve the work of two dependent smaller messages system
+latency can be improved.
 
 One sided RDMA verbs (read, write, atomic) are used to
 access remote memory without any memory side computation.
@@ -792,7 +791,9 @@ were able to correlate our fill factor results with theirs.
 
     \caption{Round trips per insert operation compared
     across search functions and hash functions. Dependent
-    hash functions with A* have the shortest search times.}
+    hash functions with A* have the shortest search
+    times.~\todo{latest numbers for A* are counter intuitive
+    - dig into}}
 
     \label{fig:search_dependence}
 \end{figure}
@@ -893,7 +894,7 @@ as a function of the number of locks which can be acquired
 per round trip.
 
 Figure~\ref{fig:search_dependence} shows the performance
-improvements gained by both locality hashing and a* search.
+improvements gained by both locality hashing and A* search.
 In this experiment the table is filled from 0 to 90\% full
 with a ycsb-w workload. We measure the 99th percentile of
 round trips for these workloads. Random search with
@@ -902,7 +903,7 @@ as locks are scattered throughout the table. RDMA masked CAS
 operation do little here to reduce the round trips as they
 can rarely aquire more than one lock in a round trip. With
 dependent hashing and random search RDMA CAS operation are
-almost sufficent to reduce round trips, however the absolute
+almost sufficient to reduce round trips, however the absolute
 number of locks required per insert is high which leads to
 greater contention. A* search with dependent hashing has
 cuckoo paths that are both short, and clustered together.
@@ -911,15 +912,15 @@ cuckoo paths that are both short, and clustered together.
 
 \subsection{Search Performance:}
 
-\todo{\textbf{Hashing Algoritms:} Rcuckoo hashing requires
-executing many hash compuations. We evalute our A* search
-alorithm abolute performacne on various hash functions and
-show how this values effect our overall fill factors.}
-
 \todo{\textbf{A* search vs BFS:} We compare the performance of A*
 vs BFS for locally computed insertions. A* performance
 directly effects system throughput as this algorithm is run
 twice on every insert.}
+
+\todo{\textbf{Hashing Algoritms:} Rcuckoo hashing requires
+executing many hash compuations. We evaluate our A* search
+alorithm abolute performacne on various hash functions and
+show how this values effect our overall fill factors.}
 
 \subsection{Read Threshold Performance} 
 
@@ -931,3 +932,13 @@ overhead of two batched messages vs one at the moment.}
 
 \section{Conclusion}
 \label{sec:conclusion}
+
+In this work we design and implement a lock based cuckoo
+hash for remote memory. Using dependent hashing, a carefully
+designed locking protocol, and the latest RDMA NIC features
+we achieve common case operations of 2 round trips, and
+lockless reads in a single round trip. We demonstrate that
+these algorithmic advantages lead to better practical
+performance by simulating hash table workloads and showing
+throughput and latency benefits of up to 2x over state of
+the art far memory hash tables.
