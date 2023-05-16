@@ -1,4 +1,5 @@
 \section{Introduction}
+\label{sec:intro}
 
 %concurrent data structures round trips
 Concurrent data structure design for remote memory is hard.
@@ -27,7 +28,33 @@ operations (e.g. locking) with main memory access latency
 small for CPU based locking, and dramatically increase them
 for one-sided RDMA based locking schemes~\cite{clover,
 sherman}.
-\label{sec:intro}
+
+%rdma and cuckoo hashing
+In this work we examine the tradeoffs between optimistic and
+lock based data structures for remote memory. Our
+contribution is a new concurrent hash table design which
+uses a novel cuckoo hashing algorithm. Our algorithm
+(rcuckoo) is designed to enable locking and unlocking
+efficiently using one-sided RDMA. In the common case our
+reads execute in a single round trip, and updates to the
+table are performed in two round trips. To achieve this
+efficiency we make use of \textit{dependent hashing} to
+increase the locality between hash location in our cuckoo
+hash. Dependent hashing enables efficient reads, fast
+heuristic search for open location, and efficient locking.
+To achieve fast locking we make use of new RDMA NIC device
+features, mainly RDMA masked CAS operations and device
+mapped memory. Rcuckoo is designed with RDMA NIC's in mind
+to achieve high throughput and low latency.
+
+%%
+Implement a prototype of our algorithm in python and
+evaluate it in a simulator against another state of the art
+remote hashing algorithm RACE. We demonstrate that in the
+common case rcuckoo requires fewer round trips, and
+therefore achieves lower latency and higher throughput than
+race but up to a factor of 2x on YCSB workloads.
+
 
 
 \section{Background}
