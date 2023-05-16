@@ -227,7 +227,7 @@ scalable as its critical section is only the length of a CAS
 instruction and is only limited by RDMA atomic operation
 throughput~\cite{design-guidelines}. However, Paths can
 become invalid as other clients running concurrent inserts
-invalidate the paths. Figure~\ref{fig:problems}(a) shows the
+invalidate the paths. Figure~\ref{fig:cuckoo-problems}(a) shows the
 path insertion failure rate as the number of concurrent
 clients grows. This approach minimizes round trips as
 dependent CAS operations can be batched thanks to in order
@@ -416,7 +416,7 @@ bandwidth consumption.
     \caption{
     \textbf{(a)} Failure rate of optimistic cuckoo insertions.
     \textbf{(b)} CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path.
-    \textbf{(c)} Round trips (99th percentile) required per insert while filling a table to 100\% while varying the lock per message, and buckets per lock. (\todo{subtract one from each current values include unlocks})
+    \textbf{(c)} Round trips (99th percentile) required per insert while filling a table to 100\% while varying the lock per message, and buckets per lock. \todo{subtract one from each current values include unlocks}
     }
     \label{fig:cuckoo-problems}
 
@@ -480,7 +480,7 @@ per bucket 96\% of lock acquisitions can be completed with a
 single RTT masked cas. If locks span 4 buckets 99\% of
 requests can be completed in a single round trip.
 %%
-Figure~\ref{fig:rdma}(c) shows the tradeoff between lock
+Figure~\ref{fig:rdma-benchmarks}(c) shows the tradeoff between lock
 granularity and the number of locks which can be set in a
 single message with locality hashing turned on. The values
 reported are the 99th percentile number of round trips
@@ -535,7 +535,7 @@ locks.
     \includegraphics[width=0.99\linewidth]{fig/table-diagram.pdf}
     \caption{Rcuckoo's table design}
     \label{fig:table-diagram}
-\end{figure}.
+\end{figure}
 
 
 \subsection{Protocol}
@@ -546,14 +546,14 @@ locks.
 \caption{Rcuckoo's protocol for reads, inserts, deletes and
 updates. Blue lines are index accesses, and red lines are
 extent accesses. Solid lines are reads, dotted lines are
-CAS, and curved dashed lines are writes. \todo{talk to this figure}}
+CAS, and curved dashed lines are writes.}
 
 \label{fig:message_diagram}
 \end{figure}
 
 In this section we describe our protocol for reading,
 inserting, and performing updates and deletes to an rcuckoo
-hash table. Figure~\ref{fig:message_digram} visualizes our
+hash table. Figure~\ref{fig:message_diagram} visualizes our
 protocol.
 
 \subsubsection{Reading} All reads are performed locklessly.
@@ -563,7 +563,7 @@ to resolve a pointer and read the extent.
 %%
 ~\footnote{This design requires exactly one pointer
 resolution in expectation that future RDMA NICs may provide
-pointer resolution reads as a primitive~\cite{prisim}}
+pointer resolution reads as a primitive~\cite{prism}}
 %%
 The index is modified concurrently by writes, clients must
 therefore validate their reads by computing a CRC post
@@ -678,22 +678,24 @@ lock ensures that no other client is currently moving the
 key to another location as part of a concurrent insert.
 
 
-\subsubsection{Search}
-Cuckoo hashing insert traditionally uses random
-replacement~\cite{cuckoo}. Random replacement requires
-little computation, however at high fill rates it leads to
-long cuckoo paths which require many locks, and reduce
-concurrent throughput. BFS search finds the shortest path
-and has been demonstrated to increase system throughput with
-fine grained locking~\cite{algorithmic-improvements}.
+\subsubsection{A* Search} 
 
-BFS search is computationally intensive. Locality based
-hashing enables us to leverage more efficient search
-strategies. Because locality hashing increases the
-probability that a cuckoo hashing location is close we can
-use an informed search algorithm to find open slots close to
-bucket a key hashes to. 
-
+Locality based hashing provides us opportunities for better
+search than traditional cuckoo hashing. Cuckoo hashing
+insert traditionally uses random replacement~\cite{cuckoo}.
+Random replacement requires little computation, however at
+high fill rates it leads to long cuckoo paths which require
+many locks, and reduce concurrent throughput. BFS search
+finds the shortest path and has been demonstrated to
+increase system throughput with fine grained
+locking~\cite{cuckoo-improvements}.  BFS is
+computationally intensive. Locality based hashing enables us
+to leverage more efficient search strategies. Because
+locality hashing increases the probability that a cuckoo
+hashing location is close we can use an informed search
+algorithm to find open slots close to bucket a key hashes
+to. 
+%%
 In the case of BFS the target bucket is unknown, therefore
 all paths must be explored. We use A* search, an algorithm
 which takes a goal location, and a distance heuristic as
@@ -701,18 +703,20 @@ input. A* is known to find shortest paths in much better
 average case times than BFS. A* requires two additional
 inputs, a distance heuristic and a goal location.
 
-\textbf{goal location}: Locality hashing increases the
+\textbf{Goal location}: Locality hashing increases the
 probability that an open slot near the insertion target
 location can terminate a cuckoo path. Our algorithm collects
 open slots near the original hash location as candidate goal
 locations. By default we set the number of candidate goal
-locations to 5. Gloal locations are collected by starting at
+locations to 5. Goal locations are collected by starting at
 the $h_1(k)$ location and iterating through the hash
 table both forward and backwards through the table one index
 at a time. Buckets with open slots are added to the
-candidate list until the limit is reached. \todo{I could
-improve this search time by tracking the list of open
-buckets and using binary search on them.}.
+candidate list until the limit is reached. 
+
+% \todo{I could
+% improve this search time by tracking the list of open
+% buckets and using binary search on them.}.
 
 \textbf{Search Heuristic}: A* requires a heuristic for
 distance which is a strict underestimate of the true
@@ -732,28 +736,29 @@ very short search times.
 
 \section{Implementation} We implement our algorithm in
 Python and emulate client based RDMA using a custom built
-simulator consisting of 1k lines of python. 
+simulator consisting of 1k lines of code. 
 
 \textbf{Simulator:} Our simulator is event based and does
 not emulate network transit time, processing time, or failed
 packets. Clients, memory, and switches are modeled as finite
 state machines, and the network as FIFO queues. Events are
-scheduled randomly, between clients, memory, and the
+scheduled randomly, multiplexing clients, memory, and the
 network. RDMA verbs are modeled as function pointers with
 arguments passed by the client.
 
-\textbf{Rcuckoo:} Cuckoo is implemented in 1.2k lines of
-python. A* is implemented by hand, with the use of python's
-standard heap library for priority queuing. Clients store
-complete copies of the remote hash table index locally, and
-none of the extent in simulation. In practice for better
-resource utilization cached pages of the index could be
-released using LRU. Our current implementation does not
-include extents, all table accesses are inlined.
+\textbf{Rcuckoo} is implemented in 1.2k lines of
+python. We implement our own version of approximate A* with
+the use of python's standard heap library for priority
+queuing. Clients store complete copies of the remote hash
+table index locally. We do not model the hash table extent
+in simulation all table accesses are inlined. In practice
+for better resource utilization cached pages of the index
+could be released using LRU. 
 
-\textbf{RACE:} We implement RACE~\cite{race} to the best of
-our abilities as no publicly available implementation is
-available. We only model the RACE index. In cases where
+\textbf{RACE~\cite{race}} has no publicly available
+implementation. Therefore we implemented our own version of
+RACE by closely following it's protocol as described in it's
+paper.  We only model the RACE index. In cases where
 blocking calls are made to RACE's extent we assume they
 succeed and simply reissue a read to the index to model the
 round trip incurred by the extent lookup. We model RACE's
@@ -793,13 +798,13 @@ were able to correlate our fill factor results with theirs.
 \end{figure}
 
 Our evaluation is run entirely in simulation. The goal of
-our evaluation is to demonstrate the practicality of Rcuckoo
+our evaluation is to demonstrate the practicality of rcuckoo
 by showing through simulation that it supports low latency
 and high throughput operations. We measure blocking round
-trip's as a proxy for latency.  To approximate throughput we
+trip's as a proxy for latency. To approximate throughput we
 measure the total number of blocking round trips required to
 fill the table, and divide by the number of concurrent
-clients.  All of our evaluations are carried out on hash
+clients. All of our evaluations are carried out on hash
 tables with buckets of size 8, and key-value pairs with
 32bit keys and 16bit values. On hash tables with 1 million
 entries. Rcuckoo is set with a read threshold of 512 bytes.
@@ -815,7 +820,7 @@ paths.
 \subsection{System Performance}
 
 \textbf{Throughput:} Figure~\ref{fig:ycsb_throughput} shows
-the throughput of race vs rcuckoo for YCSB workloads. YCSB-W
+the throughput of RACE vs rcuckoo for YCSB workloads. YCSB-W
 is a 100\% write workload. YCSB-A is a 50\% read 50\% write
 workload. YCSB-B is 95\% read and 5\% write, and YCSB-C is
 100\% read.  In each experiment clients fill the hash table
@@ -825,7 +830,7 @@ table.  Note that on large tables rcuckoo inserts scale
 almost linearly as the number of path collisions on inserts
 remains low due to the short cuckoo range.  Read heavy
 workloads (ycsb-b, c) have the highest throughput due to
-fewer round trips. In the case of ycsb-c Rcuckoo achieves 2x
+fewer round trips. In the case of ycsb-c rcuckoo achieves 2x
 the read throughput of RACE.
 
 \textbf{Latency:} Rcuckoo's operation latency is not static
@@ -834,23 +839,23 @@ longer at higher table saturations inserts are more likely
 to require more round trips when obtaining locks. We measure
 the round trips as a proxy for latency at incremental fill
 factors. In each experiment the table is filled to the
-specificed fill factor and requests are executed untill the
+specified fill factor and requests are executed until the
 table reaches an additional 5\% fill or in the case of read
 only 500k. Each experiment is run with 128 clients.
 requests are issued. 
 %%
 Figure~\ref{fig:ycsb_fill_latency}, shows the average
 operation latency for each workload. Here average RTT is the
-average between both reads, and writes. Race incurs
+average between both reads, and writes. RACE incurs
 additional round trips from reading from it's extent and
-from verifying it's successful inserts. Race has very few
+from verifying it's successful inserts. RACE has very few
 collisions as its critical section for insertion is the
-duration of a single RDMA CAS. Because of this few inserts
-fail and it retains near constant latency for read and
-writes across all fill factors. The same is true for Rcuckoo
-reads which remain at a single round trip. Rcuckoo inserts
-are subject to additional round trips as the table fills.
-Most additional round trips are caused by locks being spaced
+duration of a single RDMA CAS. Few of RACE's inserts fail
+and it retains near constant latency for read and writes
+across all fill factors. The same is true for rcuckoo reads
+which remain at a single round trip. Rcuckoo inserts are
+subject to additional round trips as the table fills.  Most
+additional round trips are caused by locks being spaced
 further than the span of an RDMA CAS on the lock table. Some
 are caused by contention. The small improvement of ycsb-a
 and ycsb-b over ycsb-w inserts are due to reduced write
@@ -861,31 +866,31 @@ bandwidth for latency by increases the size of reads for all
 operations. We measure the effect of fill factor on the
 bandwidth and messages required per operation with the same
 experiment used to measure latency.
-Figure~\ref{fig:ycsb_fill_ops_bw} shows how Rcuckoo and
+Figure~\ref{fig:ycsb_fill_ops_bw} shows how rcuckoo and
 RACE's messages and bandwidth respond to fill factor. At low
-fill rates (less than 50\%) Rcuckoo uses less bandwidth per operation
-and less messages per operation than RACE. Above 50\%
-collisions in the hash table increase the cost of
+fill rates (less than 50\%) rcuckoo uses less bandwidth per
+operation and less messages per operation than RACE. Above
+50\% collisions in the hash table increase the cost of
 insertions. While the size of the cuckoo path does not
 directly relate to the number of round trips, it does
 directly relate to messages. High fill factors nearly double
 the number of insert messages required to perform insertions
-with Rcuckoo, and bandwith can increase by up to a factor of
+with rcuckoo, and bandwidth can increase by up to a factor of
 4. \todo{In the future we could perform very large writes to
-reduce the number of messages at the cost of more bandwidth.}
+reduce the number of messages at the cost of more
+bandwidth.}
 
-\textbf{Locks Per message and independence:} 
-
-Hash function locality hash a major impact in rcuckoo's
-performance. Acquiring locks can only be done in a few round
-trips when the locks are clustered together tightly in the
-lock table. Furthermore, the search function used to
-determine the cuckoo path has a large impact on the locality
-of the locks necessary to lock the path. We evaluate
-dependent hashing and independent hashing as well as random
-and a* search. We measure the number of round trips required
-for each control as a function of the number of locks which
-can be acquired per round trip.
+\textbf{Locks per message and independence:} Hash function
+locality hash a major impact in rcuckoo's performance.
+Acquiring locks can only be done in a few round trips when
+the locks are clustered together tightly in the lock table.
+Furthermore, the search function used to determine the
+cuckoo path has a large impact on the locality of the locks
+necessary to lock the path. We evaluate dependent hashing
+and independent hashing as well as random and a* search. We
+measure the number of round trips required for each control
+as a function of the number of locks which can be acquired
+per round trip.
 
 Figure~\ref{fig:search_dependence} shows the performance
 improvements gained by both locality hashing and a* search.
