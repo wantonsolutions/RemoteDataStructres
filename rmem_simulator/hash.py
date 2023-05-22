@@ -89,6 +89,12 @@ def rcuckoo_hash_locations_independent(key, table_size):
     return (p,s)
 
 
+def ten_k_hashes():
+    key = "asdfasdfasdfasdf"
+    for i in range(10000):
+        rcuckoo_hash_locations(key,1000000)
+
+
 
 ## race
 
