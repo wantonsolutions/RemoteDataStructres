@@ -15,7 +15,7 @@ two round trips, if multiple locks are required, or locks
 are contested the number of round trips increases.
 
 %cpu locking vs rdma
-In traditional key value stores (Memcached~\cite{memcached})
+In traditional key-value stores (Memcached~\cite{memcached})
 the CPU coordinates table access for read, write, and lock
 instructions. In contrast RDMA based Key-value
 stores~\cite{herd,erpc,pilaf} use a mixture of one-sided (no
@@ -96,22 +96,22 @@ resources (save setting up the RDMA memory initially). RDMA
 is designed for extremely high throughput and low latency.
 Bandwidth capabilities of RDMA NICs have increased
 disproportionately to their latency improvement. The
-bandwidth difference between CX3 and CX7 NICs is 10x and yet
-intra rack round trips of small RDMA packets has only shrunk
-by around 1.5x. Comparatively bandwidth is cheaper than
-latency. ~\ref{fig:rdma-benchmarks}(a) shows the tradeoff
+bandwidth difference between CX3 and CX7 NICs is 10$\times$ and yet
+intra-rack round trips of small RDMA packets has only shrunk
+by around 1.5$\times$. Comparatively bandwidth is cheaper than
+latency. Figure~\ref{fig:rdma-benchmarks}(a) shows the tradeoff
 between NIC to NIC round trips times on CX5 RDMA NICs for
 write operations. All packets up to 128 bytes have
 comparable round trip latencies, and packet sizes must grow
-to above 1K before the cost of the large packet exceeds the
-cost of two round trips for smaller packets. In a network
+to above 1K before the latency cost of a large packet exceeds the
+cost of two round trips for smaller packets. \textbf{In a network
 with surplus bandwidth if single large messages can be used
 to achieve the work of two dependent smaller messages system
-latency can be improved.
+latency can be improved.}
 
-One sided RDMA verbs (read, write, atomic) are used to
+One-sided RDMA verbs (read, write, atomic) are used to
 access remote memory without any memory side computation.
-One sided verbs require RDMA reliable connections which
+One-sided verbs require RDMA reliable connections which
 guarantee in-order delivery of operations enabling dependent
 operations to be issued in batches. Operation throughput is
 not equivalent across all verbs. Reads and writes scale
@@ -139,13 +139,13 @@ nearly the same rate as read and write requests.
 RDMA operations are known to have limitations~\cite{prism},
 pointer deference, memory allocation, and the scope of CAS
 operations are the most debated. Due to fixed width CAS
-operations, and no support for mutli-CAS, RDMA based
+operations, and no support for multi-CAS, RDMA based
 algorithms using optimistic concurrency can only update
-single 64 bit values atomically. Vendors have provided
+single 64-bit values atomically. \textbf{Vendors have provided
 masked CAS operations~\cite{rdma-masked-cas} to set multiple
 bits independently, this however is not a general solution
 as it still demands data locality for items being
-independently updated.
+independently updated.}
 
 
 \subsection{RDMA Key-Value Stores}
@@ -153,7 +153,7 @@ independently updated.
 Many projects have used RDMA to accelerate key-value
 stores~\cite{farm,erpc,herd,mica,pilaf,cell,faast,storm,memc3}.
 RDMA verb use is a matter of contention among these systems.
-Typically reads are made lovelessly and directly to remote
+Typically reads are lock-free and made directly to remote
 memory, while writes use two-sided verbs and are coordinated
 by the server side CPU.
 %%
@@ -162,12 +162,12 @@ therefore use client side synchronization to achieve
 serializablity~\cite{rolex,fusee,clover,sherman,ford,race}.
 These systems make use of RDMA atomic verbs for
 serialization. However, the use of the atomics is highly
-dependent on the key value stores under lying data
+dependent on the key-value stores under lying data
 structure.
 
 \textbf{Data Structures} - The underlying data structures of
 far-memory key value stores has a large impact on the
-systems performance. To perform fast reads CPU colocated
+system's performance. To perform fast reads CPU colocated
 systems have used cuckoo and hopscotch
 hashing~\cite{pilaf,herd,cuckoo,hopscotch}. While these
 structures have fast predictable reads, they have a large
@@ -178,12 +178,11 @@ times and lead to performance bottlenecks when acquiring
 locks. Recent work on remote memory data structures have
 opted for optimistic concurrency~\cite{clover,race,ford}.
 This strategy comes at the cost of additional round trips to
-first learn up to date information about the remote
+first learn up-to-date information about the remote
 structure, and to ensure that the optimistic operation
 completed successfully.
 
-\textbf{Cuckoo hashing} is a hash table which hash constant
-time reads. It uses two hash functions to determine two
+\textbf{Cuckoo hashing} is a hash table which delivers constant-time reads. It uses two hash functions to determine two
 possible locations at which any hashed item can reside. When
 reading both locations are queried. If the item is not
 found, it is not in the table. On insert, the item is placed
@@ -194,7 +193,7 @@ items. The sequence of displaced keys on an insert is called
 a ~\textit{cuckoo-path}~\cite{cuckoo-improvements}. When a
 loop occurs in a cuckoo path the insert fails and the table
 is resized. Fill factors for cuckoo hashes can be improved
-but using associative buckets for each hash index, and
+by using associative buckets for each hash index, and
 shortening cuckoo paths by using BFS rather than radom
 search~\cite{cuckoo-improvements}.
 
@@ -202,11 +201,10 @@ search~\cite{cuckoo-improvements}.
 \label{sec:problems}
 
 Far memory data structure design is difficult because of
-it's high access latency. Operations which require
+its high access latency. Operations which require
 synchronization or blocking are amplified by the latency.
-Operations which would be prohibitively expensive if they
-were run on local DRAM can be feasible and scalable for far
-memory. For example pushing complexity to the client is
+As a result, computations that would be considered prohibitively expensive when accessing local DRAM may make sense when accessing far
+memory. For example, pushing complexity to the client is
 often beneficial as it reduces load on the server. Examples
 include caching remote data to improve optimistic
 operations, making writes associative and reads large enough
@@ -216,8 +214,8 @@ detail the problems and challenges of using traditional
 cuckoo hashing on far memory.
 
 
-\textbf{Caching:} Modifying a remote data structure requires
-clients to have synchronized caches. The cache can either be
+\textbf{Caching:} Modifying a remote data structure is most efficient when 
+clients have an up-to-date view of the remote state, i.e., synchronized caches. The cache can either be
 accumulated per operation and be discarded or persist across
 operations.  Accumulating a cache per operation is slow,
 clients must aquire locks, read, then release potentially
@@ -270,14 +268,14 @@ Alternatively to get synchronized information the client can
 lock the table, then issue reads. However acquiring locks
 without knowledge of the table is hard. A global lock
 ensures that all reads are synchronized, but bottlenecks
-hash table throughput. Alternatively per bucket locks
+hash table throughput. Alternatively per-bucket locks
 enable high throughput but calculating which buckets to lock
 requires knowledge of the table. A long cuckoo path may
 require locking many buckets and many round trips to gather
 information about the hash table.
 %%
 An ideal protocol would enable clients to perform inserts
-without bottlenecks the insert performance of the hash
+without impeding insertions in other portions of the hash
 table, while requiring the fewest round trips to construct
 and execute the cuckoo path.
 
@@ -296,7 +294,11 @@ and execute the cuckoo path.
 
 \textbf{Read Optimization:} Most data center workloads are
 read heavy, therefore read operations should be the most
-highly optimized~\cite{datacenter-workloads,facebook-memcached}. Prior
+highly optimized~\cite{datacenter-workloads,facebook-memcached}.
+Ideally we would
+be able to ensure that reads complete in a single round
+trip.
+Prior
 approaches such as RACE require two RDMA round trips per
 read. The first is a hash index lookup, the second round
 trip reads the actual key-value block. RACE must perform two
@@ -307,9 +309,7 @@ values in the index structure. Clover~\cite{clover} enables
 single round trips reads. However under contention Clovers
 reads require pointer chasing which is known to be expensive
 due to each pointer resolution requiring a round
-trip~\cite{clio,clover,pointer-chaising}. Ideally we would
-be able to ensure that reads complete in a single round
-trip.
+trip~\cite{clio,clover,pointer-chaising}. 
 
 \textbf{Duplicate Keys:} Clients may issue concurrent
 inserts for the same key, given that keys may occupy
@@ -329,7 +329,7 @@ requiring additional overheads.
     \begin{subfigure}{0.3\linewidth}
         \begin{align*}
             L_1 &= h_1(k) \\
-            L_2 &= L_1 + h_2(k) \% f^{f + log_2(h_3(k))}
+            L_2 &= L_1 + (h_2(k)\mod f^{f + log_2(h_3(k))})
         \end{align*}
         % \caption{}
         % \label{fig:hash_factor}
@@ -363,20 +363,28 @@ hashes are optimized for reads. Cuckoo hashing ensures
 constant time reads, while hopscotch hashing ensures that a
 read is within a bounded range of it's hash index. Both of
 these properties have been noticed by the RDMA key-value
-store, and far memory communities for their fast
+store and far-memory communities for their fast
 reads~\cite{memc3,cuckoo-improvements,pilaf,farm}.
 
-Our approach aims to combine the bounded reads of cuckoo
-hashing, with the locality properties of hopscotch hashing.
-To do so we make our two hash functions \textit{dependent}
-and bound the distance between cuckoo hash locations.  The
-first hash function determines the location a key will be
-hashed to. The second hash function determines the maximum
-distance the second value can have from the first. A third
-hash function determines a random location between the first
-location, and the bound imposed by the second.
-Figure~\ref{fig:locality-hashing}(a) shows the formula for
-our dependent hashing function.
+Our approach aims to combine the bounded reads of cuckoo hashing with
+the locality properties of hopscotch hashing.  To do so we make our
+two hash functions \textit{dependent}, resulting in a bound on the
+distance between cuckoo hash locations.  The first, independent, hash
+function selects a uniformly random location, while the dependent hash
+selects a second location that is selected uniformly at random from a
+(variable-size) region immediately following the first.  To avoid hot
+spots, we randomly select the size of the region according to an
+exponential distribution with a tuning factor $f$, so that most
+locations are close together.
+%The second hash function determines the maximum
+%distance the second value can have from the first. A third
+%hash function determines a random location between the first
+%location, and the bound imposed by the second.
+Figure~\ref{fig:locality-hashing}(a) shows the formula for our hashing
+function process, which implements the probabilistic region-size
+selection with a third hash function---akin to the way Bitcoin
+computes its difficulty.
+\textbf{Why not make the second hash function a true expoential?}
 
 A strawman implementation of locality based hashing would
 use the first hash function to find a location, and the
@@ -501,12 +509,12 @@ dramatically reduces the round trips required to aquire
 locks.
 
 Lock granularity effects performance under contention. Using
-values from Figure~\ref{fig:rdma-benchmarks}(b) if locks are
+values from Figure~\ref{fig:cuckoo-problems}(b) if locks are
 per bucket 96\% of lock acquisitions can be completed with a
 single RTT masked cas. If locks span 4 buckets 99\% of
 requests can be completed in a single round trip.
 %%
-Figure~\ref{fig:rdma-benchmarks}(c) shows the tradeoff between lock
+Figure~\ref{fig:ycsb_fill_latency}(c) shows the tradeoff between lock
 granularity and the number of locks which can be set in a
 single message with locality hashing turned on. The values
 reported are the 99th percentile number of round trips
@@ -516,20 +524,24 @@ concurrent clients. The biggest factor in round trip times
 is the number of locks per bucket. On the far right side of
 the heatmap (512) only a single global lock exists. Further
 the benefit in terms of locks per message falls off quickly
-after 1. RDMA masked CAS are beneficial as they allow for
-fine grained locking, but setting 3 or more locks per
+after two. RDMA-masked CAS are beneficial as they allow for
+fine-grained locking, but setting 3 or more locks per
 message has little effect up to 90\% fill rate. Reducing
 atomic operations in turn reduces the effect of the RDMA
-atomic bottleneck.
+atomic bottleneck.  \textbf{Hard to see 3; the figure only shows 2 or 4.}
 
 Our lock table is small in comparison to the true hash
-table. At it's most fine grained each lock corresponds to
+table. At its most fine-grained each lock corresponds to
 one bucket (8 entries). Each lock is 1 bit, a lock table for
 a 100 million entry hash table is ~160KB, with a lock
 granularity of 4 buckets this drops to 40KB. This tight
-layout enables us to use device mapped memory to hold our
-lock table~\cite{design-guidelines,sherman}. This enables up
-to 3x better throughput on contested locks (see
+layout enables us to use device-mapped memory to hold our
+lock table~\cite{design-guidelines,sherman}.
+%We make use of
+Device-mapped memory on recent RDMA NIC's (ConnectX-5+) avoids an
+expensive PCIe round trip, reducing lock acquisition latency.
+This enables up
+to 3$\times$ better throughput on contested locks (see
 Figure~\ref{fig:rdma-benchmarks}(c)), and reduces latency
 for locking.
 
@@ -549,12 +561,8 @@ digests~\cite{pilaf,race}, this too removes the need to read
 extent data to verify that an index entry matches it's true
 key. Figure~\ref{fig:table-diagram} illustrates our table
 design.  Each entry includes an extent bit to indicate if
-the entry is inlined or stored in an extent. We make use of
-device mapped memory on recent RDMA NIC's (ConnectX-5+) to
-reduce locking latency~\cite{sherman} and enable higher
-throughput. Device mapped locking avoids an expensive PCIe
-round trip, and reduces on NIC blocking when acquiring
-locks.
+the entry is inlined or stored in an extent.
+
 
 
 \begin{figure}[t]
@@ -601,11 +609,13 @@ index. As an optimization clients can perform reads using a
 single packet. We define a read threshold of 512 bytes for
 our clients, if two hash locations are within 512 bytes we
 issue a single large read.  Approximately 60\% of keys for
-64bit entries with a bucket size of 8 (see
+64-bit entries with a bucket size of 8 (see
 Figure~\ref{fig:locality-hashing}(b)) fall into this
 category. This has the advantage of updating the client
-cache for future operations, and reduces the header
-processing required by the NIC. To reduce bandwidth the size
+cache for future operations.
+%, and reduces the header
+%processing required by the NIC.
+To reduce bandwidth the size
 of the threshold can be tuned down, or turned off with no
 harm to correctness.
 
@@ -621,7 +631,7 @@ which buckets it needs to lock it computes a list of RDMA
 masked CAS requests. If the locks required are within 64
 locks of one another they are batched together into a single
 masked CAS request. After the list is computed the client
-issues the request for each lock one at a time. If a request
+issues lock requests one CAS at a time. If a request
 fails that request is retried until the lock is acquired.
 
 Clients need their caches synchronized with remote memory
@@ -630,27 +640,27 @@ requests to synchronize client caches. RDMA in-order
 delivery ensures that reads issued after a lock request will
 be up to date, as no other client can concurrently modify
 the locked index.  A spanning read is issued for each lock
-request. The read covers each bucket the client locks. If a
-masked CAS has three locks reads are calculated for each
+request. The read covers each bucket the client locks.  For example, if a
+masked CAS has three locks, reads are calculated for each
 bucket being locked. If the locks cover a range less than
 the read threshold a single read is issued which spans all
-buckets between the locks. Spanning reads are batched with
-lock requests. Subsequent lock requests are issued prior to
-blocking on reads.
+buckets between the locks.  Spanning reads are issued concurrently with
+lock requests.
+%Subsequent lock requests are issued prior to
+%blocking on reads.
 
-After locks are acquired the client can execute it's
-critical section. Unlock requests are the inverse CAS
-operations of the lock requests. Clients issue their
-critical sections as a sequence of writes, and batch unlock
-operations with them. RDMA in order delivery ensures that
-the unlock operations are performed after the critical
-section.
+After locks are acquired the client can execute its critical
+section. Unlock requests are the inverse masked CAS operations of the
+lock requests. Clients issue their critical sections as a sequence of
+(asynchronous) writes followed immediately by unlock operations. RDMA
+in-order delivery ensures that the unlock operations are performed
+after the writes.
 
 \subsubsection{Updates and Deletes}
 
 Updates and deletes are performed in a similar fashion.
 First the client aquire locks for the key it will update or
-delete. If the key exists the client updates it's value with
+delete. If the key exists the client updates its value with
 a write and then releases the locks. For updates the client
 updates the value and the CRC of the index, for deletes the
 index is simply set to NULL. If extents are being used
