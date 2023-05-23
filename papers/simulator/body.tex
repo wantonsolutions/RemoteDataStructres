@@ -671,16 +671,15 @@ on updates and deletes are performed in two round trips.
 
 \subsubsection{Insert}
 
-Unlike updates and deletes inserts may span the index and
-require many locks. Determining which locks to acquire is
-hard as clients may have stale caches. We use a two phase
+Unlike updates and deletes, inserts may require modifying locations spread across remote memory and
+require many locks. Determining which locks are required is
+hard as clients may have stale caches. We use a two-phase
 search strategy to find insertion paths. First the client
-constructs a cuckoo path using it's cached index. The client
-then acquires the locks for it's cuckoo path. Once the
-client has it's locks thanks to the spanning reads it's
-cache is fully synchronized with remote memory. A second
+constructs a potential cuckoo path using its cached index. The client
+then attempts to acquire the locks necessary for its cuckoo path. Thanks to the spanning reads, once a client succeeds in acquring the necessary locks its
+cache has been fully synchronized with the relevant portions of remote memory. A second
 search is then performed using only the buckets the client
-hash locked. If this search is successful the client
+succeeded in locking---which may be the same if the client's cache was completely up to date. If this search is successful the client
 calculates the updates to the cuckoo path batches them as a
 series of writes and issues them along with it's unlock
 requests.
@@ -691,11 +690,11 @@ second search may fail because the clients cache was stale
 and the list of locked buckets was insufficient to perform
 the insert. In this case the client releases the locks and
 performs the insertion from the start again by performing an
-unrestricted search on it's local cache. In the common case
-insertions take two round trips. When the hash table is less
-than 50\% full the probability that a cuckoo path which a
-length greater than one is required is low. If extents are
-used the client batches the extent write during it's locking
+unrestricted search on its local cache. In the common case
+insertions take two round trips: We find that when the table is less
+than 50\% full the probability that a cuckoo path has
+length greater than one is low. If extents are
+used the client batches the extent write during its locking
 phase.
 
 \textbf{Key Duplication:} Unlike RACE our algorithm can
@@ -706,7 +705,7 @@ concurrently.  Alternatively Cuckoo hashing inserts to
 exactly one bucket, which is read during the lock
 acquisition phase. If a duplicate key is found the client
 can abort. If the bucket is full, a duplicate key may exist
-in it's alternative bucket. Our clients issue a read to the
+in itts alternative bucket. Our clients issue a read to the
 inserted keys alternative bucket during lock acquisition. If
 the lock returns successfully and no duplicate exists in
 either bucket then no duplicates exist as the successful
@@ -723,7 +722,7 @@ Random replacement requires little computation, however at
 high fill rates it leads to long cuckoo paths which require
 many locks, and reduce concurrent throughput. BFS search
 finds the shortest path and has been demonstrated to
-increase system throughput with fine grained
+increase system throughput with fine-grained
 locking~\cite{cuckoo-improvements}.  BFS is
 computationally intensive. Locality based hashing enables us
 to leverage more efficient search strategies. Because
@@ -736,7 +735,7 @@ In the case of BFS the target bucket is unknown, therefore
 all paths must be explored. We use A* search, an algorithm
 which takes a goal location, and a distance heuristic as
 input. A* is known to find shortest paths in much better
-average case times than BFS. A* requires two additional
+average-case times than BFS~\cite{}. A* requires two additional
 inputs, a distance heuristic and a goal location.
 
 \textbf{Goal location}: Locality hashing increases the
@@ -770,8 +769,10 @@ not guarantee that we find the shortest path, however it
 does find short paths in the common case, and results in
 very short search times.
 
-\section{Implementation} We implement our algorithm in
-Python and emulate client based RDMA using a custom built
+\section{Implementation}
+
+We implement our algorithm in
+Python and emulate client-based RDMA using a custom-built
 simulator consisting of 1k lines of code. 
 
 \textbf{Simulator:} Our simulator is event based and does
@@ -784,7 +785,7 @@ arguments passed by the client.
 
 \textbf{Rcuckoo} is implemented in 1.2k lines of
 python. We implement our own version of approximate A* with
-the use of python's standard heap library for priority
+the use of Python's standard heap library for priority
 queuing. Clients store complete copies of the remote hash
 table index locally. We do not model the hash table extent
 in simulation all table accesses are inlined. In practice
@@ -793,7 +794,7 @@ could be released using LRU.
 
 \textbf{RACE~\cite{race}} has no publicly available
 implementation. Therefore we implemented our own version of
-RACE by closely following it's protocol as described in it's
+RACE by closely following its protocol as described in its
 paper.  We only model the RACE index. In cases where
 blocking calls are made to RACE's extent we assume they
 succeed and simply reissue a read to the index to model the
@@ -839,7 +840,7 @@ Our evaluation is run entirely in simulation. The goal of
 our evaluation is to demonstrate the practicality of rcuckoo
 by showing through simulation that it supports low latency
 and high throughput operations. We measure blocking round
-trip's as a proxy for latency. To approximate throughput we
+trips as a proxy for latency. To approximate throughput we
 measure the total number of blocking round trips required to
 fill the table, and divide by the number of concurrent
 clients. All of our evaluations are carried out on hash
@@ -884,9 +885,9 @@ requests are issued.
 %%
 Figure~\ref{fig:ycsb_fill_latency}, shows the average
 operation latency for each workload. Here average RTT is the
-average between both reads, and writes. RACE incurs
-additional round trips from reading from it's extent and
-from verifying it's successful inserts. RACE has very few
+average between both reads and writes. RACE incurs
+additional round trips from reading from its extent and
+from verifying its successful inserts. RACE has very few
 collisions as its critical section for insertion is the
 duration of a single RDMA CAS. Few of RACE's inserts fail
 and it retains near constant latency for read and writes
