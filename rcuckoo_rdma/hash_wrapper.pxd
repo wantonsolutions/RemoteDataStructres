@@ -6,6 +6,7 @@ cdef extern from "xxhash.h":
 cdef extern from "hash.h":
     void set_factor(float factor)
     float get_factor()
+    unsigned int distance_to_bytes(unsigned int a, unsigned int b, unsigned int bucket_size, unsigned int entry_size);
 
     struct hash_locations:
         unsigned int primary

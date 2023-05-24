@@ -1,6 +1,7 @@
 #include "xxhash.h"
 #include <cmath>
 #include <string>
+// #include <cstdlib>
 #include "hash.h"
 
 using namespace std;
@@ -73,10 +74,12 @@ unsigned int rcuckoo_secondary_location_independent(string key, int table_size){
     return location;
 }
 
-// typedef struct hash_locations{
-//     unsigned int primary;
-//     unsigned int secondary;
-// } hash_locations;
+
+unsigned int distance_to_bytes(unsigned int a, unsigned int b, unsigned int bucket_size, unsigned int entry_size){
+    unsigned int bucket_width = bucket_size * entry_size;
+    return abs(int(a-b))*bucket_width;
+}
+
 
 hash_locations rcuckoo_hash_locations(string key, int table_size){
     hash_locations hl;

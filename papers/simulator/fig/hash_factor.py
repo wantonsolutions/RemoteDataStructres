@@ -1,10 +1,11 @@
 import sys
-# caution: path[0] is reserved for script path (or '' in REPL)
-sys.path.insert(1, '/home/ena/RemoteDataStructres/rmem_simulator')
-import plot_cuckoo as pc
-import data_management as dm
+
+from experiments import plot_cuckoo as pc
+from experiments import data_management as dm
 import matplotlib.pyplot as plt
-import hash
+
+# from simulator import hash
+import chash as hash
 
 # factors = [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
 factors = [1.9, 2.1, 2.3]
@@ -13,7 +14,7 @@ data_dir="hash_factor"
 def gen_hash_factor_distance_cdf():
     global factors
 
-    samples = 10000
+    samples = 100000
     table_size = 512
     bucket_size = 8
     all_distances=[]
@@ -61,5 +62,5 @@ def plot_hash_factor_distance_cdf():
     plt.tight_layout()
     plt.savefig("hash_factor.pdf")
 
-# gen_hash_factor_distance_cdf()
+gen_hash_factor_distance_cdf()
 plot_hash_factor_distance_cdf()

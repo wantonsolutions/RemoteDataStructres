@@ -10,6 +10,9 @@ def set_factor(x):
 def get_factor():
     return h.get_factor()
 
+def distance_to_bytes(a, b, bucket_size, entry_size):
+    return h.distance_to_bytes(a, b, bucket_size, entry_size)
+
 def h1(key):
     return h.h1(key)
 
@@ -31,8 +34,10 @@ def rcuckoo_secondary_location(key, factor, table_size):
 def rcuckoo_secondary_location_independent(key, table_size):
     return h.rcuckoo_secondary_location_independent(key, table_size)
 
+
 def rcuckoo_hash_locations(key, table_size):
-    locations = h.rcuckoo_hash_locations(key, table_size)
+    bytes_key = str(key).encode('utf-8')
+    locations = h.rcuckoo_hash_locations(bytes_key, table_size)
     return (locations.primary, locations.secondary)
 
 def rcuckoo_hash_locations_independent(key, table_size):
