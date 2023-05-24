@@ -10,8 +10,8 @@ from tqdm import tqdm
 import random
 import hash
 
-# factors = [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
-factors = [1.9, 2.1, 2.3]
+factors = [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
+# factors = [1.9, 2.1, 2.3]
 memory_size = 1024 * 128
 bucket_size = 8
 buckets_per_lock = 1
