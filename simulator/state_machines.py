@@ -1,8 +1,8 @@
 # from cuckoo import *
 # import cuckoo
-import search
 import random
-import virtual_rdma as vrdma
+from . import search
+from . import virtual_rdma as vrdma
 
 import logging
 logger = logging.getLogger('root')
@@ -394,16 +394,16 @@ class client_state_machine(state_machine):
 
     #return true if the read is complete
     def wait_for_read_messages_fsm(self, message, key):
-        if message != None and message_type(message) == "read_response":
+        if message != None and vrdma.message_type(message) == "read_response":
 
             #unpack and check the response for a valid read
-            args = unpack_read_response(message)
-            fill_local_table_with_read_response(self.table, args)
+            args = vrdma.unpack_read_response(message)
+            vrdma.fill_local_table_with_read_response(self.table, args)
             read = args["read"]
 
-            keys_found = keys_contained_in_read_response(key, read)
+            keys_found = vrdma.keys_contained_in_read_response(key, read)
             self.read_values_found = self.read_values_found + keys_found
-            self.read_values.extend(get_entries_from_read(key, read))
+            self.read_values.extend(vrdma.get_entries_from_read(key, read))
             self.outstanding_read_requests = self.outstanding_read_requests - 1
 
 
@@ -476,7 +476,7 @@ class basic_memory_state_machine(state_machine):
         if message.payload["function"] == vrdma.read_table_entry:
             self.info("Read: " + "Bucket: " + str(args["bucket_id"]) + " Offset: " + str(args["bucket_offset"]) + " Size: " + str(args["size"]))  if __debug__ else None
             read = vrdma.read_table_entry(self.table, **args)
-            response = Message({"function":vrdma.fill_table_with_read, "function_args":{"read":read, "bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "size":args["size"]}})
+            response = vrdma.Message({"function":vrdma.fill_table_with_read, "function_args":{"read":read, "bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "size":args["size"]}})
             self.info("Read Response: " +  str(response.payload["function_args"]["read"])) if __debug__ else None
             return response
 

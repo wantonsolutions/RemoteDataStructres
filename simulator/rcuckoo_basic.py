@@ -1,7 +1,7 @@
-import state_machines
-import search
-import hash
-import virtual_rdma as vrdma
+from . import state_machines
+from . import search
+from . import hash
+from . import virtual_rdma as vrdma
 
 class rcuckoo_basic(state_machines.client_state_machine):
     def __init__(self, config):

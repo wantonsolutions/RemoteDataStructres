@@ -1,8 +1,8 @@
 import logging
-import tables
 import heapq
 import random
-import hash
+from . import tables
+from . import hash
 logger = logging.getLogger('root')
 
 #paths are built from path elements. A path element is a tuple of (key, table_index, bucket_index, bucket_offset)

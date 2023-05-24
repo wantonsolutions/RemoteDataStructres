@@ -1,5 +1,5 @@
 import logging
-import hash
+from . import hash
 logger = logging.getLogger('root')
 
 TABLE_ENTRY_SIZE=8

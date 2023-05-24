@@ -1,6 +1,8 @@
 import logging
 logger = logging.getLogger('root')
 
+from . import hash
+
 class Message:
     def __init__(self, config):
         self.payload = dict()

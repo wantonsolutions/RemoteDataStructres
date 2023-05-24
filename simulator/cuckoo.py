@@ -2,9 +2,11 @@
 from tqdm import tqdm
 import random
 import json
-import hash as hash
-import log as log
-import state_machines
+from . import hash
+from . import log
+from . import state_machines
+from . import virtual_rdma as vrdma
+from . import search
 
 import logging
 logger = logging.getLogger('root')
@@ -74,7 +76,7 @@ class rcuckoo(state_machines.client_state_machine):
 
     def get(self):
         self.current_read_rtt +=1
-        messages = read_threshold_message(self.current_read_key, self.read_threshold_bytes, self.table.table_size, self.table.row_size_bytes())
+        messages = vrdma.read_threshold_message(self.current_read_key, self.read_threshold_bytes, self.table.table_size, self.table.row_size_bytes())
         return self.begin_read(messages)
 
     def put(self):
@@ -92,12 +94,12 @@ class rcuckoo(state_machines.client_state_machine):
 
     def get_current_locking_message_with_covering_read(self):
         lock_message = self.current_locking_messages[self.locking_message_index]
-        read_message = get_covering_read_from_lock_message(lock_message, self.buckets_per_lock, self.table.row_size_bytes())
+        read_message = vrdma.get_covering_read_from_lock_message(lock_message, self.buckets_per_lock, self.table.row_size_bytes())
         self.outstanding_read_requests += 1
         return [lock_message, read_message]
 
     def receieve_successful_locking_message(self, message):
-        lock_indexes = lock_message_to_lock_indexes(message)
+        lock_indexes = vrdma.lock_message_to_lock_indexes(message)
         self.info("aquired locks: " + str(lock_indexes)) if __debug__ else None
         self.locks_held.extend(lock_indexes)
         #make unique
@@ -105,7 +107,7 @@ class rcuckoo(state_machines.client_state_machine):
         self.locking_message_index = self.locking_message_index + 1
 
     def receive_successful_unlocking_message(self, message):
-        unlocked_locks = lock_message_to_lock_indexes(message)
+        unlocked_locks = vrdma.lock_message_to_lock_indexes(message)
         self.info("released locks: " + str(unlocked_locks)) if __debug__ else None
         for lock in unlocked_locks:
             self.locks_held.remove(lock)
@@ -116,22 +118,22 @@ class rcuckoo(state_machines.client_state_machine):
         #get the unique set of buckets and remove -1 (the root) from the search path
         self.locking_message_index = 0
 
-        buckets = search_path_to_buckets(self.search_path)
+        buckets = search.search_path_to_buckets(self.search_path)
         self.info("gather locks for buckets: " + str(buckets)) if __debug__ else None
-        lock_messages = get_lock_messages(buckets, self.buckets_per_lock, self.locks_per_message)
-        self.current_locking_messages = masked_cas_lock_table_messages(lock_messages)
+        lock_messages = vrdma.get_lock_messages(buckets, self.buckets_per_lock, self.locks_per_message)
+        self.current_locking_messages = vrdma.masked_cas_lock_table_messages(lock_messages)
         return self.get_current_locking_message_with_covering_read()
 
     def release_locks_batched(self):
         self.locking_message_index = 0
-        buckets = lock_indexes_to_buckets(self.locks_held, self.buckets_per_lock)
+        buckets = vrdma.lock_indexes_to_buckets(self.locks_held, self.buckets_per_lock)
         buckets.sort(reverse=True)
-        unlock_messages = get_unlock_messages(buckets, self.buckets_per_lock, self.locks_per_message)
-        self.current_locking_messages = masked_cas_lock_table_messages(unlock_messages)
+        unlock_messages = vrdma.get_unlock_messages(buckets, self.buckets_per_lock, self.locks_per_message)
+        self.current_locking_messages = vrdma.masked_cas_lock_table_messages(unlock_messages)
         return self.current_locking_messages
 
     def aquire_locks_with_reads_fsm(self, message):
-        if message_type(message) == "masked_cas_response":
+        if vrdma.message_type(message) == "masked_cas_response":
             if message.payload["function_args"]["success"] == True:
                 self.receieve_successful_locking_message(message)
             #1) retransmit if we did not make process
@@ -140,10 +142,10 @@ class rcuckoo(state_machines.client_state_machine):
                 self.current_insert_rtt += 1
                 return self.get_current_locking_message_with_covering_read()
 
-        if message_type(message) == "read_response":
+        if vrdma.message_type(message) == "read_response":
             #unpack and check the response for a valid read
-            args = unpack_read_response(message)
-            fill_local_table_with_read_response(self.table, args)
+            args = vrdma.unpack_read_response(message)
+            vrdma.fill_local_table_with_read_response(self.table, args)
             self.outstanding_read_requests = self.outstanding_read_requests - 1
             #enter the critical section if we have all of the locks
             #we also want to have all of the reads completed (for now)
@@ -152,7 +154,7 @@ class rcuckoo(state_machines.client_state_machine):
         return None
 
     def release_locks_fsm(self, message):
-        if message_type(message) == "masked_cas_response":
+        if vrdma.message_type(message) == "masked_cas_response":
             if message.payload["function_args"]["success"] == False:
                 self.critical("What the fuck is happening I failed to release a lock")
                 exit(1)
@@ -167,10 +169,10 @@ class rcuckoo(state_machines.client_state_machine):
             return None
 
     def a_star_insert_self(self, limit_to_buckets=None):
-        return bucket_cuckoo_a_star_insert(self.table, self.location_function, self.current_insert_value, limit_to_buckets)
+        return search.bucket_cuckoo_a_star_insert(self.table, self.location_function, self.current_insert_value, limit_to_buckets)
 
     def random_insert_self(self, limit_to_buckets=None):
-        return bucket_cuckoo_random_insert(self.table, self.location_function, self.current_insert_value, limit_to_buckets)
+        return search.bucket_cuckoo_random_insert(self.table, self.location_function, self.current_insert_value, limit_to_buckets)
 
     def table_search_function(self, limit_to_buckets=None):
         # return self.a_star_insert_self(limit_to_buckets)
@@ -186,7 +188,7 @@ class rcuckoo(state_machines.client_state_machine):
             self.state = "idle"
             return None
 
-        self.info("Successful local search for [key: " + str(self.current_insert_value) + "] [path: " +path_to_string(self.search_path) + "]") if __debug__ else None
+        self.info("Successful local search for [key: " + str(self.current_insert_value) + "] [path: " +search.path_to_string(self.search_path) + "]") if __debug__ else None
         self.state="aquire_locks"
         return self.aquire_locks()
 
@@ -195,7 +197,7 @@ class rcuckoo(state_machines.client_state_machine):
         self.state = "inserting"
         #todo there are going to be cases where this fails because
 
-        search_buckets=lock_indexes_to_buckets(self.locks_held, self.buckets_per_lock)
+        search_buckets=vrdma.lock_indexes_to_buckets(self.locks_held, self.buckets_per_lock)
         self.info("locked buckets: " + str(search_buckets)) if __debug__ else None
         self.search_path=self.table_search_function(search_buckets)
         if len(self.search_path) == 0:
@@ -204,7 +206,7 @@ class rcuckoo(state_machines.client_state_machine):
             return self.retry_insert()
         self.search_path_index = len(self.search_path) - 1
 
-        insert_messages = gen_cas_messages(self.search_path)
+        insert_messages = vrdma.gen_cas_messages(self.search_path)
         unlock_messages = self.release_locks_batched()
 
         insert_messages.extend(unlock_messages)
@@ -214,7 +216,7 @@ class rcuckoo(state_machines.client_state_machine):
 
     def complete_insert_stats(self, success):
         self.insert_path_lengths.append(len(self.search_path))
-        self.index_range_per_insert.append(path_index_range(self.search_path))
+        self.index_range_per_insert.append(search.path_index_range(self.search_path))
 
         #clear for next insert
         return super().complete_insert_stats(success)
@@ -232,8 +234,8 @@ class rcuckoo(state_machines.client_state_machine):
 
 
     def insert_cas_fsm(self, message):
-        args = unpack_cas_response(message)
-        fill_local_table_with_cas_response(self.table, args)
+        args = vrdma.unpack_cas_response(message)
+        vrdma.fill_local_table_with_cas_response(self.table, args)
 
         #If CAS failed, try the insert a second time.
         success = args["success"]
@@ -258,10 +260,10 @@ class rcuckoo(state_machines.client_state_machine):
         if message == None:
             return None
         
-        if message_type(message) == "cas_response":
+        if vrdma.message_type(message) == "cas_response":
             return self.insert_cas_fsm(message)
 
-        if message_type(message) == "masked_cas_response":
+        if vrdma.message_type(message) == "masked_cas_response":
             return self.release_locks_fsm(message)
 
 

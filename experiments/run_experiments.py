@@ -1,26 +1,30 @@
 # from simulator.simulator import Node as Node
 
 
-def import_simulator():
-    import os
-    import sys
-    home_directory = os.path.expanduser( '~' )
-    sys.path.insert(0, home_directory + '/RemoteDataStructres/simulator')
-    import simulator
+# def import_simulator():
+#     import os
+#     import sys
+#     home_directory = os.path.expanduser( '~' )
+#     sys.path.insert(0, home_directory + '/RemoteDataStructres/simulator')
+#     # import simulator
 
 # import_simulator()
 
-from simulator import simulator as sim
-from simulator import cuckoo  as cuckoo
-from simulator import state_machines as sm
-from simulator import log as log
+# from simulator import simulator as sim
+# import simulator.simulator as sim
+import simulator.simulation_runtime as sim
+import simulator.cuckoo
+import simulator.state_machines as sm
+import simulator.race as race
+import simulator.hash as hash
+import simulator.log as log
+
 import matplotlib.pyplot as plt
 import matplotlib as matplotlib
 import numpy as np
 from tqdm import tqdm
 # from data_management import dm.save_statistics, load_statistics
 import data_management as dm
-
 import plot_cuckoo as plot_cuckoo
 
 import argparse
@@ -282,7 +286,7 @@ def insertion_debug():
     config["locks_per_message"] = 64
     config["trials"] = 1
     # config["state_machine"]=cuckoo.rcuckoobatch
-    config["state_machine"]=sm.race
+    config["state_machine"]=race.race
     config['workload']='ycsb-w'
     log.set_debug()
 
@@ -301,15 +305,15 @@ def avg_run_debug():
     bucket_sizes = [4,5]
     trials = 8
     for bucket_size in bucket_sizes:
-        config = simulator.default_config()
+        config = sim.default_config()
         config['num_clients'] = 1
         config['num_steps'] = 10000000000
         config['bucket_size'] = bucket_size
         config['read_threshold_bytes'] = config['entry_size'] * bucket_size
         config['indexes'] = table_size
-        config["state_machine"]=sm.race
+        config["state_machine"]=race.race
         log.set_off()
-        runs.append(simulator.run_trials(config, trials))
+        runs.append(sim.run_trials(config, trials))
         
     dm.save_statistics(runs)
 

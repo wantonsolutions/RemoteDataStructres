@@ -1,22 +1,27 @@
-# import log
 import logging
-# from cuckoo import *
-# from state_machines import *
-# from hash import *
-import state_machines
-import hash
 from time import sleep
 import json
 import datetime
 from collections import deque
 import git
 from tqdm import tqdm
-import log as log
-import tables as tables
-import cuckoo as cuckoo
-import rcuckoo_basic as rcuckoo_basic
 import random
-import search
+
+from . import log
+from . import tables
+from . import cuckoo
+from . import rcuckoo_basic
+from . import search
+from . import state_machines
+from . import hash
+from . import race
+
+
+# import log
+# import tables
+# import cuckoo
+# import rcuckoo_basic
+# import search
 
 
 import logging
@@ -493,6 +498,7 @@ def run_trials(config):
     for i in tqdm(range(trials)):
         c=config.copy()
         sim = Simulator(c)
+        sim.run()
         try:
             sim.run()
         except Exception as e:
@@ -546,15 +552,31 @@ def fill_then_run_trials(config, fill_to, max_fill, max_steps=1000000000):
 
 
 def main():
-    #test_hashes()
+
+    runs = []
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
     config = default_config()
-    simulator = Simulator(config)
-    simulator.run()
-    if not simulator.validate_run():
-        logger.error("Simulation failed check the logs")
-    simulator.collect_stats()
+    config['indexes'] = 16
+    config['num_clients'] = 1
+    config['num_steps'] = 5000000
+    config['read_threshold_bytes'] = 256
+    config["buckets_per_lock"] = 1
+    config["locks_per_message"] = 64
+    config["trials"] = 1
+    config["state_machine"]=cuckoo.rcuckoo
+    # config["state_machine"]=race.race
+    config['workload']='ycsb-w'
+    log.set_debug()
+
+
+
+    # simulator = Simulator(config)
+    # simulator.run()
+    # if not simulator.validate_run():
+    #     logger.error("Simulation failed check the logs")
+    # simulator.collect_stats()
+    runs.append(run_trials(config))
 
 if __name__ == "__main__":
     main()

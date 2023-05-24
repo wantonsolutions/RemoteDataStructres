@@ -1,0 +1,5 @@
+This package is structured as a package to be called from the outside.
+
+If you want to test that this package works run something like
+cd ..
+python -m simulator.simulation_runtime

@@ -1,4 +1,6 @@
-import state_machines
+from . import state_machines
+from . import virtual_rdma as vrdma
+from . import hash
 
 class race(state_machines.client_state_machine):
     def __init__(self, config):
@@ -16,7 +18,7 @@ class race(state_machines.client_state_machine):
         return messages
 
     def begin_insert_second_read(self):
-        messages = race_messages(self.current_insert_value, self.table.table_size, self.table.row_size_bytes())
+        messages = vrdma.race_messages(self.current_insert_value, self.table.table_size, self.table.row_size_bytes())
         self.outstanding_read_requests = len(messages)
         self.read_values_found = 0
         self.read_values = []
@@ -25,7 +27,7 @@ class race(state_machines.client_state_machine):
 
     def begin_extent_read(self):
         #todo read an extent, this currently just reads the table again
-        messages = race_message_read_key_location(self.current_insert_value, self.table.table_size, self.table.row_size_bytes(),0)
+        messages = vrdma.race_message_read_key_location(self.current_insert_value, self.table.table_size, self.table.row_size_bytes(),0)
         self.outstanding_read_requests = len(messages)
         self.read_values_found = 0
         self.read_values = []
@@ -33,12 +35,12 @@ class race(state_machines.client_state_machine):
         return messages
 
     def put(self):
-        messages = race_messages(self.current_insert_value, self.table.table_size, self.table.row_size_bytes())
+        messages = vrdma.race_messages(self.current_insert_value, self.table.table_size, self.table.row_size_bytes())
         self.current_insert_rtt+=1
         return self.begin_insert(messages)
 
     def get(self):
-        messages = race_messages(self.current_read_key, self.table.table_size, self.table.row_size_bytes())
+        messages = vrdma.race_messages(self.current_read_key, self.table.table_size, self.table.row_size_bytes())
         self.current_read_rtt+=1
         return self.begin_read(messages)
 
@@ -102,8 +104,8 @@ class race(state_machines.client_state_machine):
         if message == None:
             return None
 
-        args = unpack_cas_response(message)
-        fill_local_table_with_cas_response(self.table, args)
+        args = vrdma.unpack_cas_response(message)
+        vrdma.fill_local_table_with_cas_response(self.table, args)
 
         #If CAS failed, try the insert a second time.
         success = args["success"]
@@ -125,7 +127,7 @@ class race(state_machines.client_state_machine):
 
         self.info("Inserting: " + str(self.current_insert_value) + " at bucket: " + str(bucket) + " offset: " + str(offset))
         self.state="inserting"
-        return cas_table_entry_message(bucket , offset, None, self.current_insert_value)
+        return vrdma.cas_table_entry_message(bucket , offset, None, self.current_insert_value)
 
 
     def first_read_insert_fsm(self, message):
