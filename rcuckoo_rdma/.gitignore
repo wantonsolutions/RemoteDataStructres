@@ -4,3 +4,4 @@ cython_tutorial
 hash_wrapper.cpp
 hash.o
 hash.so
+chash.egg-info
