@@ -74,6 +74,10 @@ unsigned int rcuckoo_secondary_location_independent(string key, int table_size){
     return location;
 }
 
+unsigned int get_table_id_from_index(unsigned int index){
+    return index % 2;
+}
+
 
 unsigned int distance_to_bytes(unsigned int a, unsigned int b, unsigned int bucket_size, unsigned int entry_size){
     unsigned int bucket_width = bucket_size * entry_size;
@@ -103,3 +107,41 @@ void ten_k_hashes(){
         // XXH64_hash_t hash = h1(key);
     }
 }
+
+// Race functions
+race_bucket to_race_index_math(unsigned int index, unsigned int table_size){
+    if ((table_size % 3) != 0){
+        table_size -= (table_size % 3);
+    }
+    unsigned int two_thirds_table_size = (table_size * 2) / 3;
+    index = index % two_thirds_table_size;
+    unsigned int index_div_two = index / 2;
+
+    race_bucket rb;
+    if (index % 2 == 0){
+        rb.bucket = index + index_div_two;
+        rb.overflow = rb.bucket + 1;
+    } else {
+        rb.bucket = index_div_two + two_thirds_table_size;
+        rb.overflow = rb.bucket - 1;
+    }
+    return rb;
+}
+
+race_bucket race_primary_location(string key, unsigned int table_size){
+    unsigned int index = h1(key);
+    return to_race_index_math(index, table_size);
+}
+
+race_bucket race_secondary_location(string key, unsigned int table_size){
+    unsigned int index = h2(key);
+    return to_race_index_math(index, table_size);
+}
+
+race_hash_buckets race_hash_locations(string key, unsigned int table_size){
+    race_hash_buckets rhb;
+    rhb.primary = race_primary_location(key, table_size);
+    rhb.secondary = race_secondary_location(key, table_size);
+    return rhb;
+}
+

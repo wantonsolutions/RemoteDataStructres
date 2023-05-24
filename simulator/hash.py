@@ -97,7 +97,6 @@ def ten_k_hashes():
 
 
 ## race
-
 def to_race_index_math(index, table_size):
     if table_size % 3 != 0:
         table_size -= (table_size % 3) 

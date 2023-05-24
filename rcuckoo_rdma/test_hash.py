@@ -5,7 +5,8 @@ import cython
 
 # from chash import set_factor
 
-import chash as h
+# import chash as h
+import rcuckoo_rdma as h
 #from chash import set_factor_ref
 from inspect import getmembers, isfunction
 

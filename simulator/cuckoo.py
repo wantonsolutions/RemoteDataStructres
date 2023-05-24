@@ -491,10 +491,6 @@ class LockTable:
             index += 1
         # return locks
 
-
-
-
-
     def __str__(self):
         s = ""
         for i in range(len(self.locks)):
