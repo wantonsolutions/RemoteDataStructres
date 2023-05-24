@@ -1,7 +1,9 @@
-import simulator as simulator
-import cuckoo  as cuckoo
-import state_machines as sm
-import log as log
+# from simulator.simulator import Node as Node
+
+from simulator import simulator as simulator
+from simulator import cuckoo  as cuckoo
+from simulator import state_machines as sm
+from simulator import log as log
 import matplotlib.pyplot as plt
 import matplotlib as matplotlib
 import numpy as np
@@ -166,7 +168,7 @@ def plot_insertion_range_cdf():
 
 
 def plot_hash_distribution():
-    import hash
+    import simulator.hash as hash
 
     fig, ax = plt.subplots()
     ax.set_xlabel('Hash Value')
@@ -188,10 +190,18 @@ def plot_hash_distribution():
 
 
 def plot_hash_factor_distance_cdf():
-    import hash
+    import rcuckoo_rdma.external_hash as external_hash
+    # import simulator.hash as hash
+
+    from inspect import getmembers, isfunction
+    print(getmembers(external_hash, isfunction))
+
+    external_hash.rcuckoo_hash_locations_s("test", 1)
+    # import rcuckoo_rdma.rdma_hash as cpp_hash
+    import plot_cuckoo as pc
     # factors = [1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.0]
     factors = [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
-    samples = 100000
+    samples = 1000
     table_size = 512
     bucket_size = 8
     fig, ax = plt.subplots()
@@ -200,12 +210,12 @@ def plot_hash_factor_distance_cdf():
     ax.set_title('Hash Factor Distance CDF')
     for f in factors:
         print("factor: " + str(f))
-        hash.set_factor(f)
+        external_hash.set_factor(f)
         distances = []
         for i in range(samples):
-            v1, v2 = hash.rcuckoo_hash_locations(i, table_size)
-            distances.append(distance_to_bytes(v1, v2, bucket_size, 8))
-        x, y = cdf(distances)
+            v1, v2 = external_hash.rcuckoo_hash_locations(i, table_size)
+            distances.append(external_hash.distance_to_bytes(v1, v2, bucket_size, 8))
+        x, y = pc.cdf(distances)
         ax.plot(x,y, label=str(f))
     ax.set_xlim(0,4096)
     ax.legend()
@@ -916,8 +926,8 @@ def plot_hero_ycsb_fill_latency():
     plt.tight_layout()
     plt.savefig("hero_ycsb_fill_latency.pdf")
 
-run_hero_ycsb_fill_latency()
-plot_hero_ycsb_fill_latency()
+# run_hero_ycsb_fill_latency()
+# plot_hero_ycsb_fill_latency()
 # plot_hero_ycsb_throughput()
 
 
@@ -972,6 +982,7 @@ plot_hero_ycsb_fill_latency()
 # plot_table_size_experiment()
 
 # plot_hash_distribution()
+plot_hash_factor_distance_cdf()
 # plot_insertion_range_cdf()
 # plot_hash_factor_distance_cdf()
 

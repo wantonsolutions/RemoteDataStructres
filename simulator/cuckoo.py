@@ -1,4 +1,4 @@
-import hash
+# import hash
 import logging
 import heapq
 from tqdm import tqdm

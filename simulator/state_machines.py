@@ -1,4 +1,5 @@
-from cuckoo import *
+# from cuckoo import *
+from simulator.cuckoo import *
 
 class race(client_state_machine):
     def __init__(self, config):
