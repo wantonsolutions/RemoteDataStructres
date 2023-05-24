@@ -1,22 +1,14 @@
-#include <boost/python.hpp>
-#include <cstdio>
-#include <openssl/evp.h>
-#include <string>
-
-#include <iostream>
-#include <iomanip>
-#include <sstream>
-#include <openssl/md5.h>
-#include <tuple>
 #include "xxhash.h"
+#include <cmath>
+#include <string>
+#include "hash.h"
 
 using namespace std;
 
-// #define DEBUG
-
-float DEFAULT_FACTOR=2.3;
+float DEFAULT_FACTOR = 2.3;
 
 void set_factor(float factor){
+    // float local_factor = factor;
     DEFAULT_FACTOR = factor;
 }
 
@@ -81,10 +73,10 @@ unsigned int rcuckoo_secondary_location_independent(string key, int table_size){
     return location;
 }
 
-typedef struct hash_locations{
-    unsigned int primary;
-    unsigned int secondary;
-} hash_locations;
+// typedef struct hash_locations{
+//     unsigned int primary;
+//     unsigned int secondary;
+// } hash_locations;
 
 hash_locations rcuckoo_hash_locations(string key, int table_size){
     hash_locations hl;
@@ -107,25 +99,4 @@ void ten_k_hashes(){
         hash_locations hl = rcuckoo_hash_locations(key, 1000000);
         // XXH64_hash_t hash = h1(key);
     }
-}
-
-//Boost export python module
-BOOST_PYTHON_MODULE(hash)
-{
-    using namespace boost::python;
-    def("set_factor", set_factor);
-    def("get_factor", get_factor);
-    def("h1", h1);
-    def("h2", h2);
-    def("h3", h3);
-    def("rcuckoo_primary_location", rcuckoo_primary_location);
-    def("rcuckoo_secondary_location", rcuckoo_secondary_location);
-    def("rcuckoo_hash_locations", rcuckoo_hash_locations);
-    def("rcuckoo_hash_locations_independent", rcuckoo_hash_locations_independent);
-    def("ten_k_hashes", ten_k_hashes);
-
-    class_<hash_locations>("hash_locations")
-        .def_readwrite("primary", &hash_locations::primary)
-        .def_readwrite("secondary", &hash_locations::secondary)
-    ;
 }

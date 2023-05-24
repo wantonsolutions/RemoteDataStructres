@@ -3,16 +3,18 @@
 
 # print("Hello Rcuckoo!", date.today())
 
-import hash as cpp_hash
+import chash as cpp_hash
 import os
 import sys
 
-def import_rmem_simulator():
-    # home_directory = os.path.expanduser( '~' )
-    sys.path.insert(1, '/usr/local/home/ssgrant/RemoteDataStructres/')
+import simulator.hash as py_hash
 
-import_rmem_simulator()
-import rmem_simulator.hash as py_hash
+# def import_rmem_simulator():
+#     # home_directory = os.path.expanduser( '~' )
+#     sys.path.insert(1, '/usr/local/home/ssgrant/RemoteDataStructres/')
+
+# import_rmem_simulator()
+# import rmem_simulator.hash as py_hash
 
 
 import time

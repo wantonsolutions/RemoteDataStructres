@@ -7,3 +7,6 @@ paper.aux
 paper.bbl
 paper.blg
 paper.log
+build
+dist
+remotedatastructures.egg-info
