@@ -1,6 +1,16 @@
 # from simulator.simulator import Node as Node
 
-from simulator import simulator as simulator
+
+def import_simulator():
+    import os
+    import sys
+    home_directory = os.path.expanduser( '~' )
+    sys.path.insert(0, home_directory + '/RemoteDataStructres/simulator')
+    import simulator
+
+# import_simulator()
+
+from simulator import simulator as sim
 from simulator import cuckoo  as cuckoo
 from simulator import state_machines as sm
 from simulator import log as log
@@ -23,7 +33,7 @@ parser.add_argument('-d', '--description', type=str, default="", help='descripti
 def get_config():
     args = parser.parse_args()
     print(args)
-    config = simulator.default_config()
+    config = sim.default_config()
     config['description'] = args.description
     config['name'] = args.exp_name
     return config
@@ -190,13 +200,13 @@ def plot_hash_distribution():
 
 
 def plot_hash_factor_distance_cdf():
-    import rcuckoo_rdma.external_hash as external_hash
+    import chash as hash
     # import simulator.hash as hash
 
     from inspect import getmembers, isfunction
-    print(getmembers(external_hash, isfunction))
+    print(getmembers(hash, isfunction))
 
-    external_hash.rcuckoo_hash_locations_s("test", 1)
+    hash.rcuckoo_hash_locations("test", 1)
     # import rcuckoo_rdma.rdma_hash as cpp_hash
     import plot_cuckoo as pc
     # factors = [1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.0]
@@ -210,11 +220,11 @@ def plot_hash_factor_distance_cdf():
     ax.set_title('Hash Factor Distance CDF')
     for f in factors:
         print("factor: " + str(f))
-        external_hash.set_factor(f)
+        hash.set_factor(f)
         distances = []
         for i in range(samples):
-            v1, v2 = external_hash.rcuckoo_hash_locations(i, table_size)
-            distances.append(external_hash.distance_to_bytes(v1, v2, bucket_size, 8))
+            v1, v2 = hash.rcuckoo_hash_locations(i, table_size)
+            distances.append(hash.distance_to_bytes(v1, v2, bucket_size, 8))
         x, y = pc.cdf(distances)
         ax.plot(x,y, label=str(f))
     ax.set_xlim(0,4096)
@@ -276,7 +286,7 @@ def insertion_debug():
     config['workload']='ycsb-w'
     log.set_debug()
 
-    runs.append(simulator.run_trials(config))
+    runs.append(sim.run_trials(config))
 
     dm.save_statistics(runs)
 
@@ -954,7 +964,7 @@ def plot_hero_ycsb_fill_latency():
 
 # todos()
 
-# insertion_debug()
+insertion_debug()
 # plot_general_stats_last_run()
 # plot_hash_factor_distance_cdf()
 
@@ -982,7 +992,7 @@ def plot_hero_ycsb_fill_latency():
 # plot_table_size_experiment()
 
 # plot_hash_distribution()
-plot_hash_factor_distance_cdf()
+# plot_hash_factor_distance_cdf()
 # plot_insertion_range_cdf()
 # plot_hash_factor_distance_cdf()
 

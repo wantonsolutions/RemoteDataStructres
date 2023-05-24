@@ -3,11 +3,32 @@ import logging
 # from cuckoo import *
 # from state_machines import *
 # from hash import *
+import state_machines
+import hash
 from time import sleep
 import json
 import datetime
 from collections import deque
 import git
+from tqdm import tqdm
+import log as log
+import tables as tables
+import cuckoo as cuckoo
+import rcuckoo_basic as rcuckoo_basic
+import random
+import search
+
+
+import logging
+logger = logging.getLogger('root')
+
+def messages_append_or_extend(messages, message):
+    if message != None:
+        if isinstance(message, list):
+            messages.extend(message)
+        else:
+            messages.append(message)
+    return messages
 
 class Node:
     def __init__(self, config):
@@ -294,7 +315,7 @@ class Simulator(Node):
         indexes=self.config['indexes']
         buckets_per_lock=self.config['buckets_per_lock']
         memory_size=entry_size * indexes
-        index_init_function=Table
+        index_init_function=tables.Table
         index_init_args={'memory_size': memory_size, 'bucket_size': bucket_size, 'buckets_per_lock': buckets_per_lock}
         self.deterministic = self.config['deterministic']
 
@@ -308,7 +329,7 @@ class Simulator(Node):
             client_config['num_clients'] = self.config['num_clients']
 
             client_config['bucket_size'] = bucket_size
-            client_config['index_init_function'] = Table
+            client_config['index_init_function'] = tables.Table
             client_config['index_init_args'] = index_init_args
 
             # client_config['state_machine']=lockless_a_star_insert_only_state_machine
@@ -329,17 +350,17 @@ class Simulator(Node):
         #initialize memory
         memory_config = {'memory_id': 0}
         memory_config['bucket_size'] = bucket_size
-        memory_config['index_init_function'] = Table
+        memory_config['index_init_function'] = tables.Table
         memory_config['index_init_args'] = index_init_args
 
-        memory_config['state_machine']=basic_memory_state_machine
+        memory_config['state_machine']=state_machines.basic_memory_state_machine
         memory_config['state_machine_args']={'max_fill': self.config['max_fill']}
         self.memory = Memory(memory_config)
 
         #initialize switch
         switch_config = {'switch_id': 0}
         self.switch = Switch(switch_config)
-        self.config['state_machine']=get_state_machine_name(self.config['state_machine'])
+        self.config['state_machine']=state_machines.get_state_machine_name(self.config['state_machine'])
 
         print(self.config)
         self.config_set = True
@@ -455,8 +476,8 @@ def default_config():
     config['buckets_per_lock']=1
     config['locks_per_message']=64
     config['workload']="ycsb-w"
-    config['hash_factor']=hash.DEFAULT_FACTOR
-    config['state_machine']=rcuckoo
+    config['hash_factor']=hash.get_factor()
+    config['state_machine']=rcuckoo_basic.rcuckoo_basic
     config['search_function']="a_star"
     config['location_function']="dependent"
 
