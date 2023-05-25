@@ -1,21 +1,25 @@
 import sys
 # caution: path[0] is reserved for script path (or '' in REPL)
-sys.path.insert(1, '/home/ena/RemoteDataStructres/rmem_simulator')
-import plot_cuckoo as pc
-import data_management as dm
-import cuckoo as cuck
+# sys.path.insert(1, '/home/ena/RemoteDataStructres/rmem_simulator')
+from experiments import plot_cuckoo as pc
+from experiments import data_management as dm
+import simulator.search as search
+import simulator.tables as tables
+
+# import simulator.hash as hash
+import chash as hash
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 import random
-import hash
 
-factors = [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
-# factors = [1.9, 2.1, 2.3]
-memory_size = 1024 * 128
+# factors = [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
+factors = [1.9, 2.1, 2.3, 2.5, 2.7, 2.9, 3.1, 3.3]
+factors = [3.3]
+memory_size = 1024 * 1024
 bucket_size = 8
 buckets_per_lock = 1
-trials = 5
+trials = 1
 data_dir="hash_fill"
 
 def insert_cuckoo_path(path, table):
@@ -34,14 +38,14 @@ def stderr(data):
     return np.std(data) / np.sqrt(np.size(data))
 
 
-
 def factor_fill(memory_size, bucket_size, buckets_per_lock, factor):
         entry_size = 8
-        table = cuck.Table(memory_size * entry_size, bucket_size, buckets_per_lock)
+        table = tables.Table(memory_size * entry_size, bucket_size, buckets_per_lock)
         inserts = random_inserts(memory_size)
         hash.set_factor(factor)
+        print("filling with factor " + str(factor) + " ...")
         for i in tqdm(range(len(inserts))):
-            search_path=cuck.bucket_cuckoo_a_star_insert(table, hash.rcuckoo_hash_locations, inserts[i])
+            search_path=search.bucket_cuckoo_a_star_insert(table, hash.rcuckoo_hash_locations, inserts[i])
             # print(search_path)
             if len(search_path) == 0:
                 print("Search Failed: " + str(inserts[i]), hash.rcuckoo_hash_locations(inserts[i],(int((memory_size/bucket_size)/8))))
@@ -104,6 +108,6 @@ def plot_hash_fill():
     plt.savefig("hash_fill.pdf")
 
 
-# run_fill_factor_experiment()
+run_fill_factor_experiment()
 plot_hash_fill()
 

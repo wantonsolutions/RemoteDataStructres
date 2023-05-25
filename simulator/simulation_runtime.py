@@ -564,7 +564,8 @@ def main():
     config["buckets_per_lock"] = 1
     config["locks_per_message"] = 64
     config["trials"] = 1
-    config["state_machine"]=cuckoo.rcuckoo
+    config["state_machine"]=rcuckoo_basic.rcuckoo_basic
+    # config["state_machine"]=cuckoo.rcuckoo
     # config["state_machine"]=race.race
     config['workload']='ycsb-w'
     log.set_debug()
@@ -580,11 +581,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-

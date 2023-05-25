@@ -157,6 +157,7 @@ class Table:
 
 
     def bucket_has_empty(self, bucket_index):
+        assert bucket_index < self.table_size, "Bucket index out of range for table index: " + str(bucket_index) + " :" +str(self.table_size)
         return None in self.table[bucket_index]
 
     def get_first_empty_index(self, bucket_index):

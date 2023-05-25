@@ -1,6 +1,7 @@
 #include "xxhash.h"
 #include <cmath>
 #include <string>
+#include <assert.h>
 // #include <cstdlib>
 #include "hash.h"
 
@@ -27,12 +28,16 @@ XXH64_hash_t h1(string key){
 }
 
 XXH64_hash_t h2(string key){
-    key[0] = !key[0];
+    assert(key.size() >= 4);
+    key[0] = ~key[0];
+    key[1] = ~key[1];
     return xxhash_value(key);
 }
 
 XXH64_hash_t h3(string key){
-    key[1] = !key[1];
+    assert(key.size() >= 4);
+    key[2] = ~key[2];
+    key[3] = ~key[3];
     return xxhash_value(key);
 }
 
