@@ -1,13 +1,11 @@
 import lib
-lib.import_rmem_simulator()
 
-import plot_cuckoo as pc
-import log as log
-import state_machines as sm
-import simulator as sim
+import experiments.plot_cuckoo as pc
+import simulator.log as log
+import simulator.simulation_runtime as sim
 # import run_experiments as re
-import data_management as dm
-import cuckoo as cuck
+import experiments.data_management as dm
+import simulator.rcuckoo_basic as rcuckoo_basic
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
@@ -56,7 +54,7 @@ def success_rate_contention_machines():
         config['read_threshold_bytes'] = config['entry_size'] * bucket_size
         config['indexes'] = table_size
         config['trials'] = 1
-        config['state_machine']=sm.rcuckoo
+        config['state_machine']=rcuckoo_basic.rcuckoo_basic
         config['max_fill']= 90
         runs.append(sim.run_trials(config))
     dm.save_statistics(runs, dirname=data_dir)
