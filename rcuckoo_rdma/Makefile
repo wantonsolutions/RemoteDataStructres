@@ -19,5 +19,6 @@ $(TARGET).o: $(TARGET).cpp
 
 clean:
 	rm -f *.o *.so
-	rm chash.cpp
 	rm -r build
+	rm hash_wrapper.cpp
+	rm tables_wrapper.cpp

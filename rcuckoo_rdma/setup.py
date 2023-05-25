@@ -14,6 +14,10 @@ extensions = [
               extra_compile_args=['-std=c++11'],
               language='c++'
               ),
+    Extension('ctables', ['tables_wrapper.pyx', 'tables.cpp'],
+              extra_compile_args=['-std=c++11'],
+              language='c++'
+              ),
 ]
 
 # extensions = [
