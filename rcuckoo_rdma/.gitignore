@@ -2,6 +2,7 @@ build
 cython_tutorial
 *.so
 hash_wrapper.cpp
+tables_wrapper.cpp
 hash.o
 hash.so
 chash.egg-info
