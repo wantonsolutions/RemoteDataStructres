@@ -2,13 +2,73 @@
 #ifndef TABLES_H
 #define TABLES_H
 
+#include <stdint.h>
+
 namespace cuckoo_tables {
+
+    typedef struct Entry {
+        //todo add some entry functions
+        unsigned int key;
+        unsigned int value;
+    } Entry;
+
+    typedef struct CasOperationReturn {
+        bool success;
+        uint64_t current_value;
+    } CasOperationReturn;
+
+    }
+
+    class Lock_Table {
+        public:
+            Lock_Table();
+            Lock_Table(unsigned int memory_size, unsigned int bucket_size, unsigned int buckets_per_lock);
+            void unlock_all();
+            CasOperationReturn masked_cas(unsigned int index, uint64_t old, uint64_t new_value, uint64_t mask);
+            void fill_masked_cas(unsigned int index, bool success, uint64_t new_value, uint64_t mask);
+
+        private:
+            unsigned int _entry_size;
+            unsigned int _memory_size;
+            unsigned int _bucket_size;
+            unsigned int _buckets_per_lock;
+            unsigned int _total_locks;
+            uint8_t *_locks;
+    };
+    
     class Table {
         public:
             // **Entry table;
             // LockTable lock_table;
             Table();
             Table(unsigned int memory_size, unsigned int bucket_size, unsigned int buckets_per_lock);
+            void unlock_all();
+            void print_table();
+            unsigned int get_bucket_size();
+            unsigned int row_size_bytes();
+            unsigned int row_size_indexes();
+            Entry get_entry(unsigned int bucket_index, unsigned int offset);
+            void set_entry(unsigned int bucket_index, unsigned int offset, Entry entry);
+            bool bucket_has_empty(unsigned int bucket_index);
+            unsigned int get_first_empty_index(unsigned int bucket_index);
+            bool bucket_contains(unsigned int bucket_index, unsigned int key);
+            bool contains(unsigned int key);
+            float get_fill_percentage();
+            bool full();
+            Entry ** generate_bucket_cuckoo_hash_index(unsigned int memory_size, unsigned int bucket_size);
+            unsigned int find_empty_index(unsigned int bucket_index);
+            unsigned int absolute_index_to_bucket_index(unsigned int absolute_index);
+            unsigned int absolute_index_to_offset(unsigned int absolute_index);
+            
+            void assert_operation_in_table_bound(unsigned int bucket_index, unsigned int offset, unsigned int memory_size);
+            bool contains_duplicates();
+            unsigned int ** get_duplicates();
+
+
+
+
+
+
             unsigned int n_buckets_size(unsigned int n_buckets);
 
         private:
@@ -16,6 +76,8 @@ namespace cuckoo_tables {
             unsigned int _memory_size;
             unsigned int _bucket_size;
             unsigned int _buckets_per_lock;
+            Entry **_table;
+            unsigned int _table_size;
             unsigned int _fill;
     };
 }

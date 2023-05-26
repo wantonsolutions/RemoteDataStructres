@@ -32,6 +32,9 @@ class Lock:
     def __repr__(self):
         return self.__str__()
 
+CAS_SIZE = 64
+inverted_mask_index_global = [0] * CAS_SIZE
+
 class LockTable:
     def __init__(self, memory_size, entry_size, bucket_size, buckets_per_lock):
         self.memory_size = memory_size
@@ -49,56 +52,40 @@ class LockTable:
             self.locks[i].unlock()
 
 
-        # print(self)
+    def masked_cas(self, lock_index, old, new, mask):
+        #create an inverted index of the mask, to reduce the indexes we needto check.
+        #i've pre
+        global inverted_mask_index_global
+        c=0
+        for i in range(len(mask)):
+            if mask[i] == 1:
+                inverted_mask_index_global[0]=i
+                c+=1
 
-    def set_lock(self, lock_index):
-        if self.locks[lock_index].is_locked():
-            return False
-        self.locks[lock_index].lock()
-        return True
+        inverted_mask_index = inverted_mask_index_global[0:c]
+        #XOR check that the old value in the cas matches the existing lock table.
+        for v in inverted_mask_index:
+            if not self.locks[lock_index+v].equals(old[v]):
+                return (False, old)
+        
+        #now we just apply. At this point we know that the old value is the same as the current so we can lock and unlock accordingly.
+        for v in inverted_mask_index:
+            self.locks[lock_index+v].set_bit(new[v])
+        return (True, new)
     
-    def unlock_lock(self, lock_index):
-        if not self.locks[lock_index].is_locked():
-            return False
-        self.locks[lock_index].unlock()
-        return True
-
-    
-    def multi_lock(self, lock_indexes):
-        for i in lock_indexes:
-            if self.locks[i].is_locked():
-                return False
-        for i in lock_indexes:
-            self.locks[i].lock()
-        return True
-
-    def multi_unlock(self, lock_indexes):
-        for i in lock_indexes:
-            if not self.locks[i].is_locked():
-                return False
-        for i in lock_indexes:
-            self.locks[i].unlock()
-        return True
-
-
-    def get_cas_range(self, starting_index):
-        locks=[Lock()] * CAS_SIZE
-        index = starting_index
-        for i in range(CAS_SIZE):
+    def fill_masked_cas(self, lock_index, success, new, mask):
+        index = lock_index
+        for v, m in zip(new, mask):
             if index >= len(self.locks):
                 break
-            locks[i] = self.locks[index]
+            #If this value is part of the mask, set it to the cas value
+            if m == True:
+                self.locks[index] = v
             index += 1
-        return locks
 
-    def fill_cas_range(self, starting_index, locks):
-        index = starting_index
-        for i in range(CAS_SIZE):
-            if index >= len(self.locks):
-                break
-            locks[i] = self.locks[index]
-            index += 1
-        # return locks
+        if not success:
+            logger.warning("returned value is not the same as the value in the table, inserted it anyways")
+
 
     def __str__(self):
         s = ""
@@ -144,18 +131,18 @@ class Table:
     def n_buckets_size(self, n_buckets):
         return n_buckets * TABLE_ENTRY_SIZE
 
-    def get_entry(self, bucket, offset):
-        return self.table[bucket][offset]
+    def get_entry(self, bucket_index, offset):
+        return self.table[bucket_index][offset]
 
-    def set_entry(self, bucket, offset, entry):
+    def set_entry(self, bucket_index, offset, entry):
         #maintain fill counter
-        old = self.table[bucket][offset]
+        old = self.table[bucket_index][offset]
         if old == None:
             self.fill += 1
         if entry == None:
             self.fill -=1
             # print("Fill: " + str(self.fill))
-        self.table[bucket][offset] = entry
+        self.table[bucket_index][offset] = entry
 
 
     def bucket_has_empty(self, bucket_index):
@@ -237,22 +224,20 @@ class Table:
 
 
     def absolute_index_to_bucket_index(self, index):
-        bucket_offset = index % self.bucket_size
         bucket = int(index/self.bucket_size)
-        return (bucket,bucket_offset)
+        return bucket
+
+    def absolute_index_to_bucket_offset(self, index):
+        bucket_offset = index % self.bucket_size
+        return bucket_offset
 
 
     def assert_operation_in_table_bound(self, bucket_id, bucket_offset, size):
-        self.assert_read_table_properties(size)
+        # self.assert_read_table_properties(size)
         total_indexs = size/8
         max_read=bucket_id * bucket_offset + total_indexs
         table_bound=self.table_size * self.bucket_size
         assert max_read <= table_bound, "read is out of bounds " + str(max_read) + " " + str(table_bound)
-
-    def assert_read_table_properties(self, read_size):
-        assert self.table != None, "table is not initalized"
-        assert self.table[0] != None, "table must have dimensions"
-        assert read_size % TABLE_ENTRY_SIZE == 0, "size must be a multiple of 8"
 
     #check if the table has any duplicates in it
     def contains_duplicates(self):

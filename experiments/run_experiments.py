@@ -256,14 +256,14 @@ def insertion_debug():
 
     config = get_config()
     config['indexes'] = table_size
-    config['num_clients'] = 1
+    config['num_clients'] = 2
     config['num_steps'] = 5000000
     config['read_threshold_bytes'] = 256
     config["buckets_per_lock"] = 1
     config["locks_per_message"] = 64
     config["trials"] = 1
-    # config["state_machine"]=cuckoo.rcuckoobatch
-    config["state_machine"]=race.race
+    # config["state_machine"]=race.race
+    config["state_machine"]=cuckoo.rcuckoo
     config['workload']='ycsb-w'
     log.set_debug()
 
@@ -918,8 +918,8 @@ def plot_hero_ycsb_fill_latency():
 # table_size_experiment()
 # plot_table_size_experiment()
 
-factor_table_size_experiments()
-plot_factor_table_size_experiments()
+# factor_table_size_experiments()
+# plot_factor_table_size_experiments()
 
 # run_hero_ycsb_fill_latency()
 # plot_hero_ycsb_fill_latency()
@@ -949,7 +949,7 @@ plot_factor_table_size_experiments()
 
 # todos()
 
-# insertion_debug()
+insertion_debug()
 # plot_general_stats_last_run()
 # plot_hash_factor_distance_cdf()
 

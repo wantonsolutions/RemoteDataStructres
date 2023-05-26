@@ -34,7 +34,6 @@ def cas_table_entry(table, bucket_id, bucket_offset, old, new):
     else:
         return (False, v)
 
-inverted_mask_index_global = [0] * CAS_SIZE
 def masked_cas_lock_table(lock_table, lock_index, old, new, mask):
     #sanity check
     assert len(old) == CAS_SIZE, "old must be 64 bytes"
@@ -43,27 +42,9 @@ def masked_cas_lock_table(lock_table, lock_index, old, new, mask):
 
     assert lock_table != None, "lock table is not initalized"
     assert lock_index < lock_table.total_locks, "lock index is out of bounds"
+    return lock_table.masked_cas(lock_index, old, new, mask)
 
 
-    #create an inverted index of the mask, to reduce the indexes we needto check.
-    #i've pre
-    global inverted_mask_index_global
-    c=0
-    for i in range(len(mask)):
-        if mask[i] == 1:
-            inverted_mask_index_global[0]=i
-            c+=1
-
-    inverted_mask_index = inverted_mask_index_global[0:c]
-    #XOR check that the old value in the cas matches the existing lock table.
-    for v in inverted_mask_index:
-        if not lock_table.locks[lock_index+v].equals(old[v]):
-            return (False, old)
-    
-    #now we just apply. At this point we know that the old value is the same as the current so we can lock and unlock accordingly.
-    for v in inverted_mask_index:
-        lock_table.locks[lock_index+v].set_bit(new[v])
-    return (True, new)
 
 def fill_lock_table_masked_cas(lock_table, lock_index, success, value, mask):
     #sanity check
@@ -73,17 +54,7 @@ def fill_lock_table_masked_cas(lock_table, lock_index, success, value, mask):
     assert lock_table != None, "lock table is not initalized"
     assert lock_index < len(lock_table), "lock index is out of bounds"
 
-    index = lock_index
-    for v, m in zip(value,mask):
-        if index >= len(lock_table):
-            break
-        #If this value is part of the mask, set it to the cas value
-        if m == True:
-            lock_table[index] = v
-        index += 1
-
-    if not success:
-        logger.warning("returned value is not the same as the value in the table, inserted it anyways")
+    return lock_table.fill_masked_cas(lock_index, success, value, mask)
 
 
 def read_table_entry(table, bucket_id, bucket_offset, size):
@@ -94,7 +65,8 @@ def read_table_entry(table, bucket_id, bucket_offset, size):
     read = []
     base = bucket_id * table.bucket_size + bucket_offset
     for i in range(total_indexs):
-        bucket, offset = table.absolute_index_to_bucket_index(base + i)
+        bucket = table.absolute_index_to_bucket_index(base + i)
+        offset = table.absolute_index_to_bucket_offset(base + i)
         read.append(table.get_entry(bucket,offset))
     return read
 
@@ -105,7 +77,8 @@ def fill_table_with_read(table, bucket_id, bucket_offset, size, read):
     #write remote read to the table
     base = bucket_id * table.bucket_size + bucket_offset
     for i in range(total_indexs):
-        bucket, offset = table.absolute_index_to_bucket_index(base + i)
+        bucket = table.absolute_index_to_bucket_index(base + i)
+        offset = table.absolute_index_to_bucket_offset(base + i)
         table.set_entry(bucket, offset, read[i])
 
 def fill_local_table_with_cas_response(table, args):
