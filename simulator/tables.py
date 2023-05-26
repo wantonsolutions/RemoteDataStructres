@@ -55,6 +55,10 @@ class LockTable:
     def masked_cas(self, lock_index, old, new, mask):
         #create an inverted index of the mask, to reduce the indexes we needto check.
         #i've pre
+
+        #inflate the lock index, here we work per bit, but the lock index indexes the byte
+        lock_index *=8
+
         global inverted_mask_index_global
         c=0
         for i in range(len(mask)):
@@ -74,6 +78,9 @@ class LockTable:
         return (True, new)
     
     def fill_masked_cas(self, lock_index, success, new, mask):
+
+        #inflate the lock index, here we work per bit, but the lock index indexes the byte
+        lock_index *=8
         index = lock_index
         for v, m in zip(new, mask):
             if index >= len(self.locks):

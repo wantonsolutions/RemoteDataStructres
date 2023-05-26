@@ -203,6 +203,9 @@ def lock_indexes_to_buckets(lock_indexes, buckets_per_lock):
 
 def lock_message_to_lock_indexes(message):
     base=message.payload["function_args"]['lock_index']
+    #we need to byte adjust the message
+    base = base * 8
+
     lock_list=message.payload["function_args"]["mask"]
     lock_indexes=[]
     # print(lock_list)
@@ -212,14 +215,25 @@ def lock_message_to_lock_indexes(message):
     lock_indexes = [int((base + l)) for l in lock_indexes]
     return lock_indexes
 
-def lock_array_to_bits(lock_array):
+def get_min_byte_alligned_index(lock_array):
     min_lock_index = min(lock_array)
+    min_lock_index = int(min_lock_index/8) *8
+    return int(min_lock_index)
+
+def lock_array_to_bits(lock_array):
+
+    min_lock_index = get_min_byte_alligned_index(lock_array)
+    assert min_lock_index % 8 == 0, "Lock index is not a multiple of 8"
+
     lock_array = [l - min_lock_index for l in lock_array]
     old = [0] * CAS_SIZE
     new = [0] * CAS_SIZE
     for l in lock_array:
         new[l] = 1
     mask = new #the mask is the same as the locks we want to aquire
+
+    ##make sure that the locks are byte aligned
+    min_lock_index = int(min_lock_index/8)
     return (min_lock_index, old, new, mask)
 
 def unlock_array_to_bits(lock_array):
@@ -228,18 +242,20 @@ def unlock_array_to_bits(lock_array):
     return (min_lock_index, new, old, mask)
 
 def break_list_to_chunks(lock_array, locks_per_message):
+
+    #TODO this must be byte aligned now
     chunks = []
     current_chunk = []
     for i in range(len(lock_array)):
         if len(current_chunk) == 0:
-            min_lock_index = lock_array[i]
+            min_lock_index = get_min_byte_alligned_index([lock_array[i]])
 
         if (lock_array[i] - min_lock_index) < CAS_SIZE and len(current_chunk) < locks_per_message:
             current_chunk.append(lock_array[i])
         else:
             chunks.append(current_chunk)
             current_chunk = [lock_array[i]]
-            min_lock_index = lock_array[i]
+            min_lock_index = get_min_byte_alligned_index(current_chunk)
     chunks.append(current_chunk)
     return chunks
 

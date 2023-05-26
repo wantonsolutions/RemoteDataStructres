@@ -250,13 +250,13 @@ def insertion_debug():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
 
-    table_size = 16
+    table_size = 128
     runs = []
     print("table size: ", table_size)
 
     config = get_config()
     config['indexes'] = table_size
-    config['num_clients'] = 2
+    config['num_clients'] = 1
     config['num_steps'] = 5000000
     config['read_threshold_bytes'] = 256
     config["buckets_per_lock"] = 1
