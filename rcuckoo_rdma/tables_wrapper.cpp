@@ -778,6 +778,7 @@ static CYTHON_INLINE float __PYX_NAN() {
 #define __PYX_HAVE__ctables
 #define __PYX_HAVE_API__ctables
 /* Early includes */
+#include <stdint.h>
 #include "ios"
 #include "new"
 #include "stdexcept"
@@ -997,10 +998,24 @@ static const char *__pyx_f[] = {
 };
 
 /*--- Type declarations ---*/
+struct __pyx_obj_7ctables_Lock_Table;
 struct __pyx_obj_7ctables_Table;
 
-/* "tables_wrapper.pyx":7
- * cimport tables_wrapper_def as t
+/* "tables_wrapper.pyx":9
+ * 
+ * 
+ * cdef class Lock_Table:             # <<<<<<<<<<<<<<
+ *     cdef t.Lock_Table c_lock_table
+ * 
+ */
+struct __pyx_obj_7ctables_Lock_Table {
+  PyObject_HEAD
+  cuckoo_tables::Lock_Table c_lock_table;
+};
+
+
+/* "tables_wrapper.pyx":31
+ *         return
  * 
  * cdef class Table:             # <<<<<<<<<<<<<<
  *     cdef t.Table c_table
@@ -1144,6 +1159,49 @@ static CYTHON_INLINE void __Pyx_ErrFetchInState(PyThreadState *tstate, PyObject 
 /* RaiseException.proto */
 static void __Pyx_Raise(PyObject *type, PyObject *value, PyObject *tb, PyObject *cause);
 
+/* DictGetItem.proto */
+#if PY_MAJOR_VERSION >= 3 && !CYTHON_COMPILING_IN_PYPY
+static PyObject *__Pyx_PyDict_GetItem(PyObject *d, PyObject* key);
+#define __Pyx_PyObject_Dict_GetItem(obj, name)\
+    (likely(PyDict_CheckExact(obj)) ?\
+     __Pyx_PyDict_GetItem(obj, name) : PyObject_GetItem(obj, name))
+#else
+#define __Pyx_PyDict_GetItem(d, key) PyObject_GetItem(d, key)
+#define __Pyx_PyObject_Dict_GetItem(obj, name)  PyObject_GetItem(obj, name)
+#endif
+
+/* GetTopmostException.proto */
+#if CYTHON_USE_EXC_INFO_STACK
+static _PyErr_StackItem * __Pyx_PyErr_GetTopmostException(PyThreadState *tstate);
+#endif
+
+/* SaveResetException.proto */
+#if CYTHON_FAST_THREAD_STATE
+#define __Pyx_ExceptionSave(type, value, tb)  __Pyx__ExceptionSave(__pyx_tstate, type, value, tb)
+static CYTHON_INLINE void __Pyx__ExceptionSave(PyThreadState *tstate, PyObject **type, PyObject **value, PyObject **tb);
+#define __Pyx_ExceptionReset(type, value, tb)  __Pyx__ExceptionReset(__pyx_tstate, type, value, tb)
+static CYTHON_INLINE void __Pyx__ExceptionReset(PyThreadState *tstate, PyObject *type, PyObject *value, PyObject *tb);
+#else
+#define __Pyx_ExceptionSave(type, value, tb)   PyErr_GetExcInfo(type, value, tb)
+#define __Pyx_ExceptionReset(type, value, tb)  PyErr_SetExcInfo(type, value, tb)
+#endif
+
+/* PyErrExceptionMatches.proto */
+#if CYTHON_FAST_THREAD_STATE
+#define __Pyx_PyErr_ExceptionMatches(err) __Pyx_PyErr_ExceptionMatchesInState(__pyx_tstate, err)
+static CYTHON_INLINE int __Pyx_PyErr_ExceptionMatchesInState(PyThreadState* tstate, PyObject* err);
+#else
+#define __Pyx_PyErr_ExceptionMatches(err)  PyErr_ExceptionMatches(err)
+#endif
+
+/* GetException.proto */
+#if CYTHON_FAST_THREAD_STATE
+#define __Pyx_GetException(type, value, tb)  __Pyx__GetException(__pyx_tstate, type, value, tb)
+static int __Pyx__GetException(PyThreadState *tstate, PyObject **type, PyObject **value, PyObject **tb);
+#else
+static int __Pyx_GetException(PyObject **type, PyObject **value, PyObject **tb);
+#endif
+
 /* PyObject_GenericGetAttrNoDict.proto */
 #if CYTHON_USE_TYPE_SLOTS && CYTHON_USE_PYTYPE_LOOKUP && PY_VERSION_HEX < 0x03070000
 static CYTHON_INLINE PyObject* __Pyx_PyObject_GenericGetAttrNoDict(PyObject* obj, PyObject* attr_name);
@@ -1156,14 +1214,6 @@ static CYTHON_INLINE PyObject* __Pyx_PyObject_GenericGetAttrNoDict(PyObject* obj
 static PyObject* __Pyx_PyObject_GenericGetAttr(PyObject* obj, PyObject* attr_name);
 #else
 #define __Pyx_PyObject_GenericGetAttr PyObject_GenericGetAttr
-#endif
-
-/* PyErrExceptionMatches.proto */
-#if CYTHON_FAST_THREAD_STATE
-#define __Pyx_PyErr_ExceptionMatches(err) __Pyx_PyErr_ExceptionMatchesInState(__pyx_tstate, err)
-static CYTHON_INLINE int __Pyx_PyErr_ExceptionMatchesInState(PyThreadState* tstate, PyObject* err);
-#else
-#define __Pyx_PyErr_ExceptionMatches(err)  PyErr_ExceptionMatches(err)
 #endif
 
 /* PyObjectGetAttrStrNoError.proto */
@@ -1274,8 +1324,15 @@ static void __Pyx_CppExn2PyErr() {
 }
 #endif
 
+static PyObject* __pyx_convert__to_py_struct__cuckoo_tables_3a__3a_CasOperationReturn(struct cuckoo_tables::CasOperationReturn s);
 /* CIntFromPy.proto */
 static CYTHON_INLINE unsigned int __Pyx_PyInt_As_unsigned_int(PyObject *);
+
+/* CIntFromPy.proto */
+static CYTHON_INLINE uint64_t __Pyx_PyInt_As_uint64_t(PyObject *);
+
+/* CIntToPy.proto */
+static CYTHON_INLINE PyObject* __Pyx_PyInt_From_uint64_t(uint64_t value);
 
 /* CIntToPy.proto */
 static CYTHON_INLINE PyObject* __Pyx_PyInt_From_unsigned_int(unsigned int value);
@@ -1309,59 +1366,838 @@ static int __Pyx_check_binary_version(void);
 static int __Pyx_InitStrings(__Pyx_StringTabEntry *t);
 
 
+/* Module declarations from 'libc' */
+
+/* Module declarations from 'libc.stdint' */
+
+/* Module declarations from 'libcpp' */
+
 /* Module declarations from 'tables_wrapper_def' */
 
 /* Module declarations from 'ctables' */
+static PyTypeObject *__pyx_ptype_7ctables_Lock_Table = 0;
 static PyTypeObject *__pyx_ptype_7ctables_Table = 0;
+static struct cuckoo_tables::Entry __pyx_convert__from_py_struct__cuckoo_tables_3a__3a_Entry(PyObject *); /*proto*/
 #define __Pyx_MODULE_NAME "ctables"
 extern int __pyx_module_is_main_ctables;
 int __pyx_module_is_main_ctables = 0;
 
 /* Implementation of 'ctables' */
 static PyObject *__pyx_builtin_TypeError;
+static PyObject *__pyx_builtin_print;
+static PyObject *__pyx_builtin_KeyError;
+static PyObject *__pyx_builtin_ValueError;
+static const char __pyx_k_key[] = "key";
+static const char __pyx_k_old[] = "old";
 static const char __pyx_k_main[] = "__main__";
+static const char __pyx_k_mask[] = "mask";
 static const char __pyx_k_name[] = "__name__";
 static const char __pyx_k_test[] = "__test__";
 static const char __pyx_k_Table[] = "Table";
+static const char __pyx_k_entry[] = "entry";
+static const char __pyx_k_index[] = "index";
+static const char __pyx_k_print[] = "print";
+static const char __pyx_k_value[] = "value";
+static const char __pyx_k_offset[] = "offset";
 static const char __pyx_k_reduce[] = "__reduce__";
+static const char __pyx_k_success[] = "success";
+static const char __pyx_k_KeyError[] = "KeyError";
 static const char __pyx_k_getstate[] = "__getstate__";
 static const char __pyx_k_setstate[] = "__setstate__";
 static const char __pyx_k_TypeError[] = "TypeError";
+static const char __pyx_k_new_value[] = "new_value";
 static const char __pyx_k_reduce_ex[] = "__reduce_ex__";
+static const char __pyx_k_Lock_Table[] = "Lock_Table";
+static const char __pyx_k_ValueError[] = "ValueError";
+static const char __pyx_k_lock_index[] = "lock_index";
 static const char __pyx_k_bucket_size[] = "bucket_size";
 static const char __pyx_k_memory_size[] = "memory_size";
+static const char __pyx_k_bucket_index[] = "bucket_index";
+static const char __pyx_k_current_value[] = "current_value";
 static const char __pyx_k_reduce_cython[] = "__reduce_cython__";
 static const char __pyx_k_setstate_cython[] = "__setstate_cython__";
 static const char __pyx_k_buckets_per_lock[] = "buckets_per_lock";
 static const char __pyx_k_cline_in_traceback[] = "cline_in_traceback";
+static const char __pyx_k_No_value_specified_for_struct_at[] = "No value specified for struct attribute 'key'";
+static const char __pyx_k_WARNING_WARNING_WARNING_set_entr[] = "WARNING WARNING WARNING set_entry";
+static const char __pyx_k_WARTING_WARNTING_WARING_generate[] = "WARTING WARNTING WARING generate_bucket_cuckoo_hash_index not implemented";
+static const char __pyx_k_WARTING_WARNTING_WARING_get_dupl[] = "WARTING WARNTING WARING get_duplicates not implemented";
+static const char __pyx_k_self_c_lock_table_cannot_be_conv[] = "self.c_lock_table cannot be converted to a Python object for pickling";
 static const char __pyx_k_self_c_table_cannot_be_converted[] = "self.c_table cannot be converted to a Python object for pickling";
+static const char __pyx_k_No_value_specified_for_struct_at_2[] = "No value specified for struct attribute 'value'";
+static PyObject *__pyx_n_s_KeyError;
+static PyObject *__pyx_n_s_Lock_Table;
+static PyObject *__pyx_kp_s_No_value_specified_for_struct_at;
+static PyObject *__pyx_kp_s_No_value_specified_for_struct_at_2;
 static PyObject *__pyx_n_s_Table;
 static PyObject *__pyx_n_s_TypeError;
+static PyObject *__pyx_n_s_ValueError;
+static PyObject *__pyx_kp_u_WARNING_WARNING_WARNING_set_entr;
+static PyObject *__pyx_kp_u_WARTING_WARNTING_WARING_generate;
+static PyObject *__pyx_kp_u_WARTING_WARNTING_WARING_get_dupl;
+static PyObject *__pyx_n_s_bucket_index;
 static PyObject *__pyx_n_s_bucket_size;
 static PyObject *__pyx_n_s_buckets_per_lock;
 static PyObject *__pyx_n_s_cline_in_traceback;
+static PyObject *__pyx_n_s_current_value;
+static PyObject *__pyx_n_s_entry;
 static PyObject *__pyx_n_s_getstate;
+static PyObject *__pyx_n_s_index;
+static PyObject *__pyx_n_s_key;
+static PyObject *__pyx_n_s_lock_index;
 static PyObject *__pyx_n_s_main;
+static PyObject *__pyx_n_s_mask;
 static PyObject *__pyx_n_s_memory_size;
 static PyObject *__pyx_n_s_name;
+static PyObject *__pyx_n_s_new_value;
+static PyObject *__pyx_n_s_offset;
+static PyObject *__pyx_n_s_old;
+static PyObject *__pyx_n_s_print;
 static PyObject *__pyx_n_s_reduce;
 static PyObject *__pyx_n_s_reduce_cython;
 static PyObject *__pyx_n_s_reduce_ex;
+static PyObject *__pyx_kp_s_self_c_lock_table_cannot_be_conv;
 static PyObject *__pyx_kp_s_self_c_table_cannot_be_converted;
 static PyObject *__pyx_n_s_setstate;
 static PyObject *__pyx_n_s_setstate_cython;
+static PyObject *__pyx_n_s_success;
 static PyObject *__pyx_n_s_test;
+static PyObject *__pyx_n_s_value;
+static int __pyx_pf_7ctables_10Lock_Table___init__(struct __pyx_obj_7ctables_Lock_Table *__pyx_v_self, unsigned int __pyx_v_memory_size, unsigned int __pyx_v_bucket_size, unsigned int __pyx_v_buckets_per_lock); /* proto */
+static PyObject *__pyx_pf_7ctables_10Lock_Table_2unlock_all(struct __pyx_obj_7ctables_Lock_Table *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_7ctables_10Lock_Table_4masked_cas(struct __pyx_obj_7ctables_Lock_Table *__pyx_v_self, unsigned int __pyx_v_index, PyObject *__pyx_v_old, PyObject *__pyx_v_new_value, PyObject *__pyx_v_mask); /* proto */
+static PyObject *__pyx_pf_7ctables_10Lock_Table_6fill_masked_cas(struct __pyx_obj_7ctables_Lock_Table *__pyx_v_self, unsigned int __pyx_v_index, bool __pyx_v_success, PyObject *__pyx_v_new_value, PyObject *__pyx_v_mask); /* proto */
+static PyObject *__pyx_pf_7ctables_10Lock_Table_8__reduce_cython__(CYTHON_UNUSED struct __pyx_obj_7ctables_Lock_Table *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_7ctables_10Lock_Table_10__setstate_cython__(CYTHON_UNUSED struct __pyx_obj_7ctables_Lock_Table *__pyx_v_self, CYTHON_UNUSED PyObject *__pyx_v___pyx_state); /* proto */
 static int __pyx_pf_7ctables_5Table___init__(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_memory_size, unsigned int __pyx_v_bucket_size, unsigned int __pyx_v_buckets_per_lock); /* proto */
-static PyObject *__pyx_pf_7ctables_5Table_2n_buckets_size(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_n_buckets); /* proto */
-static PyObject *__pyx_pf_7ctables_5Table_4__reduce_cython__(CYTHON_UNUSED struct __pyx_obj_7ctables_Table *__pyx_v_self); /* proto */
-static PyObject *__pyx_pf_7ctables_5Table_6__setstate_cython__(CYTHON_UNUSED struct __pyx_obj_7ctables_Table *__pyx_v_self, CYTHON_UNUSED PyObject *__pyx_v___pyx_state); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_2unlock_all(struct __pyx_obj_7ctables_Table *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_4print_table(struct __pyx_obj_7ctables_Table *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_6lock_table_masked_cas(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_lock_index, PyObject *__pyx_v_old, PyObject *__pyx_v_new_value, PyObject *__pyx_v_mask); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_8fill_lock_table_masked_cas(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_lock_index, bool __pyx_v_success, PyObject *__pyx_v_value, PyObject *__pyx_v_mask); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_10get_bucket_size(struct __pyx_obj_7ctables_Table *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_12row_size_bytes(struct __pyx_obj_7ctables_Table *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_14row_size_indexes(struct __pyx_obj_7ctables_Table *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_16n_buckets_size(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_n_buckets); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_18get_entry(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_bucket_index, unsigned int __pyx_v_offset); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_20set_entry(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_bucket_index, unsigned int __pyx_v_offset, PyObject *__pyx_v_entry); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_22bucket_has_empty(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_bucket_index); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_24get_first_empty_index(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_bucket_index); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_26bucket_contains(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_bucket_index, unsigned int __pyx_v_key); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_28contains(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_key); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_30get_fill_percentage(struct __pyx_obj_7ctables_Table *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_32full(struct __pyx_obj_7ctables_Table *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_34generate_bucket_cuckoo_hash_index(CYTHON_UNUSED struct __pyx_obj_7ctables_Table *__pyx_v_self, CYTHON_UNUSED unsigned int __pyx_v_memory_size, CYTHON_UNUSED unsigned int __pyx_v_bucket_size); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_36find_empty_index(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_bucket_index); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_38absolute_index_to_bucket_index(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_absolute_index); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_40absolute_index_to_offset(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_absolute_index); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_42assert_operation_in_table_bound(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_bucket_index, unsigned int __pyx_v_offset, unsigned int __pyx_v_memory_size); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_44contains_duplicates(struct __pyx_obj_7ctables_Table *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_46get_duplicates(CYTHON_UNUSED struct __pyx_obj_7ctables_Table *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_48__reduce_cython__(CYTHON_UNUSED struct __pyx_obj_7ctables_Table *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_7ctables_5Table_50__setstate_cython__(CYTHON_UNUSED struct __pyx_obj_7ctables_Table *__pyx_v_self, CYTHON_UNUSED PyObject *__pyx_v___pyx_state); /* proto */
+static PyObject *__pyx_tp_new_7ctables_Lock_Table(PyTypeObject *t, PyObject *a, PyObject *k); /*proto*/
 static PyObject *__pyx_tp_new_7ctables_Table(PyTypeObject *t, PyObject *a, PyObject *k); /*proto*/
 static PyObject *__pyx_tuple_;
 static PyObject *__pyx_tuple__2;
+static PyObject *__pyx_tuple__3;
+static PyObject *__pyx_tuple__4;
+static PyObject *__pyx_tuple__5;
+static PyObject *__pyx_tuple__6;
+static PyObject *__pyx_tuple__7;
+static PyObject *__pyx_tuple__8;
+static PyObject *__pyx_tuple__9;
 /* Late includes */
 
-/* "tables_wrapper.pyx":11
+/* "tables_wrapper.pyx":12
+ *     cdef t.Lock_Table c_lock_table
  * 
+ *     def __init__(self, unsigned int memory_size=-1, unsigned int bucket_size=-1, unsigned int buckets_per_lock=-1):             # <<<<<<<<<<<<<<
+ *         if memory_size is not -1 and bucket_size is not -1 and buckets_per_lock is not -1:
+ *             self.c_lock_table = t.Lock_Table(memory_size, bucket_size, buckets_per_lock)
+ */
+
+/* Python wrapper */
+static int __pyx_pw_7ctables_10Lock_Table_1__init__(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static int __pyx_pw_7ctables_10Lock_Table_1__init__(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  unsigned int __pyx_v_memory_size;
+  unsigned int __pyx_v_bucket_size;
+  unsigned int __pyx_v_buckets_per_lock;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  int __pyx_r;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("__init__ (wrapper)", 0);
+  {
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_memory_size,&__pyx_n_s_bucket_size,&__pyx_n_s_buckets_per_lock,0};
+    PyObject* values[3] = {0,0,0};
+    if (unlikely(__pyx_kwds)) {
+      Py_ssize_t kw_args;
+      const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
+      switch (pos_args) {
+        case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+        CYTHON_FALLTHROUGH;
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        CYTHON_FALLTHROUGH;
+        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        CYTHON_FALLTHROUGH;
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+      kw_args = PyDict_Size(__pyx_kwds);
+      switch (pos_args) {
+        case  0:
+        if (kw_args > 0) {
+          PyObject* value = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_memory_size);
+          if (value) { values[0] = value; kw_args--; }
+        }
+        CYTHON_FALLTHROUGH;
+        case  1:
+        if (kw_args > 0) {
+          PyObject* value = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_bucket_size);
+          if (value) { values[1] = value; kw_args--; }
+        }
+        CYTHON_FALLTHROUGH;
+        case  2:
+        if (kw_args > 0) {
+          PyObject* value = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_buckets_per_lock);
+          if (value) { values[2] = value; kw_args--; }
+        }
+      }
+      if (unlikely(kw_args > 0)) {
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "__init__") < 0)) __PYX_ERR(1, 12, __pyx_L3_error)
+      }
+    } else {
+      switch (PyTuple_GET_SIZE(__pyx_args)) {
+        case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+        CYTHON_FALLTHROUGH;
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        CYTHON_FALLTHROUGH;
+        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        CYTHON_FALLTHROUGH;
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+    }
+    if (values[0]) {
+      __pyx_v_memory_size = __Pyx_PyInt_As_unsigned_int(values[0]); if (unlikely((__pyx_v_memory_size == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 12, __pyx_L3_error)
+    } else {
+      __pyx_v_memory_size = ((unsigned int)-1);
+    }
+    if (values[1]) {
+      __pyx_v_bucket_size = __Pyx_PyInt_As_unsigned_int(values[1]); if (unlikely((__pyx_v_bucket_size == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 12, __pyx_L3_error)
+    } else {
+      __pyx_v_bucket_size = ((unsigned int)-1);
+    }
+    if (values[2]) {
+      __pyx_v_buckets_per_lock = __Pyx_PyInt_As_unsigned_int(values[2]); if (unlikely((__pyx_v_buckets_per_lock == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 12, __pyx_L3_error)
+    } else {
+      __pyx_v_buckets_per_lock = ((unsigned int)-1);
+    }
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L5_argtuple_error:;
+  __Pyx_RaiseArgtupleInvalid("__init__", 0, 0, 3, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 12, __pyx_L3_error)
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("ctables.Lock_Table.__init__", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return -1;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_7ctables_10Lock_Table___init__(((struct __pyx_obj_7ctables_Lock_Table *)__pyx_v_self), __pyx_v_memory_size, __pyx_v_bucket_size, __pyx_v_buckets_per_lock);
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static int __pyx_pf_7ctables_10Lock_Table___init__(struct __pyx_obj_7ctables_Lock_Table *__pyx_v_self, unsigned int __pyx_v_memory_size, unsigned int __pyx_v_bucket_size, unsigned int __pyx_v_buckets_per_lock) {
+  int __pyx_r;
+  __Pyx_RefNannyDeclarations
+  int __pyx_t_1;
+  int __pyx_t_2;
+  cuckoo_tables::Lock_Table __pyx_t_3;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("__init__", 0);
+
+  /* "tables_wrapper.pyx":13
+ * 
+ *     def __init__(self, unsigned int memory_size=-1, unsigned int bucket_size=-1, unsigned int buckets_per_lock=-1):
+ *         if memory_size is not -1 and bucket_size is not -1 and buckets_per_lock is not -1:             # <<<<<<<<<<<<<<
+ *             self.c_lock_table = t.Lock_Table(memory_size, bucket_size, buckets_per_lock)
+ *         else:
+ */
+  __pyx_t_2 = ((__pyx_v_memory_size != -1L) != 0);
+  if (__pyx_t_2) {
+  } else {
+    __pyx_t_1 = __pyx_t_2;
+    goto __pyx_L4_bool_binop_done;
+  }
+  __pyx_t_2 = ((__pyx_v_bucket_size != -1L) != 0);
+  if (__pyx_t_2) {
+  } else {
+    __pyx_t_1 = __pyx_t_2;
+    goto __pyx_L4_bool_binop_done;
+  }
+  __pyx_t_2 = ((__pyx_v_buckets_per_lock != -1L) != 0);
+  __pyx_t_1 = __pyx_t_2;
+  __pyx_L4_bool_binop_done:;
+  if (__pyx_t_1) {
+
+    /* "tables_wrapper.pyx":14
+ *     def __init__(self, unsigned int memory_size=-1, unsigned int bucket_size=-1, unsigned int buckets_per_lock=-1):
+ *         if memory_size is not -1 and bucket_size is not -1 and buckets_per_lock is not -1:
+ *             self.c_lock_table = t.Lock_Table(memory_size, bucket_size, buckets_per_lock)             # <<<<<<<<<<<<<<
+ *         else:
+ *             self.c_lock_table = t.Lock_Table()
+ */
+    try {
+      __pyx_t_3 = cuckoo_tables::Lock_Table(__pyx_v_memory_size, __pyx_v_bucket_size, __pyx_v_buckets_per_lock);
+    } catch(...) {
+      __Pyx_CppExn2PyErr();
+      __PYX_ERR(1, 14, __pyx_L1_error)
+    }
+    __pyx_v_self->c_lock_table = __pyx_t_3;
+
+    /* "tables_wrapper.pyx":13
+ * 
+ *     def __init__(self, unsigned int memory_size=-1, unsigned int bucket_size=-1, unsigned int buckets_per_lock=-1):
+ *         if memory_size is not -1 and bucket_size is not -1 and buckets_per_lock is not -1:             # <<<<<<<<<<<<<<
+ *             self.c_lock_table = t.Lock_Table(memory_size, bucket_size, buckets_per_lock)
+ *         else:
+ */
+    goto __pyx_L3;
+  }
+
+  /* "tables_wrapper.pyx":16
+ *             self.c_lock_table = t.Lock_Table(memory_size, bucket_size, buckets_per_lock)
+ *         else:
+ *             self.c_lock_table = t.Lock_Table()             # <<<<<<<<<<<<<<
+ * 
+ *     def unlock_all(self):
+ */
+  /*else*/ {
+    try {
+      __pyx_t_3 = cuckoo_tables::Lock_Table();
+    } catch(...) {
+      __Pyx_CppExn2PyErr();
+      __PYX_ERR(1, 16, __pyx_L1_error)
+    }
+    __pyx_v_self->c_lock_table = __pyx_t_3;
+  }
+  __pyx_L3:;
+
+  /* "tables_wrapper.pyx":12
+ *     cdef t.Lock_Table c_lock_table
+ * 
+ *     def __init__(self, unsigned int memory_size=-1, unsigned int bucket_size=-1, unsigned int buckets_per_lock=-1):             # <<<<<<<<<<<<<<
+ *         if memory_size is not -1 and bucket_size is not -1 and buckets_per_lock is not -1:
+ *             self.c_lock_table = t.Lock_Table(memory_size, bucket_size, buckets_per_lock)
+ */
+
+  /* function exit code */
+  __pyx_r = 0;
+  goto __pyx_L0;
+  __pyx_L1_error:;
+  __Pyx_AddTraceback("ctables.Lock_Table.__init__", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = -1;
+  __pyx_L0:;
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":18
+ *             self.c_lock_table = t.Lock_Table()
+ * 
+ *     def unlock_all(self):             # <<<<<<<<<<<<<<
+ *         return self.c_lock_table.unlock_all()
+ * 
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_10Lock_Table_3unlock_all(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
+static PyObject *__pyx_pw_7ctables_10Lock_Table_3unlock_all(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("unlock_all (wrapper)", 0);
+  __pyx_r = __pyx_pf_7ctables_10Lock_Table_2unlock_all(((struct __pyx_obj_7ctables_Lock_Table *)__pyx_v_self));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_10Lock_Table_2unlock_all(struct __pyx_obj_7ctables_Lock_Table *__pyx_v_self) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("unlock_all", 0);
+
+  /* "tables_wrapper.pyx":19
+ * 
+ *     def unlock_all(self):
+ *         return self.c_lock_table.unlock_all()             # <<<<<<<<<<<<<<
+ * 
+ *     def masked_cas(self, unsigned int index, old, new_value, mask):
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_void_to_None(__pyx_v_self->c_lock_table.unlock_all()); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 19, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":18
+ *             self.c_lock_table = t.Lock_Table()
+ * 
+ *     def unlock_all(self):             # <<<<<<<<<<<<<<
+ *         return self.c_lock_table.unlock_all()
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Lock_Table.unlock_all", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":21
+ *         return self.c_lock_table.unlock_all()
+ * 
+ *     def masked_cas(self, unsigned int index, old, new_value, mask):             # <<<<<<<<<<<<<<
+ *         #todo: these are getting called with arrays convert them to uin64_t
+ *         response = self.c_lock_table.masked_cas(index, old, new_value, mask)
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_10Lock_Table_5masked_cas(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyObject *__pyx_pw_7ctables_10Lock_Table_5masked_cas(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  unsigned int __pyx_v_index;
+  PyObject *__pyx_v_old = 0;
+  PyObject *__pyx_v_new_value = 0;
+  PyObject *__pyx_v_mask = 0;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("masked_cas (wrapper)", 0);
+  {
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_index,&__pyx_n_s_old,&__pyx_n_s_new_value,&__pyx_n_s_mask,0};
+    PyObject* values[4] = {0,0,0,0};
+    if (unlikely(__pyx_kwds)) {
+      Py_ssize_t kw_args;
+      const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
+      switch (pos_args) {
+        case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+        CYTHON_FALLTHROUGH;
+        case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+        CYTHON_FALLTHROUGH;
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        CYTHON_FALLTHROUGH;
+        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        CYTHON_FALLTHROUGH;
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+      kw_args = PyDict_Size(__pyx_kwds);
+      switch (pos_args) {
+        case  0:
+        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_index)) != 0)) kw_args--;
+        else goto __pyx_L5_argtuple_error;
+        CYTHON_FALLTHROUGH;
+        case  1:
+        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_old)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("masked_cas", 1, 4, 4, 1); __PYX_ERR(1, 21, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  2:
+        if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_new_value)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("masked_cas", 1, 4, 4, 2); __PYX_ERR(1, 21, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  3:
+        if (likely((values[3] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_mask)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("masked_cas", 1, 4, 4, 3); __PYX_ERR(1, 21, __pyx_L3_error)
+        }
+      }
+      if (unlikely(kw_args > 0)) {
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "masked_cas") < 0)) __PYX_ERR(1, 21, __pyx_L3_error)
+      }
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 4) {
+      goto __pyx_L5_argtuple_error;
+    } else {
+      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+      values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+      values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+      values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+    }
+    __pyx_v_index = __Pyx_PyInt_As_unsigned_int(values[0]); if (unlikely((__pyx_v_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 21, __pyx_L3_error)
+    __pyx_v_old = values[1];
+    __pyx_v_new_value = values[2];
+    __pyx_v_mask = values[3];
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L5_argtuple_error:;
+  __Pyx_RaiseArgtupleInvalid("masked_cas", 1, 4, 4, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 21, __pyx_L3_error)
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("ctables.Lock_Table.masked_cas", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_7ctables_10Lock_Table_4masked_cas(((struct __pyx_obj_7ctables_Lock_Table *)__pyx_v_self), __pyx_v_index, __pyx_v_old, __pyx_v_new_value, __pyx_v_mask);
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_10Lock_Table_4masked_cas(struct __pyx_obj_7ctables_Lock_Table *__pyx_v_self, unsigned int __pyx_v_index, PyObject *__pyx_v_old, PyObject *__pyx_v_new_value, PyObject *__pyx_v_mask) {
+  struct cuckoo_tables::CasOperationReturn __pyx_v_response;
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  uint64_t __pyx_t_1;
+  uint64_t __pyx_t_2;
+  uint64_t __pyx_t_3;
+  PyObject *__pyx_t_4 = NULL;
+  PyObject *__pyx_t_5 = NULL;
+  PyObject *__pyx_t_6 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("masked_cas", 0);
+
+  /* "tables_wrapper.pyx":23
+ *     def masked_cas(self, unsigned int index, old, new_value, mask):
+ *         #todo: these are getting called with arrays convert them to uin64_t
+ *         response = self.c_lock_table.masked_cas(index, old, new_value, mask)             # <<<<<<<<<<<<<<
+ *         return (response.success, response.new_value)
+ * 
+ */
+  __pyx_t_1 = __Pyx_PyInt_As_uint64_t(__pyx_v_old); if (unlikely((__pyx_t_1 == ((uint64_t)-1)) && PyErr_Occurred())) __PYX_ERR(1, 23, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyInt_As_uint64_t(__pyx_v_new_value); if (unlikely((__pyx_t_2 == ((uint64_t)-1)) && PyErr_Occurred())) __PYX_ERR(1, 23, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyInt_As_uint64_t(__pyx_v_mask); if (unlikely((__pyx_t_3 == ((uint64_t)-1)) && PyErr_Occurred())) __PYX_ERR(1, 23, __pyx_L1_error)
+  __pyx_v_response = __pyx_v_self->c_lock_table.masked_cas(__pyx_v_index, __pyx_t_1, __pyx_t_2, __pyx_t_3);
+
+  /* "tables_wrapper.pyx":24
+ *         #todo: these are getting called with arrays convert them to uin64_t
+ *         response = self.c_lock_table.masked_cas(index, old, new_value, mask)
+ *         return (response.success, response.new_value)             # <<<<<<<<<<<<<<
+ * 
+ *     def fill_masked_cas(self, unsigned int index, bool success, new_value, mask):
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_4 = __Pyx_PyBool_FromLong(__pyx_v_response.success); if (unlikely(!__pyx_t_4)) __PYX_ERR(1, 24, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __pyx_t_5 = __pyx_convert__to_py_struct__cuckoo_tables_3a__3a_CasOperationReturn(__pyx_v_response); if (unlikely(!__pyx_t_5)) __PYX_ERR(1, 24, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_n_s_new_value); if (unlikely(!__pyx_t_6)) __PYX_ERR(1, 24, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_6);
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  __pyx_t_5 = PyTuple_New(2); if (unlikely(!__pyx_t_5)) __PYX_ERR(1, 24, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  __Pyx_GIVEREF(__pyx_t_4);
+  PyTuple_SET_ITEM(__pyx_t_5, 0, __pyx_t_4);
+  __Pyx_GIVEREF(__pyx_t_6);
+  PyTuple_SET_ITEM(__pyx_t_5, 1, __pyx_t_6);
+  __pyx_t_4 = 0;
+  __pyx_t_6 = 0;
+  __pyx_r = __pyx_t_5;
+  __pyx_t_5 = 0;
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":21
+ *         return self.c_lock_table.unlock_all()
+ * 
+ *     def masked_cas(self, unsigned int index, old, new_value, mask):             # <<<<<<<<<<<<<<
+ *         #todo: these are getting called with arrays convert them to uin64_t
+ *         response = self.c_lock_table.masked_cas(index, old, new_value, mask)
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_4);
+  __Pyx_XDECREF(__pyx_t_5);
+  __Pyx_XDECREF(__pyx_t_6);
+  __Pyx_AddTraceback("ctables.Lock_Table.masked_cas", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":26
+ *         return (response.success, response.new_value)
+ * 
+ *     def fill_masked_cas(self, unsigned int index, bool success, new_value, mask):             # <<<<<<<<<<<<<<
+ *         #todo: these are getting called with arrays convert them to uin64_t
+ *         self.c_lock_table.fill_masked_cas(index, success, new_value, mask)
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_10Lock_Table_7fill_masked_cas(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyObject *__pyx_pw_7ctables_10Lock_Table_7fill_masked_cas(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  unsigned int __pyx_v_index;
+  bool __pyx_v_success;
+  PyObject *__pyx_v_new_value = 0;
+  PyObject *__pyx_v_mask = 0;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("fill_masked_cas (wrapper)", 0);
+  {
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_index,&__pyx_n_s_success,&__pyx_n_s_new_value,&__pyx_n_s_mask,0};
+    PyObject* values[4] = {0,0,0,0};
+    if (unlikely(__pyx_kwds)) {
+      Py_ssize_t kw_args;
+      const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
+      switch (pos_args) {
+        case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+        CYTHON_FALLTHROUGH;
+        case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+        CYTHON_FALLTHROUGH;
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        CYTHON_FALLTHROUGH;
+        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        CYTHON_FALLTHROUGH;
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+      kw_args = PyDict_Size(__pyx_kwds);
+      switch (pos_args) {
+        case  0:
+        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_index)) != 0)) kw_args--;
+        else goto __pyx_L5_argtuple_error;
+        CYTHON_FALLTHROUGH;
+        case  1:
+        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_success)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("fill_masked_cas", 1, 4, 4, 1); __PYX_ERR(1, 26, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  2:
+        if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_new_value)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("fill_masked_cas", 1, 4, 4, 2); __PYX_ERR(1, 26, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  3:
+        if (likely((values[3] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_mask)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("fill_masked_cas", 1, 4, 4, 3); __PYX_ERR(1, 26, __pyx_L3_error)
+        }
+      }
+      if (unlikely(kw_args > 0)) {
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "fill_masked_cas") < 0)) __PYX_ERR(1, 26, __pyx_L3_error)
+      }
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 4) {
+      goto __pyx_L5_argtuple_error;
+    } else {
+      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+      values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+      values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+      values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+    }
+    __pyx_v_index = __Pyx_PyInt_As_unsigned_int(values[0]); if (unlikely((__pyx_v_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 26, __pyx_L3_error)
+    __pyx_v_success = __Pyx_PyObject_IsTrue(values[1]); if (unlikely((__pyx_v_success == ((bool)-1)) && PyErr_Occurred())) __PYX_ERR(1, 26, __pyx_L3_error)
+    __pyx_v_new_value = values[2];
+    __pyx_v_mask = values[3];
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L5_argtuple_error:;
+  __Pyx_RaiseArgtupleInvalid("fill_masked_cas", 1, 4, 4, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 26, __pyx_L3_error)
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("ctables.Lock_Table.fill_masked_cas", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_7ctables_10Lock_Table_6fill_masked_cas(((struct __pyx_obj_7ctables_Lock_Table *)__pyx_v_self), __pyx_v_index, __pyx_v_success, __pyx_v_new_value, __pyx_v_mask);
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_10Lock_Table_6fill_masked_cas(struct __pyx_obj_7ctables_Lock_Table *__pyx_v_self, unsigned int __pyx_v_index, bool __pyx_v_success, PyObject *__pyx_v_new_value, PyObject *__pyx_v_mask) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  uint64_t __pyx_t_1;
+  uint64_t __pyx_t_2;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("fill_masked_cas", 0);
+
+  /* "tables_wrapper.pyx":28
+ *     def fill_masked_cas(self, unsigned int index, bool success, new_value, mask):
+ *         #todo: these are getting called with arrays convert them to uin64_t
+ *         self.c_lock_table.fill_masked_cas(index, success, new_value, mask)             # <<<<<<<<<<<<<<
+ *         return
+ * 
+ */
+  __pyx_t_1 = __Pyx_PyInt_As_uint64_t(__pyx_v_new_value); if (unlikely((__pyx_t_1 == ((uint64_t)-1)) && PyErr_Occurred())) __PYX_ERR(1, 28, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyInt_As_uint64_t(__pyx_v_mask); if (unlikely((__pyx_t_2 == ((uint64_t)-1)) && PyErr_Occurred())) __PYX_ERR(1, 28, __pyx_L1_error)
+  __pyx_v_self->c_lock_table.fill_masked_cas(__pyx_v_index, __pyx_v_success, __pyx_t_1, __pyx_t_2);
+
+  /* "tables_wrapper.pyx":29
+ *         #todo: these are getting called with arrays convert them to uin64_t
+ *         self.c_lock_table.fill_masked_cas(index, success, new_value, mask)
+ *         return             # <<<<<<<<<<<<<<
+ * 
+ * cdef class Table:
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_r = Py_None; __Pyx_INCREF(Py_None);
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":26
+ *         return (response.success, response.new_value)
+ * 
+ *     def fill_masked_cas(self, unsigned int index, bool success, new_value, mask):             # <<<<<<<<<<<<<<
+ *         #todo: these are getting called with arrays convert them to uin64_t
+ *         self.c_lock_table.fill_masked_cas(index, success, new_value, mask)
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_AddTraceback("ctables.Lock_Table.fill_masked_cas", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "(tree fragment)":1
+ * def __reduce_cython__(self):             # <<<<<<<<<<<<<<
+ *     raise TypeError("self.c_lock_table cannot be converted to a Python object for pickling")
+ * def __setstate_cython__(self, __pyx_state):
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_10Lock_Table_9__reduce_cython__(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
+static PyObject *__pyx_pw_7ctables_10Lock_Table_9__reduce_cython__(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("__reduce_cython__ (wrapper)", 0);
+  __pyx_r = __pyx_pf_7ctables_10Lock_Table_8__reduce_cython__(((struct __pyx_obj_7ctables_Lock_Table *)__pyx_v_self));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_10Lock_Table_8__reduce_cython__(CYTHON_UNUSED struct __pyx_obj_7ctables_Lock_Table *__pyx_v_self) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("__reduce_cython__", 0);
+
+  /* "(tree fragment)":2
+ * def __reduce_cython__(self):
+ *     raise TypeError("self.c_lock_table cannot be converted to a Python object for pickling")             # <<<<<<<<<<<<<<
+ * def __setstate_cython__(self, __pyx_state):
+ *     raise TypeError("self.c_lock_table cannot be converted to a Python object for pickling")
+ */
+  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_TypeError, __pyx_tuple_, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 2, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_Raise(__pyx_t_1, 0, 0, 0);
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __PYX_ERR(0, 2, __pyx_L1_error)
+
+  /* "(tree fragment)":1
+ * def __reduce_cython__(self):             # <<<<<<<<<<<<<<
+ *     raise TypeError("self.c_lock_table cannot be converted to a Python object for pickling")
+ * def __setstate_cython__(self, __pyx_state):
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Lock_Table.__reduce_cython__", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "(tree fragment)":3
+ * def __reduce_cython__(self):
+ *     raise TypeError("self.c_lock_table cannot be converted to a Python object for pickling")
+ * def __setstate_cython__(self, __pyx_state):             # <<<<<<<<<<<<<<
+ *     raise TypeError("self.c_lock_table cannot be converted to a Python object for pickling")
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_10Lock_Table_11__setstate_cython__(PyObject *__pyx_v_self, PyObject *__pyx_v___pyx_state); /*proto*/
+static PyObject *__pyx_pw_7ctables_10Lock_Table_11__setstate_cython__(PyObject *__pyx_v_self, PyObject *__pyx_v___pyx_state) {
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("__setstate_cython__ (wrapper)", 0);
+  __pyx_r = __pyx_pf_7ctables_10Lock_Table_10__setstate_cython__(((struct __pyx_obj_7ctables_Lock_Table *)__pyx_v_self), ((PyObject *)__pyx_v___pyx_state));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_10Lock_Table_10__setstate_cython__(CYTHON_UNUSED struct __pyx_obj_7ctables_Lock_Table *__pyx_v_self, CYTHON_UNUSED PyObject *__pyx_v___pyx_state) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("__setstate_cython__", 0);
+
+  /* "(tree fragment)":4
+ *     raise TypeError("self.c_lock_table cannot be converted to a Python object for pickling")
+ * def __setstate_cython__(self, __pyx_state):
+ *     raise TypeError("self.c_lock_table cannot be converted to a Python object for pickling")             # <<<<<<<<<<<<<<
+ */
+  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_TypeError, __pyx_tuple__2, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 4, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_Raise(__pyx_t_1, 0, 0, 0);
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __PYX_ERR(0, 4, __pyx_L1_error)
+
+  /* "(tree fragment)":3
+ * def __reduce_cython__(self):
+ *     raise TypeError("self.c_lock_table cannot be converted to a Python object for pickling")
+ * def __setstate_cython__(self, __pyx_state):             # <<<<<<<<<<<<<<
+ *     raise TypeError("self.c_lock_table cannot be converted to a Python object for pickling")
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Lock_Table.__setstate_cython__", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":34
+ *     cdef t.Table c_table
  * 
  *     def __init__(self, unsigned int memory_size=-1, unsigned int bucket_size=-1, unsigned int buckets_per_lock=-1):             # <<<<<<<<<<<<<<
  *         if memory_size is not -1 and bucket_size is not -1 and buckets_per_lock is not -1:
@@ -1417,7 +2253,7 @@ static int __pyx_pw_7ctables_5Table_1__init__(PyObject *__pyx_v_self, PyObject *
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "__init__") < 0)) __PYX_ERR(1, 11, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "__init__") < 0)) __PYX_ERR(1, 34, __pyx_L3_error)
       }
     } else {
       switch (PyTuple_GET_SIZE(__pyx_args)) {
@@ -1432,24 +2268,24 @@ static int __pyx_pw_7ctables_5Table_1__init__(PyObject *__pyx_v_self, PyObject *
       }
     }
     if (values[0]) {
-      __pyx_v_memory_size = __Pyx_PyInt_As_unsigned_int(values[0]); if (unlikely((__pyx_v_memory_size == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 11, __pyx_L3_error)
+      __pyx_v_memory_size = __Pyx_PyInt_As_unsigned_int(values[0]); if (unlikely((__pyx_v_memory_size == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 34, __pyx_L3_error)
     } else {
       __pyx_v_memory_size = ((unsigned int)-1);
     }
     if (values[1]) {
-      __pyx_v_bucket_size = __Pyx_PyInt_As_unsigned_int(values[1]); if (unlikely((__pyx_v_bucket_size == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 11, __pyx_L3_error)
+      __pyx_v_bucket_size = __Pyx_PyInt_As_unsigned_int(values[1]); if (unlikely((__pyx_v_bucket_size == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 34, __pyx_L3_error)
     } else {
       __pyx_v_bucket_size = ((unsigned int)-1);
     }
     if (values[2]) {
-      __pyx_v_buckets_per_lock = __Pyx_PyInt_As_unsigned_int(values[2]); if (unlikely((__pyx_v_buckets_per_lock == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 11, __pyx_L3_error)
+      __pyx_v_buckets_per_lock = __Pyx_PyInt_As_unsigned_int(values[2]); if (unlikely((__pyx_v_buckets_per_lock == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 34, __pyx_L3_error)
     } else {
       __pyx_v_buckets_per_lock = ((unsigned int)-1);
     }
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("__init__", 0, 0, 3, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 11, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("__init__", 0, 0, 3, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 34, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("ctables.Table.__init__", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
@@ -1473,7 +2309,7 @@ static int __pyx_pf_7ctables_5Table___init__(struct __pyx_obj_7ctables_Table *__
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("__init__", 0);
 
-  /* "tables_wrapper.pyx":12
+  /* "tables_wrapper.pyx":35
  * 
  *     def __init__(self, unsigned int memory_size=-1, unsigned int bucket_size=-1, unsigned int buckets_per_lock=-1):
  *         if memory_size is not -1 and bucket_size is not -1 and buckets_per_lock is not -1:             # <<<<<<<<<<<<<<
@@ -1497,7 +2333,7 @@ static int __pyx_pf_7ctables_5Table___init__(struct __pyx_obj_7ctables_Table *__
   __pyx_L4_bool_binop_done:;
   if (__pyx_t_1) {
 
-    /* "tables_wrapper.pyx":13
+    /* "tables_wrapper.pyx":36
  *     def __init__(self, unsigned int memory_size=-1, unsigned int bucket_size=-1, unsigned int buckets_per_lock=-1):
  *         if memory_size is not -1 and bucket_size is not -1 and buckets_per_lock is not -1:
  *             self.c_table = t.Table(memory_size, bucket_size, buckets_per_lock)             # <<<<<<<<<<<<<<
@@ -1508,11 +2344,11 @@ static int __pyx_pf_7ctables_5Table___init__(struct __pyx_obj_7ctables_Table *__
       __pyx_t_3 = cuckoo_tables::Table(__pyx_v_memory_size, __pyx_v_bucket_size, __pyx_v_buckets_per_lock);
     } catch(...) {
       __Pyx_CppExn2PyErr();
-      __PYX_ERR(1, 13, __pyx_L1_error)
+      __PYX_ERR(1, 36, __pyx_L1_error)
     }
     __pyx_v_self->c_table = __pyx_t_3;
 
-    /* "tables_wrapper.pyx":12
+    /* "tables_wrapper.pyx":35
  * 
  *     def __init__(self, unsigned int memory_size=-1, unsigned int bucket_size=-1, unsigned int buckets_per_lock=-1):
  *         if memory_size is not -1 and bucket_size is not -1 and buckets_per_lock is not -1:             # <<<<<<<<<<<<<<
@@ -1522,26 +2358,26 @@ static int __pyx_pf_7ctables_5Table___init__(struct __pyx_obj_7ctables_Table *__
     goto __pyx_L3;
   }
 
-  /* "tables_wrapper.pyx":15
+  /* "tables_wrapper.pyx":38
  *             self.c_table = t.Table(memory_size, bucket_size, buckets_per_lock)
  *         else:
  *             self.c_table = t.Table()             # <<<<<<<<<<<<<<
  * 
- *     def n_buckets_size(self, unsigned int n_buckets):
+ *     def unlock_all(self):
  */
   /*else*/ {
     try {
       __pyx_t_3 = cuckoo_tables::Table();
     } catch(...) {
       __Pyx_CppExn2PyErr();
-      __PYX_ERR(1, 15, __pyx_L1_error)
+      __PYX_ERR(1, 38, __pyx_L1_error)
     }
     __pyx_v_self->c_table = __pyx_t_3;
   }
   __pyx_L3:;
 
-  /* "tables_wrapper.pyx":11
- * 
+  /* "tables_wrapper.pyx":34
+ *     cdef t.Table c_table
  * 
  *     def __init__(self, unsigned int memory_size=-1, unsigned int bucket_size=-1, unsigned int buckets_per_lock=-1):             # <<<<<<<<<<<<<<
  *         if memory_size is not -1 and bucket_size is not -1 and buckets_per_lock is not -1:
@@ -1559,16 +2395,614 @@ static int __pyx_pf_7ctables_5Table___init__(struct __pyx_obj_7ctables_Table *__
   return __pyx_r;
 }
 
-/* "tables_wrapper.pyx":17
+/* "tables_wrapper.pyx":40
  *             self.c_table = t.Table()
  * 
- *     def n_buckets_size(self, unsigned int n_buckets):             # <<<<<<<<<<<<<<
- *         return self.c_table.n_buckets_size(n_buckets)
+ *     def unlock_all(self):             # <<<<<<<<<<<<<<
+ *         return self.c_table.unlock_all()
+ * 
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_7ctables_5Table_3n_buckets_size(PyObject *__pyx_v_self, PyObject *__pyx_arg_n_buckets); /*proto*/
-static PyObject *__pyx_pw_7ctables_5Table_3n_buckets_size(PyObject *__pyx_v_self, PyObject *__pyx_arg_n_buckets) {
+static PyObject *__pyx_pw_7ctables_5Table_3unlock_all(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_3unlock_all(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("unlock_all (wrapper)", 0);
+  __pyx_r = __pyx_pf_7ctables_5Table_2unlock_all(((struct __pyx_obj_7ctables_Table *)__pyx_v_self));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_5Table_2unlock_all(struct __pyx_obj_7ctables_Table *__pyx_v_self) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("unlock_all", 0);
+
+  /* "tables_wrapper.pyx":41
+ * 
+ *     def unlock_all(self):
+ *         return self.c_table.unlock_all()             # <<<<<<<<<<<<<<
+ * 
+ *     def print_table(self):
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_void_to_None(__pyx_v_self->c_table.unlock_all()); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 41, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":40
+ *             self.c_table = t.Table()
+ * 
+ *     def unlock_all(self):             # <<<<<<<<<<<<<<
+ *         return self.c_table.unlock_all()
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Table.unlock_all", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":43
+ *         return self.c_table.unlock_all()
+ * 
+ *     def print_table(self):             # <<<<<<<<<<<<<<
+ *         return self.c_table.print_table()
+ * 
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_5Table_5print_table(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_5print_table(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("print_table (wrapper)", 0);
+  __pyx_r = __pyx_pf_7ctables_5Table_4print_table(((struct __pyx_obj_7ctables_Table *)__pyx_v_self));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_5Table_4print_table(struct __pyx_obj_7ctables_Table *__pyx_v_self) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("print_table", 0);
+
+  /* "tables_wrapper.pyx":44
+ * 
+ *     def print_table(self):
+ *         return self.c_table.print_table()             # <<<<<<<<<<<<<<
+ * 
+ *     def lock_table_masked_cas(self, unsigned int lock_index, old, new_value, mask):
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_void_to_None(__pyx_v_self->c_table.print_table()); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 44, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":43
+ *         return self.c_table.unlock_all()
+ * 
+ *     def print_table(self):             # <<<<<<<<<<<<<<
+ *         return self.c_table.print_table()
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Table.print_table", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":46
+ *         return self.c_table.print_table()
+ * 
+ *     def lock_table_masked_cas(self, unsigned int lock_index, old, new_value, mask):             # <<<<<<<<<<<<<<
+ *         return self.c_table.lock_table_masked_cas(lock_index, old, new_value, mask)
+ * 
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_5Table_7lock_table_masked_cas(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_7lock_table_masked_cas(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  unsigned int __pyx_v_lock_index;
+  PyObject *__pyx_v_old = 0;
+  PyObject *__pyx_v_new_value = 0;
+  PyObject *__pyx_v_mask = 0;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("lock_table_masked_cas (wrapper)", 0);
+  {
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_lock_index,&__pyx_n_s_old,&__pyx_n_s_new_value,&__pyx_n_s_mask,0};
+    PyObject* values[4] = {0,0,0,0};
+    if (unlikely(__pyx_kwds)) {
+      Py_ssize_t kw_args;
+      const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
+      switch (pos_args) {
+        case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+        CYTHON_FALLTHROUGH;
+        case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+        CYTHON_FALLTHROUGH;
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        CYTHON_FALLTHROUGH;
+        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        CYTHON_FALLTHROUGH;
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+      kw_args = PyDict_Size(__pyx_kwds);
+      switch (pos_args) {
+        case  0:
+        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_lock_index)) != 0)) kw_args--;
+        else goto __pyx_L5_argtuple_error;
+        CYTHON_FALLTHROUGH;
+        case  1:
+        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_old)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("lock_table_masked_cas", 1, 4, 4, 1); __PYX_ERR(1, 46, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  2:
+        if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_new_value)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("lock_table_masked_cas", 1, 4, 4, 2); __PYX_ERR(1, 46, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  3:
+        if (likely((values[3] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_mask)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("lock_table_masked_cas", 1, 4, 4, 3); __PYX_ERR(1, 46, __pyx_L3_error)
+        }
+      }
+      if (unlikely(kw_args > 0)) {
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "lock_table_masked_cas") < 0)) __PYX_ERR(1, 46, __pyx_L3_error)
+      }
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 4) {
+      goto __pyx_L5_argtuple_error;
+    } else {
+      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+      values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+      values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+      values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+    }
+    __pyx_v_lock_index = __Pyx_PyInt_As_unsigned_int(values[0]); if (unlikely((__pyx_v_lock_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 46, __pyx_L3_error)
+    __pyx_v_old = values[1];
+    __pyx_v_new_value = values[2];
+    __pyx_v_mask = values[3];
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L5_argtuple_error:;
+  __Pyx_RaiseArgtupleInvalid("lock_table_masked_cas", 1, 4, 4, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 46, __pyx_L3_error)
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("ctables.Table.lock_table_masked_cas", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_7ctables_5Table_6lock_table_masked_cas(((struct __pyx_obj_7ctables_Table *)__pyx_v_self), __pyx_v_lock_index, __pyx_v_old, __pyx_v_new_value, __pyx_v_mask);
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_5Table_6lock_table_masked_cas(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_lock_index, PyObject *__pyx_v_old, PyObject *__pyx_v_new_value, PyObject *__pyx_v_mask) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  uint64_t __pyx_t_1;
+  uint64_t __pyx_t_2;
+  uint64_t __pyx_t_3;
+  PyObject *__pyx_t_4 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("lock_table_masked_cas", 0);
+
+  /* "tables_wrapper.pyx":47
+ * 
+ *     def lock_table_masked_cas(self, unsigned int lock_index, old, new_value, mask):
+ *         return self.c_table.lock_table_masked_cas(lock_index, old, new_value, mask)             # <<<<<<<<<<<<<<
+ * 
+ * 
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_PyInt_As_uint64_t(__pyx_v_old); if (unlikely((__pyx_t_1 == ((uint64_t)-1)) && PyErr_Occurred())) __PYX_ERR(1, 47, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyInt_As_uint64_t(__pyx_v_new_value); if (unlikely((__pyx_t_2 == ((uint64_t)-1)) && PyErr_Occurred())) __PYX_ERR(1, 47, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyInt_As_uint64_t(__pyx_v_mask); if (unlikely((__pyx_t_3 == ((uint64_t)-1)) && PyErr_Occurred())) __PYX_ERR(1, 47, __pyx_L1_error)
+  __pyx_t_4 = __pyx_convert__to_py_struct__cuckoo_tables_3a__3a_CasOperationReturn(__pyx_v_self->c_table.lock_table_masked_cas(__pyx_v_lock_index, __pyx_t_1, __pyx_t_2, __pyx_t_3)); if (unlikely(!__pyx_t_4)) __PYX_ERR(1, 47, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __pyx_r = __pyx_t_4;
+  __pyx_t_4 = 0;
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":46
+ *         return self.c_table.print_table()
+ * 
+ *     def lock_table_masked_cas(self, unsigned int lock_index, old, new_value, mask):             # <<<<<<<<<<<<<<
+ *         return self.c_table.lock_table_masked_cas(lock_index, old, new_value, mask)
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_4);
+  __Pyx_AddTraceback("ctables.Table.lock_table_masked_cas", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":50
+ * 
+ * 
+ *     def fill_lock_table_masked_cas(self, unsigned int lock_index, bool success, value, mask):             # <<<<<<<<<<<<<<
+ *         return self.c_table.fill_lock_table_masked_cas(lock_index, success, value, mask)
+ * 
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_5Table_9fill_lock_table_masked_cas(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_9fill_lock_table_masked_cas(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  unsigned int __pyx_v_lock_index;
+  bool __pyx_v_success;
+  PyObject *__pyx_v_value = 0;
+  PyObject *__pyx_v_mask = 0;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("fill_lock_table_masked_cas (wrapper)", 0);
+  {
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_lock_index,&__pyx_n_s_success,&__pyx_n_s_value,&__pyx_n_s_mask,0};
+    PyObject* values[4] = {0,0,0,0};
+    if (unlikely(__pyx_kwds)) {
+      Py_ssize_t kw_args;
+      const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
+      switch (pos_args) {
+        case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+        CYTHON_FALLTHROUGH;
+        case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+        CYTHON_FALLTHROUGH;
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        CYTHON_FALLTHROUGH;
+        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        CYTHON_FALLTHROUGH;
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+      kw_args = PyDict_Size(__pyx_kwds);
+      switch (pos_args) {
+        case  0:
+        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_lock_index)) != 0)) kw_args--;
+        else goto __pyx_L5_argtuple_error;
+        CYTHON_FALLTHROUGH;
+        case  1:
+        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_success)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("fill_lock_table_masked_cas", 1, 4, 4, 1); __PYX_ERR(1, 50, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  2:
+        if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_value)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("fill_lock_table_masked_cas", 1, 4, 4, 2); __PYX_ERR(1, 50, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  3:
+        if (likely((values[3] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_mask)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("fill_lock_table_masked_cas", 1, 4, 4, 3); __PYX_ERR(1, 50, __pyx_L3_error)
+        }
+      }
+      if (unlikely(kw_args > 0)) {
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "fill_lock_table_masked_cas") < 0)) __PYX_ERR(1, 50, __pyx_L3_error)
+      }
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 4) {
+      goto __pyx_L5_argtuple_error;
+    } else {
+      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+      values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+      values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+      values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+    }
+    __pyx_v_lock_index = __Pyx_PyInt_As_unsigned_int(values[0]); if (unlikely((__pyx_v_lock_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 50, __pyx_L3_error)
+    __pyx_v_success = __Pyx_PyObject_IsTrue(values[1]); if (unlikely((__pyx_v_success == ((bool)-1)) && PyErr_Occurred())) __PYX_ERR(1, 50, __pyx_L3_error)
+    __pyx_v_value = values[2];
+    __pyx_v_mask = values[3];
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L5_argtuple_error:;
+  __Pyx_RaiseArgtupleInvalid("fill_lock_table_masked_cas", 1, 4, 4, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 50, __pyx_L3_error)
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("ctables.Table.fill_lock_table_masked_cas", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_7ctables_5Table_8fill_lock_table_masked_cas(((struct __pyx_obj_7ctables_Table *)__pyx_v_self), __pyx_v_lock_index, __pyx_v_success, __pyx_v_value, __pyx_v_mask);
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_5Table_8fill_lock_table_masked_cas(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_lock_index, bool __pyx_v_success, PyObject *__pyx_v_value, PyObject *__pyx_v_mask) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  uint64_t __pyx_t_1;
+  uint64_t __pyx_t_2;
+  PyObject *__pyx_t_3 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("fill_lock_table_masked_cas", 0);
+
+  /* "tables_wrapper.pyx":51
+ * 
+ *     def fill_lock_table_masked_cas(self, unsigned int lock_index, bool success, value, mask):
+ *         return self.c_table.fill_lock_table_masked_cas(lock_index, success, value, mask)             # <<<<<<<<<<<<<<
+ * 
+ *     def get_bucket_size(self):
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_PyInt_As_uint64_t(__pyx_v_value); if (unlikely((__pyx_t_1 == ((uint64_t)-1)) && PyErr_Occurred())) __PYX_ERR(1, 51, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyInt_As_uint64_t(__pyx_v_mask); if (unlikely((__pyx_t_2 == ((uint64_t)-1)) && PyErr_Occurred())) __PYX_ERR(1, 51, __pyx_L1_error)
+  __pyx_t_3 = __pyx_convert__to_py_struct__cuckoo_tables_3a__3a_CasOperationReturn(__pyx_v_self->c_table.fill_lock_table_masked_cas(__pyx_v_lock_index, __pyx_v_success, __pyx_t_1, __pyx_t_2)); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 51, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __pyx_r = __pyx_t_3;
+  __pyx_t_3 = 0;
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":50
+ * 
+ * 
+ *     def fill_lock_table_masked_cas(self, unsigned int lock_index, bool success, value, mask):             # <<<<<<<<<<<<<<
+ *         return self.c_table.fill_lock_table_masked_cas(lock_index, success, value, mask)
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_3);
+  __Pyx_AddTraceback("ctables.Table.fill_lock_table_masked_cas", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":53
+ *         return self.c_table.fill_lock_table_masked_cas(lock_index, success, value, mask)
+ * 
+ *     def get_bucket_size(self):             # <<<<<<<<<<<<<<
+ *         return self.c_table.get_bucket_size()
+ * 
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_5Table_11get_bucket_size(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_11get_bucket_size(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("get_bucket_size (wrapper)", 0);
+  __pyx_r = __pyx_pf_7ctables_5Table_10get_bucket_size(((struct __pyx_obj_7ctables_Table *)__pyx_v_self));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_5Table_10get_bucket_size(struct __pyx_obj_7ctables_Table *__pyx_v_self) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("get_bucket_size", 0);
+
+  /* "tables_wrapper.pyx":54
+ * 
+ *     def get_bucket_size(self):
+ *         return self.c_table.get_bucket_size()             # <<<<<<<<<<<<<<
+ * 
+ *     def row_size_bytes(self):
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_PyInt_From_unsigned_int(__pyx_v_self->c_table.get_bucket_size()); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 54, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":53
+ *         return self.c_table.fill_lock_table_masked_cas(lock_index, success, value, mask)
+ * 
+ *     def get_bucket_size(self):             # <<<<<<<<<<<<<<
+ *         return self.c_table.get_bucket_size()
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Table.get_bucket_size", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":56
+ *         return self.c_table.get_bucket_size()
+ * 
+ *     def row_size_bytes(self):             # <<<<<<<<<<<<<<
+ *         return self.c_table.row_size_bytes()
+ * 
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_5Table_13row_size_bytes(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_13row_size_bytes(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("row_size_bytes (wrapper)", 0);
+  __pyx_r = __pyx_pf_7ctables_5Table_12row_size_bytes(((struct __pyx_obj_7ctables_Table *)__pyx_v_self));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_5Table_12row_size_bytes(struct __pyx_obj_7ctables_Table *__pyx_v_self) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("row_size_bytes", 0);
+
+  /* "tables_wrapper.pyx":57
+ * 
+ *     def row_size_bytes(self):
+ *         return self.c_table.row_size_bytes()             # <<<<<<<<<<<<<<
+ * 
+ *     def row_size_indexes(self):
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_PyInt_From_unsigned_int(__pyx_v_self->c_table.row_size_bytes()); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 57, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":56
+ *         return self.c_table.get_bucket_size()
+ * 
+ *     def row_size_bytes(self):             # <<<<<<<<<<<<<<
+ *         return self.c_table.row_size_bytes()
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Table.row_size_bytes", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":59
+ *         return self.c_table.row_size_bytes()
+ * 
+ *     def row_size_indexes(self):             # <<<<<<<<<<<<<<
+ *         return self.c_table.row_size_indexes()
+ * 
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_5Table_15row_size_indexes(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_15row_size_indexes(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("row_size_indexes (wrapper)", 0);
+  __pyx_r = __pyx_pf_7ctables_5Table_14row_size_indexes(((struct __pyx_obj_7ctables_Table *)__pyx_v_self));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_5Table_14row_size_indexes(struct __pyx_obj_7ctables_Table *__pyx_v_self) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("row_size_indexes", 0);
+
+  /* "tables_wrapper.pyx":60
+ * 
+ *     def row_size_indexes(self):
+ *         return self.c_table.row_size_indexes()             # <<<<<<<<<<<<<<
+ * 
+ *     def n_buckets_size(self, unsigned int n_buckets):
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_PyInt_From_unsigned_int(__pyx_v_self->c_table.row_size_indexes()); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 60, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":59
+ *         return self.c_table.row_size_bytes()
+ * 
+ *     def row_size_indexes(self):             # <<<<<<<<<<<<<<
+ *         return self.c_table.row_size_indexes()
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Table.row_size_indexes", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":62
+ *         return self.c_table.row_size_indexes()
+ * 
+ *     def n_buckets_size(self, unsigned int n_buckets):             # <<<<<<<<<<<<<<
+ *         return self.c_table.n_buckets_size(n_buckets)
+ * 
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_5Table_17n_buckets_size(PyObject *__pyx_v_self, PyObject *__pyx_arg_n_buckets); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_17n_buckets_size(PyObject *__pyx_v_self, PyObject *__pyx_arg_n_buckets) {
   unsigned int __pyx_v_n_buckets;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
@@ -1577,7 +3011,7 @@ static PyObject *__pyx_pw_7ctables_5Table_3n_buckets_size(PyObject *__pyx_v_self
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("n_buckets_size (wrapper)", 0);
   assert(__pyx_arg_n_buckets); {
-    __pyx_v_n_buckets = __Pyx_PyInt_As_unsigned_int(__pyx_arg_n_buckets); if (unlikely((__pyx_v_n_buckets == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 17, __pyx_L3_error)
+    __pyx_v_n_buckets = __Pyx_PyInt_As_unsigned_int(__pyx_arg_n_buckets); if (unlikely((__pyx_v_n_buckets == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 62, __pyx_L3_error)
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -1585,14 +3019,14 @@ static PyObject *__pyx_pw_7ctables_5Table_3n_buckets_size(PyObject *__pyx_v_self
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_7ctables_5Table_2n_buckets_size(((struct __pyx_obj_7ctables_Table *)__pyx_v_self), ((unsigned int)__pyx_v_n_buckets));
+  __pyx_r = __pyx_pf_7ctables_5Table_16n_buckets_size(((struct __pyx_obj_7ctables_Table *)__pyx_v_self), ((unsigned int)__pyx_v_n_buckets));
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_7ctables_5Table_2n_buckets_size(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_n_buckets) {
+static PyObject *__pyx_pf_7ctables_5Table_16n_buckets_size(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_n_buckets) {
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   PyObject *__pyx_t_1 = NULL;
@@ -1601,29 +3035,1378 @@ static PyObject *__pyx_pf_7ctables_5Table_2n_buckets_size(struct __pyx_obj_7ctab
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("n_buckets_size", 0);
 
-  /* "tables_wrapper.pyx":18
+  /* "tables_wrapper.pyx":63
  * 
  *     def n_buckets_size(self, unsigned int n_buckets):
  *         return self.c_table.n_buckets_size(n_buckets)             # <<<<<<<<<<<<<<
+ * 
+ *     def get_entry(self, unsigned int bucket_index, unsigned int offset):
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __Pyx_PyInt_From_unsigned_int(__pyx_v_self->c_table.n_buckets_size(__pyx_v_n_buckets)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 18, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyInt_From_unsigned_int(__pyx_v_self->c_table.n_buckets_size(__pyx_v_n_buckets)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 63, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "tables_wrapper.pyx":17
- *             self.c_table = t.Table()
+  /* "tables_wrapper.pyx":62
+ *         return self.c_table.row_size_indexes()
  * 
  *     def n_buckets_size(self, unsigned int n_buckets):             # <<<<<<<<<<<<<<
  *         return self.c_table.n_buckets_size(n_buckets)
+ * 
  */
 
   /* function exit code */
   __pyx_L1_error:;
   __Pyx_XDECREF(__pyx_t_1);
   __Pyx_AddTraceback("ctables.Table.n_buckets_size", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":65
+ *         return self.c_table.n_buckets_size(n_buckets)
+ * 
+ *     def get_entry(self, unsigned int bucket_index, unsigned int offset):             # <<<<<<<<<<<<<<
+ *         e = self.c_table.get_entry(bucket_index, offset)
+ *         return e.key
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_5Table_19get_entry(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_19get_entry(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  unsigned int __pyx_v_bucket_index;
+  unsigned int __pyx_v_offset;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("get_entry (wrapper)", 0);
+  {
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_bucket_index,&__pyx_n_s_offset,0};
+    PyObject* values[2] = {0,0};
+    if (unlikely(__pyx_kwds)) {
+      Py_ssize_t kw_args;
+      const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
+      switch (pos_args) {
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        CYTHON_FALLTHROUGH;
+        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        CYTHON_FALLTHROUGH;
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+      kw_args = PyDict_Size(__pyx_kwds);
+      switch (pos_args) {
+        case  0:
+        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_bucket_index)) != 0)) kw_args--;
+        else goto __pyx_L5_argtuple_error;
+        CYTHON_FALLTHROUGH;
+        case  1:
+        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_offset)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("get_entry", 1, 2, 2, 1); __PYX_ERR(1, 65, __pyx_L3_error)
+        }
+      }
+      if (unlikely(kw_args > 0)) {
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "get_entry") < 0)) __PYX_ERR(1, 65, __pyx_L3_error)
+      }
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 2) {
+      goto __pyx_L5_argtuple_error;
+    } else {
+      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+      values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+    }
+    __pyx_v_bucket_index = __Pyx_PyInt_As_unsigned_int(values[0]); if (unlikely((__pyx_v_bucket_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 65, __pyx_L3_error)
+    __pyx_v_offset = __Pyx_PyInt_As_unsigned_int(values[1]); if (unlikely((__pyx_v_offset == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 65, __pyx_L3_error)
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L5_argtuple_error:;
+  __Pyx_RaiseArgtupleInvalid("get_entry", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 65, __pyx_L3_error)
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("ctables.Table.get_entry", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_7ctables_5Table_18get_entry(((struct __pyx_obj_7ctables_Table *)__pyx_v_self), __pyx_v_bucket_index, __pyx_v_offset);
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_5Table_18get_entry(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_bucket_index, unsigned int __pyx_v_offset) {
+  struct cuckoo_tables::Entry __pyx_v_e;
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("get_entry", 0);
+
+  /* "tables_wrapper.pyx":66
+ * 
+ *     def get_entry(self, unsigned int bucket_index, unsigned int offset):
+ *         e = self.c_table.get_entry(bucket_index, offset)             # <<<<<<<<<<<<<<
+ *         return e.key
+ * 
+ */
+  __pyx_v_e = __pyx_v_self->c_table.get_entry(__pyx_v_bucket_index, __pyx_v_offset);
+
+  /* "tables_wrapper.pyx":67
+ *     def get_entry(self, unsigned int bucket_index, unsigned int offset):
+ *         e = self.c_table.get_entry(bucket_index, offset)
+ *         return e.key             # <<<<<<<<<<<<<<
+ * 
+ *     def set_entry(self, unsigned int bucket_index, unsigned int offset, entry):
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_PyInt_From_unsigned_int(__pyx_v_e.key); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 67, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":65
+ *         return self.c_table.n_buckets_size(n_buckets)
+ * 
+ *     def get_entry(self, unsigned int bucket_index, unsigned int offset):             # <<<<<<<<<<<<<<
+ *         e = self.c_table.get_entry(bucket_index, offset)
+ *         return e.key
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Table.get_entry", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":69
+ *         return e.key
+ * 
+ *     def set_entry(self, unsigned int bucket_index, unsigned int offset, entry):             # <<<<<<<<<<<<<<
+ *         #todo wrap the entry type
+ *         print("WARNING WARNING WARNING set_entry")
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_5Table_21set_entry(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_21set_entry(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  unsigned int __pyx_v_bucket_index;
+  unsigned int __pyx_v_offset;
+  PyObject *__pyx_v_entry = 0;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("set_entry (wrapper)", 0);
+  {
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_bucket_index,&__pyx_n_s_offset,&__pyx_n_s_entry,0};
+    PyObject* values[3] = {0,0,0};
+    if (unlikely(__pyx_kwds)) {
+      Py_ssize_t kw_args;
+      const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
+      switch (pos_args) {
+        case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+        CYTHON_FALLTHROUGH;
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        CYTHON_FALLTHROUGH;
+        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        CYTHON_FALLTHROUGH;
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+      kw_args = PyDict_Size(__pyx_kwds);
+      switch (pos_args) {
+        case  0:
+        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_bucket_index)) != 0)) kw_args--;
+        else goto __pyx_L5_argtuple_error;
+        CYTHON_FALLTHROUGH;
+        case  1:
+        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_offset)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("set_entry", 1, 3, 3, 1); __PYX_ERR(1, 69, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  2:
+        if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_entry)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("set_entry", 1, 3, 3, 2); __PYX_ERR(1, 69, __pyx_L3_error)
+        }
+      }
+      if (unlikely(kw_args > 0)) {
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "set_entry") < 0)) __PYX_ERR(1, 69, __pyx_L3_error)
+      }
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 3) {
+      goto __pyx_L5_argtuple_error;
+    } else {
+      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+      values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+      values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+    }
+    __pyx_v_bucket_index = __Pyx_PyInt_As_unsigned_int(values[0]); if (unlikely((__pyx_v_bucket_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 69, __pyx_L3_error)
+    __pyx_v_offset = __Pyx_PyInt_As_unsigned_int(values[1]); if (unlikely((__pyx_v_offset == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 69, __pyx_L3_error)
+    __pyx_v_entry = values[2];
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L5_argtuple_error:;
+  __Pyx_RaiseArgtupleInvalid("set_entry", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 69, __pyx_L3_error)
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("ctables.Table.set_entry", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_7ctables_5Table_20set_entry(((struct __pyx_obj_7ctables_Table *)__pyx_v_self), __pyx_v_bucket_index, __pyx_v_offset, __pyx_v_entry);
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_5Table_20set_entry(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_bucket_index, unsigned int __pyx_v_offset, PyObject *__pyx_v_entry) {
+  PyObject *__pyx_v_c_entry = NULL;
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  struct cuckoo_tables::Entry __pyx_t_2;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("set_entry", 0);
+
+  /* "tables_wrapper.pyx":71
+ *     def set_entry(self, unsigned int bucket_index, unsigned int offset, entry):
+ *         #todo wrap the entry type
+ *         print("WARNING WARNING WARNING set_entry")             # <<<<<<<<<<<<<<
+ *         # c_entry = Entry(entry, 0)
+ *         c_entry = entry
+ */
+  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_print, __pyx_tuple__3, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 71, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+
+  /* "tables_wrapper.pyx":73
+ *         print("WARNING WARNING WARNING set_entry")
+ *         # c_entry = Entry(entry, 0)
+ *         c_entry = entry             # <<<<<<<<<<<<<<
+ *         self.c_table.set_entry(bucket_index, offset, c_entry)
+ * 
+ */
+  __Pyx_INCREF(__pyx_v_entry);
+  __pyx_v_c_entry = __pyx_v_entry;
+
+  /* "tables_wrapper.pyx":74
+ *         # c_entry = Entry(entry, 0)
+ *         c_entry = entry
+ *         self.c_table.set_entry(bucket_index, offset, c_entry)             # <<<<<<<<<<<<<<
+ * 
+ * 
+ */
+  __pyx_t_2 = __pyx_convert__from_py_struct__cuckoo_tables_3a__3a_Entry(__pyx_v_c_entry); if (unlikely(PyErr_Occurred())) __PYX_ERR(1, 74, __pyx_L1_error)
+  __pyx_v_self->c_table.set_entry(__pyx_v_bucket_index, __pyx_v_offset, __pyx_t_2);
+
+  /* "tables_wrapper.pyx":69
+ *         return e.key
+ * 
+ *     def set_entry(self, unsigned int bucket_index, unsigned int offset, entry):             # <<<<<<<<<<<<<<
+ *         #todo wrap the entry type
+ *         print("WARNING WARNING WARNING set_entry")
+ */
+
+  /* function exit code */
+  __pyx_r = Py_None; __Pyx_INCREF(Py_None);
+  goto __pyx_L0;
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Table.set_entry", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XDECREF(__pyx_v_c_entry);
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":77
+ * 
+ * 
+ *     def bucket_has_empty(self, unsigned int bucket_index):             # <<<<<<<<<<<<<<
+ *         return self.c_table.bucket_has_empty(bucket_index)
+ * 
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_5Table_23bucket_has_empty(PyObject *__pyx_v_self, PyObject *__pyx_arg_bucket_index); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_23bucket_has_empty(PyObject *__pyx_v_self, PyObject *__pyx_arg_bucket_index) {
+  unsigned int __pyx_v_bucket_index;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("bucket_has_empty (wrapper)", 0);
+  assert(__pyx_arg_bucket_index); {
+    __pyx_v_bucket_index = __Pyx_PyInt_As_unsigned_int(__pyx_arg_bucket_index); if (unlikely((__pyx_v_bucket_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 77, __pyx_L3_error)
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("ctables.Table.bucket_has_empty", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_7ctables_5Table_22bucket_has_empty(((struct __pyx_obj_7ctables_Table *)__pyx_v_self), ((unsigned int)__pyx_v_bucket_index));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_5Table_22bucket_has_empty(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_bucket_index) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("bucket_has_empty", 0);
+
+  /* "tables_wrapper.pyx":78
+ * 
+ *     def bucket_has_empty(self, unsigned int bucket_index):
+ *         return self.c_table.bucket_has_empty(bucket_index)             # <<<<<<<<<<<<<<
+ * 
+ *     def get_first_empty_index(self, unsigned int bucket_index):
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_PyBool_FromLong(__pyx_v_self->c_table.bucket_has_empty(__pyx_v_bucket_index)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 78, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":77
+ * 
+ * 
+ *     def bucket_has_empty(self, unsigned int bucket_index):             # <<<<<<<<<<<<<<
+ *         return self.c_table.bucket_has_empty(bucket_index)
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Table.bucket_has_empty", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":80
+ *         return self.c_table.bucket_has_empty(bucket_index)
+ * 
+ *     def get_first_empty_index(self, unsigned int bucket_index):             # <<<<<<<<<<<<<<
+ *         return self.c_table.get_first_empty_index(bucket_index)
+ * 
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_5Table_25get_first_empty_index(PyObject *__pyx_v_self, PyObject *__pyx_arg_bucket_index); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_25get_first_empty_index(PyObject *__pyx_v_self, PyObject *__pyx_arg_bucket_index) {
+  unsigned int __pyx_v_bucket_index;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("get_first_empty_index (wrapper)", 0);
+  assert(__pyx_arg_bucket_index); {
+    __pyx_v_bucket_index = __Pyx_PyInt_As_unsigned_int(__pyx_arg_bucket_index); if (unlikely((__pyx_v_bucket_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 80, __pyx_L3_error)
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("ctables.Table.get_first_empty_index", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_7ctables_5Table_24get_first_empty_index(((struct __pyx_obj_7ctables_Table *)__pyx_v_self), ((unsigned int)__pyx_v_bucket_index));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_5Table_24get_first_empty_index(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_bucket_index) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("get_first_empty_index", 0);
+
+  /* "tables_wrapper.pyx":81
+ * 
+ *     def get_first_empty_index(self, unsigned int bucket_index):
+ *         return self.c_table.get_first_empty_index(bucket_index)             # <<<<<<<<<<<<<<
+ * 
+ *     def bucket_contains(self, unsigned int bucket_index, unsigned int key):
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_PyInt_From_unsigned_int(__pyx_v_self->c_table.get_first_empty_index(__pyx_v_bucket_index)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 81, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":80
+ *         return self.c_table.bucket_has_empty(bucket_index)
+ * 
+ *     def get_first_empty_index(self, unsigned int bucket_index):             # <<<<<<<<<<<<<<
+ *         return self.c_table.get_first_empty_index(bucket_index)
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Table.get_first_empty_index", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":83
+ *         return self.c_table.get_first_empty_index(bucket_index)
+ * 
+ *     def bucket_contains(self, unsigned int bucket_index, unsigned int key):             # <<<<<<<<<<<<<<
+ *         return self.c_table.bucket_contains(bucket_index, key)
+ * 
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_5Table_27bucket_contains(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_27bucket_contains(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  unsigned int __pyx_v_bucket_index;
+  unsigned int __pyx_v_key;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("bucket_contains (wrapper)", 0);
+  {
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_bucket_index,&__pyx_n_s_key,0};
+    PyObject* values[2] = {0,0};
+    if (unlikely(__pyx_kwds)) {
+      Py_ssize_t kw_args;
+      const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
+      switch (pos_args) {
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        CYTHON_FALLTHROUGH;
+        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        CYTHON_FALLTHROUGH;
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+      kw_args = PyDict_Size(__pyx_kwds);
+      switch (pos_args) {
+        case  0:
+        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_bucket_index)) != 0)) kw_args--;
+        else goto __pyx_L5_argtuple_error;
+        CYTHON_FALLTHROUGH;
+        case  1:
+        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_key)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("bucket_contains", 1, 2, 2, 1); __PYX_ERR(1, 83, __pyx_L3_error)
+        }
+      }
+      if (unlikely(kw_args > 0)) {
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "bucket_contains") < 0)) __PYX_ERR(1, 83, __pyx_L3_error)
+      }
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 2) {
+      goto __pyx_L5_argtuple_error;
+    } else {
+      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+      values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+    }
+    __pyx_v_bucket_index = __Pyx_PyInt_As_unsigned_int(values[0]); if (unlikely((__pyx_v_bucket_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 83, __pyx_L3_error)
+    __pyx_v_key = __Pyx_PyInt_As_unsigned_int(values[1]); if (unlikely((__pyx_v_key == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 83, __pyx_L3_error)
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L5_argtuple_error:;
+  __Pyx_RaiseArgtupleInvalid("bucket_contains", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 83, __pyx_L3_error)
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("ctables.Table.bucket_contains", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_7ctables_5Table_26bucket_contains(((struct __pyx_obj_7ctables_Table *)__pyx_v_self), __pyx_v_bucket_index, __pyx_v_key);
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_5Table_26bucket_contains(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_bucket_index, unsigned int __pyx_v_key) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("bucket_contains", 0);
+
+  /* "tables_wrapper.pyx":84
+ * 
+ *     def bucket_contains(self, unsigned int bucket_index, unsigned int key):
+ *         return self.c_table.bucket_contains(bucket_index, key)             # <<<<<<<<<<<<<<
+ * 
+ *     def contains(self, unsigned int key):
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_PyBool_FromLong(__pyx_v_self->c_table.bucket_contains(__pyx_v_bucket_index, __pyx_v_key)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 84, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":83
+ *         return self.c_table.get_first_empty_index(bucket_index)
+ * 
+ *     def bucket_contains(self, unsigned int bucket_index, unsigned int key):             # <<<<<<<<<<<<<<
+ *         return self.c_table.bucket_contains(bucket_index, key)
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Table.bucket_contains", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":86
+ *         return self.c_table.bucket_contains(bucket_index, key)
+ * 
+ *     def contains(self, unsigned int key):             # <<<<<<<<<<<<<<
+ *         return self.c_table.contains(key)
+ * 
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_5Table_29contains(PyObject *__pyx_v_self, PyObject *__pyx_arg_key); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_29contains(PyObject *__pyx_v_self, PyObject *__pyx_arg_key) {
+  unsigned int __pyx_v_key;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("contains (wrapper)", 0);
+  assert(__pyx_arg_key); {
+    __pyx_v_key = __Pyx_PyInt_As_unsigned_int(__pyx_arg_key); if (unlikely((__pyx_v_key == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 86, __pyx_L3_error)
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("ctables.Table.contains", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_7ctables_5Table_28contains(((struct __pyx_obj_7ctables_Table *)__pyx_v_self), ((unsigned int)__pyx_v_key));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_5Table_28contains(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_key) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("contains", 0);
+
+  /* "tables_wrapper.pyx":87
+ * 
+ *     def contains(self, unsigned int key):
+ *         return self.c_table.contains(key)             # <<<<<<<<<<<<<<
+ * 
+ *     def get_fill_percentage(self):
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_PyBool_FromLong(__pyx_v_self->c_table.contains(__pyx_v_key)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 87, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":86
+ *         return self.c_table.bucket_contains(bucket_index, key)
+ * 
+ *     def contains(self, unsigned int key):             # <<<<<<<<<<<<<<
+ *         return self.c_table.contains(key)
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Table.contains", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":89
+ *         return self.c_table.contains(key)
+ * 
+ *     def get_fill_percentage(self):             # <<<<<<<<<<<<<<
+ *         return self.c_table.get_fill_percentage()
+ * 
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_5Table_31get_fill_percentage(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_31get_fill_percentage(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("get_fill_percentage (wrapper)", 0);
+  __pyx_r = __pyx_pf_7ctables_5Table_30get_fill_percentage(((struct __pyx_obj_7ctables_Table *)__pyx_v_self));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_5Table_30get_fill_percentage(struct __pyx_obj_7ctables_Table *__pyx_v_self) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("get_fill_percentage", 0);
+
+  /* "tables_wrapper.pyx":90
+ * 
+ *     def get_fill_percentage(self):
+ *         return self.c_table.get_fill_percentage()             # <<<<<<<<<<<<<<
+ * 
+ *     def full(self):
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = PyFloat_FromDouble(__pyx_v_self->c_table.get_fill_percentage()); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 90, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":89
+ *         return self.c_table.contains(key)
+ * 
+ *     def get_fill_percentage(self):             # <<<<<<<<<<<<<<
+ *         return self.c_table.get_fill_percentage()
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Table.get_fill_percentage", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":92
+ *         return self.c_table.get_fill_percentage()
+ * 
+ *     def full(self):             # <<<<<<<<<<<<<<
+ *         return self.c_table.full()
+ * 
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_5Table_33full(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_33full(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("full (wrapper)", 0);
+  __pyx_r = __pyx_pf_7ctables_5Table_32full(((struct __pyx_obj_7ctables_Table *)__pyx_v_self));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_5Table_32full(struct __pyx_obj_7ctables_Table *__pyx_v_self) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("full", 0);
+
+  /* "tables_wrapper.pyx":93
+ * 
+ *     def full(self):
+ *         return self.c_table.full()             # <<<<<<<<<<<<<<
+ * 
+ *     def generate_bucket_cuckoo_hash_index(self, unsigned int memory_size, unsigned int bucket_size):
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_PyBool_FromLong(__pyx_v_self->c_table.full()); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 93, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":92
+ *         return self.c_table.get_fill_percentage()
+ * 
+ *     def full(self):             # <<<<<<<<<<<<<<
+ *         return self.c_table.full()
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Table.full", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":95
+ *         return self.c_table.full()
+ * 
+ *     def generate_bucket_cuckoo_hash_index(self, unsigned int memory_size, unsigned int bucket_size):             # <<<<<<<<<<<<<<
+ *         #todo: this is a crazy pointer thing watch out
+ *         print("WARTING WARNTING WARING generate_bucket_cuckoo_hash_index not implemented")
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_5Table_35generate_bucket_cuckoo_hash_index(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_35generate_bucket_cuckoo_hash_index(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  CYTHON_UNUSED unsigned int __pyx_v_memory_size;
+  CYTHON_UNUSED unsigned int __pyx_v_bucket_size;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("generate_bucket_cuckoo_hash_index (wrapper)", 0);
+  {
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_memory_size,&__pyx_n_s_bucket_size,0};
+    PyObject* values[2] = {0,0};
+    if (unlikely(__pyx_kwds)) {
+      Py_ssize_t kw_args;
+      const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
+      switch (pos_args) {
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        CYTHON_FALLTHROUGH;
+        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        CYTHON_FALLTHROUGH;
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+      kw_args = PyDict_Size(__pyx_kwds);
+      switch (pos_args) {
+        case  0:
+        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_memory_size)) != 0)) kw_args--;
+        else goto __pyx_L5_argtuple_error;
+        CYTHON_FALLTHROUGH;
+        case  1:
+        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_bucket_size)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("generate_bucket_cuckoo_hash_index", 1, 2, 2, 1); __PYX_ERR(1, 95, __pyx_L3_error)
+        }
+      }
+      if (unlikely(kw_args > 0)) {
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "generate_bucket_cuckoo_hash_index") < 0)) __PYX_ERR(1, 95, __pyx_L3_error)
+      }
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 2) {
+      goto __pyx_L5_argtuple_error;
+    } else {
+      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+      values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+    }
+    __pyx_v_memory_size = __Pyx_PyInt_As_unsigned_int(values[0]); if (unlikely((__pyx_v_memory_size == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 95, __pyx_L3_error)
+    __pyx_v_bucket_size = __Pyx_PyInt_As_unsigned_int(values[1]); if (unlikely((__pyx_v_bucket_size == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 95, __pyx_L3_error)
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L5_argtuple_error:;
+  __Pyx_RaiseArgtupleInvalid("generate_bucket_cuckoo_hash_index", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 95, __pyx_L3_error)
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("ctables.Table.generate_bucket_cuckoo_hash_index", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_7ctables_5Table_34generate_bucket_cuckoo_hash_index(((struct __pyx_obj_7ctables_Table *)__pyx_v_self), __pyx_v_memory_size, __pyx_v_bucket_size);
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_5Table_34generate_bucket_cuckoo_hash_index(CYTHON_UNUSED struct __pyx_obj_7ctables_Table *__pyx_v_self, CYTHON_UNUSED unsigned int __pyx_v_memory_size, CYTHON_UNUSED unsigned int __pyx_v_bucket_size) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("generate_bucket_cuckoo_hash_index", 0);
+
+  /* "tables_wrapper.pyx":97
+ *     def generate_bucket_cuckoo_hash_index(self, unsigned int memory_size, unsigned int bucket_size):
+ *         #todo: this is a crazy pointer thing watch out
+ *         print("WARTING WARNTING WARING generate_bucket_cuckoo_hash_index not implemented")             # <<<<<<<<<<<<<<
+ *         return None
+ *         # return self.c_table.generate_bucket_cuckoo_hash_index(memory_size, bucket_size)
+ */
+  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_print, __pyx_tuple__4, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 97, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+
+  /* "tables_wrapper.pyx":98
+ *         #todo: this is a crazy pointer thing watch out
+ *         print("WARTING WARNTING WARING generate_bucket_cuckoo_hash_index not implemented")
+ *         return None             # <<<<<<<<<<<<<<
+ *         # return self.c_table.generate_bucket_cuckoo_hash_index(memory_size, bucket_size)
+ * 
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_r = Py_None; __Pyx_INCREF(Py_None);
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":95
+ *         return self.c_table.full()
+ * 
+ *     def generate_bucket_cuckoo_hash_index(self, unsigned int memory_size, unsigned int bucket_size):             # <<<<<<<<<<<<<<
+ *         #todo: this is a crazy pointer thing watch out
+ *         print("WARTING WARNTING WARING generate_bucket_cuckoo_hash_index not implemented")
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Table.generate_bucket_cuckoo_hash_index", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":101
+ *         # return self.c_table.generate_bucket_cuckoo_hash_index(memory_size, bucket_size)
+ * 
+ *     def find_empty_index(self, unsigned int bucket_index):             # <<<<<<<<<<<<<<
+ *         return self.c_table.find_empty_index(bucket_index)
+ * 
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_5Table_37find_empty_index(PyObject *__pyx_v_self, PyObject *__pyx_arg_bucket_index); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_37find_empty_index(PyObject *__pyx_v_self, PyObject *__pyx_arg_bucket_index) {
+  unsigned int __pyx_v_bucket_index;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("find_empty_index (wrapper)", 0);
+  assert(__pyx_arg_bucket_index); {
+    __pyx_v_bucket_index = __Pyx_PyInt_As_unsigned_int(__pyx_arg_bucket_index); if (unlikely((__pyx_v_bucket_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 101, __pyx_L3_error)
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("ctables.Table.find_empty_index", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_7ctables_5Table_36find_empty_index(((struct __pyx_obj_7ctables_Table *)__pyx_v_self), ((unsigned int)__pyx_v_bucket_index));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_5Table_36find_empty_index(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_bucket_index) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("find_empty_index", 0);
+
+  /* "tables_wrapper.pyx":102
+ * 
+ *     def find_empty_index(self, unsigned int bucket_index):
+ *         return self.c_table.find_empty_index(bucket_index)             # <<<<<<<<<<<<<<
+ * 
+ *     def absolute_index_to_bucket_index(self, unsigned int absolute_index):
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_PyInt_From_unsigned_int(__pyx_v_self->c_table.find_empty_index(__pyx_v_bucket_index)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 102, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":101
+ *         # return self.c_table.generate_bucket_cuckoo_hash_index(memory_size, bucket_size)
+ * 
+ *     def find_empty_index(self, unsigned int bucket_index):             # <<<<<<<<<<<<<<
+ *         return self.c_table.find_empty_index(bucket_index)
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Table.find_empty_index", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":104
+ *         return self.c_table.find_empty_index(bucket_index)
+ * 
+ *     def absolute_index_to_bucket_index(self, unsigned int absolute_index):             # <<<<<<<<<<<<<<
+ *         return self.c_table.absolute_index_to_bucket_index(absolute_index)
+ * 
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_5Table_39absolute_index_to_bucket_index(PyObject *__pyx_v_self, PyObject *__pyx_arg_absolute_index); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_39absolute_index_to_bucket_index(PyObject *__pyx_v_self, PyObject *__pyx_arg_absolute_index) {
+  unsigned int __pyx_v_absolute_index;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("absolute_index_to_bucket_index (wrapper)", 0);
+  assert(__pyx_arg_absolute_index); {
+    __pyx_v_absolute_index = __Pyx_PyInt_As_unsigned_int(__pyx_arg_absolute_index); if (unlikely((__pyx_v_absolute_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 104, __pyx_L3_error)
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("ctables.Table.absolute_index_to_bucket_index", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_7ctables_5Table_38absolute_index_to_bucket_index(((struct __pyx_obj_7ctables_Table *)__pyx_v_self), ((unsigned int)__pyx_v_absolute_index));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_5Table_38absolute_index_to_bucket_index(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_absolute_index) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("absolute_index_to_bucket_index", 0);
+
+  /* "tables_wrapper.pyx":105
+ * 
+ *     def absolute_index_to_bucket_index(self, unsigned int absolute_index):
+ *         return self.c_table.absolute_index_to_bucket_index(absolute_index)             # <<<<<<<<<<<<<<
+ * 
+ *     def absolute_index_to_offset(self, unsigned int absolute_index):
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_PyInt_From_unsigned_int(__pyx_v_self->c_table.absolute_index_to_bucket_index(__pyx_v_absolute_index)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 105, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":104
+ *         return self.c_table.find_empty_index(bucket_index)
+ * 
+ *     def absolute_index_to_bucket_index(self, unsigned int absolute_index):             # <<<<<<<<<<<<<<
+ *         return self.c_table.absolute_index_to_bucket_index(absolute_index)
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Table.absolute_index_to_bucket_index", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":107
+ *         return self.c_table.absolute_index_to_bucket_index(absolute_index)
+ * 
+ *     def absolute_index_to_offset(self, unsigned int absolute_index):             # <<<<<<<<<<<<<<
+ *         return self.c_table.absolute_index_to_offset(absolute_index)
+ * 
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_5Table_41absolute_index_to_offset(PyObject *__pyx_v_self, PyObject *__pyx_arg_absolute_index); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_41absolute_index_to_offset(PyObject *__pyx_v_self, PyObject *__pyx_arg_absolute_index) {
+  unsigned int __pyx_v_absolute_index;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("absolute_index_to_offset (wrapper)", 0);
+  assert(__pyx_arg_absolute_index); {
+    __pyx_v_absolute_index = __Pyx_PyInt_As_unsigned_int(__pyx_arg_absolute_index); if (unlikely((__pyx_v_absolute_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 107, __pyx_L3_error)
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("ctables.Table.absolute_index_to_offset", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_7ctables_5Table_40absolute_index_to_offset(((struct __pyx_obj_7ctables_Table *)__pyx_v_self), ((unsigned int)__pyx_v_absolute_index));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_5Table_40absolute_index_to_offset(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_absolute_index) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("absolute_index_to_offset", 0);
+
+  /* "tables_wrapper.pyx":108
+ * 
+ *     def absolute_index_to_offset(self, unsigned int absolute_index):
+ *         return self.c_table.absolute_index_to_offset(absolute_index)             # <<<<<<<<<<<<<<
+ * 
+ *     def assert_operation_in_table_bound(self, unsigned int bucket_index, unsigned int offset, unsigned int memory_size):
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_PyInt_From_unsigned_int(__pyx_v_self->c_table.absolute_index_to_offset(__pyx_v_absolute_index)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 108, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":107
+ *         return self.c_table.absolute_index_to_bucket_index(absolute_index)
+ * 
+ *     def absolute_index_to_offset(self, unsigned int absolute_index):             # <<<<<<<<<<<<<<
+ *         return self.c_table.absolute_index_to_offset(absolute_index)
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Table.absolute_index_to_offset", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":110
+ *         return self.c_table.absolute_index_to_offset(absolute_index)
+ * 
+ *     def assert_operation_in_table_bound(self, unsigned int bucket_index, unsigned int offset, unsigned int memory_size):             # <<<<<<<<<<<<<<
+ *         return self.c_table.assert_operation_in_table_bound(bucket_index, offset, memory_size)
+ * 
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_5Table_43assert_operation_in_table_bound(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_43assert_operation_in_table_bound(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  unsigned int __pyx_v_bucket_index;
+  unsigned int __pyx_v_offset;
+  unsigned int __pyx_v_memory_size;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("assert_operation_in_table_bound (wrapper)", 0);
+  {
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_bucket_index,&__pyx_n_s_offset,&__pyx_n_s_memory_size,0};
+    PyObject* values[3] = {0,0,0};
+    if (unlikely(__pyx_kwds)) {
+      Py_ssize_t kw_args;
+      const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
+      switch (pos_args) {
+        case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+        CYTHON_FALLTHROUGH;
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        CYTHON_FALLTHROUGH;
+        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        CYTHON_FALLTHROUGH;
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+      kw_args = PyDict_Size(__pyx_kwds);
+      switch (pos_args) {
+        case  0:
+        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_bucket_index)) != 0)) kw_args--;
+        else goto __pyx_L5_argtuple_error;
+        CYTHON_FALLTHROUGH;
+        case  1:
+        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_offset)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("assert_operation_in_table_bound", 1, 3, 3, 1); __PYX_ERR(1, 110, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  2:
+        if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_memory_size)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("assert_operation_in_table_bound", 1, 3, 3, 2); __PYX_ERR(1, 110, __pyx_L3_error)
+        }
+      }
+      if (unlikely(kw_args > 0)) {
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "assert_operation_in_table_bound") < 0)) __PYX_ERR(1, 110, __pyx_L3_error)
+      }
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 3) {
+      goto __pyx_L5_argtuple_error;
+    } else {
+      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+      values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+      values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+    }
+    __pyx_v_bucket_index = __Pyx_PyInt_As_unsigned_int(values[0]); if (unlikely((__pyx_v_bucket_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 110, __pyx_L3_error)
+    __pyx_v_offset = __Pyx_PyInt_As_unsigned_int(values[1]); if (unlikely((__pyx_v_offset == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 110, __pyx_L3_error)
+    __pyx_v_memory_size = __Pyx_PyInt_As_unsigned_int(values[2]); if (unlikely((__pyx_v_memory_size == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 110, __pyx_L3_error)
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L5_argtuple_error:;
+  __Pyx_RaiseArgtupleInvalid("assert_operation_in_table_bound", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 110, __pyx_L3_error)
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("ctables.Table.assert_operation_in_table_bound", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_7ctables_5Table_42assert_operation_in_table_bound(((struct __pyx_obj_7ctables_Table *)__pyx_v_self), __pyx_v_bucket_index, __pyx_v_offset, __pyx_v_memory_size);
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_5Table_42assert_operation_in_table_bound(struct __pyx_obj_7ctables_Table *__pyx_v_self, unsigned int __pyx_v_bucket_index, unsigned int __pyx_v_offset, unsigned int __pyx_v_memory_size) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("assert_operation_in_table_bound", 0);
+
+  /* "tables_wrapper.pyx":111
+ * 
+ *     def assert_operation_in_table_bound(self, unsigned int bucket_index, unsigned int offset, unsigned int memory_size):
+ *         return self.c_table.assert_operation_in_table_bound(bucket_index, offset, memory_size)             # <<<<<<<<<<<<<<
+ * 
+ *     def contains_duplicates(self):
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_void_to_None(__pyx_v_self->c_table.assert_operation_in_table_bound(__pyx_v_bucket_index, __pyx_v_offset, __pyx_v_memory_size)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 111, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":110
+ *         return self.c_table.absolute_index_to_offset(absolute_index)
+ * 
+ *     def assert_operation_in_table_bound(self, unsigned int bucket_index, unsigned int offset, unsigned int memory_size):             # <<<<<<<<<<<<<<
+ *         return self.c_table.assert_operation_in_table_bound(bucket_index, offset, memory_size)
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Table.assert_operation_in_table_bound", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":113
+ *         return self.c_table.assert_operation_in_table_bound(bucket_index, offset, memory_size)
+ * 
+ *     def contains_duplicates(self):             # <<<<<<<<<<<<<<
+ *         return self.c_table.contains_duplicates()
+ * 
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_5Table_45contains_duplicates(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_45contains_duplicates(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("contains_duplicates (wrapper)", 0);
+  __pyx_r = __pyx_pf_7ctables_5Table_44contains_duplicates(((struct __pyx_obj_7ctables_Table *)__pyx_v_self));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_5Table_44contains_duplicates(struct __pyx_obj_7ctables_Table *__pyx_v_self) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("contains_duplicates", 0);
+
+  /* "tables_wrapper.pyx":114
+ * 
+ *     def contains_duplicates(self):
+ *         return self.c_table.contains_duplicates()             # <<<<<<<<<<<<<<
+ * 
+ *     def get_duplicates(self):
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_PyBool_FromLong(__pyx_v_self->c_table.contains_duplicates()); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 114, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":113
+ *         return self.c_table.assert_operation_in_table_bound(bucket_index, offset, memory_size)
+ * 
+ *     def contains_duplicates(self):             # <<<<<<<<<<<<<<
+ *         return self.c_table.contains_duplicates()
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Table.contains_duplicates", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "tables_wrapper.pyx":116
+ *         return self.c_table.contains_duplicates()
+ * 
+ *     def get_duplicates(self):             # <<<<<<<<<<<<<<
+ *         print("WARTING WARNTING WARING get_duplicates not implemented")
+ *         # duplicates = self.c_table.get_duplicates()
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_7ctables_5Table_47get_duplicates(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_47get_duplicates(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("get_duplicates (wrapper)", 0);
+  __pyx_r = __pyx_pf_7ctables_5Table_46get_duplicates(((struct __pyx_obj_7ctables_Table *)__pyx_v_self));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_7ctables_5Table_46get_duplicates(CYTHON_UNUSED struct __pyx_obj_7ctables_Table *__pyx_v_self) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("get_duplicates", 0);
+
+  /* "tables_wrapper.pyx":117
+ * 
+ *     def get_duplicates(self):
+ *         print("WARTING WARNTING WARING get_duplicates not implemented")             # <<<<<<<<<<<<<<
+ *         # duplicates = self.c_table.get_duplicates()
+ *         # #todo do something with the duplicates
+ */
+  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_print, __pyx_tuple__5, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 117, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+
+  /* "tables_wrapper.pyx":121
+ *         # #todo do something with the duplicates
+ *         # print(duplicates)
+ *         return None             # <<<<<<<<<<<<<<
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_r = Py_None; __Pyx_INCREF(Py_None);
+  goto __pyx_L0;
+
+  /* "tables_wrapper.pyx":116
+ *         return self.c_table.contains_duplicates()
+ * 
+ *     def get_duplicates(self):             # <<<<<<<<<<<<<<
+ *         print("WARTING WARNTING WARING get_duplicates not implemented")
+ *         # duplicates = self.c_table.get_duplicates()
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("ctables.Table.get_duplicates", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XGIVEREF(__pyx_r);
@@ -1638,19 +4421,19 @@ static PyObject *__pyx_pf_7ctables_5Table_2n_buckets_size(struct __pyx_obj_7ctab
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_7ctables_5Table_5__reduce_cython__(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
-static PyObject *__pyx_pw_7ctables_5Table_5__reduce_cython__(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
+static PyObject *__pyx_pw_7ctables_5Table_49__reduce_cython__(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_49__reduce_cython__(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__reduce_cython__ (wrapper)", 0);
-  __pyx_r = __pyx_pf_7ctables_5Table_4__reduce_cython__(((struct __pyx_obj_7ctables_Table *)__pyx_v_self));
+  __pyx_r = __pyx_pf_7ctables_5Table_48__reduce_cython__(((struct __pyx_obj_7ctables_Table *)__pyx_v_self));
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_7ctables_5Table_4__reduce_cython__(CYTHON_UNUSED struct __pyx_obj_7ctables_Table *__pyx_v_self) {
+static PyObject *__pyx_pf_7ctables_5Table_48__reduce_cython__(CYTHON_UNUSED struct __pyx_obj_7ctables_Table *__pyx_v_self) {
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   PyObject *__pyx_t_1 = NULL;
@@ -1665,7 +4448,7 @@ static PyObject *__pyx_pf_7ctables_5Table_4__reduce_cython__(CYTHON_UNUSED struc
  * def __setstate_cython__(self, __pyx_state):
  *     raise TypeError("self.c_table cannot be converted to a Python object for pickling")
  */
-  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_TypeError, __pyx_tuple_, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 2, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_TypeError, __pyx_tuple__6, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 2, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_Raise(__pyx_t_1, 0, 0, 0);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
@@ -1695,19 +4478,19 @@ static PyObject *__pyx_pf_7ctables_5Table_4__reduce_cython__(CYTHON_UNUSED struc
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_7ctables_5Table_7__setstate_cython__(PyObject *__pyx_v_self, PyObject *__pyx_v___pyx_state); /*proto*/
-static PyObject *__pyx_pw_7ctables_5Table_7__setstate_cython__(PyObject *__pyx_v_self, PyObject *__pyx_v___pyx_state) {
+static PyObject *__pyx_pw_7ctables_5Table_51__setstate_cython__(PyObject *__pyx_v_self, PyObject *__pyx_v___pyx_state); /*proto*/
+static PyObject *__pyx_pw_7ctables_5Table_51__setstate_cython__(PyObject *__pyx_v_self, PyObject *__pyx_v___pyx_state) {
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__setstate_cython__ (wrapper)", 0);
-  __pyx_r = __pyx_pf_7ctables_5Table_6__setstate_cython__(((struct __pyx_obj_7ctables_Table *)__pyx_v_self), ((PyObject *)__pyx_v___pyx_state));
+  __pyx_r = __pyx_pf_7ctables_5Table_50__setstate_cython__(((struct __pyx_obj_7ctables_Table *)__pyx_v_self), ((PyObject *)__pyx_v___pyx_state));
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_7ctables_5Table_6__setstate_cython__(CYTHON_UNUSED struct __pyx_obj_7ctables_Table *__pyx_v_self, CYTHON_UNUSED PyObject *__pyx_v___pyx_state) {
+static PyObject *__pyx_pf_7ctables_5Table_50__setstate_cython__(CYTHON_UNUSED struct __pyx_obj_7ctables_Table *__pyx_v_self, CYTHON_UNUSED PyObject *__pyx_v___pyx_state) {
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   PyObject *__pyx_t_1 = NULL;
@@ -1721,7 +4504,7 @@ static PyObject *__pyx_pf_7ctables_5Table_6__setstate_cython__(CYTHON_UNUSED str
  * def __setstate_cython__(self, __pyx_state):
  *     raise TypeError("self.c_table cannot be converted to a Python object for pickling")             # <<<<<<<<<<<<<<
  */
-  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_TypeError, __pyx_tuple__2, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 4, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_TypeError, __pyx_tuple__7, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 4, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_Raise(__pyx_t_1, 0, 0, 0);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
@@ -1743,6 +4526,403 @@ static PyObject *__pyx_pf_7ctables_5Table_6__setstate_cython__(CYTHON_UNUSED str
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
+
+/* "FromPyStructUtility":11
+ * 
+ * @cname("__pyx_convert__from_py_struct__cuckoo_tables_3a__3a_Entry")
+ * cdef struct_type __pyx_convert__from_py_struct__cuckoo_tables_3a__3a_Entry(obj) except *:             # <<<<<<<<<<<<<<
+ *     cdef struct_type result
+ *     if not PyMapping_Check(obj):
+ */
+
+static struct cuckoo_tables::Entry __pyx_convert__from_py_struct__cuckoo_tables_3a__3a_Entry(PyObject *__pyx_v_obj) {
+  struct cuckoo_tables::Entry __pyx_v_result;
+  PyObject *__pyx_v_value = NULL;
+  struct cuckoo_tables::Entry __pyx_r;
+  __Pyx_RefNannyDeclarations
+  int __pyx_t_1;
+  PyObject *__pyx_t_2 = NULL;
+  PyObject *__pyx_t_3 = NULL;
+  PyObject *__pyx_t_4 = NULL;
+  PyObject *__pyx_t_5 = NULL;
+  int __pyx_t_6;
+  PyObject *__pyx_t_7 = NULL;
+  PyObject *__pyx_t_8 = NULL;
+  PyObject *__pyx_t_9 = NULL;
+  unsigned int __pyx_t_10;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("__pyx_convert__from_py_struct__cuckoo_tables_3a__3a_Entry", 0);
+
+  /* "FromPyStructUtility":13
+ * cdef struct_type __pyx_convert__from_py_struct__cuckoo_tables_3a__3a_Entry(obj) except *:
+ *     cdef struct_type result
+ *     if not PyMapping_Check(obj):             # <<<<<<<<<<<<<<
+ *         PyErr_Format(TypeError, b"Expected %.16s, got %.200s", b"a mapping", Py_TYPE(obj).tp_name)
+ * 
+ */
+  __pyx_t_1 = ((!(PyMapping_Check(__pyx_v_obj) != 0)) != 0);
+  if (__pyx_t_1) {
+
+    /* "FromPyStructUtility":14
+ *     cdef struct_type result
+ *     if not PyMapping_Check(obj):
+ *         PyErr_Format(TypeError, b"Expected %.16s, got %.200s", b"a mapping", Py_TYPE(obj).tp_name)             # <<<<<<<<<<<<<<
+ * 
+ *     try:
+ */
+    __pyx_t_2 = PyErr_Format(__pyx_builtin_TypeError, ((char const *)"Expected %.16s, got %.200s"), ((char *)"a mapping"), Py_TYPE(__pyx_v_obj)->tp_name); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 14, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_2);
+    __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+
+    /* "FromPyStructUtility":13
+ * cdef struct_type __pyx_convert__from_py_struct__cuckoo_tables_3a__3a_Entry(obj) except *:
+ *     cdef struct_type result
+ *     if not PyMapping_Check(obj):             # <<<<<<<<<<<<<<
+ *         PyErr_Format(TypeError, b"Expected %.16s, got %.200s", b"a mapping", Py_TYPE(obj).tp_name)
+ * 
+ */
+  }
+
+  /* "FromPyStructUtility":16
+ *         PyErr_Format(TypeError, b"Expected %.16s, got %.200s", b"a mapping", Py_TYPE(obj).tp_name)
+ * 
+ *     try:             # <<<<<<<<<<<<<<
+ *         value = obj['key']
+ *     except KeyError:
+ */
+  {
+    __Pyx_PyThreadState_declare
+    __Pyx_PyThreadState_assign
+    __Pyx_ExceptionSave(&__pyx_t_3, &__pyx_t_4, &__pyx_t_5);
+    __Pyx_XGOTREF(__pyx_t_3);
+    __Pyx_XGOTREF(__pyx_t_4);
+    __Pyx_XGOTREF(__pyx_t_5);
+    /*try:*/ {
+
+      /* "FromPyStructUtility":17
+ * 
+ *     try:
+ *         value = obj['key']             # <<<<<<<<<<<<<<
+ *     except KeyError:
+ *         raise ValueError("No value specified for struct attribute 'key'")
+ */
+      __pyx_t_2 = __Pyx_PyObject_Dict_GetItem(__pyx_v_obj, __pyx_n_s_key); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 17, __pyx_L4_error)
+      __Pyx_GOTREF(__pyx_t_2);
+      __pyx_v_value = __pyx_t_2;
+      __pyx_t_2 = 0;
+
+      /* "FromPyStructUtility":16
+ *         PyErr_Format(TypeError, b"Expected %.16s, got %.200s", b"a mapping", Py_TYPE(obj).tp_name)
+ * 
+ *     try:             # <<<<<<<<<<<<<<
+ *         value = obj['key']
+ *     except KeyError:
+ */
+    }
+    __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
+    __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
+    __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
+    goto __pyx_L9_try_end;
+    __pyx_L4_error:;
+    __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
+
+    /* "FromPyStructUtility":18
+ *     try:
+ *         value = obj['key']
+ *     except KeyError:             # <<<<<<<<<<<<<<
+ *         raise ValueError("No value specified for struct attribute 'key'")
+ *     result.key = value
+ */
+    __pyx_t_6 = __Pyx_PyErr_ExceptionMatches(__pyx_builtin_KeyError);
+    if (__pyx_t_6) {
+      __Pyx_AddTraceback("FromPyStructUtility.__pyx_convert__from_py_struct__cuckoo_tables_3a__3a_Entry", __pyx_clineno, __pyx_lineno, __pyx_filename);
+      if (__Pyx_GetException(&__pyx_t_2, &__pyx_t_7, &__pyx_t_8) < 0) __PYX_ERR(0, 18, __pyx_L6_except_error)
+      __Pyx_GOTREF(__pyx_t_2);
+      __Pyx_GOTREF(__pyx_t_7);
+      __Pyx_GOTREF(__pyx_t_8);
+
+      /* "FromPyStructUtility":19
+ *         value = obj['key']
+ *     except KeyError:
+ *         raise ValueError("No value specified for struct attribute 'key'")             # <<<<<<<<<<<<<<
+ *     result.key = value
+ *     try:
+ */
+      __pyx_t_9 = __Pyx_PyObject_Call(__pyx_builtin_ValueError, __pyx_tuple__8, NULL); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 19, __pyx_L6_except_error)
+      __Pyx_GOTREF(__pyx_t_9);
+      __Pyx_Raise(__pyx_t_9, 0, 0, 0);
+      __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
+      __PYX_ERR(0, 19, __pyx_L6_except_error)
+    }
+    goto __pyx_L6_except_error;
+    __pyx_L6_except_error:;
+
+    /* "FromPyStructUtility":16
+ *         PyErr_Format(TypeError, b"Expected %.16s, got %.200s", b"a mapping", Py_TYPE(obj).tp_name)
+ * 
+ *     try:             # <<<<<<<<<<<<<<
+ *         value = obj['key']
+ *     except KeyError:
+ */
+    __Pyx_XGIVEREF(__pyx_t_3);
+    __Pyx_XGIVEREF(__pyx_t_4);
+    __Pyx_XGIVEREF(__pyx_t_5);
+    __Pyx_ExceptionReset(__pyx_t_3, __pyx_t_4, __pyx_t_5);
+    goto __pyx_L1_error;
+    __pyx_L9_try_end:;
+  }
+
+  /* "FromPyStructUtility":20
+ *     except KeyError:
+ *         raise ValueError("No value specified for struct attribute 'key'")
+ *     result.key = value             # <<<<<<<<<<<<<<
+ *     try:
+ *         value = obj['value']
+ */
+  __pyx_t_10 = __Pyx_PyInt_As_unsigned_int(__pyx_v_value); if (unlikely((__pyx_t_10 == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(0, 20, __pyx_L1_error)
+  __pyx_v_result.key = __pyx_t_10;
+
+  /* "FromPyStructUtility":21
+ *         raise ValueError("No value specified for struct attribute 'key'")
+ *     result.key = value
+ *     try:             # <<<<<<<<<<<<<<
+ *         value = obj['value']
+ *     except KeyError:
+ */
+  {
+    __Pyx_PyThreadState_declare
+    __Pyx_PyThreadState_assign
+    __Pyx_ExceptionSave(&__pyx_t_5, &__pyx_t_4, &__pyx_t_3);
+    __Pyx_XGOTREF(__pyx_t_5);
+    __Pyx_XGOTREF(__pyx_t_4);
+    __Pyx_XGOTREF(__pyx_t_3);
+    /*try:*/ {
+
+      /* "FromPyStructUtility":22
+ *     result.key = value
+ *     try:
+ *         value = obj['value']             # <<<<<<<<<<<<<<
+ *     except KeyError:
+ *         raise ValueError("No value specified for struct attribute 'value'")
+ */
+      __pyx_t_8 = __Pyx_PyObject_Dict_GetItem(__pyx_v_obj, __pyx_n_s_value); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 22, __pyx_L12_error)
+      __Pyx_GOTREF(__pyx_t_8);
+      __Pyx_DECREF_SET(__pyx_v_value, __pyx_t_8);
+      __pyx_t_8 = 0;
+
+      /* "FromPyStructUtility":21
+ *         raise ValueError("No value specified for struct attribute 'key'")
+ *     result.key = value
+ *     try:             # <<<<<<<<<<<<<<
+ *         value = obj['value']
+ *     except KeyError:
+ */
+    }
+    __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
+    __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
+    __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
+    goto __pyx_L17_try_end;
+    __pyx_L12_error:;
+    __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
+    __Pyx_XDECREF(__pyx_t_7); __pyx_t_7 = 0;
+    __Pyx_XDECREF(__pyx_t_8); __pyx_t_8 = 0;
+    __Pyx_XDECREF(__pyx_t_9); __pyx_t_9 = 0;
+
+    /* "FromPyStructUtility":23
+ *     try:
+ *         value = obj['value']
+ *     except KeyError:             # <<<<<<<<<<<<<<
+ *         raise ValueError("No value specified for struct attribute 'value'")
+ *     result.value = value
+ */
+    __pyx_t_6 = __Pyx_PyErr_ExceptionMatches(__pyx_builtin_KeyError);
+    if (__pyx_t_6) {
+      __Pyx_AddTraceback("FromPyStructUtility.__pyx_convert__from_py_struct__cuckoo_tables_3a__3a_Entry", __pyx_clineno, __pyx_lineno, __pyx_filename);
+      if (__Pyx_GetException(&__pyx_t_8, &__pyx_t_7, &__pyx_t_2) < 0) __PYX_ERR(0, 23, __pyx_L14_except_error)
+      __Pyx_GOTREF(__pyx_t_8);
+      __Pyx_GOTREF(__pyx_t_7);
+      __Pyx_GOTREF(__pyx_t_2);
+
+      /* "FromPyStructUtility":24
+ *         value = obj['value']
+ *     except KeyError:
+ *         raise ValueError("No value specified for struct attribute 'value'")             # <<<<<<<<<<<<<<
+ *     result.value = value
+ *     return result
+ */
+      __pyx_t_9 = __Pyx_PyObject_Call(__pyx_builtin_ValueError, __pyx_tuple__9, NULL); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 24, __pyx_L14_except_error)
+      __Pyx_GOTREF(__pyx_t_9);
+      __Pyx_Raise(__pyx_t_9, 0, 0, 0);
+      __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
+      __PYX_ERR(0, 24, __pyx_L14_except_error)
+    }
+    goto __pyx_L14_except_error;
+    __pyx_L14_except_error:;
+
+    /* "FromPyStructUtility":21
+ *         raise ValueError("No value specified for struct attribute 'key'")
+ *     result.key = value
+ *     try:             # <<<<<<<<<<<<<<
+ *         value = obj['value']
+ *     except KeyError:
+ */
+    __Pyx_XGIVEREF(__pyx_t_5);
+    __Pyx_XGIVEREF(__pyx_t_4);
+    __Pyx_XGIVEREF(__pyx_t_3);
+    __Pyx_ExceptionReset(__pyx_t_5, __pyx_t_4, __pyx_t_3);
+    goto __pyx_L1_error;
+    __pyx_L17_try_end:;
+  }
+
+  /* "FromPyStructUtility":25
+ *     except KeyError:
+ *         raise ValueError("No value specified for struct attribute 'value'")
+ *     result.value = value             # <<<<<<<<<<<<<<
+ *     return result
+ * 
+ */
+  __pyx_t_10 = __Pyx_PyInt_As_unsigned_int(__pyx_v_value); if (unlikely((__pyx_t_10 == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(0, 25, __pyx_L1_error)
+  __pyx_v_result.value = __pyx_t_10;
+
+  /* "FromPyStructUtility":26
+ *         raise ValueError("No value specified for struct attribute 'value'")
+ *     result.value = value
+ *     return result             # <<<<<<<<<<<<<<
+ * 
+ * 
+ */
+  __pyx_r = __pyx_v_result;
+  goto __pyx_L0;
+
+  /* "FromPyStructUtility":11
+ * 
+ * @cname("__pyx_convert__from_py_struct__cuckoo_tables_3a__3a_Entry")
+ * cdef struct_type __pyx_convert__from_py_struct__cuckoo_tables_3a__3a_Entry(obj) except *:             # <<<<<<<<<<<<<<
+ *     cdef struct_type result
+ *     if not PyMapping_Check(obj):
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_2);
+  __Pyx_XDECREF(__pyx_t_7);
+  __Pyx_XDECREF(__pyx_t_8);
+  __Pyx_XDECREF(__pyx_t_9);
+  __Pyx_AddTraceback("FromPyStructUtility.__pyx_convert__from_py_struct__cuckoo_tables_3a__3a_Entry", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_pretend_to_initialize(&__pyx_r);
+  __pyx_L0:;
+  __Pyx_XDECREF(__pyx_v_value);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_tp_new_7ctables_Lock_Table(PyTypeObject *t, CYTHON_UNUSED PyObject *a, CYTHON_UNUSED PyObject *k) {
+  struct __pyx_obj_7ctables_Lock_Table *p;
+  PyObject *o;
+  if (likely((t->tp_flags & Py_TPFLAGS_IS_ABSTRACT) == 0)) {
+    o = (*t->tp_alloc)(t, 0);
+  } else {
+    o = (PyObject *) PyBaseObject_Type.tp_new(t, __pyx_empty_tuple, 0);
+  }
+  if (unlikely(!o)) return 0;
+  p = ((struct __pyx_obj_7ctables_Lock_Table *)o);
+  new((void*)&(p->c_lock_table)) cuckoo_tables::Lock_Table();
+  return o;
+}
+
+static void __pyx_tp_dealloc_7ctables_Lock_Table(PyObject *o) {
+  struct __pyx_obj_7ctables_Lock_Table *p = (struct __pyx_obj_7ctables_Lock_Table *)o;
+  #if CYTHON_USE_TP_FINALIZE
+  if (unlikely(PyType_HasFeature(Py_TYPE(o), Py_TPFLAGS_HAVE_FINALIZE) && Py_TYPE(o)->tp_finalize) && (!PyType_IS_GC(Py_TYPE(o)) || !_PyGC_FINALIZED(o))) {
+    if (PyObject_CallFinalizerFromDealloc(o)) return;
+  }
+  #endif
+  __Pyx_call_destructor(p->c_lock_table);
+  (*Py_TYPE(o)->tp_free)(o);
+}
+
+static PyMethodDef __pyx_methods_7ctables_Lock_Table[] = {
+  {"unlock_all", (PyCFunction)__pyx_pw_7ctables_10Lock_Table_3unlock_all, METH_NOARGS, 0},
+  {"masked_cas", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_7ctables_10Lock_Table_5masked_cas, METH_VARARGS|METH_KEYWORDS, 0},
+  {"fill_masked_cas", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_7ctables_10Lock_Table_7fill_masked_cas, METH_VARARGS|METH_KEYWORDS, 0},
+  {"__reduce_cython__", (PyCFunction)__pyx_pw_7ctables_10Lock_Table_9__reduce_cython__, METH_NOARGS, 0},
+  {"__setstate_cython__", (PyCFunction)__pyx_pw_7ctables_10Lock_Table_11__setstate_cython__, METH_O, 0},
+  {0, 0, 0, 0}
+};
+
+static PyTypeObject __pyx_type_7ctables_Lock_Table = {
+  PyVarObject_HEAD_INIT(0, 0)
+  "ctables.Lock_Table", /*tp_name*/
+  sizeof(struct __pyx_obj_7ctables_Lock_Table), /*tp_basicsize*/
+  0, /*tp_itemsize*/
+  __pyx_tp_dealloc_7ctables_Lock_Table, /*tp_dealloc*/
+  #if PY_VERSION_HEX < 0x030800b4
+  0, /*tp_print*/
+  #endif
+  #if PY_VERSION_HEX >= 0x030800b4
+  0, /*tp_vectorcall_offset*/
+  #endif
+  0, /*tp_getattr*/
+  0, /*tp_setattr*/
+  #if PY_MAJOR_VERSION < 3
+  0, /*tp_compare*/
+  #endif
+  #if PY_MAJOR_VERSION >= 3
+  0, /*tp_as_async*/
+  #endif
+  0, /*tp_repr*/
+  0, /*tp_as_number*/
+  0, /*tp_as_sequence*/
+  0, /*tp_as_mapping*/
+  0, /*tp_hash*/
+  0, /*tp_call*/
+  0, /*tp_str*/
+  0, /*tp_getattro*/
+  0, /*tp_setattro*/
+  0, /*tp_as_buffer*/
+  Py_TPFLAGS_DEFAULT|Py_TPFLAGS_HAVE_VERSION_TAG|Py_TPFLAGS_CHECKTYPES|Py_TPFLAGS_HAVE_NEWBUFFER|Py_TPFLAGS_BASETYPE, /*tp_flags*/
+  0, /*tp_doc*/
+  0, /*tp_traverse*/
+  0, /*tp_clear*/
+  0, /*tp_richcompare*/
+  0, /*tp_weaklistoffset*/
+  0, /*tp_iter*/
+  0, /*tp_iternext*/
+  __pyx_methods_7ctables_Lock_Table, /*tp_methods*/
+  0, /*tp_members*/
+  0, /*tp_getset*/
+  0, /*tp_base*/
+  0, /*tp_dict*/
+  0, /*tp_descr_get*/
+  0, /*tp_descr_set*/
+  0, /*tp_dictoffset*/
+  __pyx_pw_7ctables_10Lock_Table_1__init__, /*tp_init*/
+  0, /*tp_alloc*/
+  __pyx_tp_new_7ctables_Lock_Table, /*tp_new*/
+  0, /*tp_free*/
+  0, /*tp_is_gc*/
+  0, /*tp_bases*/
+  0, /*tp_mro*/
+  0, /*tp_cache*/
+  0, /*tp_subclasses*/
+  0, /*tp_weaklist*/
+  0, /*tp_del*/
+  0, /*tp_version_tag*/
+  #if PY_VERSION_HEX >= 0x030400a1
+  0, /*tp_finalize*/
+  #endif
+  #if PY_VERSION_HEX >= 0x030800b1 && (!CYTHON_COMPILING_IN_PYPY || PYPY_VERSION_NUM >= 0x07030800)
+  0, /*tp_vectorcall*/
+  #endif
+  #if PY_VERSION_HEX >= 0x030800b4 && PY_VERSION_HEX < 0x03090000
+  0, /*tp_print*/
+  #endif
+  #if CYTHON_COMPILING_IN_PYPY && PY_VERSION_HEX >= 0x03090000
+  0, /*tp_pypy_flags*/
+  #endif
+};
 
 static PyObject *__pyx_tp_new_7ctables_Table(PyTypeObject *t, CYTHON_UNUSED PyObject *a, CYTHON_UNUSED PyObject *k) {
   struct __pyx_obj_7ctables_Table *p;
@@ -1770,9 +4950,31 @@ static void __pyx_tp_dealloc_7ctables_Table(PyObject *o) {
 }
 
 static PyMethodDef __pyx_methods_7ctables_Table[] = {
-  {"n_buckets_size", (PyCFunction)__pyx_pw_7ctables_5Table_3n_buckets_size, METH_O, 0},
-  {"__reduce_cython__", (PyCFunction)__pyx_pw_7ctables_5Table_5__reduce_cython__, METH_NOARGS, 0},
-  {"__setstate_cython__", (PyCFunction)__pyx_pw_7ctables_5Table_7__setstate_cython__, METH_O, 0},
+  {"unlock_all", (PyCFunction)__pyx_pw_7ctables_5Table_3unlock_all, METH_NOARGS, 0},
+  {"print_table", (PyCFunction)__pyx_pw_7ctables_5Table_5print_table, METH_NOARGS, 0},
+  {"lock_table_masked_cas", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_7ctables_5Table_7lock_table_masked_cas, METH_VARARGS|METH_KEYWORDS, 0},
+  {"fill_lock_table_masked_cas", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_7ctables_5Table_9fill_lock_table_masked_cas, METH_VARARGS|METH_KEYWORDS, 0},
+  {"get_bucket_size", (PyCFunction)__pyx_pw_7ctables_5Table_11get_bucket_size, METH_NOARGS, 0},
+  {"row_size_bytes", (PyCFunction)__pyx_pw_7ctables_5Table_13row_size_bytes, METH_NOARGS, 0},
+  {"row_size_indexes", (PyCFunction)__pyx_pw_7ctables_5Table_15row_size_indexes, METH_NOARGS, 0},
+  {"n_buckets_size", (PyCFunction)__pyx_pw_7ctables_5Table_17n_buckets_size, METH_O, 0},
+  {"get_entry", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_7ctables_5Table_19get_entry, METH_VARARGS|METH_KEYWORDS, 0},
+  {"set_entry", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_7ctables_5Table_21set_entry, METH_VARARGS|METH_KEYWORDS, 0},
+  {"bucket_has_empty", (PyCFunction)__pyx_pw_7ctables_5Table_23bucket_has_empty, METH_O, 0},
+  {"get_first_empty_index", (PyCFunction)__pyx_pw_7ctables_5Table_25get_first_empty_index, METH_O, 0},
+  {"bucket_contains", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_7ctables_5Table_27bucket_contains, METH_VARARGS|METH_KEYWORDS, 0},
+  {"contains", (PyCFunction)__pyx_pw_7ctables_5Table_29contains, METH_O, 0},
+  {"get_fill_percentage", (PyCFunction)__pyx_pw_7ctables_5Table_31get_fill_percentage, METH_NOARGS, 0},
+  {"full", (PyCFunction)__pyx_pw_7ctables_5Table_33full, METH_NOARGS, 0},
+  {"generate_bucket_cuckoo_hash_index", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_7ctables_5Table_35generate_bucket_cuckoo_hash_index, METH_VARARGS|METH_KEYWORDS, 0},
+  {"find_empty_index", (PyCFunction)__pyx_pw_7ctables_5Table_37find_empty_index, METH_O, 0},
+  {"absolute_index_to_bucket_index", (PyCFunction)__pyx_pw_7ctables_5Table_39absolute_index_to_bucket_index, METH_O, 0},
+  {"absolute_index_to_offset", (PyCFunction)__pyx_pw_7ctables_5Table_41absolute_index_to_offset, METH_O, 0},
+  {"assert_operation_in_table_bound", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_7ctables_5Table_43assert_operation_in_table_bound, METH_VARARGS|METH_KEYWORDS, 0},
+  {"contains_duplicates", (PyCFunction)__pyx_pw_7ctables_5Table_45contains_duplicates, METH_NOARGS, 0},
+  {"get_duplicates", (PyCFunction)__pyx_pw_7ctables_5Table_47get_duplicates, METH_NOARGS, 0},
+  {"__reduce_cython__", (PyCFunction)__pyx_pw_7ctables_5Table_49__reduce_cython__, METH_NOARGS, 0},
+  {"__setstate_cython__", (PyCFunction)__pyx_pw_7ctables_5Table_51__setstate_cython__, METH_O, 0},
   {0, 0, 0, 0}
 };
 
@@ -1894,26 +5096,51 @@ static struct PyModuleDef __pyx_moduledef = {
 #endif
 
 static __Pyx_StringTabEntry __pyx_string_tab[] = {
+  {&__pyx_n_s_KeyError, __pyx_k_KeyError, sizeof(__pyx_k_KeyError), 0, 0, 1, 1},
+  {&__pyx_n_s_Lock_Table, __pyx_k_Lock_Table, sizeof(__pyx_k_Lock_Table), 0, 0, 1, 1},
+  {&__pyx_kp_s_No_value_specified_for_struct_at, __pyx_k_No_value_specified_for_struct_at, sizeof(__pyx_k_No_value_specified_for_struct_at), 0, 0, 1, 0},
+  {&__pyx_kp_s_No_value_specified_for_struct_at_2, __pyx_k_No_value_specified_for_struct_at_2, sizeof(__pyx_k_No_value_specified_for_struct_at_2), 0, 0, 1, 0},
   {&__pyx_n_s_Table, __pyx_k_Table, sizeof(__pyx_k_Table), 0, 0, 1, 1},
   {&__pyx_n_s_TypeError, __pyx_k_TypeError, sizeof(__pyx_k_TypeError), 0, 0, 1, 1},
+  {&__pyx_n_s_ValueError, __pyx_k_ValueError, sizeof(__pyx_k_ValueError), 0, 0, 1, 1},
+  {&__pyx_kp_u_WARNING_WARNING_WARNING_set_entr, __pyx_k_WARNING_WARNING_WARNING_set_entr, sizeof(__pyx_k_WARNING_WARNING_WARNING_set_entr), 0, 1, 0, 0},
+  {&__pyx_kp_u_WARTING_WARNTING_WARING_generate, __pyx_k_WARTING_WARNTING_WARING_generate, sizeof(__pyx_k_WARTING_WARNTING_WARING_generate), 0, 1, 0, 0},
+  {&__pyx_kp_u_WARTING_WARNTING_WARING_get_dupl, __pyx_k_WARTING_WARNTING_WARING_get_dupl, sizeof(__pyx_k_WARTING_WARNTING_WARING_get_dupl), 0, 1, 0, 0},
+  {&__pyx_n_s_bucket_index, __pyx_k_bucket_index, sizeof(__pyx_k_bucket_index), 0, 0, 1, 1},
   {&__pyx_n_s_bucket_size, __pyx_k_bucket_size, sizeof(__pyx_k_bucket_size), 0, 0, 1, 1},
   {&__pyx_n_s_buckets_per_lock, __pyx_k_buckets_per_lock, sizeof(__pyx_k_buckets_per_lock), 0, 0, 1, 1},
   {&__pyx_n_s_cline_in_traceback, __pyx_k_cline_in_traceback, sizeof(__pyx_k_cline_in_traceback), 0, 0, 1, 1},
+  {&__pyx_n_s_current_value, __pyx_k_current_value, sizeof(__pyx_k_current_value), 0, 0, 1, 1},
+  {&__pyx_n_s_entry, __pyx_k_entry, sizeof(__pyx_k_entry), 0, 0, 1, 1},
   {&__pyx_n_s_getstate, __pyx_k_getstate, sizeof(__pyx_k_getstate), 0, 0, 1, 1},
+  {&__pyx_n_s_index, __pyx_k_index, sizeof(__pyx_k_index), 0, 0, 1, 1},
+  {&__pyx_n_s_key, __pyx_k_key, sizeof(__pyx_k_key), 0, 0, 1, 1},
+  {&__pyx_n_s_lock_index, __pyx_k_lock_index, sizeof(__pyx_k_lock_index), 0, 0, 1, 1},
   {&__pyx_n_s_main, __pyx_k_main, sizeof(__pyx_k_main), 0, 0, 1, 1},
+  {&__pyx_n_s_mask, __pyx_k_mask, sizeof(__pyx_k_mask), 0, 0, 1, 1},
   {&__pyx_n_s_memory_size, __pyx_k_memory_size, sizeof(__pyx_k_memory_size), 0, 0, 1, 1},
   {&__pyx_n_s_name, __pyx_k_name, sizeof(__pyx_k_name), 0, 0, 1, 1},
+  {&__pyx_n_s_new_value, __pyx_k_new_value, sizeof(__pyx_k_new_value), 0, 0, 1, 1},
+  {&__pyx_n_s_offset, __pyx_k_offset, sizeof(__pyx_k_offset), 0, 0, 1, 1},
+  {&__pyx_n_s_old, __pyx_k_old, sizeof(__pyx_k_old), 0, 0, 1, 1},
+  {&__pyx_n_s_print, __pyx_k_print, sizeof(__pyx_k_print), 0, 0, 1, 1},
   {&__pyx_n_s_reduce, __pyx_k_reduce, sizeof(__pyx_k_reduce), 0, 0, 1, 1},
   {&__pyx_n_s_reduce_cython, __pyx_k_reduce_cython, sizeof(__pyx_k_reduce_cython), 0, 0, 1, 1},
   {&__pyx_n_s_reduce_ex, __pyx_k_reduce_ex, sizeof(__pyx_k_reduce_ex), 0, 0, 1, 1},
+  {&__pyx_kp_s_self_c_lock_table_cannot_be_conv, __pyx_k_self_c_lock_table_cannot_be_conv, sizeof(__pyx_k_self_c_lock_table_cannot_be_conv), 0, 0, 1, 0},
   {&__pyx_kp_s_self_c_table_cannot_be_converted, __pyx_k_self_c_table_cannot_be_converted, sizeof(__pyx_k_self_c_table_cannot_be_converted), 0, 0, 1, 0},
   {&__pyx_n_s_setstate, __pyx_k_setstate, sizeof(__pyx_k_setstate), 0, 0, 1, 1},
   {&__pyx_n_s_setstate_cython, __pyx_k_setstate_cython, sizeof(__pyx_k_setstate_cython), 0, 0, 1, 1},
+  {&__pyx_n_s_success, __pyx_k_success, sizeof(__pyx_k_success), 0, 0, 1, 1},
   {&__pyx_n_s_test, __pyx_k_test, sizeof(__pyx_k_test), 0, 0, 1, 1},
+  {&__pyx_n_s_value, __pyx_k_value, sizeof(__pyx_k_value), 0, 0, 1, 1},
   {0, 0, 0, 0, 0, 0, 0}
 };
 static CYTHON_SMALL_CODE int __Pyx_InitCachedBuiltins(void) {
   __pyx_builtin_TypeError = __Pyx_GetBuiltinName(__pyx_n_s_TypeError); if (!__pyx_builtin_TypeError) __PYX_ERR(0, 2, __pyx_L1_error)
+  __pyx_builtin_print = __Pyx_GetBuiltinName(__pyx_n_s_print); if (!__pyx_builtin_print) __PYX_ERR(1, 71, __pyx_L1_error)
+  __pyx_builtin_KeyError = __Pyx_GetBuiltinName(__pyx_n_s_KeyError); if (!__pyx_builtin_KeyError) __PYX_ERR(0, 18, __pyx_L1_error)
+  __pyx_builtin_ValueError = __Pyx_GetBuiltinName(__pyx_n_s_ValueError); if (!__pyx_builtin_ValueError) __PYX_ERR(0, 19, __pyx_L1_error)
   return 0;
   __pyx_L1_error:;
   return -1;
@@ -1925,22 +5152,96 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
 
   /* "(tree fragment)":2
  * def __reduce_cython__(self):
+ *     raise TypeError("self.c_lock_table cannot be converted to a Python object for pickling")             # <<<<<<<<<<<<<<
+ * def __setstate_cython__(self, __pyx_state):
+ *     raise TypeError("self.c_lock_table cannot be converted to a Python object for pickling")
+ */
+  __pyx_tuple_ = PyTuple_Pack(1, __pyx_kp_s_self_c_lock_table_cannot_be_conv); if (unlikely(!__pyx_tuple_)) __PYX_ERR(0, 2, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple_);
+  __Pyx_GIVEREF(__pyx_tuple_);
+
+  /* "(tree fragment)":4
+ *     raise TypeError("self.c_lock_table cannot be converted to a Python object for pickling")
+ * def __setstate_cython__(self, __pyx_state):
+ *     raise TypeError("self.c_lock_table cannot be converted to a Python object for pickling")             # <<<<<<<<<<<<<<
+ */
+  __pyx_tuple__2 = PyTuple_Pack(1, __pyx_kp_s_self_c_lock_table_cannot_be_conv); if (unlikely(!__pyx_tuple__2)) __PYX_ERR(0, 4, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__2);
+  __Pyx_GIVEREF(__pyx_tuple__2);
+
+  /* "tables_wrapper.pyx":71
+ *     def set_entry(self, unsigned int bucket_index, unsigned int offset, entry):
+ *         #todo wrap the entry type
+ *         print("WARNING WARNING WARNING set_entry")             # <<<<<<<<<<<<<<
+ *         # c_entry = Entry(entry, 0)
+ *         c_entry = entry
+ */
+  __pyx_tuple__3 = PyTuple_Pack(1, __pyx_kp_u_WARNING_WARNING_WARNING_set_entr); if (unlikely(!__pyx_tuple__3)) __PYX_ERR(1, 71, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__3);
+  __Pyx_GIVEREF(__pyx_tuple__3);
+
+  /* "tables_wrapper.pyx":97
+ *     def generate_bucket_cuckoo_hash_index(self, unsigned int memory_size, unsigned int bucket_size):
+ *         #todo: this is a crazy pointer thing watch out
+ *         print("WARTING WARNTING WARING generate_bucket_cuckoo_hash_index not implemented")             # <<<<<<<<<<<<<<
+ *         return None
+ *         # return self.c_table.generate_bucket_cuckoo_hash_index(memory_size, bucket_size)
+ */
+  __pyx_tuple__4 = PyTuple_Pack(1, __pyx_kp_u_WARTING_WARNTING_WARING_generate); if (unlikely(!__pyx_tuple__4)) __PYX_ERR(1, 97, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__4);
+  __Pyx_GIVEREF(__pyx_tuple__4);
+
+  /* "tables_wrapper.pyx":117
+ * 
+ *     def get_duplicates(self):
+ *         print("WARTING WARNTING WARING get_duplicates not implemented")             # <<<<<<<<<<<<<<
+ *         # duplicates = self.c_table.get_duplicates()
+ *         # #todo do something with the duplicates
+ */
+  __pyx_tuple__5 = PyTuple_Pack(1, __pyx_kp_u_WARTING_WARNTING_WARING_get_dupl); if (unlikely(!__pyx_tuple__5)) __PYX_ERR(1, 117, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__5);
+  __Pyx_GIVEREF(__pyx_tuple__5);
+
+  /* "(tree fragment)":2
+ * def __reduce_cython__(self):
  *     raise TypeError("self.c_table cannot be converted to a Python object for pickling")             # <<<<<<<<<<<<<<
  * def __setstate_cython__(self, __pyx_state):
  *     raise TypeError("self.c_table cannot be converted to a Python object for pickling")
  */
-  __pyx_tuple_ = PyTuple_Pack(1, __pyx_kp_s_self_c_table_cannot_be_converted); if (unlikely(!__pyx_tuple_)) __PYX_ERR(0, 2, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple_);
-  __Pyx_GIVEREF(__pyx_tuple_);
+  __pyx_tuple__6 = PyTuple_Pack(1, __pyx_kp_s_self_c_table_cannot_be_converted); if (unlikely(!__pyx_tuple__6)) __PYX_ERR(0, 2, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__6);
+  __Pyx_GIVEREF(__pyx_tuple__6);
 
   /* "(tree fragment)":4
  *     raise TypeError("self.c_table cannot be converted to a Python object for pickling")
  * def __setstate_cython__(self, __pyx_state):
  *     raise TypeError("self.c_table cannot be converted to a Python object for pickling")             # <<<<<<<<<<<<<<
  */
-  __pyx_tuple__2 = PyTuple_Pack(1, __pyx_kp_s_self_c_table_cannot_be_converted); if (unlikely(!__pyx_tuple__2)) __PYX_ERR(0, 4, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__2);
-  __Pyx_GIVEREF(__pyx_tuple__2);
+  __pyx_tuple__7 = PyTuple_Pack(1, __pyx_kp_s_self_c_table_cannot_be_converted); if (unlikely(!__pyx_tuple__7)) __PYX_ERR(0, 4, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__7);
+  __Pyx_GIVEREF(__pyx_tuple__7);
+
+  /* "FromPyStructUtility":19
+ *         value = obj['key']
+ *     except KeyError:
+ *         raise ValueError("No value specified for struct attribute 'key'")             # <<<<<<<<<<<<<<
+ *     result.key = value
+ *     try:
+ */
+  __pyx_tuple__8 = PyTuple_Pack(1, __pyx_kp_s_No_value_specified_for_struct_at); if (unlikely(!__pyx_tuple__8)) __PYX_ERR(0, 19, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__8);
+  __Pyx_GIVEREF(__pyx_tuple__8);
+
+  /* "FromPyStructUtility":24
+ *         value = obj['value']
+ *     except KeyError:
+ *         raise ValueError("No value specified for struct attribute 'value'")             # <<<<<<<<<<<<<<
+ *     result.value = value
+ *     return result
+ */
+  __pyx_tuple__9 = PyTuple_Pack(1, __pyx_kp_s_No_value_specified_for_struct_at_2); if (unlikely(!__pyx_tuple__9)) __PYX_ERR(0, 24, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__9);
+  __Pyx_GIVEREF(__pyx_tuple__9);
   __Pyx_RefNannyFinishContext();
   return 0;
   __pyx_L1_error:;
@@ -1994,15 +5295,25 @@ static int __Pyx_modinit_type_init_code(void) {
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("__Pyx_modinit_type_init_code", 0);
   /*--- Type init code ---*/
-  if (PyType_Ready(&__pyx_type_7ctables_Table) < 0) __PYX_ERR(1, 7, __pyx_L1_error)
+  if (PyType_Ready(&__pyx_type_7ctables_Lock_Table) < 0) __PYX_ERR(1, 9, __pyx_L1_error)
+  #if PY_VERSION_HEX < 0x030800B1
+  __pyx_type_7ctables_Lock_Table.tp_print = 0;
+  #endif
+  if ((CYTHON_USE_TYPE_SLOTS && CYTHON_USE_PYTYPE_LOOKUP) && likely(!__pyx_type_7ctables_Lock_Table.tp_dictoffset && __pyx_type_7ctables_Lock_Table.tp_getattro == PyObject_GenericGetAttr)) {
+    __pyx_type_7ctables_Lock_Table.tp_getattro = __Pyx_PyObject_GenericGetAttr;
+  }
+  if (PyObject_SetAttr(__pyx_m, __pyx_n_s_Lock_Table, (PyObject *)&__pyx_type_7ctables_Lock_Table) < 0) __PYX_ERR(1, 9, __pyx_L1_error)
+  if (__Pyx_setup_reduce((PyObject*)&__pyx_type_7ctables_Lock_Table) < 0) __PYX_ERR(1, 9, __pyx_L1_error)
+  __pyx_ptype_7ctables_Lock_Table = &__pyx_type_7ctables_Lock_Table;
+  if (PyType_Ready(&__pyx_type_7ctables_Table) < 0) __PYX_ERR(1, 31, __pyx_L1_error)
   #if PY_VERSION_HEX < 0x030800B1
   __pyx_type_7ctables_Table.tp_print = 0;
   #endif
   if ((CYTHON_USE_TYPE_SLOTS && CYTHON_USE_PYTYPE_LOOKUP) && likely(!__pyx_type_7ctables_Table.tp_dictoffset && __pyx_type_7ctables_Table.tp_getattro == PyObject_GenericGetAttr)) {
     __pyx_type_7ctables_Table.tp_getattro = __Pyx_PyObject_GenericGetAttr;
   }
-  if (PyObject_SetAttr(__pyx_m, __pyx_n_s_Table, (PyObject *)&__pyx_type_7ctables_Table) < 0) __PYX_ERR(1, 7, __pyx_L1_error)
-  if (__Pyx_setup_reduce((PyObject*)&__pyx_type_7ctables_Table) < 0) __PYX_ERR(1, 7, __pyx_L1_error)
+  if (PyObject_SetAttr(__pyx_m, __pyx_n_s_Table, (PyObject *)&__pyx_type_7ctables_Table) < 0) __PYX_ERR(1, 31, __pyx_L1_error)
+  if (__Pyx_setup_reduce((PyObject*)&__pyx_type_7ctables_Table) < 0) __PYX_ERR(1, 31, __pyx_L1_error)
   __pyx_ptype_7ctables_Table = &__pyx_type_7ctables_Table;
   __Pyx_RefNannyFinishContext();
   return 0;
@@ -2244,6 +5555,14 @@ if (!__Pyx_RefNanny) {
   __Pyx_GOTREF(__pyx_t_1);
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_test, __pyx_t_1) < 0) __PYX_ERR(1, 1, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+
+  /* "FromPyStructUtility":11
+ * 
+ * @cname("__pyx_convert__from_py_struct__cuckoo_tables_3a__3a_Entry")
+ * cdef struct_type __pyx_convert__from_py_struct__cuckoo_tables_3a__3a_Entry(obj) except *:             # <<<<<<<<<<<<<<
+ *     cdef struct_type result
+ *     if not PyMapping_Check(obj):
+ */
 
   /*--- Wrapped vars code ---*/
 
@@ -2660,6 +5979,185 @@ bad:
 }
 #endif
 
+/* DictGetItem */
+#if PY_MAJOR_VERSION >= 3 && !CYTHON_COMPILING_IN_PYPY
+static PyObject *__Pyx_PyDict_GetItem(PyObject *d, PyObject* key) {
+    PyObject *value;
+    value = PyDict_GetItemWithError(d, key);
+    if (unlikely(!value)) {
+        if (!PyErr_Occurred()) {
+            if (unlikely(PyTuple_Check(key))) {
+                PyObject* args = PyTuple_Pack(1, key);
+                if (likely(args)) {
+                    PyErr_SetObject(PyExc_KeyError, args);
+                    Py_DECREF(args);
+                }
+            } else {
+                PyErr_SetObject(PyExc_KeyError, key);
+            }
+        }
+        return NULL;
+    }
+    Py_INCREF(value);
+    return value;
+}
+#endif
+
+/* GetTopmostException */
+#if CYTHON_USE_EXC_INFO_STACK
+static _PyErr_StackItem *
+__Pyx_PyErr_GetTopmostException(PyThreadState *tstate)
+{
+    _PyErr_StackItem *exc_info = tstate->exc_info;
+    while ((exc_info->exc_type == NULL || exc_info->exc_type == Py_None) &&
+           exc_info->previous_item != NULL)
+    {
+        exc_info = exc_info->previous_item;
+    }
+    return exc_info;
+}
+#endif
+
+/* SaveResetException */
+#if CYTHON_FAST_THREAD_STATE
+static CYTHON_INLINE void __Pyx__ExceptionSave(PyThreadState *tstate, PyObject **type, PyObject **value, PyObject **tb) {
+    #if CYTHON_USE_EXC_INFO_STACK
+    _PyErr_StackItem *exc_info = __Pyx_PyErr_GetTopmostException(tstate);
+    *type = exc_info->exc_type;
+    *value = exc_info->exc_value;
+    *tb = exc_info->exc_traceback;
+    #else
+    *type = tstate->exc_type;
+    *value = tstate->exc_value;
+    *tb = tstate->exc_traceback;
+    #endif
+    Py_XINCREF(*type);
+    Py_XINCREF(*value);
+    Py_XINCREF(*tb);
+}
+static CYTHON_INLINE void __Pyx__ExceptionReset(PyThreadState *tstate, PyObject *type, PyObject *value, PyObject *tb) {
+    PyObject *tmp_type, *tmp_value, *tmp_tb;
+    #if CYTHON_USE_EXC_INFO_STACK
+    _PyErr_StackItem *exc_info = tstate->exc_info;
+    tmp_type = exc_info->exc_type;
+    tmp_value = exc_info->exc_value;
+    tmp_tb = exc_info->exc_traceback;
+    exc_info->exc_type = type;
+    exc_info->exc_value = value;
+    exc_info->exc_traceback = tb;
+    #else
+    tmp_type = tstate->exc_type;
+    tmp_value = tstate->exc_value;
+    tmp_tb = tstate->exc_traceback;
+    tstate->exc_type = type;
+    tstate->exc_value = value;
+    tstate->exc_traceback = tb;
+    #endif
+    Py_XDECREF(tmp_type);
+    Py_XDECREF(tmp_value);
+    Py_XDECREF(tmp_tb);
+}
+#endif
+
+/* PyErrExceptionMatches */
+#if CYTHON_FAST_THREAD_STATE
+static int __Pyx_PyErr_ExceptionMatchesTuple(PyObject *exc_type, PyObject *tuple) {
+    Py_ssize_t i, n;
+    n = PyTuple_GET_SIZE(tuple);
+#if PY_MAJOR_VERSION >= 3
+    for (i=0; i<n; i++) {
+        if (exc_type == PyTuple_GET_ITEM(tuple, i)) return 1;
+    }
+#endif
+    for (i=0; i<n; i++) {
+        if (__Pyx_PyErr_GivenExceptionMatches(exc_type, PyTuple_GET_ITEM(tuple, i))) return 1;
+    }
+    return 0;
+}
+static CYTHON_INLINE int __Pyx_PyErr_ExceptionMatchesInState(PyThreadState* tstate, PyObject* err) {
+    PyObject *exc_type = tstate->curexc_type;
+    if (exc_type == err) return 1;
+    if (unlikely(!exc_type)) return 0;
+    if (unlikely(PyTuple_Check(err)))
+        return __Pyx_PyErr_ExceptionMatchesTuple(exc_type, err);
+    return __Pyx_PyErr_GivenExceptionMatches(exc_type, err);
+}
+#endif
+
+/* GetException */
+#if CYTHON_FAST_THREAD_STATE
+static int __Pyx__GetException(PyThreadState *tstate, PyObject **type, PyObject **value, PyObject **tb)
+#else
+static int __Pyx_GetException(PyObject **type, PyObject **value, PyObject **tb)
+#endif
+{
+    PyObject *local_type, *local_value, *local_tb;
+#if CYTHON_FAST_THREAD_STATE
+    PyObject *tmp_type, *tmp_value, *tmp_tb;
+    local_type = tstate->curexc_type;
+    local_value = tstate->curexc_value;
+    local_tb = tstate->curexc_traceback;
+    tstate->curexc_type = 0;
+    tstate->curexc_value = 0;
+    tstate->curexc_traceback = 0;
+#else
+    PyErr_Fetch(&local_type, &local_value, &local_tb);
+#endif
+    PyErr_NormalizeException(&local_type, &local_value, &local_tb);
+#if CYTHON_FAST_THREAD_STATE
+    if (unlikely(tstate->curexc_type))
+#else
+    if (unlikely(PyErr_Occurred()))
+#endif
+        goto bad;
+    #if PY_MAJOR_VERSION >= 3
+    if (local_tb) {
+        if (unlikely(PyException_SetTraceback(local_value, local_tb) < 0))
+            goto bad;
+    }
+    #endif
+    Py_XINCREF(local_tb);
+    Py_XINCREF(local_type);
+    Py_XINCREF(local_value);
+    *type = local_type;
+    *value = local_value;
+    *tb = local_tb;
+#if CYTHON_FAST_THREAD_STATE
+    #if CYTHON_USE_EXC_INFO_STACK
+    {
+        _PyErr_StackItem *exc_info = tstate->exc_info;
+        tmp_type = exc_info->exc_type;
+        tmp_value = exc_info->exc_value;
+        tmp_tb = exc_info->exc_traceback;
+        exc_info->exc_type = local_type;
+        exc_info->exc_value = local_value;
+        exc_info->exc_traceback = local_tb;
+    }
+    #else
+    tmp_type = tstate->exc_type;
+    tmp_value = tstate->exc_value;
+    tmp_tb = tstate->exc_traceback;
+    tstate->exc_type = local_type;
+    tstate->exc_value = local_value;
+    tstate->exc_traceback = local_tb;
+    #endif
+    Py_XDECREF(tmp_type);
+    Py_XDECREF(tmp_value);
+    Py_XDECREF(tmp_tb);
+#else
+    PyErr_SetExcInfo(local_type, local_value, local_tb);
+#endif
+    return 0;
+bad:
+    *type = 0;
+    *value = 0;
+    *tb = 0;
+    Py_XDECREF(local_type);
+    Py_XDECREF(local_value);
+    Py_XDECREF(local_tb);
+    return -1;
+}
+
 /* PyObject_GenericGetAttrNoDict */
 #if CYTHON_USE_TYPE_SLOTS && CYTHON_USE_PYTYPE_LOOKUP && PY_VERSION_HEX < 0x03070000
 static PyObject *__Pyx_RaiseGenericGetAttributeError(PyTypeObject *tp, PyObject *attr_name) {
@@ -2707,31 +6205,6 @@ static PyObject* __Pyx_PyObject_GenericGetAttr(PyObject* obj, PyObject* attr_nam
         return PyObject_GenericGetAttr(obj, attr_name);
     }
     return __Pyx_PyObject_GenericGetAttrNoDict(obj, attr_name);
-}
-#endif
-
-/* PyErrExceptionMatches */
-#if CYTHON_FAST_THREAD_STATE
-static int __Pyx_PyErr_ExceptionMatchesTuple(PyObject *exc_type, PyObject *tuple) {
-    Py_ssize_t i, n;
-    n = PyTuple_GET_SIZE(tuple);
-#if PY_MAJOR_VERSION >= 3
-    for (i=0; i<n; i++) {
-        if (exc_type == PyTuple_GET_ITEM(tuple, i)) return 1;
-    }
-#endif
-    for (i=0; i<n; i++) {
-        if (__Pyx_PyErr_GivenExceptionMatches(exc_type, PyTuple_GET_ITEM(tuple, i))) return 1;
-    }
-    return 0;
-}
-static CYTHON_INLINE int __Pyx_PyErr_ExceptionMatchesInState(PyThreadState* tstate, PyObject* err) {
-    PyObject *exc_type = tstate->curexc_type;
-    if (exc_type == err) return 1;
-    if (unlikely(!exc_type)) return 0;
-    if (unlikely(PyTuple_Check(err)))
-        return __Pyx_PyErr_ExceptionMatchesTuple(exc_type, err);
-    return __Pyx_PyErr_GivenExceptionMatches(exc_type, err);
 }
 #endif
 
@@ -3138,6 +6611,22 @@ bad:
         return (target_type) value;\
     }
 
+static PyObject* __pyx_convert__to_py_struct__cuckoo_tables_3a__3a_CasOperationReturn(struct cuckoo_tables::CasOperationReturn s) {
+  PyObject* res;
+  PyObject* member;
+  res = __Pyx_PyDict_NewPresized(2); if (unlikely(!res)) return NULL;
+  member = __Pyx_PyBool_FromLong(s.success); if (unlikely(!member)) goto bad;
+  if (unlikely(PyDict_SetItem(res, __pyx_n_s_success, member) < 0)) goto bad;
+  Py_DECREF(member);
+  member = __Pyx_PyInt_From_uint64_t(s.current_value); if (unlikely(!member)) goto bad;
+  if (unlikely(PyDict_SetItem(res, __pyx_n_s_current_value, member) < 0)) goto bad;
+  Py_DECREF(member);
+  return res;
+  bad:
+  Py_XDECREF(member);
+  Py_DECREF(res);
+  return NULL;
+}
 /* CIntFromPy */
 static CYTHON_INLINE unsigned int __Pyx_PyInt_As_unsigned_int(PyObject *x) {
 #ifdef __Pyx_HAS_GCC_DIAGNOSTIC
@@ -3332,6 +6821,240 @@ raise_neg_overflow:
     PyErr_SetString(PyExc_OverflowError,
         "can't convert negative value to unsigned int");
     return (unsigned int) -1;
+}
+
+/* CIntFromPy */
+static CYTHON_INLINE uint64_t __Pyx_PyInt_As_uint64_t(PyObject *x) {
+#ifdef __Pyx_HAS_GCC_DIAGNOSTIC
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wconversion"
+#endif
+    const uint64_t neg_one = (uint64_t) -1, const_zero = (uint64_t) 0;
+#ifdef __Pyx_HAS_GCC_DIAGNOSTIC
+#pragma GCC diagnostic pop
+#endif
+    const int is_unsigned = neg_one > const_zero;
+#if PY_MAJOR_VERSION < 3
+    if (likely(PyInt_Check(x))) {
+        if (sizeof(uint64_t) < sizeof(long)) {
+            __PYX_VERIFY_RETURN_INT(uint64_t, long, PyInt_AS_LONG(x))
+        } else {
+            long val = PyInt_AS_LONG(x);
+            if (is_unsigned && unlikely(val < 0)) {
+                goto raise_neg_overflow;
+            }
+            return (uint64_t) val;
+        }
+    } else
+#endif
+    if (likely(PyLong_Check(x))) {
+        if (is_unsigned) {
+#if CYTHON_USE_PYLONG_INTERNALS
+            const digit* digits = ((PyLongObject*)x)->ob_digit;
+            switch (Py_SIZE(x)) {
+                case  0: return (uint64_t) 0;
+                case  1: __PYX_VERIFY_RETURN_INT(uint64_t, digit, digits[0])
+                case 2:
+                    if (8 * sizeof(uint64_t) > 1 * PyLong_SHIFT) {
+                        if (8 * sizeof(unsigned long) > 2 * PyLong_SHIFT) {
+                            __PYX_VERIFY_RETURN_INT(uint64_t, unsigned long, (((((unsigned long)digits[1]) << PyLong_SHIFT) | (unsigned long)digits[0])))
+                        } else if (8 * sizeof(uint64_t) >= 2 * PyLong_SHIFT) {
+                            return (uint64_t) (((((uint64_t)digits[1]) << PyLong_SHIFT) | (uint64_t)digits[0]));
+                        }
+                    }
+                    break;
+                case 3:
+                    if (8 * sizeof(uint64_t) > 2 * PyLong_SHIFT) {
+                        if (8 * sizeof(unsigned long) > 3 * PyLong_SHIFT) {
+                            __PYX_VERIFY_RETURN_INT(uint64_t, unsigned long, (((((((unsigned long)digits[2]) << PyLong_SHIFT) | (unsigned long)digits[1]) << PyLong_SHIFT) | (unsigned long)digits[0])))
+                        } else if (8 * sizeof(uint64_t) >= 3 * PyLong_SHIFT) {
+                            return (uint64_t) (((((((uint64_t)digits[2]) << PyLong_SHIFT) | (uint64_t)digits[1]) << PyLong_SHIFT) | (uint64_t)digits[0]));
+                        }
+                    }
+                    break;
+                case 4:
+                    if (8 * sizeof(uint64_t) > 3 * PyLong_SHIFT) {
+                        if (8 * sizeof(unsigned long) > 4 * PyLong_SHIFT) {
+                            __PYX_VERIFY_RETURN_INT(uint64_t, unsigned long, (((((((((unsigned long)digits[3]) << PyLong_SHIFT) | (unsigned long)digits[2]) << PyLong_SHIFT) | (unsigned long)digits[1]) << PyLong_SHIFT) | (unsigned long)digits[0])))
+                        } else if (8 * sizeof(uint64_t) >= 4 * PyLong_SHIFT) {
+                            return (uint64_t) (((((((((uint64_t)digits[3]) << PyLong_SHIFT) | (uint64_t)digits[2]) << PyLong_SHIFT) | (uint64_t)digits[1]) << PyLong_SHIFT) | (uint64_t)digits[0]));
+                        }
+                    }
+                    break;
+            }
+#endif
+#if CYTHON_COMPILING_IN_CPYTHON
+            if (unlikely(Py_SIZE(x) < 0)) {
+                goto raise_neg_overflow;
+            }
+#else
+            {
+                int result = PyObject_RichCompareBool(x, Py_False, Py_LT);
+                if (unlikely(result < 0))
+                    return (uint64_t) -1;
+                if (unlikely(result == 1))
+                    goto raise_neg_overflow;
+            }
+#endif
+            if (sizeof(uint64_t) <= sizeof(unsigned long)) {
+                __PYX_VERIFY_RETURN_INT_EXC(uint64_t, unsigned long, PyLong_AsUnsignedLong(x))
+#ifdef HAVE_LONG_LONG
+            } else if (sizeof(uint64_t) <= sizeof(unsigned PY_LONG_LONG)) {
+                __PYX_VERIFY_RETURN_INT_EXC(uint64_t, unsigned PY_LONG_LONG, PyLong_AsUnsignedLongLong(x))
+#endif
+            }
+        } else {
+#if CYTHON_USE_PYLONG_INTERNALS
+            const digit* digits = ((PyLongObject*)x)->ob_digit;
+            switch (Py_SIZE(x)) {
+                case  0: return (uint64_t) 0;
+                case -1: __PYX_VERIFY_RETURN_INT(uint64_t, sdigit, (sdigit) (-(sdigit)digits[0]))
+                case  1: __PYX_VERIFY_RETURN_INT(uint64_t,  digit, +digits[0])
+                case -2:
+                    if (8 * sizeof(uint64_t) - 1 > 1 * PyLong_SHIFT) {
+                        if (8 * sizeof(unsigned long) > 2 * PyLong_SHIFT) {
+                            __PYX_VERIFY_RETURN_INT(uint64_t, long, -(long) (((((unsigned long)digits[1]) << PyLong_SHIFT) | (unsigned long)digits[0])))
+                        } else if (8 * sizeof(uint64_t) - 1 > 2 * PyLong_SHIFT) {
+                            return (uint64_t) (((uint64_t)-1)*(((((uint64_t)digits[1]) << PyLong_SHIFT) | (uint64_t)digits[0])));
+                        }
+                    }
+                    break;
+                case 2:
+                    if (8 * sizeof(uint64_t) > 1 * PyLong_SHIFT) {
+                        if (8 * sizeof(unsigned long) > 2 * PyLong_SHIFT) {
+                            __PYX_VERIFY_RETURN_INT(uint64_t, unsigned long, (((((unsigned long)digits[1]) << PyLong_SHIFT) | (unsigned long)digits[0])))
+                        } else if (8 * sizeof(uint64_t) - 1 > 2 * PyLong_SHIFT) {
+                            return (uint64_t) ((((((uint64_t)digits[1]) << PyLong_SHIFT) | (uint64_t)digits[0])));
+                        }
+                    }
+                    break;
+                case -3:
+                    if (8 * sizeof(uint64_t) - 1 > 2 * PyLong_SHIFT) {
+                        if (8 * sizeof(unsigned long) > 3 * PyLong_SHIFT) {
+                            __PYX_VERIFY_RETURN_INT(uint64_t, long, -(long) (((((((unsigned long)digits[2]) << PyLong_SHIFT) | (unsigned long)digits[1]) << PyLong_SHIFT) | (unsigned long)digits[0])))
+                        } else if (8 * sizeof(uint64_t) - 1 > 3 * PyLong_SHIFT) {
+                            return (uint64_t) (((uint64_t)-1)*(((((((uint64_t)digits[2]) << PyLong_SHIFT) | (uint64_t)digits[1]) << PyLong_SHIFT) | (uint64_t)digits[0])));
+                        }
+                    }
+                    break;
+                case 3:
+                    if (8 * sizeof(uint64_t) > 2 * PyLong_SHIFT) {
+                        if (8 * sizeof(unsigned long) > 3 * PyLong_SHIFT) {
+                            __PYX_VERIFY_RETURN_INT(uint64_t, unsigned long, (((((((unsigned long)digits[2]) << PyLong_SHIFT) | (unsigned long)digits[1]) << PyLong_SHIFT) | (unsigned long)digits[0])))
+                        } else if (8 * sizeof(uint64_t) - 1 > 3 * PyLong_SHIFT) {
+                            return (uint64_t) ((((((((uint64_t)digits[2]) << PyLong_SHIFT) | (uint64_t)digits[1]) << PyLong_SHIFT) | (uint64_t)digits[0])));
+                        }
+                    }
+                    break;
+                case -4:
+                    if (8 * sizeof(uint64_t) - 1 > 3 * PyLong_SHIFT) {
+                        if (8 * sizeof(unsigned long) > 4 * PyLong_SHIFT) {
+                            __PYX_VERIFY_RETURN_INT(uint64_t, long, -(long) (((((((((unsigned long)digits[3]) << PyLong_SHIFT) | (unsigned long)digits[2]) << PyLong_SHIFT) | (unsigned long)digits[1]) << PyLong_SHIFT) | (unsigned long)digits[0])))
+                        } else if (8 * sizeof(uint64_t) - 1 > 4 * PyLong_SHIFT) {
+                            return (uint64_t) (((uint64_t)-1)*(((((((((uint64_t)digits[3]) << PyLong_SHIFT) | (uint64_t)digits[2]) << PyLong_SHIFT) | (uint64_t)digits[1]) << PyLong_SHIFT) | (uint64_t)digits[0])));
+                        }
+                    }
+                    break;
+                case 4:
+                    if (8 * sizeof(uint64_t) > 3 * PyLong_SHIFT) {
+                        if (8 * sizeof(unsigned long) > 4 * PyLong_SHIFT) {
+                            __PYX_VERIFY_RETURN_INT(uint64_t, unsigned long, (((((((((unsigned long)digits[3]) << PyLong_SHIFT) | (unsigned long)digits[2]) << PyLong_SHIFT) | (unsigned long)digits[1]) << PyLong_SHIFT) | (unsigned long)digits[0])))
+                        } else if (8 * sizeof(uint64_t) - 1 > 4 * PyLong_SHIFT) {
+                            return (uint64_t) ((((((((((uint64_t)digits[3]) << PyLong_SHIFT) | (uint64_t)digits[2]) << PyLong_SHIFT) | (uint64_t)digits[1]) << PyLong_SHIFT) | (uint64_t)digits[0])));
+                        }
+                    }
+                    break;
+            }
+#endif
+            if (sizeof(uint64_t) <= sizeof(long)) {
+                __PYX_VERIFY_RETURN_INT_EXC(uint64_t, long, PyLong_AsLong(x))
+#ifdef HAVE_LONG_LONG
+            } else if (sizeof(uint64_t) <= sizeof(PY_LONG_LONG)) {
+                __PYX_VERIFY_RETURN_INT_EXC(uint64_t, PY_LONG_LONG, PyLong_AsLongLong(x))
+#endif
+            }
+        }
+        {
+#if CYTHON_COMPILING_IN_PYPY && !defined(_PyLong_AsByteArray)
+            PyErr_SetString(PyExc_RuntimeError,
+                            "_PyLong_AsByteArray() not available in PyPy, cannot convert large numbers");
+#else
+            uint64_t val;
+            PyObject *v = __Pyx_PyNumber_IntOrLong(x);
+ #if PY_MAJOR_VERSION < 3
+            if (likely(v) && !PyLong_Check(v)) {
+                PyObject *tmp = v;
+                v = PyNumber_Long(tmp);
+                Py_DECREF(tmp);
+            }
+ #endif
+            if (likely(v)) {
+                int one = 1; int is_little = (int)*(unsigned char *)&one;
+                unsigned char *bytes = (unsigned char *)&val;
+                int ret = _PyLong_AsByteArray((PyLongObject *)v,
+                                              bytes, sizeof(val),
+                                              is_little, !is_unsigned);
+                Py_DECREF(v);
+                if (likely(!ret))
+                    return val;
+            }
+#endif
+            return (uint64_t) -1;
+        }
+    } else {
+        uint64_t val;
+        PyObject *tmp = __Pyx_PyNumber_IntOrLong(x);
+        if (!tmp) return (uint64_t) -1;
+        val = __Pyx_PyInt_As_uint64_t(tmp);
+        Py_DECREF(tmp);
+        return val;
+    }
+raise_overflow:
+    PyErr_SetString(PyExc_OverflowError,
+        "value too large to convert to uint64_t");
+    return (uint64_t) -1;
+raise_neg_overflow:
+    PyErr_SetString(PyExc_OverflowError,
+        "can't convert negative value to uint64_t");
+    return (uint64_t) -1;
+}
+
+/* CIntToPy */
+static CYTHON_INLINE PyObject* __Pyx_PyInt_From_uint64_t(uint64_t value) {
+#ifdef __Pyx_HAS_GCC_DIAGNOSTIC
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wconversion"
+#endif
+    const uint64_t neg_one = (uint64_t) -1, const_zero = (uint64_t) 0;
+#ifdef __Pyx_HAS_GCC_DIAGNOSTIC
+#pragma GCC diagnostic pop
+#endif
+    const int is_unsigned = neg_one > const_zero;
+    if (is_unsigned) {
+        if (sizeof(uint64_t) < sizeof(long)) {
+            return PyInt_FromLong((long) value);
+        } else if (sizeof(uint64_t) <= sizeof(unsigned long)) {
+            return PyLong_FromUnsignedLong((unsigned long) value);
+#ifdef HAVE_LONG_LONG
+        } else if (sizeof(uint64_t) <= sizeof(unsigned PY_LONG_LONG)) {
+            return PyLong_FromUnsignedLongLong((unsigned PY_LONG_LONG) value);
+#endif
+        }
+    } else {
+        if (sizeof(uint64_t) <= sizeof(long)) {
+            return PyInt_FromLong((long) value);
+#ifdef HAVE_LONG_LONG
+        } else if (sizeof(uint64_t) <= sizeof(PY_LONG_LONG)) {
+            return PyLong_FromLongLong((PY_LONG_LONG) value);
+#endif
+        }
+    }
+    {
+        int one = 1; int little = (int)*(unsigned char *)&one;
+        unsigned char *bytes = (unsigned char *)&value;
+        return _PyLong_FromByteArray(bytes, sizeof(uint64_t),
+                                     little, !is_unsigned);
+    }
 }
 
 /* CIntToPy */

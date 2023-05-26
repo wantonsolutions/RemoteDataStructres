@@ -17,7 +17,6 @@ namespace cuckoo_tables {
         uint64_t current_value;
     } CasOperationReturn;
 
-    }
 
     class Lock_Table {
         public:
@@ -38,15 +37,16 @@ namespace cuckoo_tables {
     
     class Table {
         public:
-            // **Entry table;
-            // LockTable lock_table;
             Table();
             Table(unsigned int memory_size, unsigned int bucket_size, unsigned int buckets_per_lock);
             void unlock_all();
             void print_table();
+            CasOperationReturn lock_table_masked_cas(unsigned int lock_index, uint64_t old, uint64_t new_value, uint64_t mask);
+            CasOperationReturn fill_lock_table_masked_cas(unsigned int lock_index, bool success, uint64_t value, uint64_t mask);
             unsigned int get_bucket_size();
             unsigned int row_size_bytes();
             unsigned int row_size_indexes();
+            unsigned int n_buckets_size(unsigned int n_buckets);
             Entry get_entry(unsigned int bucket_index, unsigned int offset);
             void set_entry(unsigned int bucket_index, unsigned int offset, Entry entry);
             bool bucket_has_empty(unsigned int bucket_index);
@@ -59,17 +59,9 @@ namespace cuckoo_tables {
             unsigned int find_empty_index(unsigned int bucket_index);
             unsigned int absolute_index_to_bucket_index(unsigned int absolute_index);
             unsigned int absolute_index_to_offset(unsigned int absolute_index);
-            
             void assert_operation_in_table_bound(unsigned int bucket_index, unsigned int offset, unsigned int memory_size);
             bool contains_duplicates();
             unsigned int ** get_duplicates();
-
-
-
-
-
-
-            unsigned int n_buckets_size(unsigned int n_buckets);
 
         private:
             unsigned int _entry_size;

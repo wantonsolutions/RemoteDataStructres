@@ -11,9 +11,13 @@ CPP_FLAGS = -DFAST
 # CPP_FLAGS += -DDEBUG
 # compile mesh classes
 
-TARGET = hashpp
+TARGET = tables
+# TARGET = hash
+all: $(TARGET)
+
+
 $(TARGET).so: $(TARGET).o
-	g++ -shared -Wl,--export-dynamic $(TARGET).o -L$(XXHASH_INC) -lxxhash -L$(BOOST_LIB) -lboost_python$(PYTHON_VERSIONNS) -o $(TARGET).so -lssl -lcrypto 
+	g++ -shared -Wl,--export-dynamic $(TARGET).o -L$(XXHASH_INC) -lxxhash -o $(TARGET).so -lssl -lcrypto 
 $(TARGET).o: $(TARGET).cpp
 	g++ -I$(PYTHON_INCLUDE) -I$(BOOST_INC)  -I$(XXHASH_INC) $(CPP_FLAGS) -fPIC -c $(TARGET).cpp
 
@@ -22,4 +26,3 @@ clean:
 	rm -rf build
 	rm -f hash_wrapper.cpp
 	rm -f tables_wrapper.cpp
-	rm -f py_wrapper.cpp
