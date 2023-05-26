@@ -107,6 +107,8 @@ class LockTable:
             top_bucket = bottom_bucket + self.buckets_per_lock - 1
             s += str(bottom_bucket) + "-" + str(top_bucket) + ":" + str(self.locks[i]) + "\n"
         return s[:len(s)-1]
+
+        
 class Table:
     def __init__(self, memory_size, bucket_size, buckets_per_lock):
         # self.number_tables=2

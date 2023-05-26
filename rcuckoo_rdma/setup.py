@@ -14,21 +14,16 @@ extensions = [
               extra_compile_args=['-std=c++11'],
               language='c++'
               ),
+    # Extension('ctables', ['tables_wrapper.pyx', 'tables.cpp'],
     Extension('ctables', ['tables_wrapper.pyx', 'tables.cpp'],
               extra_compile_args=['-std=c++11'],
               language='c++'
               ),
 ]
 
-# extensions = [
-#     Extension('chash', ['chash.pyx', 'hashpp.cpp'],
-#               extra_compile_args=['-std=c++11'],
-#               language='c++'
-#               ),
-# ]
 
 setup(
-    name='chash',
+    name='tables',
     ext_modules=cythonize(extensions, language_level=3),
     # extra_compile_args=["-w", '-g'],
 )
