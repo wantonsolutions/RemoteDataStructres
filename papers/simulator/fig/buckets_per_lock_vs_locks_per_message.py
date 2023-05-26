@@ -26,6 +26,7 @@ def buckets_per_lock_vs_locks_per_message_experiment():
     buckets_per_lock_arr=[1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
     locks_per_message=[1,2,4,8,16,32,64]
     log.set_off()
+    # log.set_debug()
     # locks_per_message_arr=[1, 2]
     for lpm in locks_per_message:
         runs=[]

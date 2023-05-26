@@ -34,27 +34,13 @@ def cas_table_entry(table, bucket_id, bucket_offset, old, new):
     else:
         return (False, v)
 
-def masked_cas_lock_table(lock_table, lock_index, old, new, mask):
+def masked_cas_lock_table(table, lock_index, old, new, mask):
+    return table.lock_table_masked_cas(lock_index, old, new, mask)
+
+
+def fill_lock_table_masked_cas(table, lock_index, success, value, mask):
     #sanity check
-    assert len(old) == CAS_SIZE, "old must be 64 bytes"
-    assert len(old) == len(new), "old and new must be the same length"
-    assert len(new) == len(mask), "new and mask must be the same length"
-
-    assert lock_table != None, "lock table is not initalized"
-    assert lock_index < lock_table.total_locks, "lock index is out of bounds"
-    return lock_table.masked_cas(lock_index, old, new, mask)
-
-
-
-def fill_lock_table_masked_cas(lock_table, lock_index, success, value, mask):
-    #sanity check
-    assert len(value) == CAS_SIZE, "value must be 64 bytes"
-    assert len(value) == len(mask), "value and mask must be the same length"
-
-    assert lock_table != None, "lock table is not initalized"
-    assert lock_index < len(lock_table), "lock index is out of bounds"
-
-    return lock_table.fill_masked_cas(lock_index, success, value, mask)
+    table.fill_lock_table_masked_cas(lock_index, success, value, mask)
 
 
 def read_table_entry(table, bucket_id, bucket_offset, size):

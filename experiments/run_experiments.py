@@ -350,6 +350,29 @@ def read_threshold_experiment():
         runs.append(simulator.run_trials(config))
     dm.save_statistics(runs)
 
+def basic_contention():
+    logger = log.setup_custom_logger('root')
+    logger.info("Starting simulator")
+
+    table_size = 2048
+    clients= [1,2,4,8,16,32]
+    runs=[]
+    for client_count in clients:
+        config = get_config()
+        config['indexes'] = table_size
+        config['num_clients'] = client_count
+        config['num_steps'] = 1000000
+        config['read_threshold_bytes'] = 128
+
+        config["buckets_per_lock"] = 16
+        config["locks_per_message"] = 4
+        config["state_machine"]=cuckoo.rcuckoo
+        config["max_fill"]=90
+        log.set_off()
+        runs.append(sim.run_trials(config))
+    dm.save_statistics(runs)
+
+
 def client_scalability():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
@@ -955,7 +978,7 @@ def plot_hero_ycsb_fill_latency():
 
 # todos()
 
-# insertion_debug()
+insertion_debug()
 # plot_general_stats_last_run()
 # plot_hash_factor_distance_cdf()
 
@@ -964,7 +987,8 @@ def plot_hero_ycsb_fill_latency():
 # race_bucket_size_fill_factor()
 # fill_factor_limit_experiment()
 # buckets_per_lock_experiment()
-client_scalability()
+# basic_contention()
+# client_scalability()
 
 # read_threshold_experiment()
 

@@ -131,6 +131,25 @@ class Table:
                 print("[" + '{0: <5}'.format(str(self.table[i][j])) + "] ", end='')
             print("")
 
+    def lock_table_masked_cas(self, lock_index, old, new, mask):
+        assert len(old) == CAS_SIZE, "old must be 64 bytes"
+        assert len(old) == len(new), "old and new must be the same length"
+        assert len(new) == len(mask), "new and mask must be the same length"
+
+        assert self.lock_table != None, "lock table is not initalized"
+        assert lock_index < self.lock_table.total_locks, "lock index is out of bounds"
+        return self.lock_table.masked_cas(lock_index, old, new, mask)
+
+    def fill_lock_table_masked_cas(self, lock_index, success, value, mask):
+        assert len(value) == CAS_SIZE, "value must be 64 bytes"
+        assert len(value) == len(mask), "value and mask must be the same length"
+
+        assert self.lock_table != None, "lock table is not initalized"
+        assert lock_index < len(self.lock_table), "lock index is out of bounds"
+
+        return self.lock_table.fill_masked_cas(lock_index, success, value, mask)
+
+
     def get_bucket_size(self):
         return len(self.table[0]) * TABLE_ENTRY_SIZE
         

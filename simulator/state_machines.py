@@ -498,7 +498,7 @@ class basic_memory_state_machine(state_machine):
 
         if message.payload["function"] == vrdma.masked_cas_lock_table:
             #self.info("Masked CAS in Memory: "+ str(args["lock_index"]) + " Old: " + str(args["old"]) + " New: " + str(args["new"]) + " Mask: " + str(args["mask"]))
-            success, value = vrdma.masked_cas_lock_table(self.table.lock_table, **args)
+            success, value = vrdma.masked_cas_lock_table(self.table, **args)
             response = vrdma.Message({"function": vrdma.fill_lock_table_masked_cas, "function_args":{"lock_index":args["lock_index"], "success":success, "value": value, "mask":args["mask"]}})
             return response
             
