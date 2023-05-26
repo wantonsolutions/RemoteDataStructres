@@ -388,7 +388,7 @@ def messages_per_operation(ax, stats, x_axis="clients", decoration=True, twin=Tr
         l = messages_per_operation_line(axs, stat, label=state_machine_label, x_axis=x_axis)
         lines.extend(l)
     if decoration:
-        messages_per_operation_decoration(axs, axt, x_axis, lines)
+        messages_per_operation_decoration(axs[0], axs[1], x_axis, lines)
 
 def rtt_per_operation_decoration(ax, axt, x_axis, lines):
     ax.set_ylabel("insert - rtt/op")

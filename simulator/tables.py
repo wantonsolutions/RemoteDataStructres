@@ -63,18 +63,20 @@ class LockTable:
         c=0
         for i in range(len(mask)):
             if mask[i] == 1:
-                inverted_mask_index_global[0]=i
+                inverted_mask_index_global[c]=i
                 c+=1
 
         inverted_mask_index = inverted_mask_index_global[0:c]
         #XOR check that the old value in the cas matches the existing lock table.
         for v in inverted_mask_index:
             if not self.locks[lock_index+v].equals(old[v]):
+                #logger.critical("FAILED CAS (Client 0)" + str(self))
                 return (False, old)
         
         #now we just apply. At this point we know that the old value is the same as the current so we can lock and unlock accordingly.
         for v in inverted_mask_index:
             self.locks[lock_index+v].set_bit(new[v])
+        #logger.critical("SUCCESS CAS (Client 0)" + str(self))
         return (True, new)
     
     def fill_masked_cas(self, lock_index, success, new, mask):
@@ -97,10 +99,13 @@ class LockTable:
     def __str__(self):
         s = ""
         for i in range(len(self.locks)):
-            bottom_bucket = i*self.buckets_per_lock
-            top_bucket = bottom_bucket + self.buckets_per_lock - 1
-            s += str(bottom_bucket) + "-" + str(top_bucket) + ":" + str(self.locks[i]) + "\n"
-        return s[:len(s)-1]
+            s += "(" + str(i) + ":" + str(self.locks[i]) + ")"
+        return s
+        # for i in range(len(self.locks)):
+        #     bottom_bucket = i*self.buckets_per_lock
+        #     top_bucket = bottom_bucket + self.buckets_per_lock - 1
+        #     s += str(bottom_bucket) + "-" + str(top_bucket) + ":" + str(self.locks[i]) + "\n"
+        # return s[:len(s)-1]
 
         
 class Table:

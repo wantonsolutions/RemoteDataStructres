@@ -250,22 +250,27 @@ def insertion_debug():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
 
-    table_size = 128
+    table_size = 4096
     runs = []
     print("table size: ", table_size)
 
     config = get_config()
     config['indexes'] = table_size
-    config['num_clients'] = 1
+    config['num_clients'] = 8
+    config['bucket_size'] = 8
     config['num_steps'] = 5000000
     config['read_threshold_bytes'] = 256
     config["buckets_per_lock"] = 1
     config["locks_per_message"] = 64
     config["trials"] = 1
+    
+    config['max_fill']= 50
+    # config['deterministic']=True
     # config["state_machine"]=race.race
     config["state_machine"]=cuckoo.rcuckoo
     config['workload']='ycsb-w'
-    log.set_debug()
+    # log.set_debug()
+    log.set_off()
 
     runs.append(sim.run_trials(config))
 
@@ -351,7 +356,7 @@ def client_scalability():
 
     table_size = 2048
     runs=[]
-    state_machines = [rcuckoo_basic.rcuckoo_basic, race.race]
+    state_machines = [rcuckoo_basic.rcuckoo_basic, race.race, cuckoo.rcuckoo]
     for state_machine in state_machines:
         config = get_config()
         config['indexes'] = table_size
@@ -362,6 +367,7 @@ def client_scalability():
         config["buckets_per_lock"] = 16
         config["locks_per_message"] = 4
         config["state_machine"]=state_machine
+        config["max_fill"]=90
         log.set_off()
         runs.append(sim.run_trials(config))
     dm.save_statistics(runs)
@@ -949,7 +955,7 @@ def plot_hero_ycsb_fill_latency():
 
 # todos()
 
-insertion_debug()
+# insertion_debug()
 # plot_general_stats_last_run()
 # plot_hash_factor_distance_cdf()
 
@@ -958,10 +964,9 @@ insertion_debug()
 # race_bucket_size_fill_factor()
 # fill_factor_limit_experiment()
 # buckets_per_lock_experiment()
-# plot_general_stats_last_run()
+client_scalability()
 
 # read_threshold_experiment()
-# client_scalability()
 
 
 # race_vs_rcuckoo_fill_factor()
@@ -978,3 +983,4 @@ insertion_debug()
 # plot_hash_factor_distance_cdf()
 
 
+plot_general_stats_last_run()

@@ -12,7 +12,7 @@ class Message:
     def __str__(self):
         v = ""
         for key, value in self.payload.items():
-            v += str(key) + ":" + str(value) + "\n"
+            v += str(key) + ":" + str(value) + " "
         return v[:len(v)-1]
 
 CAS_SIZE=64
@@ -348,6 +348,7 @@ def read_threshold_message(key, read_threshold_bytes, table_size, row_size_bytes
 def get_covering_read_from_lock_message(lock_message, buckets_per_lock, row_size_bytes):
     # print(lock_message.payload)
     base_index = lock_message.payload['function_args']['lock_index']
+    base_index *= 8
     #calculate the max and min mask index
     mask = lock_message.payload['function_args']['mask']
     min_index = -1

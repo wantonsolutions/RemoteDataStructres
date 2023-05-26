@@ -109,8 +109,9 @@ class Client(Node):
 
         #for now send all of the message to memory
         for i in range(len(messages)):
-            messages[i].payload["src"] = self.client_id
-            messages[i].payload["dest"] = "memory"
+            if(messages[i] != None):
+                messages[i].payload["src"] = self.client_id
+                messages[i].payload["dest"] = "memory"
         return messages
 
 
@@ -498,13 +499,14 @@ def run_trials(config):
     for i in tqdm(range(trials)):
         c=config.copy()
         sim = Simulator(c)
-        sim.run()
         try:
             sim.run()
         except Exception as e:
             print(e)
+            # sim.memory.index.print_table()
             stats = sim.collect_stats()
             sim.validate_run()
+            # raise e
         sim.validate_run()
         stats = sim.collect_stats()
         runs.append(stats)

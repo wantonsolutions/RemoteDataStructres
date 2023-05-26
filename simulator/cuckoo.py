@@ -157,7 +157,8 @@ class rcuckoo(state_machines.client_state_machine):
         if vrdma.message_type(message) == "masked_cas_response":
             if message.payload["function_args"]["success"] == False:
                 self.critical("What the fuck is happening I failed to release a lock")
-                exit(1)
+                self.critical(str(message))
+                raise Exception("Failed to unlock after aquiring lock")
             
             #successful response
             self.receive_successful_unlocking_message(message)

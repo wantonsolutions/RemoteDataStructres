@@ -1,5 +1,6 @@
 # from cuckoo import *
 # import cuckoo
+import copy
 import random
 from . import search
 from . import virtual_rdma as vrdma
@@ -154,6 +155,7 @@ class state_machine:
 
         for message in messages:
 
+
             size = vrdma.message_to_bytes(message)
             if self.inserting:
                 self.current_insert_messages += 1
@@ -195,11 +197,14 @@ class state_machine:
         #return fsm_wapper
         output_message = self.fsm_logic(message)
         if __debug__:
-            if isinstance(output_message, list):
-                for m in output_message:
-                    self.warning("FSM: " + str(message) + " -> " + str(m))
-            else:
-                self.warning("FSM: " + str(message) + " -> " + str(output_message))
+            self.warning("FSM: Input Message " + str(message))
+            print_output_message = copy.copy(output_message)
+            if not isinstance(print_output_message, list):
+                print_output_message = [print_output_message]
+            count=0
+            for m in print_output_message:
+                self.warning("FSM: Output Message " + str(count) + ") :" + str(m))
+                count+=1
 
         self.update_message_stats(output_message)
         return output_message
