@@ -59,6 +59,14 @@ namespace cuckoo_tables {
         //todo implement
         return CasOperationReturn();
     }
+    unsigned int Table::get_row_count(){
+        //todo implement
+        return 0;
+    }
+    unsigned int Table::get_buckets_per_row(){
+        //todo implement
+        return 0;
+    }
     unsigned int Table::get_bucket_size(){
         //todo implement
         return 0;

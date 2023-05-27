@@ -4,7 +4,8 @@ import sys
 from experiments import plot_cuckoo as pc
 from experiments import data_management as dm
 import simulator.search as search
-import simulator.tables as tables
+# import simulator.tables as tables
+import ctables as tables
 
 # import simulator.hash as hash
 import chash as hash
@@ -14,9 +15,9 @@ from tqdm import tqdm
 import random
 
 # factors = [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
-factors = [1.9, 2.1, 2.3, 2.5, 2.7, 2.9, 3.1, 3.3]
+# factors = [1.9, 2.1, 2.3, 2.5, 2.7, 2.9, 3.1, 3.3]
 factors = [3.3]
-memory_size = 1024 * 1024
+memory_size = 1024
 bucket_size = 8
 buckets_per_lock = 1
 trials = 1

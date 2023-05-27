@@ -50,6 +50,12 @@ cdef class Table:
     def fill_lock_table_masked_cas(self, unsigned int lock_index, bool success, value, mask):
         return self.c_table.fill_lock_table_masked_cas(lock_index, success, value, mask)
 
+    def get_buckets_per_row(self):
+        return self.c_table.get_buckets_per_row()
+
+    def get_row_count(self):
+        return self.c_table.get_row_count()
+
     def get_bucket_size(self):
         return self.c_table.get_bucket_size()
 

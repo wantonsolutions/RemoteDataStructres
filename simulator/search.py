@@ -60,7 +60,7 @@ def random_dfs_search(table, location_func, path, open_buckets, visited):
     
     #here we have a full bucket we need to evict a candidate
     #randomly select an eviction candidate
-    indicies = list(range(0, table.bucket_size))
+    indicies = list(range(0, table.get_buckets_per_row()))
     random.shuffle(indicies)
     for evict_index in indicies:
         pe = path_element(table.get_entry(index,evict_index), table_index, index, evict_index)
@@ -92,7 +92,7 @@ def bucket_cuckoo_insert(table, location_func, value, open_buckets=None):
 
 
 def next_search_location(pe, location_func, table):
-    locations = location_func(pe.key, table.table_size)
+    locations = location_func(pe.key, table.get_row_count())
     table_index = next_table_index(pe.table_index)
     #here the index is the row in the table
     index = locations[table_index]
@@ -141,11 +141,11 @@ def path_index_range(path):
 #entries are reachable. They are merely the closest n open
 #entries.
 def find_closest_target_n_bi_directional(table, location_func, value, n):
-    locations = location_func(value, table.table_size)
+    locations = location_func(value, table.get_row_count())
     index_1 = locations[0]
     index_2 = locations[0] - 1
     if index_2 < 0:
-        index_2 = table.table_size - 1
+        index_2 = table.get_row_count() - 1
     
     results=[]
     while len(results) < n:
@@ -153,12 +153,12 @@ def find_closest_target_n_bi_directional(table, location_func, value, n):
             results.append(index_1)
         if table.bucket_has_empty(index_2):
             results.append(index_2)
-        index_1 = (index_1+1) % table.table_size
+        index_1 = (index_1+1) % table.get_row_count()
         index_2 = (index_2-1)
         if index_2 < 0:
-            index_2 = table.table_size - 1
-        assert index_1 < table.table_size, "TODO Implement modulo wrap around in find closest target"
-        assert index_2 < table.table_size and index_2 >= 0, "TODO something wrong with look back index"
+            index_2 = table.get_row_count() - 1
+        assert index_1 < table.get_row_count(), "TODO Implement modulo wrap around in find closest target"
+        assert index_2 < table.get_row_count() and index_2 >= 0, "TODO something wrong with look back index"
     return results
 
 #an a star path element is a path element which we search
@@ -267,8 +267,8 @@ def fscore(element, target_index, table_size):
 
 
 def a_star_search(table, location_func, value, open_buckets=None):
-    table_size = table.table_size
-    bucket_size = table.bucket_size
+    table_size = table.get_row_count()
+    bucket_size = table.get_buckets_per_row()
     targets = find_closest_target_n_bi_directional(table, location_func, value, 20)
     # targets = list(set(targets))
     # print(targets)

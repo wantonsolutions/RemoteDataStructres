@@ -23,7 +23,7 @@ extensions = [
 
 
 setup(
-    name='tables',
+    name='ctables',
     ext_modules=cythonize(extensions, language_level=3),
     # extra_compile_args=["-w", '-g'],
 )

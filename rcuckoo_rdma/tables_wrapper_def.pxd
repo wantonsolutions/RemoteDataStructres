@@ -28,6 +28,8 @@ cdef extern from "tables.h" namespace "cuckoo_tables":
         void print_table()
         CasOperationReturn lock_table_masked_cas(unsigned int lock_index, stdint.uint64_t old, stdint.uint64_t new_value, stdint.uint64_t mask)
         CasOperationReturn fill_lock_table_masked_cas(unsigned int lock_index, bool success, stdint.uint64_t value, stdint.uint64_t mask)
+        unsigned int get_buckets_per_row()
+        unsigned int get_row_count()
         unsigned int get_bucket_size()
         unsigned int row_size_bytes()
         unsigned int row_size_indexes()

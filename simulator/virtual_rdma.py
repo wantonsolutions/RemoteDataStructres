@@ -49,7 +49,7 @@ def read_table_entry(table, bucket_id, bucket_offset, size):
 
     #collect the read
     read = []
-    base = bucket_id * table.bucket_size + bucket_offset
+    base = bucket_id * table.get_buckets_per_row() + bucket_offset
     for i in range(total_indexs):
         bucket = table.absolute_index_to_bucket_index(base + i)
         offset = table.absolute_index_to_bucket_offset(base + i)
@@ -61,7 +61,7 @@ def fill_table_with_read(table, bucket_id, bucket_offset, size, read):
     total_indexs = int(size/TABLE_ENTRY_SIZE)
 
     #write remote read to the table
-    base = bucket_id * table.bucket_size + bucket_offset
+    base = bucket_id * table.get_buckets_per_row() + bucket_offset
     for i in range(total_indexs):
         bucket = table.absolute_index_to_bucket_index(base + i)
         offset = table.absolute_index_to_bucket_offset(base + i)

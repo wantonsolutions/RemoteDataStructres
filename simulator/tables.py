@@ -116,7 +116,6 @@ class Table:
         self.bucket_size=bucket_size
         self.buckets_per_lock=buckets_per_lock
         self.table=self.generate_bucket_cuckoo_hash_index(memory_size, bucket_size)
-        self.table_size = len(self.table)
 
         self.lock_table = LockTable(memory_size, self.entry_size, bucket_size, self.buckets_per_lock)
         self.fill = 0
@@ -155,6 +154,12 @@ class Table:
         
     def row_size_bytes(self):
         return self.n_buckets_size(self.bucket_size)
+
+    def get_buckets_per_row(self):
+        return self.bucket_size
+
+    def get_row_count(self):
+        return len(self.table)
 
     def row_size_in_indexes(self):
         return len(self.table[0])

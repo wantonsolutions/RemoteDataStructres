@@ -43,6 +43,8 @@ namespace cuckoo_tables {
             void print_table();
             CasOperationReturn lock_table_masked_cas(unsigned int lock_index, uint64_t old, uint64_t new_value, uint64_t mask);
             CasOperationReturn fill_lock_table_masked_cas(unsigned int lock_index, bool success, uint64_t value, uint64_t mask);
+            unsigned int get_buckets_per_row();
+            unsigned int get_row_count();
             unsigned int get_bucket_size();
             unsigned int row_size_bytes();
             unsigned int row_size_indexes();

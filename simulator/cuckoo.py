@@ -76,7 +76,7 @@ class rcuckoo(state_machines.client_state_machine):
 
     def get(self):
         self.current_read_rtt +=1
-        messages = vrdma.read_threshold_message(self.current_read_key, self.read_threshold_bytes, self.table.table_size, self.table.row_size_bytes())
+        messages = vrdma.read_threshold_message(self.current_read_key, self.read_threshold_bytes, self.table.get_row_count(), self.table.row_size_bytes())
         return self.begin_read(messages)
 
     def put(self):
