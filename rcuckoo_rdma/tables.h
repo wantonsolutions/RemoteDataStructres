@@ -11,6 +11,7 @@ namespace cuckoo_tables {
         //todo add some entry functions
         unsigned int key;
         unsigned int value;
+        std::string to_string();
     } Entry;
 
     typedef struct CasOperationReturn {
@@ -68,10 +69,10 @@ namespace cuckoo_tables {
         private:
             unsigned int _memory_size;
             unsigned int _bucket_size;
+            unsigned int _table_size;
             unsigned int _buckets_per_lock;
             Entry **_table;
             Lock_Table _lock_table;
-            unsigned int _table_size;
             unsigned int _fill;
     };
 }

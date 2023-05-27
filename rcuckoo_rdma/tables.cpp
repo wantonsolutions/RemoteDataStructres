@@ -9,6 +9,11 @@ namespace cuckoo_tables {
 
     using namespace std;
 
+
+    string Entry::to_string(){
+        return std::to_string(key) + ": " + std::to_string(value);
+    }
+
     /*lock table functions*/
     Lock_Table::Lock_Table(){
         _total_locks = 0;
@@ -16,7 +21,7 @@ namespace cuckoo_tables {
 
     }
     Lock_Table::Lock_Table(unsigned int memory_size, unsigned int bucket_size, unsigned int buckets_per_lock){
-        cout << "Lock_Table::Lock_Table" << memory_size << " " << bucket_size << " " << buckets_per_lock;
+        cout << "Lock_Table::Lock_Table " << memory_size << " " << bucket_size << " " << buckets_per_lock;
         assert(memory_size % sizeof(Entry) == 0 );
         unsigned int row_size = memory_size / sizeof(Entry);
         assert(row_size % bucket_size == 0);
@@ -28,9 +33,6 @@ namespace cuckoo_tables {
 
     }
 
-    // Lock_Table::~Lock_Table(){
-    //     delete[] _locks;
-    // }
     void Lock_Table::unlock_all(){
         for (unsigned int i = 0; i < _total_locks; i++){
             _locks[i] = 0;
@@ -51,11 +53,9 @@ namespace cuckoo_tables {
     void Lock_Table::fill_masked_cas(unsigned int index, bool success, uint64_t new_value, uint64_t mask){
         //todo implement
         uint64_t *va = (uint64_t *) &_locks[index];
-        // if (success) {
         *va = (*va & ~(mask)) | (new_value & mask);
-        // }
         if (!success) {
-            // printf("fill_masked_cas failed\n");
+            cout << "fill_masked_cas failed" << endl;
         }
     }
 
@@ -67,26 +67,34 @@ namespace cuckoo_tables {
         return output_string;
     }
 
-
     Table::Table(){
-        //todo implement
+        _memory_size = 0;
         _bucket_size = 0;
         _buckets_per_lock = 0;
         _fill = 0;
+        _table_size = 0;
+        _table = NULL;
+        _lock_table = Lock_Table();
     }
 
     Table::Table(unsigned int memory_size, unsigned int bucket_size, unsigned int buckets_per_lock){
-        //todo implement
+        assert(memory_size > 0);
+        assert(bucket_size > 0);
+        assert(memory_size >= bucket_size);
+        assert(memory_size > bucket_size * sizeof(Entry));
+        assert(memory_size % sizeof(Entry) == 0);
+
         _memory_size = memory_size;
         _bucket_size = bucket_size;
         _buckets_per_lock = buckets_per_lock;
         _fill = 0;
+        unsigned int total_entries = memory_size / sizeof(Entry);
+        assert(total_entries % bucket_size == 0);
+        _table_size = int(memory_size / bucket_size) / sizeof(Entry);
+        _table = this->generate_bucket_cuckoo_hash_index(memory_size, bucket_size);
         _lock_table = Lock_Table(memory_size, bucket_size, buckets_per_lock);
 
     }
-    // Table::~Table(){
-    //     //todo implement
-    // }
 
 
     void Table::unlock_all(){
@@ -95,6 +103,15 @@ namespace cuckoo_tables {
     }
     void Table::print_table(){
         cout << "Table::print_table" << endl;
+        for (unsigned int i = 0; i < _table_size; i++){
+            cout << i << ") ";
+            for (unsigned int j = 0; j < _bucket_size; j++){
+                cout << "[" << _table[i][j].to_string() << "]";
+            }
+            cout << endl;
+        }
+        cout << "Lock Table" << endl;
+        cout << _lock_table.to_string() << endl;
         return;
     }
     CasOperationReturn Table::lock_table_masked_cas(unsigned int lock_index, uint64_t old, uint64_t new_value, uint64_t mask){
@@ -165,7 +182,37 @@ namespace cuckoo_tables {
 
     }
     Entry ** Table::generate_bucket_cuckoo_hash_index(unsigned int memory_size, unsigned int bucket_size){
-        //todo implement
+        cout << "Table::generate_bucket_cuckoo_hash_index" << endl;
+        //Sanity checking asserts
+        assert(memory_size > 0);
+        assert(bucket_size > 0);
+        assert(memory_size >= bucket_size);
+        assert(memory_size > bucket_size * sizeof(Entry));
+        assert(memory_size % sizeof(Entry) == 0);
+        unsigned int total_entries = memory_size / sizeof(Entry);
+        assert(total_entries % bucket_size == 0);
+        unsigned int total_rows = int(memory_size / bucket_size) / sizeof(Entry);
+        cout << "memory_size: " << memory_size << endl;
+        cout << "bucket_size: " << bucket_size << endl;
+        cout << "total_entries: " << total_entries << endl;
+
+        //Allocate memory for the table
+        unsigned int nrows = total_rows;
+        unsigned int ncols = bucket_size;
+        Entry* pool = NULL;
+
+        try {
+            Entry ** ptr = new Entry*[nrows];
+            pool = new Entry[nrows * ncols]{Entry()};
+
+            for (unsigned i = 0; i < nrows; ++i, pool += ncols ){
+                ptr[i] = pool;
+            }
+            return ptr;
+        } catch (std::bad_alloc& ba) {
+            std::cerr << "bad_alloc caught: " << ba.what() << '\n';
+            return NULL;
+        }
         return NULL;
 
     }
