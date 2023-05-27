@@ -11,7 +11,11 @@ namespace cuckoo_tables {
 
 
     string Entry::to_string(){
-        return std::to_string(key) + ": " + std::to_string(value);
+        return std::to_string(key) + ":" + std::to_string(value);
+    }
+
+    bool Entry::is_empty(){
+        return key == 0 && value == 0;
     }
 
     /*lock table functions*/
@@ -96,11 +100,11 @@ namespace cuckoo_tables {
 
     }
 
-
     void Table::unlock_all(){
-        //todo implement
+        _lock_table.unlock_all();
         return;
     }
+
     void Table::print_table(){
         cout << "Table::print_table" << endl;
         for (unsigned int i = 0; i < _table_size; i++){
@@ -114,73 +118,107 @@ namespace cuckoo_tables {
         cout << _lock_table.to_string() << endl;
         return;
     }
+
     CasOperationReturn Table::lock_table_masked_cas(unsigned int lock_index, uint64_t old, uint64_t new_value, uint64_t mask){
-        //todo implement
-        return CasOperationReturn();
+        return _lock_table.masked_cas(lock_index, old, new_value, mask);
     }
-    CasOperationReturn Table::fill_lock_table_masked_cas(unsigned int lock_index, bool success, uint64_t value, uint64_t mask){
-        //todo implement
-        return CasOperationReturn();
+
+    void Table::fill_lock_table_masked_cas(unsigned int lock_index, bool success, uint64_t value, uint64_t mask){
+        
+        _lock_table.fill_masked_cas(lock_index, success, value, mask);
     }
     unsigned int Table::get_row_count(){
-        //todo implement
-        return 0;
+        return _table_size;
     }
+
     unsigned int Table::get_buckets_per_row(){
-        //todo implement
-        return 0;
+        return _bucket_size;
     }
+
     unsigned int Table::get_bucket_size(){
-        //todo implement
-        return 0;
+        return _bucket_size * sizeof(Entry);
     }
+
     unsigned int Table::row_size_bytes(){
-        //todo implement
-        return 0;
+        return this->n_buckets_size(_bucket_size);
     }
-    unsigned int Table::row_size_indexes(){
-        //todo implement
-        return 0;
-    }
+
     unsigned int Table::n_buckets_size(unsigned int n_buckets) {
         return sizeof(Entry) * n_buckets;
     }
+
     Entry Table::get_entry(unsigned int bucket_index, unsigned int offset){
-        //todo implement
-        return Entry();
+        return _table[bucket_index][offset];
     }
+
     void Table::set_entry(unsigned int bucket_index, unsigned int offset, Entry entry){
-        //todo implement
+        Entry old = _table[bucket_index][offset] = entry;
+        if (old.is_empty()){
+            _fill++;
+        }
+
+        if (entry.is_empty()){
+            _fill--;
+        }
     }
+
     bool Table::bucket_has_empty(unsigned int bucket_index){
-        //todo implement
-        return false;
+        bool has_empty = false;
+        for (unsigned int i = 0; i < _bucket_size; i++){
+            if (_table[bucket_index][i].is_empty()){
+                has_empty = true;
+                break;
+            }
+        }
+        return has_empty;
     }
+
     unsigned int Table::get_first_empty_index(unsigned int bucket_index){
-        //todo implement
-        return 0;
+        unsigned int empty_index = -1;
+        for (unsigned int i = 0; i < _bucket_size; i++){
+            if (_table[bucket_index][i].is_empty()){
+                empty_index = i;
+                break;
+            }
+        }
+        return empty_index;
 
     }
+
     bool Table::bucket_contains(unsigned int bucket_index, unsigned int key){
-        //todo implement
-        return false;
+        bool contains = false;
+        for (unsigned int i = 0; i < _bucket_size; i++){
+            if (_table[bucket_index][i].key == key){
+                contains = true;
+                break;
+            }
+        }
+        return contains;
 
     }
-    bool Table::contains(unsigned int key){
-        //todo implement
-        return false;
 
-    }
     float Table::get_fill_percentage(){
-        //todo implement
-        return 0.0;
-
+        cout << "Table::get_fill_percentage" << endl;
+        cout << "_fill: " << _fill << endl;
+        cout << "_table_size: " << _table_size << endl;
+        cout << "_bucket_size: " << _bucket_size << endl;
+        // return float(_fill) / (float(_table_size) * float(_bucket_size));
+        unsigned int max_fill = _table_size * _bucket_size;
+        unsigned int current_fill = 0;
+        for (unsigned int i = 0; i < _table_size; i++){
+            for (unsigned int j = 0; j < _bucket_size; j++){
+                if (!_table[i][j].is_empty()){
+                    current_fill++;
+                }
+            }
+        } 
+        return float(current_fill) / float(max_fill);
     }
+
     bool Table::full(){
-        //todo implement
-        return false;
-
+        return _fill == _table_size * _bucket_size;
     }
+
     Entry ** Table::generate_bucket_cuckoo_hash_index(unsigned int memory_size, unsigned int bucket_size){
         cout << "Table::generate_bucket_cuckoo_hash_index" << endl;
         //Sanity checking asserts
@@ -216,31 +254,27 @@ namespace cuckoo_tables {
         return NULL;
 
     }
-    unsigned int Table::find_empty_index(unsigned int bucket_index){
-        //todo implement
-        return 0;
-
-    }
     unsigned int Table::absolute_index_to_bucket_index(unsigned int absolute_index){
-        //todo implement
-        return 0;
+        return absolute_index / _bucket_size;
     }
     unsigned int Table::absolute_index_to_offset(unsigned int absolute_index){
-        //todo implement
-        return 0;
+        return absolute_index % _bucket_size;
     }
-    void Table::assert_operation_in_table_bound(unsigned int bucket_index, unsigned int offset, unsigned int memory_size){
-        //todo implement
+    void Table::assert_operation_in_table_bound(unsigned int bucket_index, unsigned int offset, unsigned int read_size){
+        unsigned int total_indexes = read_size / sizeof(Entry);
+        unsigned int max_read = bucket_index * offset + total_indexes;
+        unsigned int table_bound = _table_size * _bucket_size;
+        assert (max_read <= table_bound);
         return;
     }
     bool Table::contains_duplicates(){
+        cout << "Table::contains_duplicates NOT IMPLEMENTED" << endl;
         //todo implement
-        return false;
+        return true;
     }
     unsigned int ** Table::get_duplicates(){
+        cout << "Table::get_duplicates NOT IMPLEMENTED" << endl;
         //todo implement
         return NULL;
     }
-
-
 }

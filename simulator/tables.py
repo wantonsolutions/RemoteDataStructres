@@ -161,9 +161,6 @@ class Table:
     def get_row_count(self):
         return len(self.table)
 
-    def row_size_in_indexes(self):
-        return len(self.table[0])
-
     def n_buckets_size(self, n_buckets):
         return n_buckets * TABLE_ENTRY_SIZE
 
@@ -182,36 +179,24 @@ class Table:
 
 
     def bucket_has_empty(self, bucket_index):
-        assert bucket_index < self.table_size, "Bucket index out of range for table index: " + str(bucket_index) + " :" +str(self.table_size)
+        assert bucket_index < self.get_row_count(), "Bucket index out of range for table index: " + str(bucket_index) + " :" +str(self.table_size)
         return None in self.table[bucket_index]
 
     def get_first_empty_index(self, bucket_index):
         for i in range(len(self.table[bucket_index])):
             if self.table[bucket_index][i] == None:
                 return i
-        return len(self.table[bucket_index])
-
-
+        return -1
         
 
     def bucket_contains(self, bucket_index, value):
         return value in self.table[bucket_index]
 
-    def contains(self, value):
-        locations = hash.rcuckoo_hash_locations(value, self.table_size)
-        for bucket_index in locations:
-            if self.bucket_contains(bucket_index, value):
-                return True
-        return False
-
     def get_fill_percentage(self):
-        # print("fill: ",self.fill)
-        # print("table size: ", self.table_size)
-        # print("bucket size: ", self.bucket_size)
-        return float(self.fill)/float(self.table_size * self.bucket_size)
+        return float(self.fill)/float(self.get_row_count() * self.bucket_size)
 
     def full(self):
-        return self.fill == self.table_size * self.bucket_size
+        return self.fill == self.get_row_count() * self.bucket_size
 
 
     def generate_bucket_cuckoo_hash_index(self, memory_size, bucket_size):
@@ -247,16 +232,6 @@ class Table:
         for i in range(rows):
             table.append([None]*bucket_size)
         return table
-
-
-    def find_empty_index(self, bucket_index):
-        bucket = self.table[bucket_index]
-        empty_index = -1
-        for i in range(len(bucket)):
-            if bucket[i] == None:
-                empty_index = i
-                break
-        return empty_index
 
 
     def absolute_index_to_bucket_index(self, index):

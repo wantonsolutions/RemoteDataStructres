@@ -48,7 +48,7 @@ cdef class Table:
 
 
     def fill_lock_table_masked_cas(self, unsigned int lock_index, bool success, value, mask):
-        return self.c_table.fill_lock_table_masked_cas(lock_index, success, value, mask)
+        self.c_table.fill_lock_table_masked_cas(lock_index, success, value, mask)
 
     def get_buckets_per_row(self):
         return self.c_table.get_buckets_per_row()
@@ -62,9 +62,6 @@ cdef class Table:
     def row_size_bytes(self):
         return self.c_table.row_size_bytes()
 
-    def row_size_indexes(self):
-        return self.c_table.row_size_indexes()
-
     def n_buckets_size(self, unsigned int n_buckets):
         return self.c_table.n_buckets_size(n_buckets)
 
@@ -74,9 +71,9 @@ cdef class Table:
 
     def set_entry(self, unsigned int bucket_index, unsigned int offset, entry):
         #todo wrap the entry type
-        print("WARNING WARNING WARNING set_entry")
-        # c_entry = Entry(entry, 0)
-        c_entry = entry
+        cdef t.Entry c_entry
+        c_entry.key = int(entry)
+        c_entry.value = 1
         self.c_table.set_entry(bucket_index, offset, c_entry)
 
     
@@ -88,9 +85,6 @@ cdef class Table:
 
     def bucket_contains(self, unsigned int bucket_index, unsigned int key):
         return self.c_table.bucket_contains(bucket_index, key)
-
-    def contains(self, unsigned int key):
-        return self.c_table.contains(key)
 
     def get_fill_percentage(self):
         return self.c_table.get_fill_percentage()
@@ -104,9 +98,6 @@ cdef class Table:
         return None
         # return self.c_table.generate_bucket_cuckoo_hash_index(memory_size, bucket_size)
 
-    def find_empty_index(self, unsigned int bucket_index):
-        return self.c_table.find_empty_index(bucket_index)
-    
     def absolute_index_to_bucket_index(self, unsigned int absolute_index):
         return self.c_table.absolute_index_to_bucket_index(absolute_index)
     
