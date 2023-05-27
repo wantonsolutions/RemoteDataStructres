@@ -124,7 +124,7 @@ class Table:
         self.lock_table.unlock_all()
 
     def print_table(self):
-        for i in range(0, self.table_size):
+        for i in range(0, self.get_row_count()):
             print('{0: <5}'.format(str(i)+")"), end='')
             for j in range(0, self.bucket_size):
                 print("[" + '{0: <5}'.format(str(self.table[i][j])) + "] ", end='')

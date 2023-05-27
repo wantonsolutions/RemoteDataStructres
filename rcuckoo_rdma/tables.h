@@ -3,6 +3,7 @@
 #define TABLES_H
 
 #include <stdint.h>
+#include <string>
 
 namespace cuckoo_tables {
 
@@ -14,7 +15,7 @@ namespace cuckoo_tables {
 
     typedef struct CasOperationReturn {
         bool success;
-        uint64_t current_value;
+        uint64_t original_value;
     } CasOperationReturn;
 
 
@@ -22,15 +23,13 @@ namespace cuckoo_tables {
         public:
             Lock_Table();
             Lock_Table(unsigned int memory_size, unsigned int bucket_size, unsigned int buckets_per_lock);
+            // ~Lock_Table();
             void unlock_all();
             CasOperationReturn masked_cas(unsigned int index, uint64_t old, uint64_t new_value, uint64_t mask);
             void fill_masked_cas(unsigned int index, bool success, uint64_t new_value, uint64_t mask);
+            std::string to_string();
 
         private:
-            unsigned int _entry_size;
-            unsigned int _memory_size;
-            unsigned int _bucket_size;
-            unsigned int _buckets_per_lock;
             unsigned int _total_locks;
             uint8_t *_locks;
     };
@@ -39,6 +38,7 @@ namespace cuckoo_tables {
         public:
             Table();
             Table(unsigned int memory_size, unsigned int bucket_size, unsigned int buckets_per_lock);
+            // ~Table();
             void unlock_all();
             void print_table();
             CasOperationReturn lock_table_masked_cas(unsigned int lock_index, uint64_t old, uint64_t new_value, uint64_t mask);
@@ -66,11 +66,11 @@ namespace cuckoo_tables {
             unsigned int ** get_duplicates();
 
         private:
-            unsigned int _entry_size;
             unsigned int _memory_size;
             unsigned int _bucket_size;
             unsigned int _buckets_per_lock;
             Entry **_table;
+            Lock_Table _lock_table;
             unsigned int _table_size;
             unsigned int _fill;
     };

@@ -1007,4 +1007,4 @@ insertion_debug()
 # plot_hash_factor_distance_cdf()
 
 
-plot_general_stats_last_run()
+# plot_general_stats_last_run()

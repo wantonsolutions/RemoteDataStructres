@@ -1,33 +1,75 @@
 #include "tables.h"
 #include <cstddef>
-
+#include <cassert>
+#include <string>
+#include <iostream>
+// #include "spdlog/spdlog.h" //sudo apt install libspdlog-dev
 
 namespace cuckoo_tables {
 
+    using namespace std;
+
     /*lock table functions*/
     Lock_Table::Lock_Table(){
-        //todo implement
+        _total_locks = 0;
+        _locks = NULL;
+
     }
     Lock_Table::Lock_Table(unsigned int memory_size, unsigned int bucket_size, unsigned int buckets_per_lock){
-        //todo implement
+        cout << "Lock_Table::Lock_Table" << memory_size << " " << bucket_size << " " << buckets_per_lock;
+        assert(memory_size % sizeof(Entry) == 0 );
+        unsigned int row_size = memory_size / sizeof(Entry);
+        assert(row_size % bucket_size == 0);
+        unsigned int table_rows = row_size / bucket_size;
+        assert(table_rows % buckets_per_lock == 0);
+        _total_locks = table_rows / buckets_per_lock;
+        _locks = new uint8_t[_total_locks];
+        this->unlock_all();
+
     }
+
+    // Lock_Table::~Lock_Table(){
+    //     delete[] _locks;
+    // }
     void Lock_Table::unlock_all(){
-        //todo implement
+        for (unsigned int i = 0; i < _total_locks; i++){
+            _locks[i] = 0;
+        }
     }
     CasOperationReturn Lock_Table::masked_cas(unsigned int index, uint64_t old, uint64_t new_value, uint64_t mask){
-        return CasOperationReturn();
-        //todo implement
+
+        uint64_t *va = (uint64_t *) &_locks[index];
+        CasOperationReturn atomic_response = CasOperationReturn();
+        atomic_response.original_value = *va;
+        if (!((old ^ *va) & mask)) {
+            *va = (*va & ~(mask)) | (new_value & mask);
+        }
+        atomic_response.success = (atomic_response.original_value == *va);
+        return atomic_response;
     }
+
     void Lock_Table::fill_masked_cas(unsigned int index, bool success, uint64_t new_value, uint64_t mask){
         //todo implement
+        uint64_t *va = (uint64_t *) &_locks[index];
+        // if (success) {
+        *va = (*va & ~(mask)) | (new_value & mask);
+        // }
+        if (!success) {
+            // printf("fill_masked_cas failed\n");
+        }
+    }
 
+    string Lock_Table::to_string(){
+        string output_string = "";
+        for (unsigned int i = 0; i < _total_locks; i++){
+            output_string += std::to_string(i) + ": " + std::to_string(_locks[i]) + "\n";
+        }
+        return output_string;
     }
 
 
     Table::Table(){
         //todo implement
-        _entry_size = 0;
-        _memory_size = 0;
         _bucket_size = 0;
         _buckets_per_lock = 0;
         _fill = 0;
@@ -35,12 +77,16 @@ namespace cuckoo_tables {
 
     Table::Table(unsigned int memory_size, unsigned int bucket_size, unsigned int buckets_per_lock){
         //todo implement
-        _entry_size =8;
         _memory_size = memory_size;
         _bucket_size = bucket_size;
         _buckets_per_lock = buckets_per_lock;
         _fill = 0;
+        _lock_table = Lock_Table(memory_size, bucket_size, buckets_per_lock);
+
     }
+    // Table::~Table(){
+    //     //todo implement
+    // }
 
 
     void Table::unlock_all(){
@@ -48,7 +94,7 @@ namespace cuckoo_tables {
         return;
     }
     void Table::print_table(){
-        //todo implement
+        cout << "Table::print_table" << endl;
         return;
     }
     CasOperationReturn Table::lock_table_masked_cas(unsigned int lock_index, uint64_t old, uint64_t new_value, uint64_t mask){
@@ -80,7 +126,7 @@ namespace cuckoo_tables {
         return 0;
     }
     unsigned int Table::n_buckets_size(unsigned int n_buckets) {
-        return _entry_size * n_buckets;
+        return sizeof(Entry) * n_buckets;
     }
     Entry Table::get_entry(unsigned int bucket_index, unsigned int offset){
         //todo implement

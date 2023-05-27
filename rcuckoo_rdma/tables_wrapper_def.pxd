@@ -12,7 +12,7 @@ cdef extern from "tables.h" namespace "cuckoo_tables":
 
     struct CasOperationReturn:
         bool success
-        stdint.uint64_t current_value
+        stdint.uint64_t original_value
 
     cdef cppclass Lock_Table:
         Lock_Table() except +
