@@ -3,6 +3,7 @@
 
 from libc cimport stdint
 from libcpp cimport bool
+from libcpp.vector cimport vector
 
 cdef extern from "tables.h" namespace "cuckoo_tables":
 
