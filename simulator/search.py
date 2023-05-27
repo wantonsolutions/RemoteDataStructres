@@ -1,8 +1,6 @@
 import logging
 import heapq
 import random
-from . import tables
-from . import hash
 logger = logging.getLogger('root')
 
 #paths are built from path elements. A path element is a tuple of (key, table_index, bucket_index, bucket_offset)
@@ -27,6 +25,9 @@ class path_element:
         return self.bucket_index - other.bucket_index
 
 
+def get_table_id_from_index(current_index):
+    return current_index % 2
+
 def search_path_to_buckets(search_path):
     buckets = list(set([pe.bucket_index for pe in search_path]))
     buckets.remove(-1)
@@ -43,9 +44,8 @@ def random_dfs_search(table, location_func, path, open_buckets, visited):
         return False, path
     else:
         visited[pe.key] = True
-
-    table_index, index = next_search_location(pe, location_func, table)
-    #search for an empty slot in this bucket
+    index = next_search_index(pe, location_func, table)
+    table_index = next_table_index(pe.table_index)
 
     if open_buckets != None:
         if not index in open_buckets:
@@ -64,7 +64,7 @@ def random_dfs_search(table, location_func, path, open_buckets, visited):
     random.shuffle(indicies)
     for evict_index in indicies:
         pe = path_element(table.get_entry(index,evict_index), table_index, index, evict_index)
-        if not key_causes_a_path_loop(path, pe.key):
+        if not key_in_path(path, pe.key):
             path.append(pe)
         else:
             continue
@@ -90,15 +90,13 @@ def bucket_cuckoo_insert(table, location_func, value, open_buckets=None):
         path=[]
     return path
 
-
-def next_search_location(pe, location_func, table):
+def next_search_index(pe, location_func, table):
     locations = location_func(pe.key, table.get_row_count())
     table_index = next_table_index(pe.table_index)
-    #here the index is the row in the table
     index = locations[table_index]
-    return table_index, index
+    return index
 
-def key_causes_a_path_loop(path, key):
+def key_in_path(path, key):
     for pe in path:
         if pe.key == key:
             return True
@@ -140,8 +138,8 @@ def path_index_range(path):
 #to the original hash. There is no guarantee that these
 #entries are reachable. They are merely the closest n open
 #entries.
-def find_closest_target_n_bi_directional(table, location_func, value, n):
-    locations = location_func(value, table.get_row_count())
+def find_closest_target_n_bi_directional(table, location_func, key, n):
+    locations = location_func(key, table.get_row_count())
     index_1 = locations[0]
     index_2 = locations[0] - 1
     if index_2 < 0:
@@ -231,8 +229,8 @@ def heuristic_3(current_index, target_index, table_size):
 
     distance = int(distance / median)
 
-    current_table = hash.get_table_id_from_index(current_index)
-    target_table = hash.get_table_id_from_index(target_index)
+    current_table = get_table_id_from_index(current_index)
+    target_table = get_table_id_from_index(target_index)
 
     if current_table == target_table: 
         distance = distance + 1
@@ -245,8 +243,8 @@ def heuristic_4(current_index, target_index, table_size):
     if  (target_index == current_index):
         return distance
 
-    current_table = hash.get_table_id_from_index(current_index)
-    target_table = hash.get_table_id_from_index(target_index)
+    current_table = get_table_id_from_index(current_index)
+    target_table = get_table_id_from_index(target_index)
     if current_table == target_table:
         distance = distance + 1
 

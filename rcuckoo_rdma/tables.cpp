@@ -9,13 +9,46 @@ namespace cuckoo_tables {
 
     using namespace std;
 
+    string Key::to_string(){
+        string s = "";
+        for (int i = 0; i < KEY_SIZE; i++){
+            s += std::to_string(bytes[i]);
+        }
+        return s;
+    }
+
+    bool Key::is_empty(){
+        for (int i = 0; i < KEY_SIZE; i++){
+            if (bytes[i] != 0){
+                return false;
+            }
+        }
+        return true;
+    }
+
+    string Value::to_string(){
+        string s = "";
+        for (int i = 0; i < VALUE_SIZE; i++){
+            s += std::to_string(bytes[i]);
+        }
+        return s;
+    }
+
+    bool Value::is_empty(){
+        for (int i = 0; i < VALUE_SIZE; i++){
+            if (bytes[i] != 0){
+                return false;
+            }
+        }
+        return true;
+    }
 
     string Entry::to_string(){
-        return std::to_string(key) + ":" + std::to_string(value);
+        return key.to_string() + ":" + value.to_string();
     }
 
     bool Entry::is_empty(){
-        return key == 0 && value == 0;
+        return key.is_empty() && value.is_empty();
     }
 
     /*lock table functions*/
@@ -185,7 +218,7 @@ namespace cuckoo_tables {
 
     }
 
-    bool Table::bucket_contains(unsigned int bucket_index, unsigned int key){
+    bool Table::bucket_contains(unsigned int bucket_index, Key key){
         bool contains = false;
         for (unsigned int i = 0; i < _bucket_size; i++){
             if (_table[bucket_index][i].key == key){

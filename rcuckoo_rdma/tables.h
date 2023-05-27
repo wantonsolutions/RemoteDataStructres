@@ -7,10 +7,33 @@
 
 namespace cuckoo_tables {
 
+    #define KEY_SIZE 4
+    #define VALUE_SIZE 4
+    typedef struct Key { 
+        uint8_t bytes[KEY_SIZE];
+        std::string to_string();
+        bool is_empty();
+    } Key;
+
+    bool operator==(const Key& lhs, const Key& rhs){
+        for (int i = 0; i < KEY_SIZE; i++){
+            if (lhs.bytes[i] != rhs.bytes[i]){
+                return false;
+            }
+        }
+        return true;
+    }
+
+    typedef struct Value { 
+        uint8_t bytes[VALUE_SIZE];
+        std::string to_string();
+        bool is_empty();
+    } Value;
+
     typedef struct Entry {
         //todo add some entry functions
-        unsigned int key;
-        unsigned int value;
+        Key key;
+        Value value;
         std::string to_string();
         bool is_empty();
     } Entry;
@@ -54,7 +77,7 @@ namespace cuckoo_tables {
             void set_entry(unsigned int bucket_index, unsigned int offset, Entry entry);
             bool bucket_has_empty(unsigned int bucket_index);
             unsigned int get_first_empty_index(unsigned int bucket_index);
-            bool bucket_contains(unsigned int bucket_index, unsigned int key);
+            bool bucket_contains(unsigned int bucket_index, Key key);
             float get_fill_percentage();
             bool full();
             Entry ** generate_bucket_cuckoo_hash_index(unsigned int memory_size, unsigned int bucket_size);
