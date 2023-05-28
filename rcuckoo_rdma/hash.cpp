@@ -41,7 +41,7 @@ XXH64_hash_t h3(string key){
     return xxhash_value(key);
 }
 
-unsigned int rcuckoo_primary_location(string key, int table_size){
+unsigned int rcuckoo_primary_location(string key, unsigned int table_size){
     XXH64_hash_t hash = h1(key);
     #ifdef DEBUG
     cout << "hash: " << hash << " table size " << table_size <<  endl;
@@ -58,7 +58,7 @@ unsigned int h3_suffix_base_two(string key){
     return zeros;
 }
 
-unsigned int rcuckoo_secondary_location(string key, float factor, int table_size){
+unsigned int rcuckoo_secondary_location(string key, float factor, unsigned int table_size){
     int primary = rcuckoo_primary_location(key, table_size);
     int zeros = h3_suffix_base_two(key);
     float exponent = (float)zeros + factor;
@@ -73,7 +73,7 @@ unsigned int rcuckoo_secondary_location(string key, float factor, int table_size
     return (primary + secondary) % table_size;
 }
 
-unsigned int rcuckoo_secondary_location_independent(string key, int table_size){
+unsigned int rcuckoo_secondary_location_independent(string key, unsigned int table_size){
     XXH64_hash_t hash = h2(key);
     unsigned int location = ((hash % (table_size / 2)) * 2) + 1;
     return location;
@@ -90,14 +90,14 @@ unsigned int distance_to_bytes(unsigned int a, unsigned int b, unsigned int buck
 }
 
 
-hash_locations rcuckoo_hash_locations(string key, int table_size){
+hash_locations rcuckoo_hash_locations(string key, unsigned int table_size){
     hash_locations hl;
     hl.primary = rcuckoo_primary_location(key, table_size);
     hl.secondary = rcuckoo_secondary_location(key, DEFAULT_FACTOR, table_size);
     return hl;
 }
 
-hash_locations rcuckoo_hash_locations_independent(string key, int table_size){
+hash_locations rcuckoo_hash_locations_independent(string key, unsigned int table_size){
     hash_locations hl;
     hl.primary = rcuckoo_primary_location(key, table_size);
     hl.secondary = rcuckoo_secondary_location_independent(key, table_size);

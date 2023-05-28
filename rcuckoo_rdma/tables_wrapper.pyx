@@ -33,13 +33,19 @@ cdef class Lock_Table:
         return
 
 cdef class Table:
-    cdef t.Table c_table
+    cdef t.CTable *c_table
+
+    # def __cinit__(self, unsigned int memory_size=-1, unsigned int bucket_size=-1, unsigned int buckets_per_lock=-1):
+    #     if memory_size is not -1 and bucket_size is not -1 and buckets_per_lock is not -1:
+    #         self.c_table = new t.Table(memory_size, bucket_size, buckets_per_lock)
+    #     else:
+    #         self.c_table = new t.Table()
 
     def __init__(self, unsigned int memory_size=-1, unsigned int bucket_size=-1, unsigned int buckets_per_lock=-1):
         if memory_size is not -1 and bucket_size is not -1 and buckets_per_lock is not -1:
-            self.c_table = t.Table(memory_size, bucket_size, buckets_per_lock)
+            self.c_table = new t.CTable(memory_size, bucket_size, buckets_per_lock)
         else:
-            self.c_table = t.Table()
+            self.c_table = new t.CTable()
 
     def unlock_all(self):
         return self.c_table.unlock_all()

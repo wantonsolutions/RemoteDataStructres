@@ -18,15 +18,22 @@ extensions = [
               extra_compile_args=['-std=c++11'],
               language='c++'
               ),
-    Extension('csearch', ['search_wrapper.pyx', 'search.cpp'],
-              extra_compile_args=['-std=c++11'],
-              language='c++'
-              ),
+    # Extension('csearch', ['search_wrapper.pyx', 'search.cpp'],
+    #           extra_compile_args=['-std=c++11'],
+    #           language='c++'
+    #           ),
 ]
 
 
+
 setup(
-    name='csearch',
+    name='ctable',
     ext_modules=cythonize(extensions, language_level=3),
     # extra_compile_args=["-w", '-g'],
 )
+
+# setup(
+#     name='csearch',
+#     ext_modules=cythonize(extensions, language_level=3),
+#     # extra_compile_args=["-w", '-g'],
+# )
