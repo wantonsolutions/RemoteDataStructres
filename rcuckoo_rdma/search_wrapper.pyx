@@ -4,8 +4,10 @@ cimport search_wrapper as search
 # import pyximport; pyximport.install()
 # cimport tables_wrapper as t
 # import ctables as t
+# cimport ctables as t
 from cython.operator cimport dereference as deref
 cimport tables_wrapper_def as tab
+cimport tables_wrapper_forward_def as t
 
 from libcpp.vector cimport vector
 from libcpp.unordered_map cimport unordered_map
@@ -20,7 +22,7 @@ def search_path_to_buckets(vector[search.path_element] path):
 def random_dfs_search(key, unsigned int table_size):
     return search.random_dfs_search(key, table_size)
 
-def bucket_cuckoo_insert(tab.PyTable table, location_func, tab.Key key, vector[unsigned int] open_buckets):
+def bucket_cuckoo_insert(t.Table table, location_func, tab.Key key, vector[unsigned int] open_buckets):
 
     #todo check the name of the location func being passed in, and then select based on that. It sucks but it's the best way to do this.
     #BUG

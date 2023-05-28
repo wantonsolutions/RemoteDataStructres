@@ -3,6 +3,10 @@
 # from tables_wrapper import Table as t
 # cimport tables_wrapper_def as t
 cimport tables_wrapper_def as t
+# cimport tables_wrapper_forward_def as tab
+# from .tables_wrapper_forward_def cimport Table
+# cimport Table from tables_wrapper_forward_def
+# cimport tables_wrapper_forward_def as tab
 from libcpp cimport bool
 
 def key_to_c_key(key):
@@ -32,8 +36,8 @@ cdef class Lock_Table:
         self.c_lock_table.fill_masked_cas(index, success, new_value, mask)
         return
 
-cdef class Table:
-    cdef t.CTable *c_table
+cdef class PyTable:
+    cdef t.Table *c_table
 
     # def __cinit__(self, unsigned int memory_size=-1, unsigned int bucket_size=-1, unsigned int buckets_per_lock=-1):
     #     if memory_size is not -1 and bucket_size is not -1 and buckets_per_lock is not -1:
@@ -43,9 +47,9 @@ cdef class Table:
 
     def __init__(self, unsigned int memory_size=-1, unsigned int bucket_size=-1, unsigned int buckets_per_lock=-1):
         if memory_size is not -1 and bucket_size is not -1 and buckets_per_lock is not -1:
-            self.c_table = new t.CTable(memory_size, bucket_size, buckets_per_lock)
+            self.c_table = new t.Table(memory_size, bucket_size, buckets_per_lock)
         else:
-            self.c_table = new t.CTable()
+            self.c_table = new t.Table()
 
     def unlock_all(self):
         return self.c_table.unlock_all()

@@ -27,7 +27,7 @@ cdef extern from "tables.h" namespace "cuckoo_tables":
         CasOperationReturn masked_cas(unsigned int index, stdint.uint64_t old, stdint.uint64_t new_value, stdint.uint64_t mask)
         void fill_masked_cas(unsigned int index, bool sucess, stdint.uint64_t new_value, stdint.uint64_t mask)
 
-    cdef cppclass CTable:
+    cdef cppclass Table:
         Table() except +
         Table(unsigned int memory_size, unsigned int bucket_size, unsigned int buckets_per_lock) except +
         void unlock_all()
@@ -53,5 +53,5 @@ cdef extern from "tables.h" namespace "cuckoo_tables":
         bool contains_duplicates()
         unsigned int ** get_duplicates()
 
-cdef class Table:
-    cdef CTable * c_table
+cdef class PyTable:
+    cdef Table * c_table
