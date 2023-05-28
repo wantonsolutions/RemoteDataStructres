@@ -3,13 +3,18 @@
 
 from libc cimport stdint
 from libcpp cimport bool
-from libcpp.vector cimport vector
 
 cdef extern from "tables.h" namespace "cuckoo_tables":
 
+    struct Key:
+        stdint.uint8_t bytes[4]
+
+    struct Value:
+        stdint.uint8_t bytes[4]
+
     struct Entry:
-        unsigned int key
-        unsigned int value
+        Key key
+        Value value
 
     struct CasOperationReturn:
         bool success
@@ -38,7 +43,7 @@ cdef extern from "tables.h" namespace "cuckoo_tables":
         void set_entry(unsigned int bucket_index, unsigned int offset, Entry entry)
         bool bucket_has_empty(unsigned int bucket_index)
         unsigned int get_first_empty_index(unsigned int bucket_index)
-        bool bucket_contains(unsigned int bucket_index, unsigned int key)
+        bool bucket_contains(unsigned int bucket_index, Key key)
         float get_fill_percentage()
         bool full()
         Entry ** generate_bucket_cuckoo_hash_index(unsigned int memory_size, unsigned int bucket_size)

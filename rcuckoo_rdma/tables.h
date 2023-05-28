@@ -13,16 +13,24 @@ namespace cuckoo_tables {
         uint8_t bytes[KEY_SIZE];
         std::string to_string();
         bool is_empty();
+        bool operator==(const Key& rhs) const {
+            for (int i = 0; i < KEY_SIZE; i++){
+                if (bytes[i] != rhs.bytes[i]){
+                    return false;
+                }
+            }
+            return true;
+        }
     } Key;
 
-    bool operator==(const Key& lhs, const Key& rhs){
-        for (int i = 0; i < KEY_SIZE; i++){
-            if (lhs.bytes[i] != rhs.bytes[i]){
-                return false;
-            }
-        }
-        return true;
-    }
+    // bool operator==(const Key& lhs, const Key& rhs){
+    //     for (int i = 0; i < KEY_SIZE; i++){
+    //         if (lhs.bytes[i] != rhs.bytes[i]){
+    //             return false;
+    //         }
+    //     }
+    //     return true;
+    // }
 
     typedef struct Value { 
         uint8_t bytes[VALUE_SIZE];

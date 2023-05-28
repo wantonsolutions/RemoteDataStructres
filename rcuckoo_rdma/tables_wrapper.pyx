@@ -5,6 +5,10 @@
 cimport tables_wrapper_def as t
 from libcpp cimport bool
 
+def key_to_c_key(key):
+    cdef t.Key c_key
+    c_key = str(key)
+    return c_key
 
 cdef class Lock_Table:
     cdef t.Lock_Table c_lock_table
@@ -72,8 +76,9 @@ cdef class Table:
     def set_entry(self, unsigned int bucket_index, unsigned int offset, entry):
         #todo wrap the entry type
         cdef t.Entry c_entry
-        c_entry.key = int(entry)
-        c_entry.value = 1
+        print("Entry not being set WARNING WARNING!!!!")
+        # c_entry.key = int(entry)
+        # c_entry.value = int(1)
         self.c_table.set_entry(bucket_index, offset, c_entry)
 
     
@@ -83,8 +88,9 @@ cdef class Table:
     def get_first_empty_index(self, unsigned int bucket_index):
         return self.c_table.get_first_empty_index(bucket_index)
 
-    def bucket_contains(self, unsigned int bucket_index, unsigned int key):
-        return self.c_table.bucket_contains(bucket_index, key)
+    def bucket_contains(self, unsigned int bucket_index, key):
+        c_key = key_to_c_key(key)
+        return self.c_table.bucket_contains(bucket_index, c_key)
 
     def get_fill_percentage(self):
         return self.c_table.get_fill_percentage()

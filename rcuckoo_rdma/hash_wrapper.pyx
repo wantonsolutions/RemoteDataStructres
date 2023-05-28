@@ -3,7 +3,6 @@
 # from chash cimport * as c_hash
 cimport hash_wrapper as h
 
-
 def set_factor(x):
     return h.set_factor(x)
 

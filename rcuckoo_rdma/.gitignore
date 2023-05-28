@@ -3,6 +3,8 @@ cython_tutorial
 *.so
 hash_wrapper.cpp
 tables_wrapper.cpp
+search_wrapper.cpp
 hash.o
 hash.so
 chash.egg-info
+csearch.egg-info
