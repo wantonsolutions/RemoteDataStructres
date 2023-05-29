@@ -8,3 +8,4 @@ hash.o
 hash.so
 chash.egg-info
 csearch.egg-info
+rcuckoo_wrap.egg*

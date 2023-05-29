@@ -155,11 +155,13 @@ cdef class PyTable:
         return e.key
 
     def set_entry(self, unsigned int bucket_index, unsigned int offset, entry):
-        #todo wrap the entry type
+        #todo improve this wrapping job with casting
+        vals = str(entry)
         cdef rw.Entry c_entry
-        print("Entry not being set WARNING WARNING!!!!")
-        # c_entry.key = int(entry)
-        # c_entry.value = int(1)
+        lens = [len(vals), len(c_entry.key.bytes)]
+        l = min(lens)
+        for i in range(l):
+            c_entry.key.bytes[i] = int(vals[i])
         self.c_table.set_entry(bucket_index, offset, c_entry)
 
     
@@ -205,55 +207,35 @@ cdef class PyTable:
         return None
 
 
-# cimport hash_wrapper as h
-# cimport search_wrapper as search
-# cimport tables_wrapper_def as t
-# import pyximport; pyximport.install()
-# cimport tables_wrapper as t
-# import ctables as t
-# cimport ctables as t
 from cython.operator cimport dereference as deref
-# cimport tables_wrapper as t
-
-# cimport ctables as tab
-# cimport tables_wrapper_forward_def as t
-
 from libcpp.vector cimport vector
-from libcpp.unordered_map cimport unordered_map
-from libcpp.string cimport string
 
-def get_table_id_from_index(unsigned int index):
-    return rw.get_table_id_from_index(index)
 
 def search_path_to_buckets(vector[rw.path_element] path):
     return rw.search_path_to_buckets(path)
 
-def random_dfs_search(key, unsigned int table_size):
-    return rw.random_dfs_search(key, table_size)
+def path_to_string(vector[rw.path_element] path):
+    return rw.path_to_string(path)
 
-def bucket_cuckoo_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):
+def path_index_range(vector[rw.path_element] path):
+    return rw.path_index_range(path)
 
-    #todo check the name of the location func being passed in, and then select based on that. It sucks but it's the best way to do this.
-    sub_location_func = rw.rcuckoo_hash_locations
-    # new_table = rw.Table(deref(table.c_table))
-    # return searcrw.bucket_cuckoo_insert(deref(table.c_table), sub_location_func, key, open_buckets)
-    return rw.bucket_cuckoo_insert(deref(table.c_table), sub_location_func, key, open_buckets)
-    
-    # unsigned int next_search_index(path_element pe, t.hash_locations (*location_func) (string, unsigned int), t.Table table)
-    # bool key_in_path(vector[path_element] path, t.Key key)
-    # void print_path(vector[path_element] path)
-    # string path_to_string(vector[path_element] path)
-    # unsigned int path_index_range(vector[path_element] path)
-    # vector[unsigned int] find_closest_target_n_bi_directional(t.Table table, rw.hash_locations (*location_func) (string, unsigned int), t.Key key, unsigned int n)
+def bucket_cuckoo_a_star_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):
+    if location_func.__name__ == "rcuckoo_hash_locations":
+        sub_function = rw.rcuckoo_hash_locations
+    elif location_func.__name__ == "rcuckoo_hash_locations_independent":
+        sub_function = rw.rcuckoo_hash_locations_independent
+    else :
+        print("ERROR: location_func not recognized returning defualt func")
+        return None
+    return rw.bucket_cuckoo_a_star_insert(deref(table.c_table), sub_function, key, open_buckets)
 
-    # path_element pop_list(vector[a_star_pe] list, unordered_map[t.Key , a_star_pe] list_map)
-    # void push_list(vector[a_star_pe] list, unordered_map[t.Key, a_star_pe] list_map, a_star_pe pe)
-    # bool list_contains(unordered_map[t.Key, a_star_pe] list_map, t.Key key)
-    # unsigned int next_table_index(unsigned int table_index)
-
-    # unsigned int heuristic(unsigned int current_index, unsigned int target_index, unsigned int table_size)
-    # unsigned int fscore(a_star_pe pe, unsigned int target_index, unsigned int table_size)
-
-    # vector[path_element] a_star_search(t.Table table, t.hash_locations (*location_func) (string, unsigned int), t.Key key, vector[unsigned int] open_buckets)
-    # vector[path_element] bucket_cuckoo_a_star_insert(t.Table table, t.hash_locations (*location_func) (string, unsigned int), t.Key key, vector[unsigned int] open_buckets)
-    # vector[path_element] bucket_cuckoo_random_insert(t.Table table, t.hash_locations (*location_func) (string, unsigned int), t.Key key, vector[unsigned int] open_buckets)
+def bucket_cuckoo_random_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):
+    if location_func.__name__ == "rcuckoo_hash_locations":
+        sub_function = rw.rcuckoo_hash_locations
+    elif location_func.__name__ == "rcuckoo_hash_locations_independent":
+        sub_function = rw.rcuckoo_hash_locations_independent
+    else :
+        print("ERROR: location_func not recognized returning defualt func")
+        return None
+    return rw.bucket_cuckoo_random_insert(deref(table.c_table), sub_function, key, open_buckets)

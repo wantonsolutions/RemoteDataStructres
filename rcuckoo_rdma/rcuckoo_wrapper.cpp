@@ -1234,6 +1234,38 @@ static CYTHON_INLINE void __Pyx_ErrFetchInState(PyThreadState *tstate, PyObject 
 /* RaiseException.proto */
 static void __Pyx_Raise(PyObject *type, PyObject *value, PyObject *tb, PyObject *cause);
 
+/* IncludeStringH.proto */
+#include <string.h>
+
+/* GetItemInt.proto */
+#define __Pyx_GetItemInt(o, i, type, is_signed, to_py_func, is_list, wraparound, boundscheck)\
+    (__Pyx_fits_Py_ssize_t(i, type, is_signed) ?\
+    __Pyx_GetItemInt_Fast(o, (Py_ssize_t)i, is_list, wraparound, boundscheck) :\
+    (is_list ? (PyErr_SetString(PyExc_IndexError, "list index out of range"), (PyObject*)NULL) :\
+               __Pyx_GetItemInt_Generic(o, to_py_func(i))))
+#define __Pyx_GetItemInt_List(o, i, type, is_signed, to_py_func, is_list, wraparound, boundscheck)\
+    (__Pyx_fits_Py_ssize_t(i, type, is_signed) ?\
+    __Pyx_GetItemInt_List_Fast(o, (Py_ssize_t)i, wraparound, boundscheck) :\
+    (PyErr_SetString(PyExc_IndexError, "list index out of range"), (PyObject*)NULL))
+static CYTHON_INLINE PyObject *__Pyx_GetItemInt_List_Fast(PyObject *o, Py_ssize_t i,
+                                                              int wraparound, int boundscheck);
+#define __Pyx_GetItemInt_Tuple(o, i, type, is_signed, to_py_func, is_list, wraparound, boundscheck)\
+    (__Pyx_fits_Py_ssize_t(i, type, is_signed) ?\
+    __Pyx_GetItemInt_Tuple_Fast(o, (Py_ssize_t)i, wraparound, boundscheck) :\
+    (PyErr_SetString(PyExc_IndexError, "tuple index out of range"), (PyObject*)NULL))
+static CYTHON_INLINE PyObject *__Pyx_GetItemInt_Tuple_Fast(PyObject *o, Py_ssize_t i,
+                                                              int wraparound, int boundscheck);
+static PyObject *__Pyx_GetItemInt_Generic(PyObject *o, PyObject* j);
+static CYTHON_INLINE PyObject *__Pyx_GetItemInt_Fast(PyObject *o, Py_ssize_t i,
+                                                     int is_list, int wraparound, int boundscheck);
+
+/* ObjectGetItem.proto */
+#if CYTHON_USE_TYPE_SLOTS
+static CYTHON_INLINE PyObject *__Pyx_PyObject_GetItem(PyObject *obj, PyObject* key);
+#else
+#define __Pyx_PyObject_GetItem(obj, key)  PyObject_GetItem(obj, key)
+#endif
+
 /* PyDictVersioning.proto */
 #if CYTHON_USE_DICT_VERSIONS && CYTHON_USE_TYPE_SLOTS
 #define __PYX_DICT_VERSION_INIT  ((PY_UINT64_T) -1)
@@ -1290,6 +1322,12 @@ static CYTHON_UNUSED PyObject* __Pyx_PyObject_Call2Args(PyObject* function, PyOb
         __Pyx__ArgTypeTest(obj, type, name, exact))
 static int __Pyx__ArgTypeTest(PyObject *obj, PyTypeObject *type, const char *name, int exact);
 
+/* BytesEquals.proto */
+static CYTHON_INLINE int __Pyx_PyBytes_Equals(PyObject* s1, PyObject* s2, int equals);
+
+/* UnicodeEquals.proto */
+static CYTHON_INLINE int __Pyx_PyUnicode_Equals(PyObject* s1, PyObject* s2, int equals);
+
 /* GetTopmostException.proto */
 #if CYTHON_USE_EXC_INFO_STACK
 static _PyErr_StackItem * __Pyx_PyErr_GetTopmostException(PyThreadState *tstate);
@@ -1332,9 +1370,6 @@ static int __Pyx__GetException(PyThreadState *tstate, PyObject **type, PyObject 
 #else
 static int __Pyx_GetException(PyObject **type, PyObject **value, PyObject **tb);
 #endif
-
-/* IncludeStringH.proto */
-#include <string.h>
 
 /* ListCompAppend.proto */
 #if CYTHON_USE_PYLIST_INTERNALS && CYTHON_ASSUME_SAFE_MACROS
@@ -1531,6 +1566,11 @@ static std::vector<struct cuckoo_search::path_element>  __pyx_convert_vector_fro
 static std::vector<unsigned int>  __pyx_convert_vector_from_py_unsigned_int(PyObject *); /*proto*/
 static std::string __pyx_convert_string_from_py_std__in_string(PyObject *); /*proto*/
 static PyObject *__pyx_convert_vector_to_py_unsigned_int(const std::vector<unsigned int>  &); /*proto*/
+static CYTHON_INLINE PyObject *__pyx_convert_PyObject_string_to_py_std__in_string(std::string const &); /*proto*/
+static CYTHON_INLINE PyObject *__pyx_convert_PyUnicode_string_to_py_std__in_string(std::string const &); /*proto*/
+static CYTHON_INLINE PyObject *__pyx_convert_PyStr_string_to_py_std__in_string(std::string const &); /*proto*/
+static CYTHON_INLINE PyObject *__pyx_convert_PyBytes_string_to_py_std__in_string(std::string const &); /*proto*/
+static CYTHON_INLINE PyObject *__pyx_convert_PyByteArray_string_to_py_std__in_string(std::string const &); /*proto*/
 static PyObject *__pyx_convert_vector_to_py_struct__cuckoo_search_3a__3a_path_element(const std::vector<struct cuckoo_search::path_element>  &); /*proto*/
 #define __Pyx_MODULE_NAME "rcuckoo_wrap"
 extern int __pyx_module_is_main_rcuckoo_wrap;
@@ -1538,13 +1578,14 @@ int __pyx_module_is_main_rcuckoo_wrap = 0;
 
 /* Implementation of 'rcuckoo_wrap' */
 static PyObject *__pyx_builtin_TypeError;
+static PyObject *__pyx_builtin_min;
+static PyObject *__pyx_builtin_range;
 static PyObject *__pyx_builtin_print;
 static PyObject *__pyx_builtin_OverflowError;
 static PyObject *__pyx_builtin_enumerate;
 static PyObject *__pyx_builtin_IndexError;
 static PyObject *__pyx_builtin_KeyError;
 static PyObject *__pyx_builtin_ValueError;
-static PyObject *__pyx_builtin_range;
 static const char __pyx_k_a[] = "a";
 static const char __pyx_k_b[] = "b";
 static const char __pyx_k_x[] = "x";
@@ -1552,6 +1593,7 @@ static const char __pyx_k_h1[] = "h1";
 static const char __pyx_k_h2[] = "h2";
 static const char __pyx_k_h3[] = "h3";
 static const char __pyx_k_key[] = "key";
+static const char __pyx_k_min[] = "min";
 static const char __pyx_k_old[] = "old";
 static const char __pyx_k_main[] = "__main__";
 static const char __pyx_k_mask[] = "mask";
@@ -1598,22 +1640,22 @@ static const char __pyx_k_hash_buckets[] = "hash_buckets";
 static const char __pyx_k_key_to_c_key[] = "key_to_c_key";
 static const char __pyx_k_open_buckets[] = "open_buckets";
 static const char __pyx_k_rcuckoo_wrap[] = "rcuckoo_wrap";
+static const char __pyx_k_sub_function[] = "sub_function";
 static const char __pyx_k_ten_k_hashes[] = "ten_k_hashes";
 static const char __pyx_k_OverflowError[] = "OverflowError";
 static const char __pyx_k_location_func[] = "location_func";
 static const char __pyx_k_reduce_cython[] = "__reduce_cython__";
 static const char __pyx_k_original_value[] = "original_value";
+static const char __pyx_k_path_to_string[] = "path_to_string";
 static const char __pyx_k_setstate_cython[] = "__setstate_cython__";
 static const char __pyx_k_buckets_per_lock[] = "buckets_per_lock";
+static const char __pyx_k_path_index_range[] = "path_index_range";
 static const char __pyx_k_distance_to_bytes[] = "distance_to_bytes";
-static const char __pyx_k_random_dfs_search[] = "random_dfs_search";
-static const char __pyx_k_sub_location_func[] = "sub_location_func";
 static const char __pyx_k_cline_in_traceback[] = "cline_in_traceback";
 static const char __pyx_k_h3_suffix_base_two[] = "h3_suffix_base_two";
 static const char __pyx_k_to_race_index_math[] = "to_race_index_math";
 static const char __pyx_k_race_hash_locations[] = "race_hash_locations";
 static const char __pyx_k_rcuckoo_wrapper_pyx[] = "rcuckoo_wrapper.pyx";
-static const char __pyx_k_bucket_cuckoo_insert[] = "bucket_cuckoo_insert";
 static const char __pyx_k_race_primary_location[] = "race_primary_location";
 static const char __pyx_k_rcuckoo_hash_locations[] = "rcuckoo_hash_locations";
 static const char __pyx_k_search_path_to_buckets[] = "search_path_to_buckets";
@@ -1621,7 +1663,9 @@ static const char __pyx_k_get_table_id_from_index[] = "get_table_id_from_index";
 static const char __pyx_k_race_secondary_location[] = "race_secondary_location";
 static const char __pyx_k_rcuckoo_primary_location[] = "rcuckoo_primary_location";
 static const char __pyx_k_rcuckoo_secondary_location[] = "rcuckoo_secondary_location";
-static const char __pyx_k_Entry_not_being_set_WARNING_WARN[] = "Entry not being set WARNING WARNING!!!!";
+static const char __pyx_k_bucket_cuckoo_a_star_insert[] = "bucket_cuckoo_a_star_insert";
+static const char __pyx_k_bucket_cuckoo_random_insert[] = "bucket_cuckoo_random_insert";
+static const char __pyx_k_ERROR_location_func_not_recogniz[] = "ERROR: location_func not recognized returning defualt func";
 static const char __pyx_k_No_value_specified_for_struct_at[] = "No value specified for struct attribute 'bytes'";
 static const char __pyx_k_WARTING_WARNTING_WARING_generate[] = "WARTING WARNTING WARING generate_bucket_cuckoo_hash_index not implemented";
 static const char __pyx_k_WARTING_WARNTING_WARING_get_dupl[] = "WARTING WARNTING WARING get_duplicates not implemented";
@@ -1633,7 +1677,7 @@ static const char __pyx_k_No_value_specified_for_struct_at_2[] = "No value speci
 static const char __pyx_k_No_value_specified_for_struct_at_3[] = "No value specified for struct attribute 'table_index'";
 static const char __pyx_k_No_value_specified_for_struct_at_4[] = "No value specified for struct attribute 'bucket_index'";
 static const char __pyx_k_No_value_specified_for_struct_at_5[] = "No value specified for struct attribute 'offset'";
-static PyObject *__pyx_kp_u_Entry_not_being_set_WARNING_WARN;
+static PyObject *__pyx_kp_u_ERROR_location_func_not_recogniz;
 static PyObject *__pyx_n_s_IndexError;
 static PyObject *__pyx_n_s_KeyError;
 static PyObject *__pyx_kp_s_No_value_specified_for_struct_at;
@@ -1651,7 +1695,8 @@ static PyObject *__pyx_kp_u_WARTING_WARNTING_WARING_get_dupl;
 static PyObject *__pyx_n_s_a;
 static PyObject *__pyx_n_s_b;
 static PyObject *__pyx_n_s_bucket;
-static PyObject *__pyx_n_s_bucket_cuckoo_insert;
+static PyObject *__pyx_n_s_bucket_cuckoo_a_star_insert;
+static PyObject *__pyx_n_s_bucket_cuckoo_random_insert;
 static PyObject *__pyx_n_s_bucket_index;
 static PyObject *__pyx_n_s_bucket_size;
 static PyObject *__pyx_n_s_buckets_per_lock;
@@ -1681,6 +1726,7 @@ static PyObject *__pyx_n_s_lock_index;
 static PyObject *__pyx_n_s_main;
 static PyObject *__pyx_n_s_mask;
 static PyObject *__pyx_n_s_memory_size;
+static PyObject *__pyx_n_s_min;
 static PyObject *__pyx_n_s_name;
 static PyObject *__pyx_n_s_new_value;
 static PyObject *__pyx_n_s_offset;
@@ -1689,14 +1735,17 @@ static PyObject *__pyx_n_s_open_buckets;
 static PyObject *__pyx_n_s_original_value;
 static PyObject *__pyx_n_s_overflow;
 static PyObject *__pyx_n_s_path;
+static PyObject *__pyx_n_s_path_index_range;
+static PyObject *__pyx_n_s_path_to_string;
 static PyObject *__pyx_n_s_print;
 static PyObject *__pyx_n_s_race_hash_locations;
 static PyObject *__pyx_n_s_race_primary_location;
 static PyObject *__pyx_n_s_race_secondary_location;
-static PyObject *__pyx_n_s_random_dfs_search;
 static PyObject *__pyx_n_s_range;
 static PyObject *__pyx_n_s_rcuckoo_hash_locations;
+static PyObject *__pyx_n_u_rcuckoo_hash_locations;
 static PyObject *__pyx_n_s_rcuckoo_hash_locations_independe;
+static PyObject *__pyx_n_u_rcuckoo_hash_locations_independe;
 static PyObject *__pyx_n_s_rcuckoo_primary_location;
 static PyObject *__pyx_n_s_rcuckoo_secondary_location;
 static PyObject *__pyx_n_s_rcuckoo_secondary_location_indep;
@@ -1711,7 +1760,7 @@ static PyObject *__pyx_kp_s_self_c_table_cannot_be_converted;
 static PyObject *__pyx_n_s_set_factor;
 static PyObject *__pyx_n_s_setstate;
 static PyObject *__pyx_n_s_setstate_cython;
-static PyObject *__pyx_n_s_sub_location_func;
+static PyObject *__pyx_n_s_sub_function;
 static PyObject *__pyx_n_s_success;
 static PyObject *__pyx_n_s_table;
 static PyObject *__pyx_n_s_table_index;
@@ -1757,7 +1806,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_14get_bucket_size(struct __pyx
 static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_16row_size_bytes(struct __pyx_obj_12rcuckoo_wrap_PyTable *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_18n_buckets_size(struct __pyx_obj_12rcuckoo_wrap_PyTable *__pyx_v_self, unsigned int __pyx_v_n_buckets); /* proto */
 static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_20get_entry(struct __pyx_obj_12rcuckoo_wrap_PyTable *__pyx_v_self, unsigned int __pyx_v_bucket_index, unsigned int __pyx_v_offset); /* proto */
-static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_22set_entry(struct __pyx_obj_12rcuckoo_wrap_PyTable *__pyx_v_self, unsigned int __pyx_v_bucket_index, unsigned int __pyx_v_offset, CYTHON_UNUSED PyObject *__pyx_v_entry); /* proto */
+static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_22set_entry(struct __pyx_obj_12rcuckoo_wrap_PyTable *__pyx_v_self, unsigned int __pyx_v_bucket_index, unsigned int __pyx_v_offset, PyObject *__pyx_v_entry); /* proto */
 static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_24bucket_has_empty(struct __pyx_obj_12rcuckoo_wrap_PyTable *__pyx_v_self, unsigned int __pyx_v_bucket_index); /* proto */
 static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_26get_first_empty_index(struct __pyx_obj_12rcuckoo_wrap_PyTable *__pyx_v_self, unsigned int __pyx_v_bucket_index); /* proto */
 static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_28bucket_contains(struct __pyx_obj_12rcuckoo_wrap_PyTable *__pyx_v_self, unsigned int __pyx_v_bucket_index, PyObject *__pyx_v_key); /* proto */
@@ -1771,10 +1820,11 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_42contains_duplicates(struct _
 static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_44get_duplicates(CYTHON_UNUSED struct __pyx_obj_12rcuckoo_wrap_PyTable *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_46__reduce_cython__(CYTHON_UNUSED struct __pyx_obj_12rcuckoo_wrap_PyTable *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_48__setstate_cython__(CYTHON_UNUSED struct __pyx_obj_12rcuckoo_wrap_PyTable *__pyx_v_self, CYTHON_UNUSED PyObject *__pyx_v___pyx_state); /* proto */
-static PyObject *__pyx_pf_12rcuckoo_wrap_38get_table_id_from_index(CYTHON_UNUSED PyObject *__pyx_self, unsigned int __pyx_v_index); /* proto */
-static PyObject *__pyx_pf_12rcuckoo_wrap_40search_path_to_buckets(CYTHON_UNUSED PyObject *__pyx_self, std::vector<struct cuckoo_search::path_element>  __pyx_v_path); /* proto */
-static PyObject *__pyx_pf_12rcuckoo_wrap_42random_dfs_search(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_key, unsigned int __pyx_v_table_size); /* proto */
-static PyObject *__pyx_pf_12rcuckoo_wrap_44bucket_cuckoo_insert(CYTHON_UNUSED PyObject *__pyx_self, struct __pyx_obj_12rcuckoo_wrap_PyTable *__pyx_v_table, CYTHON_UNUSED PyObject *__pyx_v_location_func, struct cuckoo_tables::Key __pyx_v_key, std::vector<unsigned int>  __pyx_v_open_buckets); /* proto */
+static PyObject *__pyx_pf_12rcuckoo_wrap_38search_path_to_buckets(CYTHON_UNUSED PyObject *__pyx_self, std::vector<struct cuckoo_search::path_element>  __pyx_v_path); /* proto */
+static PyObject *__pyx_pf_12rcuckoo_wrap_40path_to_string(CYTHON_UNUSED PyObject *__pyx_self, std::vector<struct cuckoo_search::path_element>  __pyx_v_path); /* proto */
+static PyObject *__pyx_pf_12rcuckoo_wrap_42path_index_range(CYTHON_UNUSED PyObject *__pyx_self, std::vector<struct cuckoo_search::path_element>  __pyx_v_path); /* proto */
+static PyObject *__pyx_pf_12rcuckoo_wrap_44bucket_cuckoo_a_star_insert(CYTHON_UNUSED PyObject *__pyx_self, struct __pyx_obj_12rcuckoo_wrap_PyTable *__pyx_v_table, PyObject *__pyx_v_location_func, struct cuckoo_tables::Key __pyx_v_key, std::vector<unsigned int>  __pyx_v_open_buckets); /* proto */
+static PyObject *__pyx_pf_12rcuckoo_wrap_46bucket_cuckoo_random_insert(CYTHON_UNUSED PyObject *__pyx_self, struct __pyx_obj_12rcuckoo_wrap_PyTable *__pyx_v_table, PyObject *__pyx_v_location_func, struct cuckoo_tables::Key __pyx_v_key, std::vector<unsigned int>  __pyx_v_open_buckets); /* proto */
 static PyObject *__pyx_tp_new_12rcuckoo_wrap_PyLock_Table(PyTypeObject *t, PyObject *a, PyObject *k); /*proto*/
 static PyObject *__pyx_tp_new_12rcuckoo_wrap_PyTable(PyTypeObject *t, PyObject *a, PyObject *k); /*proto*/
 static PyObject *__pyx_tuple_;
@@ -1810,6 +1860,7 @@ static PyObject *__pyx_tuple__49;
 static PyObject *__pyx_tuple__51;
 static PyObject *__pyx_tuple__53;
 static PyObject *__pyx_tuple__55;
+static PyObject *__pyx_tuple__57;
 static PyObject *__pyx_codeobj__14;
 static PyObject *__pyx_codeobj__15;
 static PyObject *__pyx_codeobj__17;
@@ -1833,6 +1884,7 @@ static PyObject *__pyx_codeobj__50;
 static PyObject *__pyx_codeobj__52;
 static PyObject *__pyx_codeobj__54;
 static PyObject *__pyx_codeobj__56;
+static PyObject *__pyx_codeobj__58;
 /* Late includes */
 
 /* "rcuckoo_wrapper.pyx":4
@@ -5642,8 +5694,8 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_20get_entry(struct __pyx_obj_1
  *         return e.key
  * 
  *     def set_entry(self, unsigned int bucket_index, unsigned int offset, entry):             # <<<<<<<<<<<<<<
- *         #todo wrap the entry type
- *         cdef rw.Entry c_entry
+ *         #todo improve this wrapping job with casting
+ *         vals = str(entry)
  */
 
 /* Python wrapper */
@@ -5651,7 +5703,7 @@ static PyObject *__pyx_pw_12rcuckoo_wrap_7PyTable_23set_entry(PyObject *__pyx_v_
 static PyObject *__pyx_pw_12rcuckoo_wrap_7PyTable_23set_entry(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   unsigned int __pyx_v_bucket_index;
   unsigned int __pyx_v_offset;
-  CYTHON_UNUSED PyObject *__pyx_v_entry = 0;
+  PyObject *__pyx_v_entry = 0;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
@@ -5721,30 +5773,157 @@ static PyObject *__pyx_pw_12rcuckoo_wrap_7PyTable_23set_entry(PyObject *__pyx_v_
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_22set_entry(struct __pyx_obj_12rcuckoo_wrap_PyTable *__pyx_v_self, unsigned int __pyx_v_bucket_index, unsigned int __pyx_v_offset, CYTHON_UNUSED PyObject *__pyx_v_entry) {
+static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_22set_entry(struct __pyx_obj_12rcuckoo_wrap_PyTable *__pyx_v_self, unsigned int __pyx_v_bucket_index, unsigned int __pyx_v_offset, PyObject *__pyx_v_entry) {
+  PyObject *__pyx_v_vals = NULL;
   struct cuckoo_tables::Entry __pyx_v_c_entry;
+  PyObject *__pyx_v_lens = NULL;
+  PyObject *__pyx_v_l = NULL;
+  PyObject *__pyx_v_i = NULL;
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   PyObject *__pyx_t_1 = NULL;
+  Py_ssize_t __pyx_t_2;
+  size_t __pyx_t_3;
+  PyObject *__pyx_t_4 = NULL;
+  PyObject *__pyx_t_5 = NULL;
+  PyObject *(*__pyx_t_6)(PyObject *);
+  uint8_t __pyx_t_7;
+  Py_ssize_t __pyx_t_8;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("set_entry", 0);
 
-  /* "rcuckoo_wrapper.pyx":160
- *         #todo wrap the entry type
+  /* "rcuckoo_wrapper.pyx":159
+ *     def set_entry(self, unsigned int bucket_index, unsigned int offset, entry):
+ *         #todo improve this wrapping job with casting
+ *         vals = str(entry)             # <<<<<<<<<<<<<<
  *         cdef rw.Entry c_entry
- *         print("Entry not being set WARNING WARNING!!!!")             # <<<<<<<<<<<<<<
- *         # c_entry.key = int(entry)
- *         # c_entry.value = int(1)
+ *         lens = [len(vals), len(c_entry.key.bytes)]
  */
-  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_print, __pyx_tuple__3, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 160, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_CallOneArg(((PyObject *)(&PyUnicode_Type)), __pyx_v_entry); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 159, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __pyx_v_vals = __pyx_t_1;
+  __pyx_t_1 = 0;
+
+  /* "rcuckoo_wrapper.pyx":161
+ *         vals = str(entry)
+ *         cdef rw.Entry c_entry
+ *         lens = [len(vals), len(c_entry.key.bytes)]             # <<<<<<<<<<<<<<
+ *         l = min(lens)
+ *         for i in range(l):
+ */
+  __pyx_t_2 = PyObject_Length(__pyx_v_vals); if (unlikely(__pyx_t_2 == ((Py_ssize_t)-1))) __PYX_ERR(1, 161, __pyx_L1_error)
+  __pyx_t_1 = PyInt_FromSsize_t(__pyx_t_2); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 161, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_t_3 = strlen(((char const *)__pyx_v_c_entry.key.bytes)); 
+  __pyx_t_4 = __Pyx_PyInt_FromSize_t(__pyx_t_3); if (unlikely(!__pyx_t_4)) __PYX_ERR(1, 161, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __pyx_t_5 = PyList_New(2); if (unlikely(!__pyx_t_5)) __PYX_ERR(1, 161, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  __Pyx_GIVEREF(__pyx_t_1);
+  PyList_SET_ITEM(__pyx_t_5, 0, __pyx_t_1);
+  __Pyx_GIVEREF(__pyx_t_4);
+  PyList_SET_ITEM(__pyx_t_5, 1, __pyx_t_4);
+  __pyx_t_1 = 0;
+  __pyx_t_4 = 0;
+  __pyx_v_lens = ((PyObject*)__pyx_t_5);
+  __pyx_t_5 = 0;
+
+  /* "rcuckoo_wrapper.pyx":162
+ *         cdef rw.Entry c_entry
+ *         lens = [len(vals), len(c_entry.key.bytes)]
+ *         l = min(lens)             # <<<<<<<<<<<<<<
+ *         for i in range(l):
+ *             c_entry.key.bytes[i] = int(vals[i])
+ */
+  __pyx_t_5 = __Pyx_PyObject_CallOneArg(__pyx_builtin_min, __pyx_v_lens); if (unlikely(!__pyx_t_5)) __PYX_ERR(1, 162, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  __pyx_v_l = __pyx_t_5;
+  __pyx_t_5 = 0;
 
   /* "rcuckoo_wrapper.pyx":163
- *         # c_entry.key = int(entry)
- *         # c_entry.value = int(1)
+ *         lens = [len(vals), len(c_entry.key.bytes)]
+ *         l = min(lens)
+ *         for i in range(l):             # <<<<<<<<<<<<<<
+ *             c_entry.key.bytes[i] = int(vals[i])
+ *         self.c_table.set_entry(bucket_index, offset, c_entry)
+ */
+  __pyx_t_5 = __Pyx_PyObject_CallOneArg(__pyx_builtin_range, __pyx_v_l); if (unlikely(!__pyx_t_5)) __PYX_ERR(1, 163, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  if (likely(PyList_CheckExact(__pyx_t_5)) || PyTuple_CheckExact(__pyx_t_5)) {
+    __pyx_t_4 = __pyx_t_5; __Pyx_INCREF(__pyx_t_4); __pyx_t_2 = 0;
+    __pyx_t_6 = NULL;
+  } else {
+    __pyx_t_2 = -1; __pyx_t_4 = PyObject_GetIter(__pyx_t_5); if (unlikely(!__pyx_t_4)) __PYX_ERR(1, 163, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_4);
+    __pyx_t_6 = Py_TYPE(__pyx_t_4)->tp_iternext; if (unlikely(!__pyx_t_6)) __PYX_ERR(1, 163, __pyx_L1_error)
+  }
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  for (;;) {
+    if (likely(!__pyx_t_6)) {
+      if (likely(PyList_CheckExact(__pyx_t_4))) {
+        if (__pyx_t_2 >= PyList_GET_SIZE(__pyx_t_4)) break;
+        #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
+        __pyx_t_5 = PyList_GET_ITEM(__pyx_t_4, __pyx_t_2); __Pyx_INCREF(__pyx_t_5); __pyx_t_2++; if (unlikely(0 < 0)) __PYX_ERR(1, 163, __pyx_L1_error)
+        #else
+        __pyx_t_5 = PySequence_ITEM(__pyx_t_4, __pyx_t_2); __pyx_t_2++; if (unlikely(!__pyx_t_5)) __PYX_ERR(1, 163, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_5);
+        #endif
+      } else {
+        if (__pyx_t_2 >= PyTuple_GET_SIZE(__pyx_t_4)) break;
+        #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
+        __pyx_t_5 = PyTuple_GET_ITEM(__pyx_t_4, __pyx_t_2); __Pyx_INCREF(__pyx_t_5); __pyx_t_2++; if (unlikely(0 < 0)) __PYX_ERR(1, 163, __pyx_L1_error)
+        #else
+        __pyx_t_5 = PySequence_ITEM(__pyx_t_4, __pyx_t_2); __pyx_t_2++; if (unlikely(!__pyx_t_5)) __PYX_ERR(1, 163, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_5);
+        #endif
+      }
+    } else {
+      __pyx_t_5 = __pyx_t_6(__pyx_t_4);
+      if (unlikely(!__pyx_t_5)) {
+        PyObject* exc_type = PyErr_Occurred();
+        if (exc_type) {
+          if (likely(__Pyx_PyErr_GivenExceptionMatches(exc_type, PyExc_StopIteration))) PyErr_Clear();
+          else __PYX_ERR(1, 163, __pyx_L1_error)
+        }
+        break;
+      }
+      __Pyx_GOTREF(__pyx_t_5);
+    }
+    __Pyx_XDECREF_SET(__pyx_v_i, __pyx_t_5);
+    __pyx_t_5 = 0;
+
+    /* "rcuckoo_wrapper.pyx":164
+ *         l = min(lens)
+ *         for i in range(l):
+ *             c_entry.key.bytes[i] = int(vals[i])             # <<<<<<<<<<<<<<
+ *         self.c_table.set_entry(bucket_index, offset, c_entry)
+ * 
+ */
+    __pyx_t_5 = __Pyx_PyObject_GetItem(__pyx_v_vals, __pyx_v_i); if (unlikely(!__pyx_t_5)) __PYX_ERR(1, 164, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_5);
+    __pyx_t_1 = __Pyx_PyNumber_Int(__pyx_t_5); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 164, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_1);
+    __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+    __pyx_t_7 = __Pyx_PyInt_As_uint8_t(__pyx_t_1); if (unlikely((__pyx_t_7 == ((uint8_t)-1)) && PyErr_Occurred())) __PYX_ERR(1, 164, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+    __pyx_t_8 = __Pyx_PyIndex_AsSsize_t(__pyx_v_i); if (unlikely((__pyx_t_8 == (Py_ssize_t)-1) && PyErr_Occurred())) __PYX_ERR(1, 164, __pyx_L1_error)
+    (__pyx_v_c_entry.key.bytes[__pyx_t_8]) = __pyx_t_7;
+
+    /* "rcuckoo_wrapper.pyx":163
+ *         lens = [len(vals), len(c_entry.key.bytes)]
+ *         l = min(lens)
+ *         for i in range(l):             # <<<<<<<<<<<<<<
+ *             c_entry.key.bytes[i] = int(vals[i])
+ *         self.c_table.set_entry(bucket_index, offset, c_entry)
+ */
+  }
+  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+
+  /* "rcuckoo_wrapper.pyx":165
+ *         for i in range(l):
+ *             c_entry.key.bytes[i] = int(vals[i])
  *         self.c_table.set_entry(bucket_index, offset, c_entry)             # <<<<<<<<<<<<<<
  * 
  * 
@@ -5755,8 +5934,8 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_22set_entry(struct __pyx_obj_1
  *         return e.key
  * 
  *     def set_entry(self, unsigned int bucket_index, unsigned int offset, entry):             # <<<<<<<<<<<<<<
- *         #todo wrap the entry type
- *         cdef rw.Entry c_entry
+ *         #todo improve this wrapping job with casting
+ *         vals = str(entry)
  */
 
   /* function exit code */
@@ -5764,15 +5943,21 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_22set_entry(struct __pyx_obj_1
   goto __pyx_L0;
   __pyx_L1_error:;
   __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_XDECREF(__pyx_t_4);
+  __Pyx_XDECREF(__pyx_t_5);
   __Pyx_AddTraceback("rcuckoo_wrap.PyTable.set_entry", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
+  __Pyx_XDECREF(__pyx_v_vals);
+  __Pyx_XDECREF(__pyx_v_lens);
+  __Pyx_XDECREF(__pyx_v_l);
+  __Pyx_XDECREF(__pyx_v_i);
   __Pyx_XGIVEREF(__pyx_r);
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-/* "rcuckoo_wrapper.pyx":166
+/* "rcuckoo_wrapper.pyx":168
  * 
  * 
  *     def bucket_has_empty(self, unsigned int bucket_index):             # <<<<<<<<<<<<<<
@@ -5791,7 +5976,7 @@ static PyObject *__pyx_pw_12rcuckoo_wrap_7PyTable_25bucket_has_empty(PyObject *_
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("bucket_has_empty (wrapper)", 0);
   assert(__pyx_arg_bucket_index); {
-    __pyx_v_bucket_index = __Pyx_PyInt_As_unsigned_int(__pyx_arg_bucket_index); if (unlikely((__pyx_v_bucket_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 166, __pyx_L3_error)
+    __pyx_v_bucket_index = __Pyx_PyInt_As_unsigned_int(__pyx_arg_bucket_index); if (unlikely((__pyx_v_bucket_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 168, __pyx_L3_error)
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -5815,7 +6000,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_24bucket_has_empty(struct __py
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("bucket_has_empty", 0);
 
-  /* "rcuckoo_wrapper.pyx":167
+  /* "rcuckoo_wrapper.pyx":169
  * 
  *     def bucket_has_empty(self, unsigned int bucket_index):
  *         return self.c_table.bucket_has_empty(bucket_index)             # <<<<<<<<<<<<<<
@@ -5823,13 +6008,13 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_24bucket_has_empty(struct __py
  *     def get_first_empty_index(self, unsigned int bucket_index):
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __Pyx_PyBool_FromLong(__pyx_v_self->c_table->bucket_has_empty(__pyx_v_bucket_index)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 167, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyBool_FromLong(__pyx_v_self->c_table->bucket_has_empty(__pyx_v_bucket_index)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 169, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "rcuckoo_wrapper.pyx":166
+  /* "rcuckoo_wrapper.pyx":168
  * 
  * 
  *     def bucket_has_empty(self, unsigned int bucket_index):             # <<<<<<<<<<<<<<
@@ -5848,7 +6033,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_24bucket_has_empty(struct __py
   return __pyx_r;
 }
 
-/* "rcuckoo_wrapper.pyx":169
+/* "rcuckoo_wrapper.pyx":171
  *         return self.c_table.bucket_has_empty(bucket_index)
  * 
  *     def get_first_empty_index(self, unsigned int bucket_index):             # <<<<<<<<<<<<<<
@@ -5867,7 +6052,7 @@ static PyObject *__pyx_pw_12rcuckoo_wrap_7PyTable_27get_first_empty_index(PyObje
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("get_first_empty_index (wrapper)", 0);
   assert(__pyx_arg_bucket_index); {
-    __pyx_v_bucket_index = __Pyx_PyInt_As_unsigned_int(__pyx_arg_bucket_index); if (unlikely((__pyx_v_bucket_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 169, __pyx_L3_error)
+    __pyx_v_bucket_index = __Pyx_PyInt_As_unsigned_int(__pyx_arg_bucket_index); if (unlikely((__pyx_v_bucket_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 171, __pyx_L3_error)
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -5891,7 +6076,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_26get_first_empty_index(struct
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("get_first_empty_index", 0);
 
-  /* "rcuckoo_wrapper.pyx":170
+  /* "rcuckoo_wrapper.pyx":172
  * 
  *     def get_first_empty_index(self, unsigned int bucket_index):
  *         return self.c_table.get_first_empty_index(bucket_index)             # <<<<<<<<<<<<<<
@@ -5899,13 +6084,13 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_26get_first_empty_index(struct
  *     def bucket_contains(self, unsigned int bucket_index, key):
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __Pyx_PyInt_From_unsigned_int(__pyx_v_self->c_table->get_first_empty_index(__pyx_v_bucket_index)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 170, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyInt_From_unsigned_int(__pyx_v_self->c_table->get_first_empty_index(__pyx_v_bucket_index)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 172, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "rcuckoo_wrapper.pyx":169
+  /* "rcuckoo_wrapper.pyx":171
  *         return self.c_table.bucket_has_empty(bucket_index)
  * 
  *     def get_first_empty_index(self, unsigned int bucket_index):             # <<<<<<<<<<<<<<
@@ -5924,7 +6109,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_26get_first_empty_index(struct
   return __pyx_r;
 }
 
-/* "rcuckoo_wrapper.pyx":172
+/* "rcuckoo_wrapper.pyx":174
  *         return self.c_table.get_first_empty_index(bucket_index)
  * 
  *     def bucket_contains(self, unsigned int bucket_index, key):             # <<<<<<<<<<<<<<
@@ -5966,11 +6151,11 @@ static PyObject *__pyx_pw_12rcuckoo_wrap_7PyTable_29bucket_contains(PyObject *__
         case  1:
         if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_key)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("bucket_contains", 1, 2, 2, 1); __PYX_ERR(1, 172, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("bucket_contains", 1, 2, 2, 1); __PYX_ERR(1, 174, __pyx_L3_error)
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "bucket_contains") < 0)) __PYX_ERR(1, 172, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "bucket_contains") < 0)) __PYX_ERR(1, 174, __pyx_L3_error)
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 2) {
       goto __pyx_L5_argtuple_error;
@@ -5978,12 +6163,12 @@ static PyObject *__pyx_pw_12rcuckoo_wrap_7PyTable_29bucket_contains(PyObject *__
       values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
       values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
     }
-    __pyx_v_bucket_index = __Pyx_PyInt_As_unsigned_int(values[0]); if (unlikely((__pyx_v_bucket_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 172, __pyx_L3_error)
+    __pyx_v_bucket_index = __Pyx_PyInt_As_unsigned_int(values[0]); if (unlikely((__pyx_v_bucket_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 174, __pyx_L3_error)
     __pyx_v_key = values[1];
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("bucket_contains", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 172, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("bucket_contains", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 174, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("rcuckoo_wrap.PyTable.bucket_contains", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
@@ -6009,14 +6194,14 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_28bucket_contains(struct __pyx
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("bucket_contains", 0);
 
-  /* "rcuckoo_wrapper.pyx":173
+  /* "rcuckoo_wrapper.pyx":175
  * 
  *     def bucket_contains(self, unsigned int bucket_index, key):
  *         c_key = key_to_c_key(key)             # <<<<<<<<<<<<<<
  *         return self.c_table.bucket_contains(bucket_index, c_key)
  * 
  */
-  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_key_to_c_key); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 173, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_key_to_c_key); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 175, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __pyx_t_3 = NULL;
   if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_2))) {
@@ -6030,13 +6215,13 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_28bucket_contains(struct __pyx
   }
   __pyx_t_1 = (__pyx_t_3) ? __Pyx_PyObject_Call2Args(__pyx_t_2, __pyx_t_3, __pyx_v_key) : __Pyx_PyObject_CallOneArg(__pyx_t_2, __pyx_v_key);
   __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
-  if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 173, __pyx_L1_error)
+  if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 175, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __pyx_v_c_key = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "rcuckoo_wrapper.pyx":174
+  /* "rcuckoo_wrapper.pyx":176
  *     def bucket_contains(self, unsigned int bucket_index, key):
  *         c_key = key_to_c_key(key)
  *         return self.c_table.bucket_contains(bucket_index, c_key)             # <<<<<<<<<<<<<<
@@ -6044,14 +6229,14 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_28bucket_contains(struct __pyx
  *     def get_fill_percentage(self):
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_4 = __pyx_convert__from_py_struct__cuckoo_tables_3a__3a_Key(__pyx_v_c_key); if (unlikely(PyErr_Occurred())) __PYX_ERR(1, 174, __pyx_L1_error)
-  __pyx_t_1 = __Pyx_PyBool_FromLong(__pyx_v_self->c_table->bucket_contains(__pyx_v_bucket_index, __pyx_t_4)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 174, __pyx_L1_error)
+  __pyx_t_4 = __pyx_convert__from_py_struct__cuckoo_tables_3a__3a_Key(__pyx_v_c_key); if (unlikely(PyErr_Occurred())) __PYX_ERR(1, 176, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyBool_FromLong(__pyx_v_self->c_table->bucket_contains(__pyx_v_bucket_index, __pyx_t_4)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 176, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "rcuckoo_wrapper.pyx":172
+  /* "rcuckoo_wrapper.pyx":174
  *         return self.c_table.get_first_empty_index(bucket_index)
  * 
  *     def bucket_contains(self, unsigned int bucket_index, key):             # <<<<<<<<<<<<<<
@@ -6073,7 +6258,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_28bucket_contains(struct __pyx
   return __pyx_r;
 }
 
-/* "rcuckoo_wrapper.pyx":176
+/* "rcuckoo_wrapper.pyx":178
  *         return self.c_table.bucket_contains(bucket_index, c_key)
  * 
  *     def get_fill_percentage(self):             # <<<<<<<<<<<<<<
@@ -6103,7 +6288,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_30get_fill_percentage(struct _
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("get_fill_percentage", 0);
 
-  /* "rcuckoo_wrapper.pyx":177
+  /* "rcuckoo_wrapper.pyx":179
  * 
  *     def get_fill_percentage(self):
  *         return self.c_table.get_fill_percentage()             # <<<<<<<<<<<<<<
@@ -6111,13 +6296,13 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_30get_fill_percentage(struct _
  *     def full(self):
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = PyFloat_FromDouble(__pyx_v_self->c_table->get_fill_percentage()); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 177, __pyx_L1_error)
+  __pyx_t_1 = PyFloat_FromDouble(__pyx_v_self->c_table->get_fill_percentage()); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 179, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "rcuckoo_wrapper.pyx":176
+  /* "rcuckoo_wrapper.pyx":178
  *         return self.c_table.bucket_contains(bucket_index, c_key)
  * 
  *     def get_fill_percentage(self):             # <<<<<<<<<<<<<<
@@ -6136,7 +6321,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_30get_fill_percentage(struct _
   return __pyx_r;
 }
 
-/* "rcuckoo_wrapper.pyx":179
+/* "rcuckoo_wrapper.pyx":181
  *         return self.c_table.get_fill_percentage()
  * 
  *     def full(self):             # <<<<<<<<<<<<<<
@@ -6166,7 +6351,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_32full(struct __pyx_obj_12rcuc
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("full", 0);
 
-  /* "rcuckoo_wrapper.pyx":180
+  /* "rcuckoo_wrapper.pyx":182
  * 
  *     def full(self):
  *         return self.c_table.full()             # <<<<<<<<<<<<<<
@@ -6174,13 +6359,13 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_32full(struct __pyx_obj_12rcuc
  *     def generate_bucket_cuckoo_hash_index(self, unsigned int memory_size, unsigned int bucket_size):
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __Pyx_PyBool_FromLong(__pyx_v_self->c_table->full()); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 180, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyBool_FromLong(__pyx_v_self->c_table->full()); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 182, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "rcuckoo_wrapper.pyx":179
+  /* "rcuckoo_wrapper.pyx":181
  *         return self.c_table.get_fill_percentage()
  * 
  *     def full(self):             # <<<<<<<<<<<<<<
@@ -6199,7 +6384,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_32full(struct __pyx_obj_12rcuc
   return __pyx_r;
 }
 
-/* "rcuckoo_wrapper.pyx":182
+/* "rcuckoo_wrapper.pyx":184
  *         return self.c_table.full()
  * 
  *     def generate_bucket_cuckoo_hash_index(self, unsigned int memory_size, unsigned int bucket_size):             # <<<<<<<<<<<<<<
@@ -6241,11 +6426,11 @@ static PyObject *__pyx_pw_12rcuckoo_wrap_7PyTable_35generate_bucket_cuckoo_hash_
         case  1:
         if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_bucket_size)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("generate_bucket_cuckoo_hash_index", 1, 2, 2, 1); __PYX_ERR(1, 182, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("generate_bucket_cuckoo_hash_index", 1, 2, 2, 1); __PYX_ERR(1, 184, __pyx_L3_error)
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "generate_bucket_cuckoo_hash_index") < 0)) __PYX_ERR(1, 182, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "generate_bucket_cuckoo_hash_index") < 0)) __PYX_ERR(1, 184, __pyx_L3_error)
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 2) {
       goto __pyx_L5_argtuple_error;
@@ -6253,12 +6438,12 @@ static PyObject *__pyx_pw_12rcuckoo_wrap_7PyTable_35generate_bucket_cuckoo_hash_
       values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
       values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
     }
-    __pyx_v_memory_size = __Pyx_PyInt_As_unsigned_int(values[0]); if (unlikely((__pyx_v_memory_size == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 182, __pyx_L3_error)
-    __pyx_v_bucket_size = __Pyx_PyInt_As_unsigned_int(values[1]); if (unlikely((__pyx_v_bucket_size == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 182, __pyx_L3_error)
+    __pyx_v_memory_size = __Pyx_PyInt_As_unsigned_int(values[0]); if (unlikely((__pyx_v_memory_size == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 184, __pyx_L3_error)
+    __pyx_v_bucket_size = __Pyx_PyInt_As_unsigned_int(values[1]); if (unlikely((__pyx_v_bucket_size == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 184, __pyx_L3_error)
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("generate_bucket_cuckoo_hash_index", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 182, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("generate_bucket_cuckoo_hash_index", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 184, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("rcuckoo_wrap.PyTable.generate_bucket_cuckoo_hash_index", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
@@ -6280,18 +6465,18 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_34generate_bucket_cuckoo_hash_
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("generate_bucket_cuckoo_hash_index", 0);
 
-  /* "rcuckoo_wrapper.pyx":184
+  /* "rcuckoo_wrapper.pyx":186
  *     def generate_bucket_cuckoo_hash_index(self, unsigned int memory_size, unsigned int bucket_size):
  *         #todo: this is a crazy pointer thing watch out
  *         print("WARTING WARNTING WARING generate_bucket_cuckoo_hash_index not implemented")             # <<<<<<<<<<<<<<
  *         return None
  *         # return self.c_table.generate_bucket_cuckoo_hash_index(memory_size, bucket_size)
  */
-  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_print, __pyx_tuple__4, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 184, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_print, __pyx_tuple__3, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 186, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rcuckoo_wrapper.pyx":185
+  /* "rcuckoo_wrapper.pyx":187
  *         #todo: this is a crazy pointer thing watch out
  *         print("WARTING WARNTING WARING generate_bucket_cuckoo_hash_index not implemented")
  *         return None             # <<<<<<<<<<<<<<
@@ -6302,7 +6487,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_34generate_bucket_cuckoo_hash_
   __pyx_r = Py_None; __Pyx_INCREF(Py_None);
   goto __pyx_L0;
 
-  /* "rcuckoo_wrapper.pyx":182
+  /* "rcuckoo_wrapper.pyx":184
  *         return self.c_table.full()
  * 
  *     def generate_bucket_cuckoo_hash_index(self, unsigned int memory_size, unsigned int bucket_size):             # <<<<<<<<<<<<<<
@@ -6321,7 +6506,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_34generate_bucket_cuckoo_hash_
   return __pyx_r;
 }
 
-/* "rcuckoo_wrapper.pyx":188
+/* "rcuckoo_wrapper.pyx":190
  *         # return self.c_table.generate_bucket_cuckoo_hash_index(memory_size, bucket_size)
  * 
  *     def absolute_index_to_bucket_index(self, unsigned int absolute_index):             # <<<<<<<<<<<<<<
@@ -6340,7 +6525,7 @@ static PyObject *__pyx_pw_12rcuckoo_wrap_7PyTable_37absolute_index_to_bucket_ind
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("absolute_index_to_bucket_index (wrapper)", 0);
   assert(__pyx_arg_absolute_index); {
-    __pyx_v_absolute_index = __Pyx_PyInt_As_unsigned_int(__pyx_arg_absolute_index); if (unlikely((__pyx_v_absolute_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 188, __pyx_L3_error)
+    __pyx_v_absolute_index = __Pyx_PyInt_As_unsigned_int(__pyx_arg_absolute_index); if (unlikely((__pyx_v_absolute_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 190, __pyx_L3_error)
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -6364,7 +6549,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_36absolute_index_to_bucket_ind
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("absolute_index_to_bucket_index", 0);
 
-  /* "rcuckoo_wrapper.pyx":189
+  /* "rcuckoo_wrapper.pyx":191
  * 
  *     def absolute_index_to_bucket_index(self, unsigned int absolute_index):
  *         return self.c_table.absolute_index_to_bucket_index(absolute_index)             # <<<<<<<<<<<<<<
@@ -6372,13 +6557,13 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_36absolute_index_to_bucket_ind
  *     def absolute_index_to_offset(self, unsigned int absolute_index):
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __Pyx_PyInt_From_unsigned_int(__pyx_v_self->c_table->absolute_index_to_bucket_index(__pyx_v_absolute_index)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 189, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyInt_From_unsigned_int(__pyx_v_self->c_table->absolute_index_to_bucket_index(__pyx_v_absolute_index)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 191, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "rcuckoo_wrapper.pyx":188
+  /* "rcuckoo_wrapper.pyx":190
  *         # return self.c_table.generate_bucket_cuckoo_hash_index(memory_size, bucket_size)
  * 
  *     def absolute_index_to_bucket_index(self, unsigned int absolute_index):             # <<<<<<<<<<<<<<
@@ -6397,7 +6582,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_36absolute_index_to_bucket_ind
   return __pyx_r;
 }
 
-/* "rcuckoo_wrapper.pyx":191
+/* "rcuckoo_wrapper.pyx":193
  *         return self.c_table.absolute_index_to_bucket_index(absolute_index)
  * 
  *     def absolute_index_to_offset(self, unsigned int absolute_index):             # <<<<<<<<<<<<<<
@@ -6416,7 +6601,7 @@ static PyObject *__pyx_pw_12rcuckoo_wrap_7PyTable_39absolute_index_to_offset(PyO
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("absolute_index_to_offset (wrapper)", 0);
   assert(__pyx_arg_absolute_index); {
-    __pyx_v_absolute_index = __Pyx_PyInt_As_unsigned_int(__pyx_arg_absolute_index); if (unlikely((__pyx_v_absolute_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 191, __pyx_L3_error)
+    __pyx_v_absolute_index = __Pyx_PyInt_As_unsigned_int(__pyx_arg_absolute_index); if (unlikely((__pyx_v_absolute_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 193, __pyx_L3_error)
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -6440,7 +6625,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_38absolute_index_to_offset(str
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("absolute_index_to_offset", 0);
 
-  /* "rcuckoo_wrapper.pyx":192
+  /* "rcuckoo_wrapper.pyx":194
  * 
  *     def absolute_index_to_offset(self, unsigned int absolute_index):
  *         return self.c_table.absolute_index_to_offset(absolute_index)             # <<<<<<<<<<<<<<
@@ -6448,13 +6633,13 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_38absolute_index_to_offset(str
  *     def assert_operation_in_table_bound(self, unsigned int bucket_index, unsigned int offset, unsigned int memory_size):
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __Pyx_PyInt_From_unsigned_int(__pyx_v_self->c_table->absolute_index_to_offset(__pyx_v_absolute_index)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 192, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyInt_From_unsigned_int(__pyx_v_self->c_table->absolute_index_to_offset(__pyx_v_absolute_index)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 194, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "rcuckoo_wrapper.pyx":191
+  /* "rcuckoo_wrapper.pyx":193
  *         return self.c_table.absolute_index_to_bucket_index(absolute_index)
  * 
  *     def absolute_index_to_offset(self, unsigned int absolute_index):             # <<<<<<<<<<<<<<
@@ -6473,7 +6658,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_38absolute_index_to_offset(str
   return __pyx_r;
 }
 
-/* "rcuckoo_wrapper.pyx":194
+/* "rcuckoo_wrapper.pyx":196
  *         return self.c_table.absolute_index_to_offset(absolute_index)
  * 
  *     def assert_operation_in_table_bound(self, unsigned int bucket_index, unsigned int offset, unsigned int memory_size):             # <<<<<<<<<<<<<<
@@ -6518,17 +6703,17 @@ static PyObject *__pyx_pw_12rcuckoo_wrap_7PyTable_41assert_operation_in_table_bo
         case  1:
         if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_offset)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("assert_operation_in_table_bound", 1, 3, 3, 1); __PYX_ERR(1, 194, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("assert_operation_in_table_bound", 1, 3, 3, 1); __PYX_ERR(1, 196, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
         if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_memory_size)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("assert_operation_in_table_bound", 1, 3, 3, 2); __PYX_ERR(1, 194, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("assert_operation_in_table_bound", 1, 3, 3, 2); __PYX_ERR(1, 196, __pyx_L3_error)
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "assert_operation_in_table_bound") < 0)) __PYX_ERR(1, 194, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "assert_operation_in_table_bound") < 0)) __PYX_ERR(1, 196, __pyx_L3_error)
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 3) {
       goto __pyx_L5_argtuple_error;
@@ -6537,13 +6722,13 @@ static PyObject *__pyx_pw_12rcuckoo_wrap_7PyTable_41assert_operation_in_table_bo
       values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
       values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
     }
-    __pyx_v_bucket_index = __Pyx_PyInt_As_unsigned_int(values[0]); if (unlikely((__pyx_v_bucket_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 194, __pyx_L3_error)
-    __pyx_v_offset = __Pyx_PyInt_As_unsigned_int(values[1]); if (unlikely((__pyx_v_offset == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 194, __pyx_L3_error)
-    __pyx_v_memory_size = __Pyx_PyInt_As_unsigned_int(values[2]); if (unlikely((__pyx_v_memory_size == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 194, __pyx_L3_error)
+    __pyx_v_bucket_index = __Pyx_PyInt_As_unsigned_int(values[0]); if (unlikely((__pyx_v_bucket_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 196, __pyx_L3_error)
+    __pyx_v_offset = __Pyx_PyInt_As_unsigned_int(values[1]); if (unlikely((__pyx_v_offset == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 196, __pyx_L3_error)
+    __pyx_v_memory_size = __Pyx_PyInt_As_unsigned_int(values[2]); if (unlikely((__pyx_v_memory_size == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 196, __pyx_L3_error)
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("assert_operation_in_table_bound", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 194, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("assert_operation_in_table_bound", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 196, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("rcuckoo_wrap.PyTable.assert_operation_in_table_bound", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
@@ -6565,7 +6750,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_40assert_operation_in_table_bo
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("assert_operation_in_table_bound", 0);
 
-  /* "rcuckoo_wrapper.pyx":195
+  /* "rcuckoo_wrapper.pyx":197
  * 
  *     def assert_operation_in_table_bound(self, unsigned int bucket_index, unsigned int offset, unsigned int memory_size):
  *         return self.c_table.assert_operation_in_table_bound(bucket_index, offset, memory_size)             # <<<<<<<<<<<<<<
@@ -6573,13 +6758,13 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_40assert_operation_in_table_bo
  *     def contains_duplicates(self):
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __Pyx_void_to_None(__pyx_v_self->c_table->assert_operation_in_table_bound(__pyx_v_bucket_index, __pyx_v_offset, __pyx_v_memory_size)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 195, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_void_to_None(__pyx_v_self->c_table->assert_operation_in_table_bound(__pyx_v_bucket_index, __pyx_v_offset, __pyx_v_memory_size)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 197, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "rcuckoo_wrapper.pyx":194
+  /* "rcuckoo_wrapper.pyx":196
  *         return self.c_table.absolute_index_to_offset(absolute_index)
  * 
  *     def assert_operation_in_table_bound(self, unsigned int bucket_index, unsigned int offset, unsigned int memory_size):             # <<<<<<<<<<<<<<
@@ -6598,7 +6783,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_40assert_operation_in_table_bo
   return __pyx_r;
 }
 
-/* "rcuckoo_wrapper.pyx":197
+/* "rcuckoo_wrapper.pyx":199
  *         return self.c_table.assert_operation_in_table_bound(bucket_index, offset, memory_size)
  * 
  *     def contains_duplicates(self):             # <<<<<<<<<<<<<<
@@ -6628,7 +6813,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_42contains_duplicates(struct _
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("contains_duplicates", 0);
 
-  /* "rcuckoo_wrapper.pyx":198
+  /* "rcuckoo_wrapper.pyx":200
  * 
  *     def contains_duplicates(self):
  *         return self.c_table.contains_duplicates()             # <<<<<<<<<<<<<<
@@ -6636,13 +6821,13 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_42contains_duplicates(struct _
  *     def get_duplicates(self):
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __Pyx_PyBool_FromLong(__pyx_v_self->c_table->contains_duplicates()); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 198, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyBool_FromLong(__pyx_v_self->c_table->contains_duplicates()); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 200, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "rcuckoo_wrapper.pyx":197
+  /* "rcuckoo_wrapper.pyx":199
  *         return self.c_table.assert_operation_in_table_bound(bucket_index, offset, memory_size)
  * 
  *     def contains_duplicates(self):             # <<<<<<<<<<<<<<
@@ -6661,7 +6846,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_42contains_duplicates(struct _
   return __pyx_r;
 }
 
-/* "rcuckoo_wrapper.pyx":200
+/* "rcuckoo_wrapper.pyx":202
  *         return self.c_table.contains_duplicates()
  * 
  *     def get_duplicates(self):             # <<<<<<<<<<<<<<
@@ -6691,18 +6876,18 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_44get_duplicates(CYTHON_UNUSED
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("get_duplicates", 0);
 
-  /* "rcuckoo_wrapper.pyx":201
+  /* "rcuckoo_wrapper.pyx":203
  * 
  *     def get_duplicates(self):
  *         print("WARTING WARNTING WARING get_duplicates not implemented")             # <<<<<<<<<<<<<<
  *         # duplicates = self.c_table.get_duplicates()
  *         # #todo do something with the duplicates
  */
-  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_print, __pyx_tuple__5, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 201, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_print, __pyx_tuple__4, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 203, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rcuckoo_wrapper.pyx":205
+  /* "rcuckoo_wrapper.pyx":207
  *         # #todo do something with the duplicates
  *         # print(duplicates)
  *         return None             # <<<<<<<<<<<<<<
@@ -6713,7 +6898,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_44get_duplicates(CYTHON_UNUSED
   __pyx_r = Py_None; __Pyx_INCREF(Py_None);
   goto __pyx_L0;
 
-  /* "rcuckoo_wrapper.pyx":200
+  /* "rcuckoo_wrapper.pyx":202
  *         return self.c_table.contains_duplicates()
  * 
  *     def get_duplicates(self):             # <<<<<<<<<<<<<<
@@ -6766,7 +6951,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_46__reduce_cython__(CYTHON_UNU
  * def __setstate_cython__(self, __pyx_state):
  *     raise TypeError("self.c_table cannot be converted to a Python object for pickling")
  */
-  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_TypeError, __pyx_tuple__6, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 2, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_TypeError, __pyx_tuple__5, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 2, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_Raise(__pyx_t_1, 0, 0, 0);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
@@ -6822,7 +7007,7 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_48__setstate_cython__(CYTHON_U
  * def __setstate_cython__(self, __pyx_state):
  *     raise TypeError("self.c_table cannot be converted to a Python object for pickling")             # <<<<<<<<<<<<<<
  */
-  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_TypeError, __pyx_tuple__7, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 4, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_TypeError, __pyx_tuple__6, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 4, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_Raise(__pyx_t_1, 0, 0, 0);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
@@ -6845,85 +7030,8 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_7PyTable_48__setstate_cython__(CYTHON_U
   return __pyx_r;
 }
 
-/* "rcuckoo_wrapper.pyx":225
- * from libcpp.string cimport string
+/* "rcuckoo_wrapper.pyx":214
  * 
- * def get_table_id_from_index(unsigned int index):             # <<<<<<<<<<<<<<
- *     return rw.get_table_id_from_index(index)
- * 
- */
-
-/* Python wrapper */
-static PyObject *__pyx_pw_12rcuckoo_wrap_39get_table_id_from_index(PyObject *__pyx_self, PyObject *__pyx_arg_index); /*proto*/
-static PyMethodDef __pyx_mdef_12rcuckoo_wrap_39get_table_id_from_index = {"get_table_id_from_index", (PyCFunction)__pyx_pw_12rcuckoo_wrap_39get_table_id_from_index, METH_O, 0};
-static PyObject *__pyx_pw_12rcuckoo_wrap_39get_table_id_from_index(PyObject *__pyx_self, PyObject *__pyx_arg_index) {
-  unsigned int __pyx_v_index;
-  int __pyx_lineno = 0;
-  const char *__pyx_filename = NULL;
-  int __pyx_clineno = 0;
-  PyObject *__pyx_r = 0;
-  __Pyx_RefNannyDeclarations
-  __Pyx_RefNannySetupContext("get_table_id_from_index (wrapper)", 0);
-  assert(__pyx_arg_index); {
-    __pyx_v_index = __Pyx_PyInt_As_unsigned_int(__pyx_arg_index); if (unlikely((__pyx_v_index == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 225, __pyx_L3_error)
-  }
-  goto __pyx_L4_argument_unpacking_done;
-  __pyx_L3_error:;
-  __Pyx_AddTraceback("rcuckoo_wrap.get_table_id_from_index", __pyx_clineno, __pyx_lineno, __pyx_filename);
-  __Pyx_RefNannyFinishContext();
-  return NULL;
-  __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_12rcuckoo_wrap_38get_table_id_from_index(__pyx_self, ((unsigned int)__pyx_v_index));
-
-  /* function exit code */
-  __Pyx_RefNannyFinishContext();
-  return __pyx_r;
-}
-
-static PyObject *__pyx_pf_12rcuckoo_wrap_38get_table_id_from_index(CYTHON_UNUSED PyObject *__pyx_self, unsigned int __pyx_v_index) {
-  PyObject *__pyx_r = NULL;
-  __Pyx_RefNannyDeclarations
-  PyObject *__pyx_t_1 = NULL;
-  int __pyx_lineno = 0;
-  const char *__pyx_filename = NULL;
-  int __pyx_clineno = 0;
-  __Pyx_RefNannySetupContext("get_table_id_from_index", 0);
-
-  /* "rcuckoo_wrapper.pyx":226
- * 
- * def get_table_id_from_index(unsigned int index):
- *     return rw.get_table_id_from_index(index)             # <<<<<<<<<<<<<<
- * 
- * def search_path_to_buckets(vector[rw.path_element] path):
- */
-  __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __Pyx_PyInt_From_unsigned_int(get_table_id_from_index(__pyx_v_index)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 226, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_1);
-  __pyx_r = __pyx_t_1;
-  __pyx_t_1 = 0;
-  goto __pyx_L0;
-
-  /* "rcuckoo_wrapper.pyx":225
- * from libcpp.string cimport string
- * 
- * def get_table_id_from_index(unsigned int index):             # <<<<<<<<<<<<<<
- *     return rw.get_table_id_from_index(index)
- * 
- */
-
-  /* function exit code */
-  __pyx_L1_error:;
-  __Pyx_XDECREF(__pyx_t_1);
-  __Pyx_AddTraceback("rcuckoo_wrap.get_table_id_from_index", __pyx_clineno, __pyx_lineno, __pyx_filename);
-  __pyx_r = NULL;
-  __pyx_L0:;
-  __Pyx_XGIVEREF(__pyx_r);
-  __Pyx_RefNannyFinishContext();
-  return __pyx_r;
-}
-
-/* "rcuckoo_wrapper.pyx":228
- *     return rw.get_table_id_from_index(index)
  * 
  * def search_path_to_buckets(vector[rw.path_element] path):             # <<<<<<<<<<<<<<
  *     return rw.search_path_to_buckets(path)
@@ -6931,9 +7039,9 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_38get_table_id_from_index(CYTHON_UNUSED
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_12rcuckoo_wrap_41search_path_to_buckets(PyObject *__pyx_self, PyObject *__pyx_arg_path); /*proto*/
-static PyMethodDef __pyx_mdef_12rcuckoo_wrap_41search_path_to_buckets = {"search_path_to_buckets", (PyCFunction)__pyx_pw_12rcuckoo_wrap_41search_path_to_buckets, METH_O, 0};
-static PyObject *__pyx_pw_12rcuckoo_wrap_41search_path_to_buckets(PyObject *__pyx_self, PyObject *__pyx_arg_path) {
+static PyObject *__pyx_pw_12rcuckoo_wrap_39search_path_to_buckets(PyObject *__pyx_self, PyObject *__pyx_arg_path); /*proto*/
+static PyMethodDef __pyx_mdef_12rcuckoo_wrap_39search_path_to_buckets = {"search_path_to_buckets", (PyCFunction)__pyx_pw_12rcuckoo_wrap_39search_path_to_buckets, METH_O, 0};
+static PyObject *__pyx_pw_12rcuckoo_wrap_39search_path_to_buckets(PyObject *__pyx_self, PyObject *__pyx_arg_path) {
   std::vector<struct cuckoo_search::path_element>  __pyx_v_path;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
@@ -6942,7 +7050,7 @@ static PyObject *__pyx_pw_12rcuckoo_wrap_41search_path_to_buckets(PyObject *__py
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("search_path_to_buckets (wrapper)", 0);
   assert(__pyx_arg_path); {
-    __pyx_v_path = __pyx_convert_vector_from_py_struct__cuckoo_search_3a__3a_path_element(__pyx_arg_path); if (unlikely(PyErr_Occurred())) __PYX_ERR(1, 228, __pyx_L3_error)
+    __pyx_v_path = __pyx_convert_vector_from_py_struct__cuckoo_search_3a__3a_path_element(__pyx_arg_path); if (unlikely(PyErr_Occurred())) __PYX_ERR(1, 214, __pyx_L3_error)
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -6950,14 +7058,14 @@ static PyObject *__pyx_pw_12rcuckoo_wrap_41search_path_to_buckets(PyObject *__py
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_12rcuckoo_wrap_40search_path_to_buckets(__pyx_self, ((std::vector<struct cuckoo_search::path_element> )__pyx_v_path));
+  __pyx_r = __pyx_pf_12rcuckoo_wrap_38search_path_to_buckets(__pyx_self, ((std::vector<struct cuckoo_search::path_element> )__pyx_v_path));
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_12rcuckoo_wrap_40search_path_to_buckets(CYTHON_UNUSED PyObject *__pyx_self, std::vector<struct cuckoo_search::path_element>  __pyx_v_path) {
+static PyObject *__pyx_pf_12rcuckoo_wrap_38search_path_to_buckets(CYTHON_UNUSED PyObject *__pyx_self, std::vector<struct cuckoo_search::path_element>  __pyx_v_path) {
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   PyObject *__pyx_t_1 = NULL;
@@ -6966,22 +7074,22 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_40search_path_to_buckets(CYTHON_UNUSED 
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("search_path_to_buckets", 0);
 
-  /* "rcuckoo_wrapper.pyx":229
+  /* "rcuckoo_wrapper.pyx":215
  * 
  * def search_path_to_buckets(vector[rw.path_element] path):
  *     return rw.search_path_to_buckets(path)             # <<<<<<<<<<<<<<
  * 
- * def random_dfs_search(key, unsigned int table_size):
+ * def path_to_string(vector[rw.path_element] path):
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __pyx_convert_vector_to_py_unsigned_int(cuckoo_search::search_path_to_buckets(__pyx_v_path)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 229, __pyx_L1_error)
+  __pyx_t_1 = __pyx_convert_vector_to_py_unsigned_int(cuckoo_search::search_path_to_buckets(__pyx_v_path)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 215, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "rcuckoo_wrapper.pyx":228
- *     return rw.get_table_id_from_index(index)
+  /* "rcuckoo_wrapper.pyx":214
+ * 
  * 
  * def search_path_to_buckets(vector[rw.path_element] path):             # <<<<<<<<<<<<<<
  *     return rw.search_path_to_buckets(path)
@@ -6999,116 +7107,76 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_40search_path_to_buckets(CYTHON_UNUSED 
   return __pyx_r;
 }
 
-/* "rcuckoo_wrapper.pyx":231
+/* "rcuckoo_wrapper.pyx":217
  *     return rw.search_path_to_buckets(path)
  * 
- * def random_dfs_search(key, unsigned int table_size):             # <<<<<<<<<<<<<<
- *     return rw.random_dfs_search(key, table_size)
+ * def path_to_string(vector[rw.path_element] path):             # <<<<<<<<<<<<<<
+ *     return rw.path_to_string(path)
  * 
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_12rcuckoo_wrap_43random_dfs_search(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyMethodDef __pyx_mdef_12rcuckoo_wrap_43random_dfs_search = {"random_dfs_search", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_12rcuckoo_wrap_43random_dfs_search, METH_VARARGS|METH_KEYWORDS, 0};
-static PyObject *__pyx_pw_12rcuckoo_wrap_43random_dfs_search(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
-  PyObject *__pyx_v_key = 0;
-  unsigned int __pyx_v_table_size;
+static PyObject *__pyx_pw_12rcuckoo_wrap_41path_to_string(PyObject *__pyx_self, PyObject *__pyx_arg_path); /*proto*/
+static PyMethodDef __pyx_mdef_12rcuckoo_wrap_41path_to_string = {"path_to_string", (PyCFunction)__pyx_pw_12rcuckoo_wrap_41path_to_string, METH_O, 0};
+static PyObject *__pyx_pw_12rcuckoo_wrap_41path_to_string(PyObject *__pyx_self, PyObject *__pyx_arg_path) {
+  std::vector<struct cuckoo_search::path_element>  __pyx_v_path;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
-  __Pyx_RefNannySetupContext("random_dfs_search (wrapper)", 0);
-  {
-    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_key,&__pyx_n_s_table_size,0};
-    PyObject* values[2] = {0,0};
-    if (unlikely(__pyx_kwds)) {
-      Py_ssize_t kw_args;
-      const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
-      switch (pos_args) {
-        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
-        CYTHON_FALLTHROUGH;
-        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
-        CYTHON_FALLTHROUGH;
-        case  0: break;
-        default: goto __pyx_L5_argtuple_error;
-      }
-      kw_args = PyDict_Size(__pyx_kwds);
-      switch (pos_args) {
-        case  0:
-        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_key)) != 0)) kw_args--;
-        else goto __pyx_L5_argtuple_error;
-        CYTHON_FALLTHROUGH;
-        case  1:
-        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_table_size)) != 0)) kw_args--;
-        else {
-          __Pyx_RaiseArgtupleInvalid("random_dfs_search", 1, 2, 2, 1); __PYX_ERR(1, 231, __pyx_L3_error)
-        }
-      }
-      if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "random_dfs_search") < 0)) __PYX_ERR(1, 231, __pyx_L3_error)
-      }
-    } else if (PyTuple_GET_SIZE(__pyx_args) != 2) {
-      goto __pyx_L5_argtuple_error;
-    } else {
-      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
-      values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
-    }
-    __pyx_v_key = values[0];
-    __pyx_v_table_size = __Pyx_PyInt_As_unsigned_int(values[1]); if (unlikely((__pyx_v_table_size == (unsigned int)-1) && PyErr_Occurred())) __PYX_ERR(1, 231, __pyx_L3_error)
+  __Pyx_RefNannySetupContext("path_to_string (wrapper)", 0);
+  assert(__pyx_arg_path); {
+    __pyx_v_path = __pyx_convert_vector_from_py_struct__cuckoo_search_3a__3a_path_element(__pyx_arg_path); if (unlikely(PyErr_Occurred())) __PYX_ERR(1, 217, __pyx_L3_error)
   }
   goto __pyx_L4_argument_unpacking_done;
-  __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("random_dfs_search", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 231, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("rcuckoo_wrap.random_dfs_search", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("rcuckoo_wrap.path_to_string", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_12rcuckoo_wrap_42random_dfs_search(__pyx_self, __pyx_v_key, __pyx_v_table_size);
+  __pyx_r = __pyx_pf_12rcuckoo_wrap_40path_to_string(__pyx_self, ((std::vector<struct cuckoo_search::path_element> )__pyx_v_path));
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_12rcuckoo_wrap_42random_dfs_search(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_key, unsigned int __pyx_v_table_size) {
+static PyObject *__pyx_pf_12rcuckoo_wrap_40path_to_string(CYTHON_UNUSED PyObject *__pyx_self, std::vector<struct cuckoo_search::path_element>  __pyx_v_path) {
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
-  struct cuckoo_tables::Key __pyx_t_1;
-  PyObject *__pyx_t_2 = NULL;
+  PyObject *__pyx_t_1 = NULL;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
-  __Pyx_RefNannySetupContext("random_dfs_search", 0);
+  __Pyx_RefNannySetupContext("path_to_string", 0);
 
-  /* "rcuckoo_wrapper.pyx":232
+  /* "rcuckoo_wrapper.pyx":218
  * 
- * def random_dfs_search(key, unsigned int table_size):
- *     return rw.random_dfs_search(key, table_size)             # <<<<<<<<<<<<<<
+ * def path_to_string(vector[rw.path_element] path):
+ *     return rw.path_to_string(path)             # <<<<<<<<<<<<<<
  * 
- * def bucket_cuckoo_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):
+ * def path_index_range(vector[rw.path_element] path):
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __pyx_convert__from_py_struct__cuckoo_tables_3a__3a_Key(__pyx_v_key); if (unlikely(PyErr_Occurred())) __PYX_ERR(1, 232, __pyx_L1_error)
-  __pyx_t_2 = __pyx_convert_vector_to_py_struct__cuckoo_search_3a__3a_path_element(cuckoo_search::random_dfs_search(__pyx_t_1, __pyx_v_table_size)); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 232, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_2);
-  __pyx_r = __pyx_t_2;
-  __pyx_t_2 = 0;
+  __pyx_t_1 = __pyx_convert_PyBytes_string_to_py_std__in_string(cuckoo_search::path_to_string(__pyx_v_path)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 218, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "rcuckoo_wrapper.pyx":231
+  /* "rcuckoo_wrapper.pyx":217
  *     return rw.search_path_to_buckets(path)
  * 
- * def random_dfs_search(key, unsigned int table_size):             # <<<<<<<<<<<<<<
- *     return rw.random_dfs_search(key, table_size)
+ * def path_to_string(vector[rw.path_element] path):             # <<<<<<<<<<<<<<
+ *     return rw.path_to_string(path)
  * 
  */
 
   /* function exit code */
   __pyx_L1_error:;
-  __Pyx_XDECREF(__pyx_t_2);
-  __Pyx_AddTraceback("rcuckoo_wrap.random_dfs_search", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("rcuckoo_wrap.path_to_string", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XGIVEREF(__pyx_r);
@@ -7116,20 +7184,97 @@ static PyObject *__pyx_pf_12rcuckoo_wrap_42random_dfs_search(CYTHON_UNUSED PyObj
   return __pyx_r;
 }
 
-/* "rcuckoo_wrapper.pyx":234
- *     return rw.random_dfs_search(key, table_size)
+/* "rcuckoo_wrapper.pyx":220
+ *     return rw.path_to_string(path)
  * 
- * def bucket_cuckoo_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):             # <<<<<<<<<<<<<<
+ * def path_index_range(vector[rw.path_element] path):             # <<<<<<<<<<<<<<
+ *     return rw.path_index_range(path)
  * 
- *     #todo check the name of the location func being passed in, and then select based on that. It sucks but it's the best way to do this.
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_12rcuckoo_wrap_45bucket_cuckoo_insert(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyMethodDef __pyx_mdef_12rcuckoo_wrap_45bucket_cuckoo_insert = {"bucket_cuckoo_insert", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_12rcuckoo_wrap_45bucket_cuckoo_insert, METH_VARARGS|METH_KEYWORDS, 0};
-static PyObject *__pyx_pw_12rcuckoo_wrap_45bucket_cuckoo_insert(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_12rcuckoo_wrap_43path_index_range(PyObject *__pyx_self, PyObject *__pyx_arg_path); /*proto*/
+static PyMethodDef __pyx_mdef_12rcuckoo_wrap_43path_index_range = {"path_index_range", (PyCFunction)__pyx_pw_12rcuckoo_wrap_43path_index_range, METH_O, 0};
+static PyObject *__pyx_pw_12rcuckoo_wrap_43path_index_range(PyObject *__pyx_self, PyObject *__pyx_arg_path) {
+  std::vector<struct cuckoo_search::path_element>  __pyx_v_path;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("path_index_range (wrapper)", 0);
+  assert(__pyx_arg_path); {
+    __pyx_v_path = __pyx_convert_vector_from_py_struct__cuckoo_search_3a__3a_path_element(__pyx_arg_path); if (unlikely(PyErr_Occurred())) __PYX_ERR(1, 220, __pyx_L3_error)
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("rcuckoo_wrap.path_index_range", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_12rcuckoo_wrap_42path_index_range(__pyx_self, ((std::vector<struct cuckoo_search::path_element> )__pyx_v_path));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_12rcuckoo_wrap_42path_index_range(CYTHON_UNUSED PyObject *__pyx_self, std::vector<struct cuckoo_search::path_element>  __pyx_v_path) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("path_index_range", 0);
+
+  /* "rcuckoo_wrapper.pyx":221
+ * 
+ * def path_index_range(vector[rw.path_element] path):
+ *     return rw.path_index_range(path)             # <<<<<<<<<<<<<<
+ * 
+ * def bucket_cuckoo_a_star_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_PyInt_From_unsigned_int(cuckoo_search::path_index_range(__pyx_v_path)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 221, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "rcuckoo_wrapper.pyx":220
+ *     return rw.path_to_string(path)
+ * 
+ * def path_index_range(vector[rw.path_element] path):             # <<<<<<<<<<<<<<
+ *     return rw.path_index_range(path)
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("rcuckoo_wrap.path_index_range", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "rcuckoo_wrapper.pyx":223
+ *     return rw.path_index_range(path)
+ * 
+ * def bucket_cuckoo_a_star_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):             # <<<<<<<<<<<<<<
+ *     if location_func.__name__ == "rcuckoo_hash_locations":
+ *         sub_function = rw.rcuckoo_hash_locations
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_12rcuckoo_wrap_45bucket_cuckoo_a_star_insert(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyMethodDef __pyx_mdef_12rcuckoo_wrap_45bucket_cuckoo_a_star_insert = {"bucket_cuckoo_a_star_insert", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_12rcuckoo_wrap_45bucket_cuckoo_a_star_insert, METH_VARARGS|METH_KEYWORDS, 0};
+static PyObject *__pyx_pw_12rcuckoo_wrap_45bucket_cuckoo_a_star_insert(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   struct __pyx_obj_12rcuckoo_wrap_PyTable *__pyx_v_table = 0;
-  CYTHON_UNUSED PyObject *__pyx_v_location_func = 0;
+  PyObject *__pyx_v_location_func = 0;
   struct cuckoo_tables::Key __pyx_v_key;
   std::vector<unsigned int>  __pyx_v_open_buckets;
   int __pyx_lineno = 0;
@@ -7137,7 +7282,7 @@ static PyObject *__pyx_pw_12rcuckoo_wrap_45bucket_cuckoo_insert(PyObject *__pyx_
   int __pyx_clineno = 0;
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
-  __Pyx_RefNannySetupContext("bucket_cuckoo_insert (wrapper)", 0);
+  __Pyx_RefNannySetupContext("bucket_cuckoo_a_star_insert (wrapper)", 0);
   {
     static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_table,&__pyx_n_s_location_func,&__pyx_n_s_key,&__pyx_n_s_open_buckets,0};
     PyObject* values[4] = {0,0,0,0};
@@ -7165,23 +7310,23 @@ static PyObject *__pyx_pw_12rcuckoo_wrap_45bucket_cuckoo_insert(PyObject *__pyx_
         case  1:
         if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_location_func)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("bucket_cuckoo_insert", 1, 4, 4, 1); __PYX_ERR(1, 234, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("bucket_cuckoo_a_star_insert", 1, 4, 4, 1); __PYX_ERR(1, 223, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
         if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_key)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("bucket_cuckoo_insert", 1, 4, 4, 2); __PYX_ERR(1, 234, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("bucket_cuckoo_a_star_insert", 1, 4, 4, 2); __PYX_ERR(1, 223, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  3:
         if (likely((values[3] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_open_buckets)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("bucket_cuckoo_insert", 1, 4, 4, 3); __PYX_ERR(1, 234, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("bucket_cuckoo_a_star_insert", 1, 4, 4, 3); __PYX_ERR(1, 223, __pyx_L3_error)
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "bucket_cuckoo_insert") < 0)) __PYX_ERR(1, 234, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "bucket_cuckoo_a_star_insert") < 0)) __PYX_ERR(1, 223, __pyx_L3_error)
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 4) {
       goto __pyx_L5_argtuple_error;
@@ -7193,19 +7338,19 @@ static PyObject *__pyx_pw_12rcuckoo_wrap_45bucket_cuckoo_insert(PyObject *__pyx_
     }
     __pyx_v_table = ((struct __pyx_obj_12rcuckoo_wrap_PyTable *)values[0]);
     __pyx_v_location_func = values[1];
-    __pyx_v_key = __pyx_convert__from_py_struct__cuckoo_tables_3a__3a_Key(values[2]); if (unlikely(PyErr_Occurred())) __PYX_ERR(1, 234, __pyx_L3_error)
-    __pyx_v_open_buckets = __pyx_convert_vector_from_py_unsigned_int(values[3]); if (unlikely(PyErr_Occurred())) __PYX_ERR(1, 234, __pyx_L3_error)
+    __pyx_v_key = __pyx_convert__from_py_struct__cuckoo_tables_3a__3a_Key(values[2]); if (unlikely(PyErr_Occurred())) __PYX_ERR(1, 223, __pyx_L3_error)
+    __pyx_v_open_buckets = __pyx_convert_vector_from_py_unsigned_int(values[3]); if (unlikely(PyErr_Occurred())) __PYX_ERR(1, 223, __pyx_L3_error)
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("bucket_cuckoo_insert", 1, 4, 4, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 234, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("bucket_cuckoo_a_star_insert", 1, 4, 4, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 223, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("rcuckoo_wrap.bucket_cuckoo_insert", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("rcuckoo_wrap.bucket_cuckoo_a_star_insert", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_table), __pyx_ptype_12rcuckoo_wrap_PyTable, 1, "table", 0))) __PYX_ERR(1, 234, __pyx_L1_error)
-  __pyx_r = __pyx_pf_12rcuckoo_wrap_44bucket_cuckoo_insert(__pyx_self, __pyx_v_table, __pyx_v_location_func, __pyx_v_key, __pyx_v_open_buckets);
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_table), __pyx_ptype_12rcuckoo_wrap_PyTable, 1, "table", 0))) __PYX_ERR(1, 223, __pyx_L1_error)
+  __pyx_r = __pyx_pf_12rcuckoo_wrap_44bucket_cuckoo_a_star_insert(__pyx_self, __pyx_v_table, __pyx_v_location_func, __pyx_v_key, __pyx_v_open_buckets);
 
   /* function exit code */
   goto __pyx_L0;
@@ -7216,51 +7361,365 @@ static PyObject *__pyx_pw_12rcuckoo_wrap_45bucket_cuckoo_insert(PyObject *__pyx_
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_12rcuckoo_wrap_44bucket_cuckoo_insert(CYTHON_UNUSED PyObject *__pyx_self, struct __pyx_obj_12rcuckoo_wrap_PyTable *__pyx_v_table, CYTHON_UNUSED PyObject *__pyx_v_location_func, struct cuckoo_tables::Key __pyx_v_key, std::vector<unsigned int>  __pyx_v_open_buckets) {
-  struct hash_locations (*__pyx_v_sub_location_func)(std::string, unsigned int);
+static PyObject *__pyx_pf_12rcuckoo_wrap_44bucket_cuckoo_a_star_insert(CYTHON_UNUSED PyObject *__pyx_self, struct __pyx_obj_12rcuckoo_wrap_PyTable *__pyx_v_table, PyObject *__pyx_v_location_func, struct cuckoo_tables::Key __pyx_v_key, std::vector<unsigned int>  __pyx_v_open_buckets) {
+  struct hash_locations (*__pyx_v_sub_function)(std::string, unsigned int);
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   PyObject *__pyx_t_1 = NULL;
+  int __pyx_t_2;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
-  __Pyx_RefNannySetupContext("bucket_cuckoo_insert", 0);
+  __Pyx_RefNannySetupContext("bucket_cuckoo_a_star_insert", 0);
 
-  /* "rcuckoo_wrapper.pyx":237
+  /* "rcuckoo_wrapper.pyx":224
  * 
- *     #todo check the name of the location func being passed in, and then select based on that. It sucks but it's the best way to do this.
- *     sub_location_func = rw.rcuckoo_hash_locations             # <<<<<<<<<<<<<<
- *     # new_table = rw.Table(deref(table.c_table))
- *     # return searcrw.bucket_cuckoo_insert(deref(table.c_table), sub_location_func, key, open_buckets)
+ * def bucket_cuckoo_a_star_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):
+ *     if location_func.__name__ == "rcuckoo_hash_locations":             # <<<<<<<<<<<<<<
+ *         sub_function = rw.rcuckoo_hash_locations
+ *     elif location_func.__name__ == "rcuckoo_hash_locations_independent":
  */
-  __pyx_v_sub_location_func = rcuckoo_hash_locations;
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_location_func, __pyx_n_s_name); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 224, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_t_2 = (__Pyx_PyUnicode_Equals(__pyx_t_1, __pyx_n_u_rcuckoo_hash_locations, Py_EQ)); if (unlikely(__pyx_t_2 < 0)) __PYX_ERR(1, 224, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  if (__pyx_t_2) {
 
-  /* "rcuckoo_wrapper.pyx":240
- *     # new_table = rw.Table(deref(table.c_table))
- *     # return searcrw.bucket_cuckoo_insert(deref(table.c_table), sub_location_func, key, open_buckets)
- *     return rw.bucket_cuckoo_insert(deref(table.c_table), sub_location_func, key, open_buckets)             # <<<<<<<<<<<<<<
+    /* "rcuckoo_wrapper.pyx":225
+ * def bucket_cuckoo_a_star_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):
+ *     if location_func.__name__ == "rcuckoo_hash_locations":
+ *         sub_function = rw.rcuckoo_hash_locations             # <<<<<<<<<<<<<<
+ *     elif location_func.__name__ == "rcuckoo_hash_locations_independent":
+ *         sub_function = rw.rcuckoo_hash_locations_independent
+ */
+    __pyx_v_sub_function = rcuckoo_hash_locations;
+
+    /* "rcuckoo_wrapper.pyx":224
  * 
- *     # unsigned int next_search_index(path_element pe, t.hash_locations (*location_func) (string, unsigned int), t.Table table)
+ * def bucket_cuckoo_a_star_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):
+ *     if location_func.__name__ == "rcuckoo_hash_locations":             # <<<<<<<<<<<<<<
+ *         sub_function = rw.rcuckoo_hash_locations
+ *     elif location_func.__name__ == "rcuckoo_hash_locations_independent":
+ */
+    goto __pyx_L3;
+  }
+
+  /* "rcuckoo_wrapper.pyx":226
+ *     if location_func.__name__ == "rcuckoo_hash_locations":
+ *         sub_function = rw.rcuckoo_hash_locations
+ *     elif location_func.__name__ == "rcuckoo_hash_locations_independent":             # <<<<<<<<<<<<<<
+ *         sub_function = rw.rcuckoo_hash_locations_independent
+ *     else :
+ */
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_location_func, __pyx_n_s_name); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 226, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_t_2 = (__Pyx_PyUnicode_Equals(__pyx_t_1, __pyx_n_u_rcuckoo_hash_locations_independe, Py_EQ)); if (unlikely(__pyx_t_2 < 0)) __PYX_ERR(1, 226, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  if (__pyx_t_2) {
+
+    /* "rcuckoo_wrapper.pyx":227
+ *         sub_function = rw.rcuckoo_hash_locations
+ *     elif location_func.__name__ == "rcuckoo_hash_locations_independent":
+ *         sub_function = rw.rcuckoo_hash_locations_independent             # <<<<<<<<<<<<<<
+ *     else :
+ *         print("ERROR: location_func not recognized returning defualt func")
+ */
+    __pyx_v_sub_function = rcuckoo_hash_locations_independent;
+
+    /* "rcuckoo_wrapper.pyx":226
+ *     if location_func.__name__ == "rcuckoo_hash_locations":
+ *         sub_function = rw.rcuckoo_hash_locations
+ *     elif location_func.__name__ == "rcuckoo_hash_locations_independent":             # <<<<<<<<<<<<<<
+ *         sub_function = rw.rcuckoo_hash_locations_independent
+ *     else :
+ */
+    goto __pyx_L3;
+  }
+
+  /* "rcuckoo_wrapper.pyx":229
+ *         sub_function = rw.rcuckoo_hash_locations_independent
+ *     else :
+ *         print("ERROR: location_func not recognized returning defualt func")             # <<<<<<<<<<<<<<
+ *         return None
+ *     return rw.bucket_cuckoo_a_star_insert(deref(table.c_table), sub_function, key, open_buckets)
+ */
+  /*else*/ {
+    __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_print, __pyx_tuple__7, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 229, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_1);
+    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+
+    /* "rcuckoo_wrapper.pyx":230
+ *     else :
+ *         print("ERROR: location_func not recognized returning defualt func")
+ *         return None             # <<<<<<<<<<<<<<
+ *     return rw.bucket_cuckoo_a_star_insert(deref(table.c_table), sub_function, key, open_buckets)
+ * 
+ */
+    __Pyx_XDECREF(__pyx_r);
+    __pyx_r = Py_None; __Pyx_INCREF(Py_None);
+    goto __pyx_L0;
+  }
+  __pyx_L3:;
+
+  /* "rcuckoo_wrapper.pyx":231
+ *         print("ERROR: location_func not recognized returning defualt func")
+ *         return None
+ *     return rw.bucket_cuckoo_a_star_insert(deref(table.c_table), sub_function, key, open_buckets)             # <<<<<<<<<<<<<<
+ * 
+ * def bucket_cuckoo_random_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __pyx_convert_vector_to_py_struct__cuckoo_search_3a__3a_path_element(cuckoo_search::bucket_cuckoo_insert((*__pyx_v_table->c_table), __pyx_v_sub_location_func, __pyx_v_key, __pyx_v_open_buckets)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 240, __pyx_L1_error)
+  __pyx_t_1 = __pyx_convert_vector_to_py_struct__cuckoo_search_3a__3a_path_element(cuckoo_search::bucket_cuckoo_a_star_insert((*__pyx_v_table->c_table), __pyx_v_sub_function, __pyx_v_key, __pyx_v_open_buckets)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 231, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "rcuckoo_wrapper.pyx":234
- *     return rw.random_dfs_search(key, table_size)
+  /* "rcuckoo_wrapper.pyx":223
+ *     return rw.path_index_range(path)
  * 
- * def bucket_cuckoo_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):             # <<<<<<<<<<<<<<
- * 
- *     #todo check the name of the location func being passed in, and then select based on that. It sucks but it's the best way to do this.
+ * def bucket_cuckoo_a_star_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):             # <<<<<<<<<<<<<<
+ *     if location_func.__name__ == "rcuckoo_hash_locations":
+ *         sub_function = rw.rcuckoo_hash_locations
  */
 
   /* function exit code */
   __pyx_L1_error:;
   __Pyx_XDECREF(__pyx_t_1);
-  __Pyx_AddTraceback("rcuckoo_wrap.bucket_cuckoo_insert", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("rcuckoo_wrap.bucket_cuckoo_a_star_insert", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "rcuckoo_wrapper.pyx":233
+ *     return rw.bucket_cuckoo_a_star_insert(deref(table.c_table), sub_function, key, open_buckets)
+ * 
+ * def bucket_cuckoo_random_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):             # <<<<<<<<<<<<<<
+ *     if location_func.__name__ == "rcuckoo_hash_locations":
+ *         sub_function = rw.rcuckoo_hash_locations
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_12rcuckoo_wrap_47bucket_cuckoo_random_insert(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyMethodDef __pyx_mdef_12rcuckoo_wrap_47bucket_cuckoo_random_insert = {"bucket_cuckoo_random_insert", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_12rcuckoo_wrap_47bucket_cuckoo_random_insert, METH_VARARGS|METH_KEYWORDS, 0};
+static PyObject *__pyx_pw_12rcuckoo_wrap_47bucket_cuckoo_random_insert(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  struct __pyx_obj_12rcuckoo_wrap_PyTable *__pyx_v_table = 0;
+  PyObject *__pyx_v_location_func = 0;
+  struct cuckoo_tables::Key __pyx_v_key;
+  std::vector<unsigned int>  __pyx_v_open_buckets;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("bucket_cuckoo_random_insert (wrapper)", 0);
+  {
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_table,&__pyx_n_s_location_func,&__pyx_n_s_key,&__pyx_n_s_open_buckets,0};
+    PyObject* values[4] = {0,0,0,0};
+    if (unlikely(__pyx_kwds)) {
+      Py_ssize_t kw_args;
+      const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
+      switch (pos_args) {
+        case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+        CYTHON_FALLTHROUGH;
+        case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+        CYTHON_FALLTHROUGH;
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        CYTHON_FALLTHROUGH;
+        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        CYTHON_FALLTHROUGH;
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+      kw_args = PyDict_Size(__pyx_kwds);
+      switch (pos_args) {
+        case  0:
+        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_table)) != 0)) kw_args--;
+        else goto __pyx_L5_argtuple_error;
+        CYTHON_FALLTHROUGH;
+        case  1:
+        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_location_func)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("bucket_cuckoo_random_insert", 1, 4, 4, 1); __PYX_ERR(1, 233, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  2:
+        if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_key)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("bucket_cuckoo_random_insert", 1, 4, 4, 2); __PYX_ERR(1, 233, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  3:
+        if (likely((values[3] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_open_buckets)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("bucket_cuckoo_random_insert", 1, 4, 4, 3); __PYX_ERR(1, 233, __pyx_L3_error)
+        }
+      }
+      if (unlikely(kw_args > 0)) {
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "bucket_cuckoo_random_insert") < 0)) __PYX_ERR(1, 233, __pyx_L3_error)
+      }
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 4) {
+      goto __pyx_L5_argtuple_error;
+    } else {
+      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+      values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+      values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+      values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+    }
+    __pyx_v_table = ((struct __pyx_obj_12rcuckoo_wrap_PyTable *)values[0]);
+    __pyx_v_location_func = values[1];
+    __pyx_v_key = __pyx_convert__from_py_struct__cuckoo_tables_3a__3a_Key(values[2]); if (unlikely(PyErr_Occurred())) __PYX_ERR(1, 233, __pyx_L3_error)
+    __pyx_v_open_buckets = __pyx_convert_vector_from_py_unsigned_int(values[3]); if (unlikely(PyErr_Occurred())) __PYX_ERR(1, 233, __pyx_L3_error)
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L5_argtuple_error:;
+  __Pyx_RaiseArgtupleInvalid("bucket_cuckoo_random_insert", 1, 4, 4, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 233, __pyx_L3_error)
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("rcuckoo_wrap.bucket_cuckoo_random_insert", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_table), __pyx_ptype_12rcuckoo_wrap_PyTable, 1, "table", 0))) __PYX_ERR(1, 233, __pyx_L1_error)
+  __pyx_r = __pyx_pf_12rcuckoo_wrap_46bucket_cuckoo_random_insert(__pyx_self, __pyx_v_table, __pyx_v_location_func, __pyx_v_key, __pyx_v_open_buckets);
+
+  /* function exit code */
+  goto __pyx_L0;
+  __pyx_L1_error:;
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_12rcuckoo_wrap_46bucket_cuckoo_random_insert(CYTHON_UNUSED PyObject *__pyx_self, struct __pyx_obj_12rcuckoo_wrap_PyTable *__pyx_v_table, PyObject *__pyx_v_location_func, struct cuckoo_tables::Key __pyx_v_key, std::vector<unsigned int>  __pyx_v_open_buckets) {
+  struct hash_locations (*__pyx_v_sub_function)(std::string, unsigned int);
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_t_2;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("bucket_cuckoo_random_insert", 0);
+
+  /* "rcuckoo_wrapper.pyx":234
+ * 
+ * def bucket_cuckoo_random_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):
+ *     if location_func.__name__ == "rcuckoo_hash_locations":             # <<<<<<<<<<<<<<
+ *         sub_function = rw.rcuckoo_hash_locations
+ *     elif location_func.__name__ == "rcuckoo_hash_locations_independent":
+ */
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_location_func, __pyx_n_s_name); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 234, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_t_2 = (__Pyx_PyUnicode_Equals(__pyx_t_1, __pyx_n_u_rcuckoo_hash_locations, Py_EQ)); if (unlikely(__pyx_t_2 < 0)) __PYX_ERR(1, 234, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  if (__pyx_t_2) {
+
+    /* "rcuckoo_wrapper.pyx":235
+ * def bucket_cuckoo_random_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):
+ *     if location_func.__name__ == "rcuckoo_hash_locations":
+ *         sub_function = rw.rcuckoo_hash_locations             # <<<<<<<<<<<<<<
+ *     elif location_func.__name__ == "rcuckoo_hash_locations_independent":
+ *         sub_function = rw.rcuckoo_hash_locations_independent
+ */
+    __pyx_v_sub_function = rcuckoo_hash_locations;
+
+    /* "rcuckoo_wrapper.pyx":234
+ * 
+ * def bucket_cuckoo_random_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):
+ *     if location_func.__name__ == "rcuckoo_hash_locations":             # <<<<<<<<<<<<<<
+ *         sub_function = rw.rcuckoo_hash_locations
+ *     elif location_func.__name__ == "rcuckoo_hash_locations_independent":
+ */
+    goto __pyx_L3;
+  }
+
+  /* "rcuckoo_wrapper.pyx":236
+ *     if location_func.__name__ == "rcuckoo_hash_locations":
+ *         sub_function = rw.rcuckoo_hash_locations
+ *     elif location_func.__name__ == "rcuckoo_hash_locations_independent":             # <<<<<<<<<<<<<<
+ *         sub_function = rw.rcuckoo_hash_locations_independent
+ *     else :
+ */
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_location_func, __pyx_n_s_name); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 236, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_t_2 = (__Pyx_PyUnicode_Equals(__pyx_t_1, __pyx_n_u_rcuckoo_hash_locations_independe, Py_EQ)); if (unlikely(__pyx_t_2 < 0)) __PYX_ERR(1, 236, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  if (__pyx_t_2) {
+
+    /* "rcuckoo_wrapper.pyx":237
+ *         sub_function = rw.rcuckoo_hash_locations
+ *     elif location_func.__name__ == "rcuckoo_hash_locations_independent":
+ *         sub_function = rw.rcuckoo_hash_locations_independent             # <<<<<<<<<<<<<<
+ *     else :
+ *         print("ERROR: location_func not recognized returning defualt func")
+ */
+    __pyx_v_sub_function = rcuckoo_hash_locations_independent;
+
+    /* "rcuckoo_wrapper.pyx":236
+ *     if location_func.__name__ == "rcuckoo_hash_locations":
+ *         sub_function = rw.rcuckoo_hash_locations
+ *     elif location_func.__name__ == "rcuckoo_hash_locations_independent":             # <<<<<<<<<<<<<<
+ *         sub_function = rw.rcuckoo_hash_locations_independent
+ *     else :
+ */
+    goto __pyx_L3;
+  }
+
+  /* "rcuckoo_wrapper.pyx":239
+ *         sub_function = rw.rcuckoo_hash_locations_independent
+ *     else :
+ *         print("ERROR: location_func not recognized returning defualt func")             # <<<<<<<<<<<<<<
+ *         return None
+ *     return rw.bucket_cuckoo_random_insert(deref(table.c_table), sub_function, key, open_buckets)
+ */
+  /*else*/ {
+    __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_print, __pyx_tuple__7, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 239, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_1);
+    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+
+    /* "rcuckoo_wrapper.pyx":240
+ *     else :
+ *         print("ERROR: location_func not recognized returning defualt func")
+ *         return None             # <<<<<<<<<<<<<<
+ *     return rw.bucket_cuckoo_random_insert(deref(table.c_table), sub_function, key, open_buckets)
+ * 
+ */
+    __Pyx_XDECREF(__pyx_r);
+    __pyx_r = Py_None; __Pyx_INCREF(Py_None);
+    goto __pyx_L0;
+  }
+  __pyx_L3:;
+
+  /* "rcuckoo_wrapper.pyx":241
+ *         print("ERROR: location_func not recognized returning defualt func")
+ *         return None
+ *     return rw.bucket_cuckoo_random_insert(deref(table.c_table), sub_function, key, open_buckets)             # <<<<<<<<<<<<<<
+ * 
+ * 
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __pyx_convert_vector_to_py_struct__cuckoo_search_3a__3a_path_element(cuckoo_search::bucket_cuckoo_random_insert((*__pyx_v_table->c_table), __pyx_v_sub_function, __pyx_v_key, __pyx_v_open_buckets)); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 241, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "rcuckoo_wrapper.pyx":233
+ *     return rw.bucket_cuckoo_a_star_insert(deref(table.c_table), sub_function, key, open_buckets)
+ * 
+ * def bucket_cuckoo_random_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):             # <<<<<<<<<<<<<<
+ *     if location_func.__name__ == "rcuckoo_hash_locations":
+ *         sub_function = rw.rcuckoo_hash_locations
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("rcuckoo_wrap.bucket_cuckoo_random_insert", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XGIVEREF(__pyx_r);
@@ -8640,6 +9099,263 @@ static PyObject *__pyx_convert_vector_to_py_unsigned_int(const std::vector<unsig
   return __pyx_r;
 }
 
+/* "string.to_py":31
+ * 
+ * @cname("__pyx_convert_PyObject_string_to_py_std__in_string")
+ * cdef inline object __pyx_convert_PyObject_string_to_py_std__in_string(const string& s):             # <<<<<<<<<<<<<<
+ *     return __Pyx_PyObject_FromStringAndSize(s.data(), s.size())
+ * cdef extern from *:
+ */
+
+static CYTHON_INLINE PyObject *__pyx_convert_PyObject_string_to_py_std__in_string(std::string const &__pyx_v_s) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("__pyx_convert_PyObject_string_to_py_std__in_string", 0);
+
+  /* "string.to_py":32
+ * @cname("__pyx_convert_PyObject_string_to_py_std__in_string")
+ * cdef inline object __pyx_convert_PyObject_string_to_py_std__in_string(const string& s):
+ *     return __Pyx_PyObject_FromStringAndSize(s.data(), s.size())             # <<<<<<<<<<<<<<
+ * cdef extern from *:
+ *     cdef object __Pyx_PyUnicode_FromStringAndSize(const char*, size_t)
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_PyObject_FromStringAndSize(__pyx_v_s.data(), __pyx_v_s.size()); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 32, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "string.to_py":31
+ * 
+ * @cname("__pyx_convert_PyObject_string_to_py_std__in_string")
+ * cdef inline object __pyx_convert_PyObject_string_to_py_std__in_string(const string& s):             # <<<<<<<<<<<<<<
+ *     return __Pyx_PyObject_FromStringAndSize(s.data(), s.size())
+ * cdef extern from *:
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("string.to_py.__pyx_convert_PyObject_string_to_py_std__in_string", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = 0;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "string.to_py":37
+ * 
+ * @cname("__pyx_convert_PyUnicode_string_to_py_std__in_string")
+ * cdef inline object __pyx_convert_PyUnicode_string_to_py_std__in_string(const string& s):             # <<<<<<<<<<<<<<
+ *     return __Pyx_PyUnicode_FromStringAndSize(s.data(), s.size())
+ * cdef extern from *:
+ */
+
+static CYTHON_INLINE PyObject *__pyx_convert_PyUnicode_string_to_py_std__in_string(std::string const &__pyx_v_s) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("__pyx_convert_PyUnicode_string_to_py_std__in_string", 0);
+
+  /* "string.to_py":38
+ * @cname("__pyx_convert_PyUnicode_string_to_py_std__in_string")
+ * cdef inline object __pyx_convert_PyUnicode_string_to_py_std__in_string(const string& s):
+ *     return __Pyx_PyUnicode_FromStringAndSize(s.data(), s.size())             # <<<<<<<<<<<<<<
+ * cdef extern from *:
+ *     cdef object __Pyx_PyStr_FromStringAndSize(const char*, size_t)
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_PyUnicode_FromStringAndSize(__pyx_v_s.data(), __pyx_v_s.size()); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 38, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "string.to_py":37
+ * 
+ * @cname("__pyx_convert_PyUnicode_string_to_py_std__in_string")
+ * cdef inline object __pyx_convert_PyUnicode_string_to_py_std__in_string(const string& s):             # <<<<<<<<<<<<<<
+ *     return __Pyx_PyUnicode_FromStringAndSize(s.data(), s.size())
+ * cdef extern from *:
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("string.to_py.__pyx_convert_PyUnicode_string_to_py_std__in_string", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = 0;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "string.to_py":43
+ * 
+ * @cname("__pyx_convert_PyStr_string_to_py_std__in_string")
+ * cdef inline object __pyx_convert_PyStr_string_to_py_std__in_string(const string& s):             # <<<<<<<<<<<<<<
+ *     return __Pyx_PyStr_FromStringAndSize(s.data(), s.size())
+ * cdef extern from *:
+ */
+
+static CYTHON_INLINE PyObject *__pyx_convert_PyStr_string_to_py_std__in_string(std::string const &__pyx_v_s) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("__pyx_convert_PyStr_string_to_py_std__in_string", 0);
+
+  /* "string.to_py":44
+ * @cname("__pyx_convert_PyStr_string_to_py_std__in_string")
+ * cdef inline object __pyx_convert_PyStr_string_to_py_std__in_string(const string& s):
+ *     return __Pyx_PyStr_FromStringAndSize(s.data(), s.size())             # <<<<<<<<<<<<<<
+ * cdef extern from *:
+ *     cdef object __Pyx_PyBytes_FromStringAndSize(const char*, size_t)
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_PyStr_FromStringAndSize(__pyx_v_s.data(), __pyx_v_s.size()); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 44, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "string.to_py":43
+ * 
+ * @cname("__pyx_convert_PyStr_string_to_py_std__in_string")
+ * cdef inline object __pyx_convert_PyStr_string_to_py_std__in_string(const string& s):             # <<<<<<<<<<<<<<
+ *     return __Pyx_PyStr_FromStringAndSize(s.data(), s.size())
+ * cdef extern from *:
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("string.to_py.__pyx_convert_PyStr_string_to_py_std__in_string", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = 0;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "string.to_py":49
+ * 
+ * @cname("__pyx_convert_PyBytes_string_to_py_std__in_string")
+ * cdef inline object __pyx_convert_PyBytes_string_to_py_std__in_string(const string& s):             # <<<<<<<<<<<<<<
+ *     return __Pyx_PyBytes_FromStringAndSize(s.data(), s.size())
+ * cdef extern from *:
+ */
+
+static CYTHON_INLINE PyObject *__pyx_convert_PyBytes_string_to_py_std__in_string(std::string const &__pyx_v_s) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("__pyx_convert_PyBytes_string_to_py_std__in_string", 0);
+
+  /* "string.to_py":50
+ * @cname("__pyx_convert_PyBytes_string_to_py_std__in_string")
+ * cdef inline object __pyx_convert_PyBytes_string_to_py_std__in_string(const string& s):
+ *     return __Pyx_PyBytes_FromStringAndSize(s.data(), s.size())             # <<<<<<<<<<<<<<
+ * cdef extern from *:
+ *     cdef object __Pyx_PyByteArray_FromStringAndSize(const char*, size_t)
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_PyBytes_FromStringAndSize(__pyx_v_s.data(), __pyx_v_s.size()); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 50, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "string.to_py":49
+ * 
+ * @cname("__pyx_convert_PyBytes_string_to_py_std__in_string")
+ * cdef inline object __pyx_convert_PyBytes_string_to_py_std__in_string(const string& s):             # <<<<<<<<<<<<<<
+ *     return __Pyx_PyBytes_FromStringAndSize(s.data(), s.size())
+ * cdef extern from *:
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("string.to_py.__pyx_convert_PyBytes_string_to_py_std__in_string", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = 0;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "string.to_py":55
+ * 
+ * @cname("__pyx_convert_PyByteArray_string_to_py_std__in_string")
+ * cdef inline object __pyx_convert_PyByteArray_string_to_py_std__in_string(const string& s):             # <<<<<<<<<<<<<<
+ *     return __Pyx_PyByteArray_FromStringAndSize(s.data(), s.size())
+ * 
+ */
+
+static CYTHON_INLINE PyObject *__pyx_convert_PyByteArray_string_to_py_std__in_string(std::string const &__pyx_v_s) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("__pyx_convert_PyByteArray_string_to_py_std__in_string", 0);
+
+  /* "string.to_py":56
+ * @cname("__pyx_convert_PyByteArray_string_to_py_std__in_string")
+ * cdef inline object __pyx_convert_PyByteArray_string_to_py_std__in_string(const string& s):
+ *     return __Pyx_PyByteArray_FromStringAndSize(s.data(), s.size())             # <<<<<<<<<<<<<<
+ * 
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __Pyx_PyByteArray_FromStringAndSize(__pyx_v_s.data(), __pyx_v_s.size()); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 56, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
+  goto __pyx_L0;
+
+  /* "string.to_py":55
+ * 
+ * @cname("__pyx_convert_PyByteArray_string_to_py_std__in_string")
+ * cdef inline object __pyx_convert_PyByteArray_string_to_py_std__in_string(const string& s):             # <<<<<<<<<<<<<<
+ *     return __Pyx_PyByteArray_FromStringAndSize(s.data(), s.size())
+ * 
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("string.to_py.__pyx_convert_PyByteArray_string_to_py_std__in_string", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = 0;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "vector.to_py":60
+ * 
+ * @cname("__pyx_convert_vector_to_py_struct__cuckoo_search_3a__3a_path_element")
+ * cdef object __pyx_convert_vector_to_py_struct__cuckoo_search_3a__3a_path_element(vector[X]& v):             # <<<<<<<<<<<<<<
+ *     return [v[i] for i in range(v.size())]
+ * 
+ */
+
 static PyObject *__pyx_convert_vector_to_py_struct__cuckoo_search_3a__3a_path_element(const std::vector<struct cuckoo_search::path_element>  &__pyx_v_v) {
   size_t __pyx_v_i;
   PyObject *__pyx_r = NULL;
@@ -8969,7 +9685,7 @@ static struct PyModuleDef __pyx_moduledef = {
 #endif
 
 static __Pyx_StringTabEntry __pyx_string_tab[] = {
-  {&__pyx_kp_u_Entry_not_being_set_WARNING_WARN, __pyx_k_Entry_not_being_set_WARNING_WARN, sizeof(__pyx_k_Entry_not_being_set_WARNING_WARN), 0, 1, 0, 0},
+  {&__pyx_kp_u_ERROR_location_func_not_recogniz, __pyx_k_ERROR_location_func_not_recogniz, sizeof(__pyx_k_ERROR_location_func_not_recogniz), 0, 1, 0, 0},
   {&__pyx_n_s_IndexError, __pyx_k_IndexError, sizeof(__pyx_k_IndexError), 0, 0, 1, 1},
   {&__pyx_n_s_KeyError, __pyx_k_KeyError, sizeof(__pyx_k_KeyError), 0, 0, 1, 1},
   {&__pyx_kp_s_No_value_specified_for_struct_at, __pyx_k_No_value_specified_for_struct_at, sizeof(__pyx_k_No_value_specified_for_struct_at), 0, 0, 1, 0},
@@ -8987,7 +9703,8 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_a, __pyx_k_a, sizeof(__pyx_k_a), 0, 0, 1, 1},
   {&__pyx_n_s_b, __pyx_k_b, sizeof(__pyx_k_b), 0, 0, 1, 1},
   {&__pyx_n_s_bucket, __pyx_k_bucket, sizeof(__pyx_k_bucket), 0, 0, 1, 1},
-  {&__pyx_n_s_bucket_cuckoo_insert, __pyx_k_bucket_cuckoo_insert, sizeof(__pyx_k_bucket_cuckoo_insert), 0, 0, 1, 1},
+  {&__pyx_n_s_bucket_cuckoo_a_star_insert, __pyx_k_bucket_cuckoo_a_star_insert, sizeof(__pyx_k_bucket_cuckoo_a_star_insert), 0, 0, 1, 1},
+  {&__pyx_n_s_bucket_cuckoo_random_insert, __pyx_k_bucket_cuckoo_random_insert, sizeof(__pyx_k_bucket_cuckoo_random_insert), 0, 0, 1, 1},
   {&__pyx_n_s_bucket_index, __pyx_k_bucket_index, sizeof(__pyx_k_bucket_index), 0, 0, 1, 1},
   {&__pyx_n_s_bucket_size, __pyx_k_bucket_size, sizeof(__pyx_k_bucket_size), 0, 0, 1, 1},
   {&__pyx_n_s_buckets_per_lock, __pyx_k_buckets_per_lock, sizeof(__pyx_k_buckets_per_lock), 0, 0, 1, 1},
@@ -9017,6 +9734,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_main, __pyx_k_main, sizeof(__pyx_k_main), 0, 0, 1, 1},
   {&__pyx_n_s_mask, __pyx_k_mask, sizeof(__pyx_k_mask), 0, 0, 1, 1},
   {&__pyx_n_s_memory_size, __pyx_k_memory_size, sizeof(__pyx_k_memory_size), 0, 0, 1, 1},
+  {&__pyx_n_s_min, __pyx_k_min, sizeof(__pyx_k_min), 0, 0, 1, 1},
   {&__pyx_n_s_name, __pyx_k_name, sizeof(__pyx_k_name), 0, 0, 1, 1},
   {&__pyx_n_s_new_value, __pyx_k_new_value, sizeof(__pyx_k_new_value), 0, 0, 1, 1},
   {&__pyx_n_s_offset, __pyx_k_offset, sizeof(__pyx_k_offset), 0, 0, 1, 1},
@@ -9025,14 +9743,17 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_original_value, __pyx_k_original_value, sizeof(__pyx_k_original_value), 0, 0, 1, 1},
   {&__pyx_n_s_overflow, __pyx_k_overflow, sizeof(__pyx_k_overflow), 0, 0, 1, 1},
   {&__pyx_n_s_path, __pyx_k_path, sizeof(__pyx_k_path), 0, 0, 1, 1},
+  {&__pyx_n_s_path_index_range, __pyx_k_path_index_range, sizeof(__pyx_k_path_index_range), 0, 0, 1, 1},
+  {&__pyx_n_s_path_to_string, __pyx_k_path_to_string, sizeof(__pyx_k_path_to_string), 0, 0, 1, 1},
   {&__pyx_n_s_print, __pyx_k_print, sizeof(__pyx_k_print), 0, 0, 1, 1},
   {&__pyx_n_s_race_hash_locations, __pyx_k_race_hash_locations, sizeof(__pyx_k_race_hash_locations), 0, 0, 1, 1},
   {&__pyx_n_s_race_primary_location, __pyx_k_race_primary_location, sizeof(__pyx_k_race_primary_location), 0, 0, 1, 1},
   {&__pyx_n_s_race_secondary_location, __pyx_k_race_secondary_location, sizeof(__pyx_k_race_secondary_location), 0, 0, 1, 1},
-  {&__pyx_n_s_random_dfs_search, __pyx_k_random_dfs_search, sizeof(__pyx_k_random_dfs_search), 0, 0, 1, 1},
   {&__pyx_n_s_range, __pyx_k_range, sizeof(__pyx_k_range), 0, 0, 1, 1},
   {&__pyx_n_s_rcuckoo_hash_locations, __pyx_k_rcuckoo_hash_locations, sizeof(__pyx_k_rcuckoo_hash_locations), 0, 0, 1, 1},
+  {&__pyx_n_u_rcuckoo_hash_locations, __pyx_k_rcuckoo_hash_locations, sizeof(__pyx_k_rcuckoo_hash_locations), 0, 1, 0, 1},
   {&__pyx_n_s_rcuckoo_hash_locations_independe, __pyx_k_rcuckoo_hash_locations_independe, sizeof(__pyx_k_rcuckoo_hash_locations_independe), 0, 0, 1, 1},
+  {&__pyx_n_u_rcuckoo_hash_locations_independe, __pyx_k_rcuckoo_hash_locations_independe, sizeof(__pyx_k_rcuckoo_hash_locations_independe), 0, 1, 0, 1},
   {&__pyx_n_s_rcuckoo_primary_location, __pyx_k_rcuckoo_primary_location, sizeof(__pyx_k_rcuckoo_primary_location), 0, 0, 1, 1},
   {&__pyx_n_s_rcuckoo_secondary_location, __pyx_k_rcuckoo_secondary_location, sizeof(__pyx_k_rcuckoo_secondary_location), 0, 0, 1, 1},
   {&__pyx_n_s_rcuckoo_secondary_location_indep, __pyx_k_rcuckoo_secondary_location_indep, sizeof(__pyx_k_rcuckoo_secondary_location_indep), 0, 0, 1, 1},
@@ -9047,7 +9768,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_set_factor, __pyx_k_set_factor, sizeof(__pyx_k_set_factor), 0, 0, 1, 1},
   {&__pyx_n_s_setstate, __pyx_k_setstate, sizeof(__pyx_k_setstate), 0, 0, 1, 1},
   {&__pyx_n_s_setstate_cython, __pyx_k_setstate_cython, sizeof(__pyx_k_setstate_cython), 0, 0, 1, 1},
-  {&__pyx_n_s_sub_location_func, __pyx_k_sub_location_func, sizeof(__pyx_k_sub_location_func), 0, 0, 1, 1},
+  {&__pyx_n_s_sub_function, __pyx_k_sub_function, sizeof(__pyx_k_sub_function), 0, 0, 1, 1},
   {&__pyx_n_s_success, __pyx_k_success, sizeof(__pyx_k_success), 0, 0, 1, 1},
   {&__pyx_n_s_table, __pyx_k_table, sizeof(__pyx_k_table), 0, 0, 1, 1},
   {&__pyx_n_s_table_index, __pyx_k_table_index, sizeof(__pyx_k_table_index), 0, 0, 1, 1},
@@ -9061,13 +9782,14 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
 };
 static CYTHON_SMALL_CODE int __Pyx_InitCachedBuiltins(void) {
   __pyx_builtin_TypeError = __Pyx_GetBuiltinName(__pyx_n_s_TypeError); if (!__pyx_builtin_TypeError) __PYX_ERR(0, 2, __pyx_L1_error)
-  __pyx_builtin_print = __Pyx_GetBuiltinName(__pyx_n_s_print); if (!__pyx_builtin_print) __PYX_ERR(1, 160, __pyx_L1_error)
+  __pyx_builtin_min = __Pyx_GetBuiltinName(__pyx_n_s_min); if (!__pyx_builtin_min) __PYX_ERR(1, 162, __pyx_L1_error)
+  __pyx_builtin_range = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_range) __PYX_ERR(1, 163, __pyx_L1_error)
+  __pyx_builtin_print = __Pyx_GetBuiltinName(__pyx_n_s_print); if (!__pyx_builtin_print) __PYX_ERR(1, 186, __pyx_L1_error)
   __pyx_builtin_OverflowError = __Pyx_GetBuiltinName(__pyx_n_s_OverflowError); if (!__pyx_builtin_OverflowError) __PYX_ERR(0, 81, __pyx_L1_error)
   __pyx_builtin_enumerate = __Pyx_GetBuiltinName(__pyx_n_s_enumerate); if (!__pyx_builtin_enumerate) __PYX_ERR(0, 84, __pyx_L1_error)
   __pyx_builtin_IndexError = __Pyx_GetBuiltinName(__pyx_n_s_IndexError); if (!__pyx_builtin_IndexError) __PYX_ERR(0, 94, __pyx_L1_error)
   __pyx_builtin_KeyError = __Pyx_GetBuiltinName(__pyx_n_s_KeyError); if (!__pyx_builtin_KeyError) __PYX_ERR(0, 18, __pyx_L1_error)
   __pyx_builtin_ValueError = __Pyx_GetBuiltinName(__pyx_n_s_ValueError); if (!__pyx_builtin_ValueError) __PYX_ERR(0, 19, __pyx_L1_error)
-  __pyx_builtin_range = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_range) __PYX_ERR(0, 61, __pyx_L1_error)
   return 0;
   __pyx_L1_error:;
   return -1;
@@ -9096,38 +9818,27 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__2);
   __Pyx_GIVEREF(__pyx_tuple__2);
 
-  /* "rcuckoo_wrapper.pyx":160
- *         #todo wrap the entry type
- *         cdef rw.Entry c_entry
- *         print("Entry not being set WARNING WARNING!!!!")             # <<<<<<<<<<<<<<
- *         # c_entry.key = int(entry)
- *         # c_entry.value = int(1)
- */
-  __pyx_tuple__3 = PyTuple_Pack(1, __pyx_kp_u_Entry_not_being_set_WARNING_WARN); if (unlikely(!__pyx_tuple__3)) __PYX_ERR(1, 160, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__3);
-  __Pyx_GIVEREF(__pyx_tuple__3);
-
-  /* "rcuckoo_wrapper.pyx":184
+  /* "rcuckoo_wrapper.pyx":186
  *     def generate_bucket_cuckoo_hash_index(self, unsigned int memory_size, unsigned int bucket_size):
  *         #todo: this is a crazy pointer thing watch out
  *         print("WARTING WARNTING WARING generate_bucket_cuckoo_hash_index not implemented")             # <<<<<<<<<<<<<<
  *         return None
  *         # return self.c_table.generate_bucket_cuckoo_hash_index(memory_size, bucket_size)
  */
-  __pyx_tuple__4 = PyTuple_Pack(1, __pyx_kp_u_WARTING_WARNTING_WARING_generate); if (unlikely(!__pyx_tuple__4)) __PYX_ERR(1, 184, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__4);
-  __Pyx_GIVEREF(__pyx_tuple__4);
+  __pyx_tuple__3 = PyTuple_Pack(1, __pyx_kp_u_WARTING_WARNTING_WARING_generate); if (unlikely(!__pyx_tuple__3)) __PYX_ERR(1, 186, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__3);
+  __Pyx_GIVEREF(__pyx_tuple__3);
 
-  /* "rcuckoo_wrapper.pyx":201
+  /* "rcuckoo_wrapper.pyx":203
  * 
  *     def get_duplicates(self):
  *         print("WARTING WARNTING WARING get_duplicates not implemented")             # <<<<<<<<<<<<<<
  *         # duplicates = self.c_table.get_duplicates()
  *         # #todo do something with the duplicates
  */
-  __pyx_tuple__5 = PyTuple_Pack(1, __pyx_kp_u_WARTING_WARNTING_WARING_get_dupl); if (unlikely(!__pyx_tuple__5)) __PYX_ERR(1, 201, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__5);
-  __Pyx_GIVEREF(__pyx_tuple__5);
+  __pyx_tuple__4 = PyTuple_Pack(1, __pyx_kp_u_WARTING_WARNTING_WARING_get_dupl); if (unlikely(!__pyx_tuple__4)) __PYX_ERR(1, 203, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__4);
+  __Pyx_GIVEREF(__pyx_tuple__4);
 
   /* "(tree fragment)":2
  * def __reduce_cython__(self):
@@ -9135,16 +9846,27 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  * def __setstate_cython__(self, __pyx_state):
  *     raise TypeError("self.c_table cannot be converted to a Python object for pickling")
  */
-  __pyx_tuple__6 = PyTuple_Pack(1, __pyx_kp_s_self_c_table_cannot_be_converted); if (unlikely(!__pyx_tuple__6)) __PYX_ERR(0, 2, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__6);
-  __Pyx_GIVEREF(__pyx_tuple__6);
+  __pyx_tuple__5 = PyTuple_Pack(1, __pyx_kp_s_self_c_table_cannot_be_converted); if (unlikely(!__pyx_tuple__5)) __PYX_ERR(0, 2, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__5);
+  __Pyx_GIVEREF(__pyx_tuple__5);
 
   /* "(tree fragment)":4
  *     raise TypeError("self.c_table cannot be converted to a Python object for pickling")
  * def __setstate_cython__(self, __pyx_state):
  *     raise TypeError("self.c_table cannot be converted to a Python object for pickling")             # <<<<<<<<<<<<<<
  */
-  __pyx_tuple__7 = PyTuple_Pack(1, __pyx_kp_s_self_c_table_cannot_be_converted); if (unlikely(!__pyx_tuple__7)) __PYX_ERR(0, 4, __pyx_L1_error)
+  __pyx_tuple__6 = PyTuple_Pack(1, __pyx_kp_s_self_c_table_cannot_be_converted); if (unlikely(!__pyx_tuple__6)) __PYX_ERR(0, 4, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__6);
+  __Pyx_GIVEREF(__pyx_tuple__6);
+
+  /* "rcuckoo_wrapper.pyx":229
+ *         sub_function = rw.rcuckoo_hash_locations_independent
+ *     else :
+ *         print("ERROR: location_func not recognized returning defualt func")             # <<<<<<<<<<<<<<
+ *         return None
+ *     return rw.bucket_cuckoo_a_star_insert(deref(table.c_table), sub_function, key, open_buckets)
+ */
+  __pyx_tuple__7 = PyTuple_Pack(1, __pyx_kp_u_ERROR_location_func_not_recogniz); if (unlikely(!__pyx_tuple__7)) __PYX_ERR(1, 229, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__7);
   __Pyx_GIVEREF(__pyx_tuple__7);
 
@@ -9417,53 +10139,65 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GIVEREF(__pyx_tuple__47);
   __pyx_codeobj__48 = (PyObject*)__Pyx_PyCode_New(1, 0, 2, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__47, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_rcuckoo_wrapper_pyx, __pyx_n_s_key_to_c_key, 83, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__48)) __PYX_ERR(1, 83, __pyx_L1_error)
 
-  /* "rcuckoo_wrapper.pyx":225
- * from libcpp.string cimport string
+  /* "rcuckoo_wrapper.pyx":214
  * 
- * def get_table_id_from_index(unsigned int index):             # <<<<<<<<<<<<<<
- *     return rw.get_table_id_from_index(index)
- * 
- */
-  __pyx_tuple__49 = PyTuple_Pack(2, __pyx_n_s_index, __pyx_n_s_index); if (unlikely(!__pyx_tuple__49)) __PYX_ERR(1, 225, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__49);
-  __Pyx_GIVEREF(__pyx_tuple__49);
-  __pyx_codeobj__50 = (PyObject*)__Pyx_PyCode_New(1, 0, 2, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__49, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_rcuckoo_wrapper_pyx, __pyx_n_s_get_table_id_from_index, 225, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__50)) __PYX_ERR(1, 225, __pyx_L1_error)
-
-  /* "rcuckoo_wrapper.pyx":228
- *     return rw.get_table_id_from_index(index)
  * 
  * def search_path_to_buckets(vector[rw.path_element] path):             # <<<<<<<<<<<<<<
  *     return rw.search_path_to_buckets(path)
  * 
  */
-  __pyx_tuple__51 = PyTuple_Pack(2, __pyx_n_s_path, __pyx_n_s_path); if (unlikely(!__pyx_tuple__51)) __PYX_ERR(1, 228, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__51);
-  __Pyx_GIVEREF(__pyx_tuple__51);
-  __pyx_codeobj__52 = (PyObject*)__Pyx_PyCode_New(1, 0, 2, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__51, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_rcuckoo_wrapper_pyx, __pyx_n_s_search_path_to_buckets, 228, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__52)) __PYX_ERR(1, 228, __pyx_L1_error)
+  __pyx_tuple__49 = PyTuple_Pack(2, __pyx_n_s_path, __pyx_n_s_path); if (unlikely(!__pyx_tuple__49)) __PYX_ERR(1, 214, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__49);
+  __Pyx_GIVEREF(__pyx_tuple__49);
+  __pyx_codeobj__50 = (PyObject*)__Pyx_PyCode_New(1, 0, 2, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__49, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_rcuckoo_wrapper_pyx, __pyx_n_s_search_path_to_buckets, 214, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__50)) __PYX_ERR(1, 214, __pyx_L1_error)
 
-  /* "rcuckoo_wrapper.pyx":231
+  /* "rcuckoo_wrapper.pyx":217
  *     return rw.search_path_to_buckets(path)
  * 
- * def random_dfs_search(key, unsigned int table_size):             # <<<<<<<<<<<<<<
- *     return rw.random_dfs_search(key, table_size)
+ * def path_to_string(vector[rw.path_element] path):             # <<<<<<<<<<<<<<
+ *     return rw.path_to_string(path)
  * 
  */
-  __pyx_tuple__53 = PyTuple_Pack(2, __pyx_n_s_key, __pyx_n_s_table_size); if (unlikely(!__pyx_tuple__53)) __PYX_ERR(1, 231, __pyx_L1_error)
+  __pyx_tuple__51 = PyTuple_Pack(2, __pyx_n_s_path, __pyx_n_s_path); if (unlikely(!__pyx_tuple__51)) __PYX_ERR(1, 217, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__51);
+  __Pyx_GIVEREF(__pyx_tuple__51);
+  __pyx_codeobj__52 = (PyObject*)__Pyx_PyCode_New(1, 0, 2, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__51, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_rcuckoo_wrapper_pyx, __pyx_n_s_path_to_string, 217, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__52)) __PYX_ERR(1, 217, __pyx_L1_error)
+
+  /* "rcuckoo_wrapper.pyx":220
+ *     return rw.path_to_string(path)
+ * 
+ * def path_index_range(vector[rw.path_element] path):             # <<<<<<<<<<<<<<
+ *     return rw.path_index_range(path)
+ * 
+ */
+  __pyx_tuple__53 = PyTuple_Pack(2, __pyx_n_s_path, __pyx_n_s_path); if (unlikely(!__pyx_tuple__53)) __PYX_ERR(1, 220, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__53);
   __Pyx_GIVEREF(__pyx_tuple__53);
-  __pyx_codeobj__54 = (PyObject*)__Pyx_PyCode_New(2, 0, 2, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__53, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_rcuckoo_wrapper_pyx, __pyx_n_s_random_dfs_search, 231, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__54)) __PYX_ERR(1, 231, __pyx_L1_error)
+  __pyx_codeobj__54 = (PyObject*)__Pyx_PyCode_New(1, 0, 2, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__53, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_rcuckoo_wrapper_pyx, __pyx_n_s_path_index_range, 220, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__54)) __PYX_ERR(1, 220, __pyx_L1_error)
 
-  /* "rcuckoo_wrapper.pyx":234
- *     return rw.random_dfs_search(key, table_size)
+  /* "rcuckoo_wrapper.pyx":223
+ *     return rw.path_index_range(path)
  * 
- * def bucket_cuckoo_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):             # <<<<<<<<<<<<<<
- * 
- *     #todo check the name of the location func being passed in, and then select based on that. It sucks but it's the best way to do this.
+ * def bucket_cuckoo_a_star_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):             # <<<<<<<<<<<<<<
+ *     if location_func.__name__ == "rcuckoo_hash_locations":
+ *         sub_function = rw.rcuckoo_hash_locations
  */
-  __pyx_tuple__55 = PyTuple_Pack(5, __pyx_n_s_table, __pyx_n_s_location_func, __pyx_n_s_key, __pyx_n_s_open_buckets, __pyx_n_s_sub_location_func); if (unlikely(!__pyx_tuple__55)) __PYX_ERR(1, 234, __pyx_L1_error)
+  __pyx_tuple__55 = PyTuple_Pack(5, __pyx_n_s_table, __pyx_n_s_location_func, __pyx_n_s_key, __pyx_n_s_open_buckets, __pyx_n_s_sub_function); if (unlikely(!__pyx_tuple__55)) __PYX_ERR(1, 223, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__55);
   __Pyx_GIVEREF(__pyx_tuple__55);
-  __pyx_codeobj__56 = (PyObject*)__Pyx_PyCode_New(4, 0, 5, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__55, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_rcuckoo_wrapper_pyx, __pyx_n_s_bucket_cuckoo_insert, 234, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__56)) __PYX_ERR(1, 234, __pyx_L1_error)
+  __pyx_codeobj__56 = (PyObject*)__Pyx_PyCode_New(4, 0, 5, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__55, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_rcuckoo_wrapper_pyx, __pyx_n_s_bucket_cuckoo_a_star_insert, 223, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__56)) __PYX_ERR(1, 223, __pyx_L1_error)
+
+  /* "rcuckoo_wrapper.pyx":233
+ *     return rw.bucket_cuckoo_a_star_insert(deref(table.c_table), sub_function, key, open_buckets)
+ * 
+ * def bucket_cuckoo_random_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):             # <<<<<<<<<<<<<<
+ *     if location_func.__name__ == "rcuckoo_hash_locations":
+ *         sub_function = rw.rcuckoo_hash_locations
+ */
+  __pyx_tuple__57 = PyTuple_Pack(5, __pyx_n_s_table, __pyx_n_s_location_func, __pyx_n_s_key, __pyx_n_s_open_buckets, __pyx_n_s_sub_function); if (unlikely(!__pyx_tuple__57)) __PYX_ERR(1, 233, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__57);
+  __Pyx_GIVEREF(__pyx_tuple__57);
+  __pyx_codeobj__58 = (PyObject*)__Pyx_PyCode_New(4, 0, 5, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__57, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_rcuckoo_wrapper_pyx, __pyx_n_s_bucket_cuckoo_random_insert, 233, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__58)) __PYX_ERR(1, 233, __pyx_L1_error)
   __Pyx_RefNannyFinishContext();
   return 0;
   __pyx_L1_error:;
@@ -9996,52 +10730,64 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_key_to_c_key, __pyx_t_1) < 0) __PYX_ERR(1, 83, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rcuckoo_wrapper.pyx":225
- * from libcpp.string cimport string
+  /* "rcuckoo_wrapper.pyx":214
  * 
- * def get_table_id_from_index(unsigned int index):             # <<<<<<<<<<<<<<
- *     return rw.get_table_id_from_index(index)
- * 
- */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_12rcuckoo_wrap_39get_table_id_from_index, NULL, __pyx_n_s_rcuckoo_wrap); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 225, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_get_table_id_from_index, __pyx_t_1) < 0) __PYX_ERR(1, 225, __pyx_L1_error)
-  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-
-  /* "rcuckoo_wrapper.pyx":228
- *     return rw.get_table_id_from_index(index)
  * 
  * def search_path_to_buckets(vector[rw.path_element] path):             # <<<<<<<<<<<<<<
  *     return rw.search_path_to_buckets(path)
  * 
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_12rcuckoo_wrap_41search_path_to_buckets, NULL, __pyx_n_s_rcuckoo_wrap); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 228, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_12rcuckoo_wrap_39search_path_to_buckets, NULL, __pyx_n_s_rcuckoo_wrap); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 214, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_search_path_to_buckets, __pyx_t_1) < 0) __PYX_ERR(1, 228, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_search_path_to_buckets, __pyx_t_1) < 0) __PYX_ERR(1, 214, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rcuckoo_wrapper.pyx":231
+  /* "rcuckoo_wrapper.pyx":217
  *     return rw.search_path_to_buckets(path)
  * 
- * def random_dfs_search(key, unsigned int table_size):             # <<<<<<<<<<<<<<
- *     return rw.random_dfs_search(key, table_size)
+ * def path_to_string(vector[rw.path_element] path):             # <<<<<<<<<<<<<<
+ *     return rw.path_to_string(path)
  * 
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_12rcuckoo_wrap_43random_dfs_search, NULL, __pyx_n_s_rcuckoo_wrap); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 231, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_12rcuckoo_wrap_41path_to_string, NULL, __pyx_n_s_rcuckoo_wrap); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 217, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_random_dfs_search, __pyx_t_1) < 0) __PYX_ERR(1, 231, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_path_to_string, __pyx_t_1) < 0) __PYX_ERR(1, 217, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rcuckoo_wrapper.pyx":234
- *     return rw.random_dfs_search(key, table_size)
+  /* "rcuckoo_wrapper.pyx":220
+ *     return rw.path_to_string(path)
  * 
- * def bucket_cuckoo_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):             # <<<<<<<<<<<<<<
+ * def path_index_range(vector[rw.path_element] path):             # <<<<<<<<<<<<<<
+ *     return rw.path_index_range(path)
  * 
- *     #todo check the name of the location func being passed in, and then select based on that. It sucks but it's the best way to do this.
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_12rcuckoo_wrap_45bucket_cuckoo_insert, NULL, __pyx_n_s_rcuckoo_wrap); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 234, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_12rcuckoo_wrap_43path_index_range, NULL, __pyx_n_s_rcuckoo_wrap); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 220, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_bucket_cuckoo_insert, __pyx_t_1) < 0) __PYX_ERR(1, 234, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_path_index_range, __pyx_t_1) < 0) __PYX_ERR(1, 220, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+
+  /* "rcuckoo_wrapper.pyx":223
+ *     return rw.path_index_range(path)
+ * 
+ * def bucket_cuckoo_a_star_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):             # <<<<<<<<<<<<<<
+ *     if location_func.__name__ == "rcuckoo_hash_locations":
+ *         sub_function = rw.rcuckoo_hash_locations
+ */
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_12rcuckoo_wrap_45bucket_cuckoo_a_star_insert, NULL, __pyx_n_s_rcuckoo_wrap); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 223, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_bucket_cuckoo_a_star_insert, __pyx_t_1) < 0) __PYX_ERR(1, 223, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+
+  /* "rcuckoo_wrapper.pyx":233
+ *     return rw.bucket_cuckoo_a_star_insert(deref(table.c_table), sub_function, key, open_buckets)
+ * 
+ * def bucket_cuckoo_random_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):             # <<<<<<<<<<<<<<
+ *     if location_func.__name__ == "rcuckoo_hash_locations":
+ *         sub_function = rw.rcuckoo_hash_locations
+ */
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_12rcuckoo_wrap_47bucket_cuckoo_random_insert, NULL, __pyx_n_s_rcuckoo_wrap); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 233, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_bucket_cuckoo_random_insert, __pyx_t_1) < 0) __PYX_ERR(1, 233, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
   /* "rcuckoo_wrapper.pyx":1
@@ -10679,6 +11425,122 @@ bad:
 }
 #endif
 
+/* GetItemInt */
+static PyObject *__Pyx_GetItemInt_Generic(PyObject *o, PyObject* j) {
+    PyObject *r;
+    if (!j) return NULL;
+    r = PyObject_GetItem(o, j);
+    Py_DECREF(j);
+    return r;
+}
+static CYTHON_INLINE PyObject *__Pyx_GetItemInt_List_Fast(PyObject *o, Py_ssize_t i,
+                                                              CYTHON_NCP_UNUSED int wraparound,
+                                                              CYTHON_NCP_UNUSED int boundscheck) {
+#if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
+    Py_ssize_t wrapped_i = i;
+    if (wraparound & unlikely(i < 0)) {
+        wrapped_i += PyList_GET_SIZE(o);
+    }
+    if ((!boundscheck) || likely(__Pyx_is_valid_index(wrapped_i, PyList_GET_SIZE(o)))) {
+        PyObject *r = PyList_GET_ITEM(o, wrapped_i);
+        Py_INCREF(r);
+        return r;
+    }
+    return __Pyx_GetItemInt_Generic(o, PyInt_FromSsize_t(i));
+#else
+    return PySequence_GetItem(o, i);
+#endif
+}
+static CYTHON_INLINE PyObject *__Pyx_GetItemInt_Tuple_Fast(PyObject *o, Py_ssize_t i,
+                                                              CYTHON_NCP_UNUSED int wraparound,
+                                                              CYTHON_NCP_UNUSED int boundscheck) {
+#if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
+    Py_ssize_t wrapped_i = i;
+    if (wraparound & unlikely(i < 0)) {
+        wrapped_i += PyTuple_GET_SIZE(o);
+    }
+    if ((!boundscheck) || likely(__Pyx_is_valid_index(wrapped_i, PyTuple_GET_SIZE(o)))) {
+        PyObject *r = PyTuple_GET_ITEM(o, wrapped_i);
+        Py_INCREF(r);
+        return r;
+    }
+    return __Pyx_GetItemInt_Generic(o, PyInt_FromSsize_t(i));
+#else
+    return PySequence_GetItem(o, i);
+#endif
+}
+static CYTHON_INLINE PyObject *__Pyx_GetItemInt_Fast(PyObject *o, Py_ssize_t i, int is_list,
+                                                     CYTHON_NCP_UNUSED int wraparound,
+                                                     CYTHON_NCP_UNUSED int boundscheck) {
+#if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS && CYTHON_USE_TYPE_SLOTS
+    if (is_list || PyList_CheckExact(o)) {
+        Py_ssize_t n = ((!wraparound) | likely(i >= 0)) ? i : i + PyList_GET_SIZE(o);
+        if ((!boundscheck) || (likely(__Pyx_is_valid_index(n, PyList_GET_SIZE(o))))) {
+            PyObject *r = PyList_GET_ITEM(o, n);
+            Py_INCREF(r);
+            return r;
+        }
+    }
+    else if (PyTuple_CheckExact(o)) {
+        Py_ssize_t n = ((!wraparound) | likely(i >= 0)) ? i : i + PyTuple_GET_SIZE(o);
+        if ((!boundscheck) || likely(__Pyx_is_valid_index(n, PyTuple_GET_SIZE(o)))) {
+            PyObject *r = PyTuple_GET_ITEM(o, n);
+            Py_INCREF(r);
+            return r;
+        }
+    } else {
+        PySequenceMethods *m = Py_TYPE(o)->tp_as_sequence;
+        if (likely(m && m->sq_item)) {
+            if (wraparound && unlikely(i < 0) && likely(m->sq_length)) {
+                Py_ssize_t l = m->sq_length(o);
+                if (likely(l >= 0)) {
+                    i += l;
+                } else {
+                    if (!PyErr_ExceptionMatches(PyExc_OverflowError))
+                        return NULL;
+                    PyErr_Clear();
+                }
+            }
+            return m->sq_item(o, i);
+        }
+    }
+#else
+    if (is_list || PySequence_Check(o)) {
+        return PySequence_GetItem(o, i);
+    }
+#endif
+    return __Pyx_GetItemInt_Generic(o, PyInt_FromSsize_t(i));
+}
+
+/* ObjectGetItem */
+#if CYTHON_USE_TYPE_SLOTS
+static PyObject *__Pyx_PyObject_GetIndex(PyObject *obj, PyObject* index) {
+    PyObject *runerr = NULL;
+    Py_ssize_t key_value;
+    PySequenceMethods *m = Py_TYPE(obj)->tp_as_sequence;
+    if (unlikely(!(m && m->sq_item))) {
+        PyErr_Format(PyExc_TypeError, "'%.200s' object is not subscriptable", Py_TYPE(obj)->tp_name);
+        return NULL;
+    }
+    key_value = __Pyx_PyIndex_AsSsize_t(index);
+    if (likely(key_value != -1 || !(runerr = PyErr_Occurred()))) {
+        return __Pyx_GetItemInt_Fast(obj, key_value, 0, 1, 1);
+    }
+    if (PyErr_GivenExceptionMatches(runerr, PyExc_OverflowError)) {
+        PyErr_Clear();
+        PyErr_Format(PyExc_IndexError, "cannot fit '%.200s' into an index-sized integer", Py_TYPE(index)->tp_name);
+    }
+    return NULL;
+}
+static PyObject *__Pyx_PyObject_GetItem(PyObject *obj, PyObject* key) {
+    PyMappingMethods *m = Py_TYPE(obj)->tp_as_mapping;
+    if (likely(m && m->mp_subscript)) {
+        return m->mp_subscript(obj, key);
+    }
+    return __Pyx_PyObject_GetIndex(obj, key);
+}
+#endif
+
 /* PyDictVersioning */
 #if CYTHON_USE_DICT_VERSIONS && CYTHON_USE_TYPE_SLOTS
 static CYTHON_INLINE PY_UINT64_T __Pyx_get_tp_dict_version(PyObject *obj) {
@@ -10788,6 +11650,155 @@ static int __Pyx__ArgTypeTest(PyObject *obj, PyTypeObject *type, const char *nam
         "Argument '%.200s' has incorrect type (expected %.200s, got %.200s)",
         name, type->tp_name, Py_TYPE(obj)->tp_name);
     return 0;
+}
+
+/* BytesEquals */
+static CYTHON_INLINE int __Pyx_PyBytes_Equals(PyObject* s1, PyObject* s2, int equals) {
+#if CYTHON_COMPILING_IN_PYPY
+    return PyObject_RichCompareBool(s1, s2, equals);
+#else
+    if (s1 == s2) {
+        return (equals == Py_EQ);
+    } else if (PyBytes_CheckExact(s1) & PyBytes_CheckExact(s2)) {
+        const char *ps1, *ps2;
+        Py_ssize_t length = PyBytes_GET_SIZE(s1);
+        if (length != PyBytes_GET_SIZE(s2))
+            return (equals == Py_NE);
+        ps1 = PyBytes_AS_STRING(s1);
+        ps2 = PyBytes_AS_STRING(s2);
+        if (ps1[0] != ps2[0]) {
+            return (equals == Py_NE);
+        } else if (length == 1) {
+            return (equals == Py_EQ);
+        } else {
+            int result;
+#if CYTHON_USE_UNICODE_INTERNALS && (PY_VERSION_HEX < 0x030B0000)
+            Py_hash_t hash1, hash2;
+            hash1 = ((PyBytesObject*)s1)->ob_shash;
+            hash2 = ((PyBytesObject*)s2)->ob_shash;
+            if (hash1 != hash2 && hash1 != -1 && hash2 != -1) {
+                return (equals == Py_NE);
+            }
+#endif
+            result = memcmp(ps1, ps2, (size_t)length);
+            return (equals == Py_EQ) ? (result == 0) : (result != 0);
+        }
+    } else if ((s1 == Py_None) & PyBytes_CheckExact(s2)) {
+        return (equals == Py_NE);
+    } else if ((s2 == Py_None) & PyBytes_CheckExact(s1)) {
+        return (equals == Py_NE);
+    } else {
+        int result;
+        PyObject* py_result = PyObject_RichCompare(s1, s2, equals);
+        if (!py_result)
+            return -1;
+        result = __Pyx_PyObject_IsTrue(py_result);
+        Py_DECREF(py_result);
+        return result;
+    }
+#endif
+}
+
+/* UnicodeEquals */
+static CYTHON_INLINE int __Pyx_PyUnicode_Equals(PyObject* s1, PyObject* s2, int equals) {
+#if CYTHON_COMPILING_IN_PYPY
+    return PyObject_RichCompareBool(s1, s2, equals);
+#else
+#if PY_MAJOR_VERSION < 3
+    PyObject* owned_ref = NULL;
+#endif
+    int s1_is_unicode, s2_is_unicode;
+    if (s1 == s2) {
+        goto return_eq;
+    }
+    s1_is_unicode = PyUnicode_CheckExact(s1);
+    s2_is_unicode = PyUnicode_CheckExact(s2);
+#if PY_MAJOR_VERSION < 3
+    if ((s1_is_unicode & (!s2_is_unicode)) && PyString_CheckExact(s2)) {
+        owned_ref = PyUnicode_FromObject(s2);
+        if (unlikely(!owned_ref))
+            return -1;
+        s2 = owned_ref;
+        s2_is_unicode = 1;
+    } else if ((s2_is_unicode & (!s1_is_unicode)) && PyString_CheckExact(s1)) {
+        owned_ref = PyUnicode_FromObject(s1);
+        if (unlikely(!owned_ref))
+            return -1;
+        s1 = owned_ref;
+        s1_is_unicode = 1;
+    } else if (((!s2_is_unicode) & (!s1_is_unicode))) {
+        return __Pyx_PyBytes_Equals(s1, s2, equals);
+    }
+#endif
+    if (s1_is_unicode & s2_is_unicode) {
+        Py_ssize_t length;
+        int kind;
+        void *data1, *data2;
+        if (unlikely(__Pyx_PyUnicode_READY(s1) < 0) || unlikely(__Pyx_PyUnicode_READY(s2) < 0))
+            return -1;
+        length = __Pyx_PyUnicode_GET_LENGTH(s1);
+        if (length != __Pyx_PyUnicode_GET_LENGTH(s2)) {
+            goto return_ne;
+        }
+#if CYTHON_USE_UNICODE_INTERNALS
+        {
+            Py_hash_t hash1, hash2;
+        #if CYTHON_PEP393_ENABLED
+            hash1 = ((PyASCIIObject*)s1)->hash;
+            hash2 = ((PyASCIIObject*)s2)->hash;
+        #else
+            hash1 = ((PyUnicodeObject*)s1)->hash;
+            hash2 = ((PyUnicodeObject*)s2)->hash;
+        #endif
+            if (hash1 != hash2 && hash1 != -1 && hash2 != -1) {
+                goto return_ne;
+            }
+        }
+#endif
+        kind = __Pyx_PyUnicode_KIND(s1);
+        if (kind != __Pyx_PyUnicode_KIND(s2)) {
+            goto return_ne;
+        }
+        data1 = __Pyx_PyUnicode_DATA(s1);
+        data2 = __Pyx_PyUnicode_DATA(s2);
+        if (__Pyx_PyUnicode_READ(kind, data1, 0) != __Pyx_PyUnicode_READ(kind, data2, 0)) {
+            goto return_ne;
+        } else if (length == 1) {
+            goto return_eq;
+        } else {
+            int result = memcmp(data1, data2, (size_t)(length * kind));
+            #if PY_MAJOR_VERSION < 3
+            Py_XDECREF(owned_ref);
+            #endif
+            return (equals == Py_EQ) ? (result == 0) : (result != 0);
+        }
+    } else if ((s1 == Py_None) & s2_is_unicode) {
+        goto return_ne;
+    } else if ((s2 == Py_None) & s1_is_unicode) {
+        goto return_ne;
+    } else {
+        int result;
+        PyObject* py_result = PyObject_RichCompare(s1, s2, equals);
+        #if PY_MAJOR_VERSION < 3
+        Py_XDECREF(owned_ref);
+        #endif
+        if (!py_result)
+            return -1;
+        result = __Pyx_PyObject_IsTrue(py_result);
+        Py_DECREF(py_result);
+        return result;
+    }
+return_eq:
+    #if PY_MAJOR_VERSION < 3
+    Py_XDECREF(owned_ref);
+    #endif
+    return (equals == Py_EQ);
+return_ne:
+    #if PY_MAJOR_VERSION < 3
+    Py_XDECREF(owned_ref);
+    #endif
+    return (equals == Py_NE);
+#endif
 }
 
 /* GetTopmostException */
