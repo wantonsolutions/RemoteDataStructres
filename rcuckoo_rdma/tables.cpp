@@ -58,7 +58,7 @@ namespace cuckoo_tables {
 
     }
     Lock_Table::Lock_Table(unsigned int memory_size, unsigned int bucket_size, unsigned int buckets_per_lock){
-        cout << "Lock_Table::Lock_Table " << memory_size << " " << bucket_size << " " << buckets_per_lock;
+        cout << "Lock_Table::Lock_Table " << memory_size << " " << bucket_size << " " << buckets_per_lock << endl;
         assert(memory_size % sizeof(Entry) == 0 );
         unsigned int row_size = memory_size / sizeof(Entry);
         assert(row_size % bucket_size == 0);
@@ -185,7 +185,13 @@ namespace cuckoo_tables {
     }
 
     void Table::set_entry(unsigned int bucket_index, unsigned int offset, Entry entry){
-        Entry old = _table[bucket_index][offset] = entry;
+        cout << "Table::set_entry" << endl;
+        cout << "bucket_index: " << bucket_index << endl;
+        cout << "offset: " << offset << endl;
+        cout << "entry: " << entry.to_string() << endl;
+
+        Entry old = _table[bucket_index][offset];
+        _table[bucket_index][offset] = entry;
         if (old.is_empty()){
             _fill++;
         }

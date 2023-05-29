@@ -21,7 +21,9 @@ namespace cuckoo_search {
             bucket_index = _bucket_index;
             offset = _offset;
         };
-        std::string to_string();
+        std::string to_string(){
+            return "key: " + key.to_string() + " table_index: " + std::to_string(table_index) + " bucket_index: " + std::to_string(bucket_index) + " offset: " + std::to_string(offset);
+        }
     } path_element;
 
     typedef struct a_star_pe {
@@ -55,9 +57,9 @@ namespace cuckoo_search {
     unsigned int path_index_range(std::vector<path_element> path);
     std::vector<unsigned int> find_closest_target_n_bi_directional(cuckoo_tables::Table table, hash_locations (*location_func) (std::string, unsigned int), cuckoo_tables::Key key, unsigned int n);
 
-    a_star_pe pop_list(std::vector<a_star_pe> list, std::unordered_map<cuckoo_tables::Key, a_star_pe> list_map);
-    void push_list(std::vector<a_star_pe> list, std::unordered_map<cuckoo_tables::Key, a_star_pe> list_map, a_star_pe pe);
-    bool list_contains(std::unordered_map<cuckoo_tables::Key, a_star_pe> list_map, cuckoo_tables::Key key);
+    a_star_pe pop_list(std::vector<a_star_pe> &list, std::unordered_map<cuckoo_tables::Key, a_star_pe> &list_map);
+    void push_list(std::vector<a_star_pe> &list, std::unordered_map<cuckoo_tables::Key, a_star_pe> &list_map, a_star_pe pe);
+    bool list_contains(std::unordered_map<cuckoo_tables::Key, a_star_pe> &list_map, cuckoo_tables::Key key);
     unsigned int next_table_index(unsigned int table_index);
 
     unsigned int heuristic(unsigned int current_index, unsigned int target_index, unsigned int table_size);

@@ -22,6 +22,12 @@ namespace cuckoo_tables {
             }
             return true;
         }
+        bool operator=(const Key& rhs) {
+            for (int i = 0; i < KEY_SIZE; i++){
+                bytes[i] = rhs.bytes[i];
+            }
+            return true;
+        }
 
     } Key;
 
