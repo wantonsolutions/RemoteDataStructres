@@ -1,24 +1,35 @@
 #include "search.h"
 #include <string>
 #include <vector>
+#include <set>
 #include "tables.h"
 #include "hash.h"
 #include <unordered_map>
 #include <iostream>
 
 namespace cuckoo_search {
+    using namespace std;
     unsigned int get_table_id_from_index(unsigned int index){
         return index / 2;
     }
 
-    std::vector<unsigned int> search_path_to_buckets(std::vector<path_element> path){
+    //Take a path and return a vector of the bucket indices
+    //The bucket indicies are unique
+    vector<unsigned int> search_path_to_buckets(vector<path_element> path){
         cout << "search_path_to_buckets not implemented" << endl;
-        std::vector<unsigned int> buckets;
+        vector<unsigned int> buckets;
+        for (auto pe : path){
+            buckets.push_back(pe.bucket_index);
+        }
+        set<unsigned int> s( buckets.begin(), buckets.end() );
+        buckets.assign( s.begin(), s.end() );
         return buckets;
     }
 
     std::vector<path_element> random_dfs_search(cuckoo_tables::Key key, unsigned int table_size){
         cout << "random_dfs_search not implemented" << endl;
+        cout <<"key: " << key << endl;
+        cout <<"table_size: " << table_size << endl;
         std::vector<path_element> path;
         return path;
     }
