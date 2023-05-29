@@ -5,11 +5,13 @@ from experiments import plot_cuckoo as pc
 from experiments import data_management as dm
 import simulator.search as search
 
-# import simulator.tables as tables
-import ctables as tables
+
+import rcuckoo_wrap as hash
+import rcuckoo_wrap as tables
+tables.Table = tables.PyTable
 
 # import simulator.hash as hash
-import chash as hash
+# import chash as hash
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm

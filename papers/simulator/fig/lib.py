@@ -3,6 +3,7 @@ import os
 import numpy as np
 import matplotlib as matplotlib
 
+
 def get_config():
     import simulator.simulation_runtime as sim
     config = sim.default_config()
