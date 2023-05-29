@@ -203,13 +203,13 @@ namespace cuckoo_search {
         a_star_pe search_element;
 
         //Debugging print the list of targets
-        cout << "targets: " << endl;
-        for (auto target : targets){
-            cout << target << " " << endl;
-        }
+        // cout << "targets: " << endl;
+        // for (auto target : targets){
+        //     cout << target << " " << endl;
+        // }
 
         for (auto target : targets){
-            cout << "target: " << target << endl;
+            // cout << "target: " << target << endl;
             path_element starting_pe = path_element(key, -1, -1, -1);
             search_element = a_star_pe(starting_pe, NULL, 0, 0);
 
@@ -220,17 +220,17 @@ namespace cuckoo_search {
             prior_aspe = NULL;
             unsigned int closed_list_addressable_index = 0;
             push_list(open_list, open_list_map, search_element);
-            cout << "pushed to open list size: " << open_list.size() << endl;
-            cout << "starting search element " << search_element.pe.to_string() << endl;
+            // cout << "pushed to open list size: " << open_list.size() << endl;
+            // cout << "starting search element " << search_element.pe.to_string() << endl;
 
             while (open_list.size() > 0){
-                cout << "top of search -- open list size: " << open_list.size() << endl;
+                // cout << "top of search -- open list size: " << open_list.size() << endl;
                 search_element = pop_list(open_list, open_list_map);
                 //I need to store back pointers to the closed list so I can reconstruct the path
                 closed_list_addressable[closed_list_addressable_index] = search_element;
                 closed_list_addressable_index++;
                 prior_aspe = &closed_list_addressable[closed_list_addressable_index - 1];
-                cout << "set the origin to the beginning of the closed list " << prior_aspe->pe.to_string() << endl;
+                // cout << "set the origin to the beginning of the closed list " << prior_aspe->pe.to_string() << endl;
                 //todo closed list is not actually used, we only need the map remove it for optimizations
                 push_list(closed_list, closed_list_map, search_element);
 
@@ -254,16 +254,15 @@ namespace cuckoo_search {
                     unsigned int distance = search_element.distance + 1;
                     unsigned int f_score = fscore(search_element, target, table.get_row_count());
                     a_star_pe open_a_star_pe = a_star_pe(open_pe, prior_aspe, search_element.distance+1, f_score);
-                    cout << "found target: " << open_a_star_pe.pe.to_string() << endl;
-                    cout << "setting prior to " << prior_aspe->pe.to_string() << endl;
-                    cout << "exiting search" << endl;
+                    // cout << "found target: " << open_a_star_pe.pe.to_string() << endl;
+                    // cout << "setting prior to " << prior_aspe->pe.to_string() << endl;
+                    // cout << "exiting search" << endl;
                     //todo this is a critial line but also a hack find a better way to set the tail of the search path
                     search_element = open_a_star_pe;
                     found=true;
                 }
 
                 if (found) {
-                    cout << "breaking central" << endl;
                     break;
                 }
 
@@ -297,7 +296,6 @@ namespace cuckoo_search {
                 }
             }
             if (found) {
-                cout << "found target: " << search_element.pe.to_string() << endl;
                 break;
             }
         }
@@ -305,7 +303,7 @@ namespace cuckoo_search {
         if (found) {
             a_star_pe * back_tracker = &search_element;
             while (back_tracker != NULL){
-                cout << "pushing key to path: " << back_tracker->pe.to_string() << endl;
+                // cout << "pushing key to path: " << back_tracker->pe.to_string() << endl;
                 path_element pe = back_tracker->pe;
                 path.push_back(pe);
                 back_tracker = back_tracker->prior;

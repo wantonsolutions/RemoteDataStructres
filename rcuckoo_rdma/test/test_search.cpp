@@ -91,12 +91,12 @@ void run_basic_table_tests() {
 }
 
 void insert_cuckoo_path(Table &table, vector<path_element> path) {
-    cout << "inserting cuckoo path" << endl;
-    print_path(path);
+    // cout << "inserting cuckoo path" << endl;
+    // print_path(path);
     assert(path.size() >= 2);
     // for (int i=path.size()-2; i >=0; i--){
     for (int i=path.size()-2; i >=0; i--){
-        cout << "i: " << i << " i+1 " << i+1 << endl;
+        // cout << "i: " << i << " i+1 " << i+1 << endl;
         //we actually need to swap the values here
         Entry e;
         e.key = path[i+1].key;
@@ -105,31 +105,53 @@ void insert_cuckoo_path(Table &table, vector<path_element> path) {
         e.value.bytes[1] = 0;
         e.value.bytes[1] = 0;
 
-        for (auto pe : path) {
-            cout << "pe: " << pe.bucket_index << " " << pe.offset << endl;
-        }
+        // for (auto pe : path) {
+        //     cout << "pe: " << pe.bucket_index << " " << pe.offset << endl;
+        // }
 
-        cout << "writing to index:" << path[i].bucket_index << " offset:" << path[i].offset << "key: " << e.key.to_string() << endl;
+        // cout << "writing to index:" << path[i].bucket_index << " offset:" << path[i].offset << "key: " << e.key.to_string() << endl;
         
-        cout << "setting entry" << endl;
+        // cout << "setting entry" << endl;
         table.set_entry(path[i].bucket_index, path[i].offset, e);
-        cout << "post setting entry" << endl;
-        table.print_table();
+        // cout << "post setting entry" << endl;
+        // table.print_table();
     }
 }
 
+void fill_key(Key &key, int value) {
+    uint8_t *vp = (uint8_t*)&value;
+    key.bytes[0] = vp[0];
+    key.bytes[1] = vp[1];
+    key.bytes[2] = vp[2];
+    key.bytes[3] = vp[3];
+} 
+
 void run_single_insert() {
-    Table table = Table(128, 8, 1);
+    unsigned int indexes = 1024 * 1024 * 10;
+    unsigned int buckets = 8;
+    unsigned int memory = indexes * sizeof(Entry);
+    Table table = Table(memory, buckets, 1);
     Key key;
-    key.bytes[0] = 1;
+    int total_inserts = indexes+1;
     vector<unsigned int> open_buckets; //empty open buckets
-    vector<path_element> path = bucket_cuckoo_a_star_insert(table, rcuckoo_hash_locations, key, open_buckets);
-    print_path(path);
-    insert_cuckoo_path(table, path);
-    table.print_table();
+    for (int i=0; i< total_inserts;i++){
+        fill_key(key, i);
+        vector<path_element> path = bucket_cuckoo_a_star_insert(table, rcuckoo_hash_locations, key, open_buckets);
+        // print_path(path);
+        if (path.size() == 0){
+            cout << "failed to insert key: " << key.to_string() << endl;
+            break;
+        }
+        insert_cuckoo_path(table, path);
+        // table.print_table();
+    }
 
-
+    // cout << "final table" << endl;
+    // table.print_table();
+    cout << "final fill: " << table.get_fill_percentage() << endl;
 }
+
+
 
 // void run_single_insert() {
 //     Table table = Table(64, 8, 1);
