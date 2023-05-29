@@ -2,7 +2,9 @@
 # from tables_wrapper cimport Table as t
 # from tables_wrapper import Table as t
 # cimport tables_wrapper_def as t
-cimport tables_wrapper_def as t
+cimport tables_wrapper as t
+# from tables_wrapper cimport PyTable
+# import tables_wrapper_def as t
 # cimport tables_wrapper_forward_def as tab
 # from .tables_wrapper_forward_def cimport Table
 # cimport Table from tables_wrapper_forward_def

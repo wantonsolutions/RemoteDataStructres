@@ -1,7 +1,7 @@
 from libcpp.vector cimport vector
 from libcpp.unordered_map cimport unordered_map
 from libcpp.string cimport string
-cimport tables_wrapper_def as t
+cimport tables_wrapper as t
 cimport hash_wrapper as h
 from libcpp cimport bool
 

@@ -6,8 +6,10 @@ cimport search_wrapper as search
 # import ctables as t
 # cimport ctables as t
 from cython.operator cimport dereference as deref
-cimport tables_wrapper_def as tab
-cimport tables_wrapper_forward_def as t
+cimport tables_wrapper as t
+
+cimport ctables as tab
+# cimport tables_wrapper_forward_def as t
 
 from libcpp.vector cimport vector
 from libcpp.unordered_map cimport unordered_map
@@ -22,13 +24,15 @@ def search_path_to_buckets(vector[search.path_element] path):
 def random_dfs_search(key, unsigned int table_size):
     return search.random_dfs_search(key, table_size)
 
-def bucket_cuckoo_insert(t.Table table, location_func, tab.Key key, vector[unsigned int] open_buckets):
+def bucket_cuckoo_insert(table, location_func, t.Key key, vector[unsigned int] open_buckets):
 
     #todo check the name of the location func being passed in, and then select based on that. It sucks but it's the best way to do this.
     #BUG
+    assert isinstance(table, tab.PyTable)
     sub_location_func = h.rcuckoo_hash_locations
-    # new_table = new tab.Table(deref(table.c_table))
-    return search.bucket_cuckoo_insert(deref(table.c_table), sub_location_func, key, open_buckets)
+    new_table = tab.Table(deref(table.c_table))
+    # return search.bucket_cuckoo_insert(deref(table.c_table), sub_location_func, key, open_buckets)
+    return search.bucket_cuckoo_insert(new_table, sub_location_func, key, open_buckets)
     
     # unsigned int next_search_index(path_element pe, t.hash_locations (*location_func) (string, unsigned int), t.Table table)
     # bool key_in_path(vector[path_element] path, t.Key key)
