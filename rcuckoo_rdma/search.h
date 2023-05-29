@@ -23,6 +23,9 @@ namespace cuckoo_search {
         unsigned int distance;
         unsigned int fscore;
         std::string to_string();
+        bool operator<( const a_star_pe & aspe ) const {
+            return fscore < aspe.fscore;
+        }
     } a_star_pe;
 
     unsigned int get_table_id_from_index(unsigned int index);

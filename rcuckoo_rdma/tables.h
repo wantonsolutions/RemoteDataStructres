@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <string>
 
+
 namespace cuckoo_tables {
 
     #define KEY_SIZE 4
@@ -21,16 +22,10 @@ namespace cuckoo_tables {
             }
             return true;
         }
+
     } Key;
 
-    // bool operator==(const Key& lhs, const Key& rhs){
-    //     for (int i = 0; i < KEY_SIZE; i++){
-    //         if (lhs.bytes[i] != rhs.bytes[i]){
-    //             return false;
-    //         }
-    //     }
-    //     return true;
-    // }
+
 
     typedef struct Value { 
         uint8_t bytes[VALUE_SIZE];
@@ -104,6 +99,31 @@ namespace cuckoo_tables {
             Lock_Table _lock_table;
             unsigned int _fill;
     };
+}
+
+namespace std {
+
+    using namespace cuckoo_tables;
+    template <>
+    struct hash<Key>
+    {
+        std::size_t operator()(const Key& k) const
+        {
+        using std::size_t;
+        using std::hash;
+        using std::string;
+
+        // Compute individual hash values for first,
+        // second and third and combine them using XOR
+        // and bit shifting:
+
+        std::size_t s = hash<string>()("salt");
+        for (int i = 0; i < KEY_SIZE; i++){
+            s ^= (hash<int>()(k.bytes[i]) << i);
+        }
+        return s;
+        }
+        };
 }
 
 #endif

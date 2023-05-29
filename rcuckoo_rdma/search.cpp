@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <iostream>
 #include <assert.h>
+#include <algorithm>
 
 namespace cuckoo_search {
     using namespace std;
@@ -133,14 +134,17 @@ namespace cuckoo_search {
         return targets;
     }
 
+    // list must be a heap
     path_element pop_list(std::vector<a_star_pe> list, std::unordered_map<cuckoo_tables::Key, a_star_pe> list_map){
         cout << "pop_list not implemented" << endl;
         path_element pe;
         return pe;
     }
 
-    void push_list(std::vector<a_star_pe> list, std::unordered_map<cuckoo_tables::Key, a_star_pe> list_map, a_star_pe pe) {
-        cout << "push_list not implemented" << endl;
+    void push_list(std::vector<a_star_pe> list, std::unordered_map<cuckoo_tables::Key, a_star_pe> list_map, a_star_pe aspe) {
+        list.push_back(aspe);
+        push_heap(list.begin(), list.end());
+        list_map[aspe.pe.key] = aspe;
     }
     bool list_contains(std::unordered_map<cuckoo_tables::Key, a_star_pe> list_map, cuckoo_tables::Key key){
         cout << "list_contains not implemented" << endl;
