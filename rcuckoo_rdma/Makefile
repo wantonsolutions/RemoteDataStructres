@@ -59,7 +59,7 @@ test_tables : tables.o
 	mv test_tables $(test_dir)/test_tables
 
 test_search : search.o
-	g++ $(CFLAGS)  $(test_dir)/test_search.cpp -o test_search search.o
+	g++ $(CFLAGS)  $(test_dir)/test_search.cpp -o test_search search.o tables.o hash.o $(LIBRARIES)
 	mv test_search $(test_dir)/test_search
 
 

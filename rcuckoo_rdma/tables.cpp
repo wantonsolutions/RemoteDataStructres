@@ -118,7 +118,7 @@ namespace cuckoo_tables {
         assert(memory_size > 0);
         assert(bucket_size > 0);
         assert(memory_size >= bucket_size);
-        assert(memory_size > bucket_size * sizeof(Entry));
+        assert(memory_size >= bucket_size * sizeof(Entry));
         assert(memory_size % sizeof(Entry) == 0);
 
         _memory_size = memory_size;
@@ -258,7 +258,7 @@ namespace cuckoo_tables {
         assert(memory_size > 0);
         assert(bucket_size > 0);
         assert(memory_size >= bucket_size);
-        assert(memory_size > bucket_size * sizeof(Entry));
+        assert(memory_size >= bucket_size * sizeof(Entry));
         assert(memory_size % sizeof(Entry) == 0);
         unsigned int total_entries = memory_size / sizeof(Entry);
         assert(total_entries % bucket_size == 0);
