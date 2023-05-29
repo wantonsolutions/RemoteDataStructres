@@ -14,18 +14,34 @@ namespace cuckoo_search {
         unsigned int table_index;
         unsigned int bucket_index;
         unsigned int offset;
+        path_element() {};
+        path_element(cuckoo_tables::Key _key, unsigned int _table_index, unsigned int _bucket_index, unsigned int _offset) {
+            key = _key;
+            table_index = _table_index;
+            bucket_index = _bucket_index;
+            offset = _offset;
+        };
         std::string to_string();
     } path_element;
 
     typedef struct a_star_pe {
         path_element pe;
-        path_element prior;
+        a_star_pe *prior;
         unsigned int distance;
         unsigned int fscore;
         std::string to_string();
         bool operator<( const a_star_pe & aspe ) const {
             return fscore < aspe.fscore;
         }
+        bool operator==( const a_star_pe & aspe ) const {
+            return pe.key == aspe.pe.key;
+        }
+        a_star_pe() {};
+        a_star_pe(path_element _pe, a_star_pe * _prior, unsigned int _distance, unsigned int _fscore) {
+            pe = _pe;
+            prior = _prior;
+            distance = _distance;
+            fscore = _fscore;}
     } a_star_pe;
 
     unsigned int get_table_id_from_index(unsigned int index);
@@ -39,7 +55,7 @@ namespace cuckoo_search {
     unsigned int path_index_range(std::vector<path_element> path);
     std::vector<unsigned int> find_closest_target_n_bi_directional(cuckoo_tables::Table table, hash_locations (*location_func) (std::string, unsigned int), cuckoo_tables::Key key, unsigned int n);
 
-    path_element pop_list(std::vector<a_star_pe> list, std::unordered_map<cuckoo_tables::Key, a_star_pe> list_map);
+    a_star_pe pop_list(std::vector<a_star_pe> list, std::unordered_map<cuckoo_tables::Key, a_star_pe> list_map);
     void push_list(std::vector<a_star_pe> list, std::unordered_map<cuckoo_tables::Key, a_star_pe> list_map, a_star_pe pe);
     bool list_contains(std::unordered_map<cuckoo_tables::Key, a_star_pe> list_map, cuckoo_tables::Key key);
     unsigned int next_table_index(unsigned int table_index);
