@@ -5,7 +5,6 @@ import json
 from . import hash
 from . import state_machines
 from . import virtual_rdma as vrdma
-from . import search
 
 import logging
 logger = logging.getLogger('root')

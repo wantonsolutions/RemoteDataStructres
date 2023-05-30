@@ -882,7 +882,8 @@ def run_hero_ycsb_fill_latency():
     fills = [10, 20, 30, 40, 50, 60, 70, 80, 90]
     # fills = [10, 20]
     # clients = [100]
-    state_machines = [cuckoo.rcuckoo,race.race]
+    # state_machines = [cuckoo.rcuckoo,race.race]
+    state_machines = [rcuckoo_basic.rcuckoo_basic]
 
     master_config = get_config()
     master_config["bucket_size"]=8

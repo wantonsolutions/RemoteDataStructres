@@ -7,6 +7,7 @@ class rcuckoo_basic(state_machines.client_state_machine):
     def __init__(self, config):
         super().__init__(config)
         self.table = config["table"]
+        self.search_module = config["search_module"]
 
         #inserting and locking
         self.current_insert_value = None
@@ -57,7 +58,7 @@ class rcuckoo_basic(state_machines.client_state_machine):
     def search(self, message=None):
         assert message == None, "there should be no message passed to search"
 
-        self.search_path=search.bucket_cuckoo_a_star_insert(self.table, hash.rcuckoo_hash_locations, self.current_insert_value)
+        self.search_path=self.search_module.bucket_cuckoo_a_star_insert(self.table, hash.rcuckoo_hash_locations, self.current_insert_value)
         if len(self.search_path) == 0:
             self.info("Search Failed: " + str(self.current_insert_value) + "| unable to continue, client " + str(self.id) + " is done")
             self.complete=True
@@ -72,7 +73,7 @@ class rcuckoo_basic(state_machines.client_state_machine):
     def aquire_locks(self):
         #get the unique set of buckets and remove -1 (the root) from the search path
         self.locking_message_index = 0
-        buckets = search.search_path_to_buckets(self.search_path)
+        buckets = self.search_module.search_path_to_buckets(self.search_path)
         self.info("gather locks for buckets: " + str(buckets))
         lock_messages = vrdma.get_lock_messages(buckets, self.buckets_per_lock, self.locks_per_message)
         self.current_locking_messages = vrdma.masked_cas_lock_table_messages(lock_messages)
@@ -125,7 +126,7 @@ class rcuckoo_basic(state_machines.client_state_machine):
 
     def complete_insert_stats(self, success):
         self.insert_path_lengths.append(len(self.search_path))
-        self.index_range_per_insert.append(search.path_index_range(self.search_path))
+        self.index_range_per_insert.append(self.search_module.path_index_range(self.search_path))
         self.messages_per_insert.append(self.current_insert_messages)
 
         #clear for next insert
