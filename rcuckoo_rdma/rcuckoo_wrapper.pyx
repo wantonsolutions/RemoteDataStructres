@@ -220,7 +220,11 @@ def path_to_string(vector[rw.path_element] path):
 def path_index_range(vector[rw.path_element] path):
     return rw.path_index_range(path)
 
-def bucket_cuckoo_a_star_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):
+def bucket_cuckoo_a_star_insert(PyTable table, location_func, key, open_buckets=None):
+    cdef vector[unsigned int] empty_buckets
+    cdef rw.Key c_key
+    strkey = str(key)
+    c_key.bytes[0] = int(strkey[0])
     if location_func.__name__ == "rcuckoo_hash_locations":
         sub_function = rw.rcuckoo_hash_locations
     elif location_func.__name__ == "rcuckoo_hash_locations_independent":
@@ -228,9 +232,25 @@ def bucket_cuckoo_a_star_insert(PyTable table, location_func, rw.Key key, vector
     else :
         print("ERROR: location_func not recognized returning defualt func")
         return None
-    return rw.bucket_cuckoo_a_star_insert(deref(table.c_table), sub_function, key, open_buckets)
 
-def bucket_cuckoo_random_insert(PyTable table, location_func, rw.Key key, vector[unsigned int] open_buckets):
+    import simulator.search
+    if open_buckets is None:
+        dict_path =  rw.bucket_cuckoo_a_star_insert(deref(table.c_table), sub_function, c_key, empty_buckets)
+    else:
+        dict_path = rw.bucket_cuckoo_a_star_insert(deref(table.c_table), sub_function, c_key, open_buckets)
+    ret_path = []
+    # for i in range(len(dict_path)):
+    for d in dict_path:
+        key = d.key.bytes.decode('utf-8')
+        table_index = d.table_index
+        bucket_index = d.bucket_index
+        bucket_offset = d.offset
+        ret_path.append(simulator.search.path_element(key=key,table_index=table_index,bucket_index=bucket_index,bucket_offset=bucket_offset))
+    ret_path.reverse()
+    return ret_path
+
+def bucket_cuckoo_random_insert(PyTable table, location_func, rw.Key key, open_buckets=None):
+    cdef vector[unsigned int] empty_buckets
     if location_func.__name__ == "rcuckoo_hash_locations":
         sub_function = rw.rcuckoo_hash_locations
     elif location_func.__name__ == "rcuckoo_hash_locations_independent":
@@ -238,4 +258,8 @@ def bucket_cuckoo_random_insert(PyTable table, location_func, rw.Key key, vector
     else :
         print("ERROR: location_func not recognized returning defualt func")
         return None
-    return rw.bucket_cuckoo_random_insert(deref(table.c_table), sub_function, key, open_buckets)
+
+    if open_buckets is None:
+        return rw.bucket_cuckoo_random_insert(deref(table.c_table), sub_function, key, empty_buckets)
+    else:
+        return rw.bucket_cuckoo_random_insert(deref(table.c_table), sub_function, key, open_buckets)

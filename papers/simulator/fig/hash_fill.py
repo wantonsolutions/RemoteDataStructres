@@ -3,11 +3,12 @@ import sys
 # sys.path.insert(1, '/home/ena/RemoteDataStructres/rmem_simulator')
 from experiments import plot_cuckoo as pc
 from experiments import data_management as dm
-import simulator.search as search
+# import simulator.search as search
 
 
 import rcuckoo_wrap as hash
 import rcuckoo_wrap as tables
+import rcuckoo_wrap as search
 tables.Table = tables.PyTable
 
 # import simulator.hash as hash
@@ -29,6 +30,8 @@ data_dir="hash_fill"
 def insert_cuckoo_path(path, table):
     assert(len(path) >=2)
     for i in reversed(range(0,len(path)-1)):
+        # print(path[i+1])
+        # print(path[i+1]['bucket_index'])
         table.set_entry(path[i+1].bucket_index, path[i+1].bucket_offset, path[i].key)
 
 def random_inserts(size):
@@ -50,6 +53,7 @@ def factor_fill(memory_size, bucket_size, buckets_per_lock, factor):
         print("filling with factor " + str(factor) + " ...")
         for i in tqdm(range(len(inserts))):
             search_path=search.bucket_cuckoo_a_star_insert(table, hash.rcuckoo_hash_locations, inserts[i])
+            print("search path: ", search_path)
             # print(search_path)
             if len(search_path) == 0:
                 print("Search Failed: " + str(inserts[i]), hash.rcuckoo_hash_locations(inserts[i],(int((memory_size/bucket_size)/8))))
