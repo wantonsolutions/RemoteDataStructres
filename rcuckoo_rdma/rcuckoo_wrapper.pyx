@@ -155,13 +155,8 @@ cdef class PyTable:
         return e.key
 
     def set_entry(self, unsigned int bucket_index, unsigned int offset, entry):
-        #todo improve this wrapping job with casting
-        vals = str(entry)
         cdef rw.Entry c_entry
-        lens = [len(vals), len(c_entry.key.bytes)]
-        l = min(lens)
-        for i in range(l):
-            c_entry.key.bytes[i] = int(vals[i])
+        c_entry.key.bytes = entry.to_bytes(4, byteorder='little')
         self.c_table.set_entry(bucket_index, offset, c_entry)
 
     
@@ -223,8 +218,10 @@ def path_index_range(vector[rw.path_element] path):
 def bucket_cuckoo_a_star_insert(PyTable table, location_func, key, open_buckets=None):
     cdef vector[unsigned int] empty_buckets
     cdef rw.Key c_key
-    strkey = str(key)
-    c_key.bytes[0] = int(strkey[0])
+    #copy the key over
+    c_key.bytes = key.to_bytes(4, byteorder='little')
+
+    #determine which hash function to use
     if location_func.__name__ == "rcuckoo_hash_locations":
         sub_function = rw.rcuckoo_hash_locations
     elif location_func.__name__ == "rcuckoo_hash_locations_independent":
@@ -233,15 +230,18 @@ def bucket_cuckoo_a_star_insert(PyTable table, location_func, key, open_buckets=
         print("ERROR: location_func not recognized returning defualt func")
         return None
 
+    #call the actuall insert function
     import simulator.search
     if open_buckets is None:
         dict_path =  rw.bucket_cuckoo_a_star_insert(deref(table.c_table), sub_function, c_key, empty_buckets)
     else:
         dict_path = rw.bucket_cuckoo_a_star_insert(deref(table.c_table), sub_function, c_key, open_buckets)
+
+    #reconstruct a python path_element path from the c++ path
     ret_path = []
-    # for i in range(len(dict_path)):
     for d in dict_path:
-        key = d.key.bytes.decode('utf-8')
+        bytes = d.key.bytes
+        key = int.from_bytes(bytes, "big")
         table_index = d.table_index
         bucket_index = d.bucket_index
         bucket_offset = d.offset
