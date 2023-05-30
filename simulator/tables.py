@@ -1,5 +1,4 @@
 import logging
-from . import hash
 logger = logging.getLogger('root')
 
 TABLE_ENTRY_SIZE=8
@@ -179,7 +178,7 @@ class Table:
 
 
     def bucket_has_empty(self, bucket_index):
-        assert bucket_index < self.get_row_count(), "Bucket index out of range for table index: " + str(bucket_index) + " :" +str(self.table_size)
+        assert bucket_index < self.get_row_count(), "Bucket index out of range for table index: " + str(bucket_index) + " :" +str(self.table.get_row_count())
         return None in self.table[bucket_index]
 
     def get_first_empty_index(self, bucket_index):
@@ -247,7 +246,7 @@ class Table:
         # self.assert_read_table_properties(size)
         total_indexs = size/8
         max_read=bucket_id * bucket_offset + total_indexs
-        table_bound=self.table_size * self.bucket_size
+        table_bound=self.get_row_count() * self.bucket_size
         assert max_read <= table_bound, "read is out of bounds " + str(max_read) + " " + str(table_bound)
 
     #check if the table has any duplicates in it

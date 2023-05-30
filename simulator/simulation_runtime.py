@@ -6,15 +6,13 @@ from collections import deque
 import git
 from tqdm import tqdm
 import random
+import traceback
 
 from . import log
 from . import tables
-from . import cuckoo
 from . import rcuckoo_basic
-from . import search
 from . import state_machines
 from . import hash
-from . import race
 
 
 # import log
@@ -502,6 +500,8 @@ def run_trials(config):
         try:
             sim.run()
         except Exception as e:
+            if not "Table has reached max fill rate" in str(e):
+                print(traceback.format_exc())
             print(e)
             # sim.memory.index.print_table()
             stats = sim.collect_stats()

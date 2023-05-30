@@ -6,6 +6,7 @@ from . import virtual_rdma as vrdma
 class rcuckoo_basic(state_machines.client_state_machine):
     def __init__(self, config):
         super().__init__(config)
+        self.table = config["table"]
 
         #inserting and locking
         self.current_insert_value = None
@@ -201,7 +202,7 @@ class rcuckoo_basic(state_machines.client_state_machine):
         return self.general_idle_fsm(message)
 
     def read_fsm(self,message):
-        complete, success = self.wait_for_read_messages_fsm(message, self.current_read_key)
+        complete, success = self.wait_for_read_messages_fsm(self.table, message, self.current_read_key)
         if complete:
             self.state="idle"
             self.complete_read_stats(success, self.current_read_key)

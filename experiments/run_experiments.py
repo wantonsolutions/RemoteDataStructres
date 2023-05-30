@@ -782,10 +782,10 @@ def plot_race_bucket_fill_factor():
 def run_hero_ycsb():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
-    table_size = 1680  * 512
+    table_size = 1680
     # table_size=420
-    clients = [1,2,4,8,16,32,64,128]
-    # clients = [1,2]
+    # clients = [1,2,4,8,16,32,64,128]
+    clients = [1,2]
     state_machines = [cuckoo.rcuckoo,race.race]
 
     master_config = get_config()
@@ -963,8 +963,8 @@ def plot_hero_ycsb_fill_latency():
 # buckets_per_lock_vs_locks_per_message_experiment()
 # plot_buckets_per_lock_vs_locks_per_message_experiment()
 
-# run_hero_ycsb()
-# plot_hero_ycsb()
+run_hero_ycsb()
+plot_hero_ycsb()
 # 
 
 # plot_insertion_range_cdf()
@@ -978,7 +978,7 @@ def plot_hero_ycsb_fill_latency():
 
 # todos()
 
-insertion_debug()
+# insertion_debug()
 # plot_general_stats_last_run()
 # plot_hash_factor_distance_cdf()
 

@@ -6,6 +6,8 @@ class race(state_machines.client_state_machine):
     def __init__(self, config):
         super().__init__(config)
 
+        self.table = config["table"]
+
     def idle_fsm(self, message):
         return self.general_idle_fsm(message)
 
@@ -45,7 +47,7 @@ class race(state_machines.client_state_machine):
         return self.begin_read(messages)
 
     def first_read_fsm(self,message):
-        complete, success = self.wait_for_read_messages_fsm(message, self.current_read_key)
+        complete, success = self.wait_for_read_messages_fsm(self.table, message, self.current_read_key)
         if complete:
             self.debug("Race Reading Complete! success:" + str(success) + " key: " +str(self.current_read_key))
             self.current_read_rtt+=1
@@ -58,7 +60,7 @@ class race(state_machines.client_state_machine):
 
     
     def extent_read_fsm(self,message):
-        complete, success = self.wait_for_read_messages_fsm(message, self.current_read_key)
+        complete, success = self.wait_for_read_messages_fsm(self.table, message, self.current_read_key)
         if complete:
             self.debug("Race Extent Reading Complete! success:" + str(success) + " key: " +str(self.current_read_key))
             self.state="idle"
@@ -131,7 +133,7 @@ class race(state_machines.client_state_machine):
 
 
     def first_read_insert_fsm(self, message):
-        complete, success = self.wait_for_read_messages_fsm(message, self.current_insert_value)
+        complete, success = self.wait_for_read_messages_fsm(self.table, message, self.current_insert_value)
         if complete:
             self.info("Race Reading Complete - first insert!: " + str(success) + " " + str(self.current_insert_value))
             if success:
@@ -146,7 +148,7 @@ class race(state_machines.client_state_machine):
     
 
     def second_read_insert_fsm(self, message):
-        complete, success = self.wait_for_read_messages_fsm(message, self.current_insert_value)
+        complete, success = self.wait_for_read_messages_fsm(self.table, message, self.current_insert_value)
         if complete:
             self.info("Race Reading Complete - second insert!: " + str(success) + " " + str(self.current_insert_value))
             if success:

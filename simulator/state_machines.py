@@ -2,7 +2,6 @@
 # import cuckoo
 import copy
 import random
-from . import search
 from . import virtual_rdma as vrdma
 
 import logging
@@ -335,7 +334,6 @@ class client_state_machine(state_machine):
         self.config = config
         self.total_inserts = config["total_inserts"]
         self.id = config["id"]
-        self.table = config["table"]
         self.state="idle"
 
 
@@ -398,12 +396,12 @@ class client_state_machine(state_machine):
 
 
     #return true if the read is complete
-    def wait_for_read_messages_fsm(self, message, key):
+    def wait_for_read_messages_fsm(self, table, message, key):
         if message != None and vrdma.message_type(message) == "read_response":
 
             #unpack and check the response for a valid read
             args = vrdma.unpack_read_response(message)
-            vrdma.fill_local_table_with_read_response(self.table, args)
+            vrdma.fill_local_table_with_read_response(table, args)
             read = args["read"]
 
             keys_found = vrdma.keys_contained_in_read_response(key, read)
