@@ -3,15 +3,20 @@ import sys
 # sys.path.insert(1, '/home/ena/RemoteDataStructres/rmem_simulator')
 from experiments import plot_cuckoo as pc
 from experiments import data_management as dm
-# import simulator.search as search
 
+#commit 102f229f5096df69810e274e54a86eb24e913af4 
+#is good for taking data for this experiment
+simulator=False
+if simulator:
+    import simulator.hash as hash
+    import simulator.tables as tables
+    import simulator.search as search
+else:
+    import rcuckoo_wrap as hash
+    import rcuckoo_wrap as tables
+    import rcuckoo_wrap as search
+    tables.Table = tables.PyTable
 
-import rcuckoo_wrap as hash
-import rcuckoo_wrap as tables
-import rcuckoo_wrap as search
-tables.Table = tables.PyTable
-
-# import simulator.hash as hash
 # import chash as hash
 import matplotlib.pyplot as plt
 import numpy as np

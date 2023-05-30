@@ -13,6 +13,7 @@ from . import tables
 from . import rcuckoo_basic
 from . import state_machines
 from . import hash
+from . import search
 
 
 # import log
@@ -74,9 +75,11 @@ class Client(Node):
         self.debug("Index Args: " + str(index_args)+"\n")
         self.index = index_func(**index_args)
 
-        state_machine_args = config['state_machine_args'] 
+
         state_machine_args['table'] = self.index
         state_machine_args['id'] = self.client_id
+
+        state_machine_args = config['state_machine_args'] 
         state_machine_args['num_clients'] = config['num_clients']
         state_machine_args['read_threshold_bytes'] = config['read_threshold_bytes']
         state_machine_args['deterministic'] = config['deterministic']
@@ -484,6 +487,8 @@ def default_config():
     config['state_machine']=rcuckoo_basic.rcuckoo_basic
     config['search_function']="a_star"
     config['location_function']="dependent"
+
+    config['search_module']=search
 
     config['date']=datetime.datetime.now().strftime("%Y-%m-%d")
     config['commit']=git.Repo(search_parent_directories=True).head.object.hexsha
