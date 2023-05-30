@@ -41,6 +41,7 @@ class rcuckoo(state_machines.client_state_machine):
         # self.current_locking_messages = []
         # self.current_lock_read_messages = []
         # self.locking_message_index = 0
+        self.search_module = config['search_module']
 
         self.set_search_function(config)
         self.set_location_function(config)
@@ -118,7 +119,7 @@ class rcuckoo(state_machines.client_state_machine):
         #get the unique set of buckets and remove -1 (the root) from the search path
         self.locking_message_index = 0
 
-        buckets = search.search_path_to_buckets(self.search_path)
+        buckets = self.search_module.search_path_to_buckets(self.search_path)
         self.info("gather locks for buckets: " + str(buckets)) if __debug__ else None
         lock_messages = vrdma.get_lock_messages(buckets, self.buckets_per_lock, self.locks_per_message)
         self.current_locking_messages = vrdma.masked_cas_lock_table_messages(lock_messages)
@@ -170,10 +171,10 @@ class rcuckoo(state_machines.client_state_machine):
             return None
 
     def a_star_insert_self(self, limit_to_buckets=None):
-        return search.bucket_cuckoo_a_star_insert(self.table, self.location_function, self.current_insert_value, limit_to_buckets)
+        return self.search_module.bucket_cuckoo_a_star_insert(self.table, self.location_function, self.current_insert_value, limit_to_buckets)
 
     def random_insert_self(self, limit_to_buckets=None):
-        return search.bucket_cuckoo_random_insert(self.table, self.location_function, self.current_insert_value, limit_to_buckets)
+        return self.search_module.bucket_cuckoo_random_insert(self.table, self.location_function, self.current_insert_value, limit_to_buckets)
 
     def table_search_function(self, limit_to_buckets=None):
         # return self.a_star_insert_self(limit_to_buckets)
@@ -189,7 +190,7 @@ class rcuckoo(state_machines.client_state_machine):
             self.state = "idle"
             return None
 
-        self.info("Successful local search for [key: " + str(self.current_insert_value) + "] [path: " +search.path_to_string(self.search_path) + "]") if __debug__ else None
+        self.info("Successful local search for [key: " + str(self.current_insert_value) + "] [path: " +self.search_module.path_to_string(self.search_path) + "]") if __debug__ else None
         self.state="aquire_locks"
         return self.aquire_locks()
 
@@ -217,7 +218,7 @@ class rcuckoo(state_machines.client_state_machine):
 
     def complete_insert_stats(self, success):
         self.insert_path_lengths.append(len(self.search_path))
-        self.index_range_per_insert.append(search.path_index_range(self.search_path))
+        self.index_range_per_insert.append(self.search_module.path_index_range(self.search_path))
 
         #clear for next insert
         return super().complete_insert_stats(success)

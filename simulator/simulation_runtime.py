@@ -75,19 +75,11 @@ class Client(Node):
         self.debug("Index Args: " + str(index_args)+"\n")
         self.index = index_func(**index_args)
 
+        state_machine_args = config
 
         state_machine_args['table'] = self.index
         state_machine_args['id'] = self.client_id
 
-        state_machine_args = config['state_machine_args'] 
-        state_machine_args['num_clients'] = config['num_clients']
-        state_machine_args['read_threshold_bytes'] = config['read_threshold_bytes']
-        state_machine_args['deterministic'] = config['deterministic']
-        state_machine_args['buckets_per_lock'] = config['buckets_per_lock']
-        state_machine_args['locks_per_message'] = config['locks_per_message']
-        state_machine_args['search_function'] = config['search_function']
-        state_machine_args['location_function'] = config['location_function']
-        state_machine_args['workload'] = config['workload']
         state_machine = config['state_machine']
         self.critical(str(state_machine))
         self.state_machine = state_machine(state_machine_args)
@@ -131,7 +123,7 @@ class Memory(Node):
         self.debug("Index Args: " + str(index_args)+"\n")
         self.index = index_func(**index_args)
 
-        state_machine_args = config['state_machine_args']
+        state_machine_args = config
         state_machine_args['table'] = self.index
         state_machine = config['state_machine']
 
@@ -338,10 +330,10 @@ class Simulator(Node):
             client_config['bucket_size'] = bucket_size
             client_config['index_init_function'] = tables.Table
             client_config['index_init_args'] = index_init_args
+            client_config['total_inserts']=indexes * 20
 
             # client_config['state_machine']=lockless_a_star_insert_only_state_machine
             client_config['state_machine']=self.config["state_machine"]
-            client_config['state_machine_args']={'total_inserts': indexes * 20}
             client_config['read_threshold_bytes']=self.config['read_threshold_bytes']
             client_config['buckets_per_lock']=buckets_per_lock
             client_config['locks_per_message']=self.config['locks_per_message']
@@ -349,6 +341,7 @@ class Simulator(Node):
             client_config['location_function']=self.config['location_function']
             client_config['workload']=self.config['workload']
             client_config['deterministic']=self.config['deterministic']
+            client_config['search_module']=self.config['search_module']
 
             c = Client(client_config)
 
@@ -361,13 +354,16 @@ class Simulator(Node):
         memory_config['index_init_args'] = index_init_args
 
         memory_config['state_machine']=state_machines.basic_memory_state_machine
-        memory_config['state_machine_args']={'max_fill': self.config['max_fill']}
+        memory_config['max_fill']=self.config['max_fill']
         self.memory = Memory(memory_config)
 
         #initialize switch
         switch_config = {'switch_id': 0}
         self.switch = Switch(switch_config)
+
+
         self.config['state_machine']=state_machines.get_state_machine_name(self.config['state_machine'])
+        self.config['search_module']=self.config['search_module'].__name__
 
         print(self.config)
         self.config_set = True
