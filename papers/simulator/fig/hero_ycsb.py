@@ -1,13 +1,12 @@
 import lib
-lib.import_rmem_simulator()
 
-import plot_cuckoo as plot_cuckoo
-import log as log
-import state_machines as sm
-import simulator as simulator
+import experiments.plot_cuckoo as plot_cuckoo
+import simulator.log as log
+import simulator.race as race
+import simulator.simulation_runtime as sim
 # import run_experiments as re
-import data_management as dm
-import cuckoo as cuckoo
+import experiments.data_management as dm
+import simulator.cuckoo as cuckoo
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
@@ -19,7 +18,7 @@ def run_hero_ycsb():
     # table_size=1680
     clients = [1,2,4,8,16,32,64,128]
     # clients = [100]
-    state_machines = [cuckoo.rcuckoobatch,sm.race]
+    state_machines = [cuckoo.rcuckoo,race.race]
 
     master_config = lib.get_config()
     master_config["bucket_size"]=8
@@ -48,9 +47,9 @@ def run_hero_ycsb():
 
                 if workload == "ycsb-c":
                     steps = 1000000
-                    r = simulator.fill_then_run_trials(config, fill_to=config['max_fill'], max_fill=config['max_fill']+1, max_steps=steps)
+                    r = sim.fill_then_run_trials(config, fill_to=config['max_fill'], max_fill=config['max_fill']+1, max_steps=steps)
                 else:
-                    r= simulator.run_trials(config)
+                    r= sim.run_trials(config)
                 runs.append(r)
             # dm.save_statistics(runs)
             # plot_cuckoo.plot_general_stats_last_run()
@@ -81,5 +80,5 @@ def plot_hero_ycsb_throughput():
     plt.tight_layout()
     plt.savefig("hero_ycsb_throughput.pdf")
 
-# run_hero_ycsb()
+run_hero_ycsb()
 plot_hero_ycsb_throughput()

@@ -1,432 +1,462 @@
 # from cuckoo import *
-from simulator.cuckoo import *
+# import cuckoo
+import copy
+import random
+from . import virtual_rdma as vrdma
 
-class race(client_state_machine):
-    def __init__(self, config):
-        super().__init__(config)
+import logging
+logger = logging.getLogger('root')
 
-    def idle_fsm(self, message):
-        return self.general_idle_fsm(message)
+class request():
+    def __init__(self, request_type, key, value=None):
+        self.request_type = request_type
+        self.key = key
+        self.value = value
 
+    def __str__(self):
+        return "Request: " + self.request_type + " Key: " + str(self.key) + " Value: " + str(self.value)
 
-    def begin_insert(self, messages):
-        self.outstanding_read_requests = len(messages)
-        self.read_values_found = 0
-        self.read_values = []
-        self.state = "inserting-read-first"
-        return messages
+    def __repr__(self):
+        return self.__str__()
 
-    def begin_insert_second_read(self):
-        messages = race_messages(self.current_insert_value, self.table.table_size, self.table.row_size_bytes())
-        self.outstanding_read_requests = len(messages)
-        self.read_values_found = 0
-        self.read_values = []
-        self.state = "inserting-read-second"
-        return messages
+def get_state_machine_name(state_machine_class_pointer):
+    str_name = str(state_machine_class_pointer)
+    back = str_name.split(".")[1]
+    front = back.split("'")[0]
+    return front
 
-    def begin_extent_read(self):
-        #todo read an extent, this currently just reads the table again
-        messages = race_message_read_key_location(self.current_insert_value, self.table.table_size, self.table.row_size_bytes(),0)
-        self.outstanding_read_requests = len(messages)
-        self.read_values_found = 0
-        self.read_values = []
-        self.state = "reading-extent"
-        return messages
+#cuckoo protocols
+class state_machine:
+    def clear_statistics(self):
+        self.complete = False
+        self.inserting = False
+        self.reading = False
 
-    def put(self):
-        messages = race_messages(self.current_insert_value, self.table.table_size, self.table.row_size_bytes())
-        self.current_insert_rtt+=1
-        return self.begin_insert(messages)
+        #state machine statistics
+        self.total_bytes = 0
+        self.read_bytes = 0
+        self.write_bytes = 0
+        self.cas_bytes = 0
+        self.total_reads = 0
+        self.total_writes = 0
+        self.total_cas = 0
+        self.total_cas_failures = 0
 
-    def get(self):
-        messages = race_messages(self.current_read_key, self.table.table_size, self.table.row_size_bytes())
-        self.current_read_rtt+=1
-        return self.begin_read(messages)
-
-    def first_read_fsm(self,message):
-        complete, success = self.wait_for_read_messages_fsm(message, self.current_read_key)
-        if complete:
-            self.debug("Race Reading Complete! success:" + str(success) + " key: " +str(self.current_read_key))
-            self.current_read_rtt+=1
-            return self.begin_extent_read()
-        return None
-        #     self.state="idle"
-        #     self.complete_read_stats(success, self.current_read_key)
-        #     self.reading=False
-        # return None
-
-    
-    def extent_read_fsm(self,message):
-        complete, success = self.wait_for_read_messages_fsm(message, self.current_read_key)
-        if complete:
-            self.debug("Race Extent Reading Complete! success:" + str(success) + " key: " +str(self.current_read_key))
-            self.state="idle"
-            self.critical("we are assuming all reads are successful in race for extents") if __debug__ else None
-            success=True
-            self.complete_read_stats(success, self.current_read_key)
-            self.reading=False
-        return None
-
-    def get_power_of_two_cas_location(self,bucket_0,bucket_1):
-        if self.table.bucket_has_empty(bucket_0) or self.table.bucket_has_empty(bucket_1):
-            fill_0 = self.table.get_first_empty_index(bucket_0)
-            fill_1 = self.table.get_first_empty_index(bucket_1)
-            if fill_0 <= fill_1:
-                return bucket_0, fill_0
-            else:
-                return bucket_1, fill_1
-        return -1, -1
-
-
-    def power_of_two_cas_location(self, key, table_size):
-        locations = hash.race_hash_locations(key, table_size)
-        bucket_0, overflow_0 = locations[0]
-        bucket_1, overflow_1 = locations[1]
-
-        bucket, offset = self.get_power_of_two_cas_location(bucket_0, bucket_1) 
-        if bucket != -1:
-            return bucket, offset
-
-        #both buckets are full moving to overflow buckets
-        self.info("both buckets are full moving to overflow buckets")
-        bucket, offset = self.get_power_of_two_cas_location(overflow_0, overflow_1)
-        if bucket != -1:
-            return bucket, offset
-
-        return -1, -1
-
-    def complete_insert_stats(self, success):
-        super().complete_insert_stats(success)
-    
-    def insert_fsm(self, message):
-        #there should be a message, otherwise don't do anything
-        if message == None:
-            return None
-
-        args = unpack_cas_response(message)
-        fill_local_table_with_cas_response(self.table, args)
-
-        #If CAS failed, try the insert a second time.
-        success = args["success"]
-        #increment the rtt fdor both cases
-        self.current_insert_rtt+=1
-        if not success:
-            self.debug("Insert Failed: " + str(self.current_insert_value) + "| trying again")
-            #try again
-            return self.insert_cas()
-        else:
-            return self.begin_insert_second_read()
-
-    def insert_cas(self):
-        bucket, offset = self.power_of_two_cas_location(self.current_insert_value, self.table.table_size)
-        if bucket == -1:
-            self.complete=True
-            self.state = "idle"
-            return None
-
-        self.info("Inserting: " + str(self.current_insert_value) + " at bucket: " + str(bucket) + " offset: " + str(offset))
-        self.state="inserting"
-        return cas_table_entry_message(bucket , offset, None, self.current_insert_value)
-
-
-    def first_read_insert_fsm(self, message):
-        complete, success = self.wait_for_read_messages_fsm(message, self.current_insert_value)
-        if complete:
-            self.info("Race Reading Complete - first insert!: " + str(success) + " " + str(self.current_insert_value))
-            if success:
-                self.critical("we found a duplicate value in the table, so we are not going to insert")
-                self.state="idle"
-                self.complete_insert_stats(False)
-                self.inserting=False
-                return None
-            else:
-                self.current_insert_rtt+=1
-                return self.insert_cas()
-    
-
-    def second_read_insert_fsm(self, message):
-        complete, success = self.wait_for_read_messages_fsm(message, self.current_insert_value)
-        if complete:
-            self.info("Race Reading Complete - second insert!: " + str(success) + " " + str(self.current_insert_value))
-            if success:
-                #TODO check for duplicates
-                # self.critical("Insertion complete (todo check for duplicates")
-                self.state="idle"
-                self.complete_insert_stats(True)
-                self.inserting=False
-                return None
-            else:
-                raise Exception("We should never get here, because we should have already inserted the value (FAILED INSERT)")
-
-
-    def fsm_logic(self, message = None):
-
-        if self.complete:
-            return None
-
-        if self.state== "idle":
-            return self.idle_fsm(message)
-
-        if self.state == "reading":
-            return self.first_read_fsm(message)
-
-        if self.state == "reading-extent":
-            return self.extent_read_fsm(message)
-
-        if self.state == "inserting-read-first":
-            return self.first_read_insert_fsm(message)
-
-        if self.state == "inserting":
-            return self.insert_fsm(message)
-
-        if self.state == "inserting-read-second":
-            return self.second_read_insert_fsm(message)
-
-        #todo re-read to check for duplicates
-        # if self.state == "inserting-read-second":
-        #     return self.first_read_insert_second(message)
-
-
-        return None
-
-
-class rcuckoo(client_state_machine):
-    def __init__(self, config):
-        super().__init__(config)
-
-        #inserting and locking
-        self.current_insert_value = None
-        self.search_path = []
-        self.search_path_index = 0
-
-        self.buckets_per_lock = config['buckets_per_lock']
-        self.locks_per_message = config['locks_per_message']
-
-        self.read_threshold_bytes = config['read_threshold_bytes']
-        assert self.read_threshold_bytes >= self.table.row_size_bytes(), "read threshold is smaller than a single row in the table (this is not allowed)"
-        self.locks_held = []
-        self.current_locking_messages = []
-        self.locking_message_index = 0
-
-
-    def get(self):
-        messages = read_threshold_message(self.current_read_key, self.read_threshold_bytes, self.table.table_size, self.table.row_size_bytes())
-        return self.begin_read(messages)
-
-    def put(self):
-        return self.search()
-
-    def all_locks_aquired(self):
-        return self.locking_message_index == len(self.current_locking_messages) and len(self.locks_held) > 0
-
-    def all_locks_released(self):
-        return len(self.locks_held) == 0
-
-    def get_current_locking_message(self):
-        return self.current_locking_messages[self.locking_message_index]
-
-    def receieve_successful_locking_message(self, message):
-        lock_indexes = lock_message_to_lock_indexes(message)
-        self.info("aquired locks: " + str(lock_indexes))
-        self.locks_held.extend(lock_indexes)
-        #make unique
-        self.locks_held = list(set(self.locks_held))
-        self.locking_message_index = self.locking_message_index + 1
-
-    def receive_successful_unlocking_message(self, message):
-        unlocked_locks = lock_message_to_lock_indexes(message)
-        self.info("released locks: " + str(unlocked_locks))
-        for lock in unlocked_locks:
-            self.locks_held.remove(lock)
-        self.locking_message_index = self.locking_message_index + 1
-
-    def search(self, message=None):
-        assert message == None, "there should be no message passed to search"
-
-        self.search_path=bucket_cuckoo_a_star_insert(self.table, hash.rcuckoo_hash_locations, self.current_insert_value)
-        if len(self.search_path) == 0:
-            self.info("Search Failed: " + str(self.current_insert_value) + "| unable to continue, client " + str(self.id) + " is done")
-            self.complete=True
-            self.state = "idle"
-            return None
-
-        self.info("Search complete aquiring locks")
-        self.state="aquire_locks"
-        return self.aquire_locks()
-
-
-    def aquire_locks(self):
-        #get the unique set of buckets and remove -1 (the root) from the search path
-        self.locking_message_index = 0
-        buckets = search_path_to_buckets(self.search_path)
-        self.info("gather locks for buckets: " + str(buckets))
-        lock_messages = get_lock_messages(buckets, self.buckets_per_lock, self.locks_per_message)
-        self.current_locking_messages = masked_cas_lock_table_messages(lock_messages)
-        return self.get_current_locking_message()
-
-    def release_locks(self):
-        self.locking_message_index = 0
-        buckets = lock_indexes_to_buckets(self.locks_held, self.buckets_per_lock)
-        buckets.sort(reverse=True)
-        unlock_messages = get_unlock_messages(buckets, self.buckets_per_lock, self.locks_per_message)
-        self.current_locking_messages = masked_cas_lock_table_messages(unlock_messages)
-        return self.get_current_locking_message()
-
-    def aquire_locks_fsm(self, message):
-        if message_type(message) == "masked_cas_response":
-            if message.payload["function_args"]["success"] == True:
-                self.receieve_successful_locking_message(message)
-                #enter the critical section if we have all of the locks
-                if self.all_locks_aquired():
-                    self.state = "critical_section"
-                    return None
-            #1) retransmit if we did not make process
-            #2) or just select the next message
-            return self.get_current_locking_message()
-        return None
-
-    def release_locks_fsm(self, message):
-        if message_type(message) == "masked_cas_response":
-            if message.payload["function_args"]["success"] == False:
-                self.critical("What the fuck is happening I failed to release a lock")
-                exit(1)
-            
-            #successful response
-            self.receive_successful_unlocking_message(message)
-            if self.all_locks_released():
-                if self.state == "release_locks":
-                    self.state = "idle"
-                    self.inserting=False
-                    return None
-                if self.state == "release_locks_try_again":
-                    return self.search()
-            else:
-                return self.get_current_locking_message()
-
-    def begin_insert(self):
-        self.state = "inserting"
-        #todo there are going to be cases where this fails because 
-        self.search_path_index = len(self.search_path)-1
-        return next_cas_message(self.search_path, self.search_path_index)
-
-    def complete_insert_stats(self, success):
-        self.insert_path_lengths.append(len(self.search_path))
-        self.index_range_per_insert.append(path_index_range(self.search_path))
-        self.messages_per_insert.append(self.current_insert_messages)
-
-        #clear for next insert
+        #todo add to a subclass
+        #insert stats
+        self.insert_path_lengths = []
+        self.index_range_per_insert = []
         self.current_insert_messages = 0
-        return super().complete_insert_stats(success)
+        self.messages_per_insert = []
+        self.completed_inserts = []
+        self.completed_insert_count = 0
+        self.failed_inserts = []
+        self.failed_insert_count = 0
+        self.insert_operation_bytes = 0
+        self.insert_operation_messages = 0
+        #track rtt
+        self.current_insert_rtt = 0
+        self.insert_rtt = []
+        self.insert_rtt_count = 0
 
-    def finish_insert_and_release_locks(self, success):
-        self.complete_insert_stats(success)
-        return self.release_locks()
+        #read stats
+        self.current_read_messages = 0
+        self.messages_per_read = []
+        self.completed_reads = []
+        self.completed_read_count = 0
+        self.failed_reads = []
+        self.failed_read_count = 0
+        self.read_operation_bytes = 0
+        self.read_operation_messages = 0
+        self.current_read_rtt = 0
+        self.read_rtt = []
+        self.read_rtt_count = 0
 
-    def complete_insert(self):
-        self.info("Insert Complete: " + str(self.current_insert_value))
-        self.state="release_locks"
-        return self.finish_insert_and_release_locks(success=True)
+    def __init__(self, config):
+        self.logger = logging.getLogger("root")
+        self.config = config
+        self.clear_statistics()
+        #spiritually these are the high level states of the state machine
+        #these are considered less configurable than the self.state variable I use in the children
 
-    def fail_insert(self):
-        self.info("Insert Failed: " + str(self.current_insert_value))
-        self.state="release_locks_try_again"
-        return self.finish_insert_and_release_locks(success=False)
-
-
-
-    def undo_last_cas_fsm(self, message):
-        if message == None:
-            return None
-
-        args = unpack_cas_response(message)
-        fill_local_table_with_cas_response(self.table, args)
-
-        #If CAS failed, try the insert a second time.
-        success = args["success"]
-        if not success:
-            raise Exception("Failed to undo last cas -- this is a really bad scenario")
-        
-        self.debug("Last CAS was undone, now we are just trying again")
-
-        #this insertion was a failure
-        return self.fail_insert()
-
-    def insert_fsm(self, message):
-        #there should be a message, otherwise don't do anything
-        if message == None:
-            return None
-
-        args = unpack_cas_response(message)
-        fill_local_table_with_cas_response(self.table, args)
-
-        #If CAS failed, try the insert a second time.
-        success = args["success"]
-        if not success:
-            self.debug("Insert Failed: " + str(self.current_insert_value) + "| trying again")
-            self.debug("failed insert path: " + str(self.search_path))
-            self.debug("failed insert path index: " + str(self.search_path_index) + "of  " + str(len(self.search_path) -1 ))
-            self.debug("failed cas: " + str(message))
-            self.debug("cas element: " + str(self.search_path[self.search_path_index]))
-
-            #if we have not issued a successful CAS yet there is nothing to backtrack to.
-            if self.search_path_index == len(self.search_path)-1:
-                self.debug("Insertion has failed but no harm was done, trying again")
-                return self.fail_insert()
-            else:
-                self.debug("Insertion has failed, but we have issued a CAS, we can backtrack to repair damage")
-                self.state = "undo_last_cas"
-                return undo_last_cas_message(self.search_path, self.search_path_index)
-
-        #Step down the search path a single index
-        self.search_path_index -= 1
-        if self.search_path_index <= 0:
-            return self.complete_insert()
+    def complete_read_stats(self, success, read_value):
+        if success:
+            self.completed_read_count += 1
+            self.completed_reads.append(read_value)
         else:
-            return next_cas_message(self.search_path, self.search_path_index)
+            self.failed_read_count += 1
+            self.failed_reads.append(read_value)
+        self.messages_per_read.append(self.current_read_messages)
+        self.read_rtt.append(self.current_read_rtt)
+        self.read_rtt_count += self.current_read_rtt
 
-    def idle_fsm(self,message):
-        return self.general_idle_fsm(message)
+        #clear for next time
+        self.current_read_messages = 0
+        self.current_read_rtt=0
 
-    def read_fsm(self,message):
-        complete, success = self.wait_for_read_messages_fsm(message, self.current_read_key)
-        if complete:
-            self.state="idle"
-            self.complete_read_stats(success, self.current_read_key)
-            self.reading=False
-        return None
-
-    def fsm_logic(self, message = None):
-
-        if self.complete and self.state == "idle":
-            return None
-
-        if self.state== "idle":
-            return self.idle_fsm(message)
-
-        if self.state == "reading":
-            return self.read_fsm(message)
-
-        if self.state == "aquire_locks":
-            return self.aquire_locks_fsm(message)
-
-        if self.state == "release_locks" or self.state == "release_locks_try_again":
-            return self.release_locks_fsm(message)
-
-        if self.state == "critical_section":
-            return self.begin_insert()
-
-        if self.state == "inserting":
-            return self.insert_fsm(message)
-
-        if self.state == "undo_last_cas":
-            return self.undo_last_cas_fsm(message)
+    def complete_insert_stats(self, success):
+        if success:
+            self.completed_inserts.append(self.current_insert_value)
+            self.completed_insert_count += 1
+        else:
+            self.failed_inserts.append(self.current_insert_value)
+            self.failed_insert_count += 1
+        self.messages_per_insert.append(self.current_insert_messages)
+        self.insert_rtt.append(self.current_insert_rtt)
+        self.insert_rtt_count += self.current_insert_rtt
+        self.current_insert_rtt = 0
+        self.current_insert_messages = 0
 
 
-    def toJSON(self):
-        return json.dumps(self, default=lambda o: o.__dict__, 
-            sort_keys=True, indent=4)
+    def get_stats(self):
+        stats = dict()
+        stats["total_bytes"] = self.total_bytes
+        stats["read_bytes"] = self.read_bytes
+        stats["write_bytes"] = self.write_bytes
+        stats["cas_bytes"] = self.cas_bytes
+        stats["total_reads"] = self.total_reads
+        stats["total_writes"] = self.total_writes
+        stats["total_cas"] = self.total_cas
+        stats["total_cas_failures"] = self.total_cas_failures
+
+        #todo add to a subclass 
+        stats["insert_path_lengths"] = self.insert_path_lengths
+        stats["index_range_per_insert"] = self.index_range_per_insert
+        stats["messages_per_insert"] = self.messages_per_insert
+        stats["completed_inserts"] = self.completed_inserts
+        stats["completed_insert_count"] = self.completed_insert_count
+        stats["failed_inserts"] = self.failed_inserts
+        stats["failed_insert_count"] = self.failed_insert_count
+        stats["insert_operation_bytes"] = self.insert_operation_bytes
+        stats["insert_operation_messages"] = self.insert_operation_messages
+        stats["insert_rtt"] = self.insert_rtt
+        stats["insert_rtt_count"] = self.insert_rtt_count
+
+
+        stats["messages_per_read"] = self.messages_per_read
+        stats["completed_reads"] = self.completed_reads
+        stats["completed_read_count"] = self.completed_read_count
+        stats["failed_reads"] = self.failed_reads
+        stats["failed_read_count"] = self.failed_read_count
+        stats["read_operation_bytes"] = self.read_operation_bytes
+        stats["read_operation_messages"] = self.read_operation_messages
+        stats["read_rtt"] = self.read_rtt
+        stats["read_rtt_count"] = self.read_rtt_count
+        return stats
+
+    def update_message_stats(self, messages):
+
+        if messages == None:
+            return
+
+        if not isinstance(messages, list):
+            messages = [messages]
+
+        for message in messages:
+
+
+            size = vrdma.message_to_bytes(message)
+            if self.inserting:
+                self.current_insert_messages += 1
+                self.insert_operation_bytes += size
+                self.insert_operation_messages +=1
+            elif self.reading:
+                self.current_read_messages +=1
+                self.read_operation_bytes += size
+                self.read_operation_messages +=1
+
+            self.total_bytes += size
+            t = vrdma.message_type(message)
+            payload = message.payload
+            if t == "read":
+                self.total_reads += 1
+                self.read_bytes += size
+            elif t == "read_response":
+                self.read_bytes += size
+            elif t == "cas" or t == "masked_cas":
+                self.total_cas += 1
+                self.cas_bytes += size
+            elif t == "cas_response" or t == "masked_cas_response":
+                self.cas_bytes += size
+                if payload["function_args"]["success"] == False:
+                    self.total_cas_failures += 1
+            elif t == "write":
+                self.total_writes += 1
+                self.write_bytes += size
+            elif t == "write_response":
+                self.write_bytes += size
+            else:
+                print("Unknown message type! " + str(message))
+                exit(1)
 
     
+    def fsm(self, message = None):
+        #caclulate statistics
+        self.update_message_stats(message)
+        #return fsm_wapper
+        output_message = self.fsm_logic(message)
+        if __debug__:
+            self.warning("FSM: Input Message " + str(message))
+            print_output_message = copy.copy(output_message)
+            if not isinstance(print_output_message, list):
+                print_output_message = [print_output_message]
+            count=0
+            for m in print_output_message:
+                self.warning("FSM: Output Message " + str(count) + ") :" + str(m))
+                count+=1
+
+        self.update_message_stats(output_message)
+        return output_message
+
+    def fsm_logic(self, messages=None):
+        print("state machine top level overload this")
+
+
+    def log_prefix(self):
+        return "{:<9}".format(str(self))
+
+    def info(self, message):
+        self.logger.info("[" + self.log_prefix() + "] " + message)
+
+    def debug(self, message):
+        self.logger.debug("[" + self.log_prefix() + "] " + message)
+
+    def warning(self, message):
+        self.logger.warning("[" + self.log_prefix() + "] " + message)
+
+    def critical(self, message):
+        self.logger.critical("[" + self.log_prefix() + "] " + message)
+
+workload_write_percentage={
+    "ycsb-a": 50,
+    "ycsb-b": 5,
+    "ycsb-c": 0,
+    "ycsb-w": 100,
+}
+
+class client_workload_driver():
+    def __init__(self, config):
+        self.set_workload(config["workload"])
+        self.total_requests=config["total_requests"]
+        self.client_id=config['id']
+        self.num_clients=config['num_clients']
+        self.deterministic=config['deterministic']
+
+        if self.deterministic:
+            self.random_factor = 1
+        else:
+            self.random_factor = int(random.random() * 100) + 1
+        #todo add a line for having a workload passed in as a file
+        self.completed_requests=0
+        self.completed_puts=0
+        self.completed_gets=0
+        self.last_request=None
+
+    def get_stats(self):
+        stats = dict()
+        stats["completed_requests"] = self.completed_requests
+        stats["completed_puts"] = self.completed_puts
+        stats["completed_gets"] = self.completed_gets
+        stats["workload"] = self.workload
+        stats["total_requests"] = self.total_requests
+        stats["client_id"] = self.client_id
+        stats["num_clients"] = self.num_clients
+        return stats
+
+    def record_last_request(self):
+        request = self.last_request
+        self.completed_requests += 1
+        if request == None:
+            return
+        if request.request_type == "put":
+            self.completed_puts += 1
+        elif request.request_type == "get":
+            self.completed_gets += 1
+        else:
+            print("Unknown request type! " + str(request))
+            exit(1)
+
+    #the +1 in both unique get and put are to ensure we do not put a zero key
+    def unique_insert(self, insert, client_id, total_clients, factor):
+        return ((insert + 1) * total_clients * factor) + client_id
+
+    def unique_get(self, get, client_id, total_clients, factor):
+        return ((get + 1) * total_clients * factor) + client_id
+
+    def next_put(self):
+        next_value = self.unique_insert(self.completed_puts, self.client_id, self.num_clients, self.random_factor)
+        req = request("put", next_value, next_value)
+        self.last_request = req
+        return req
+
+    def next_get(self):
+        if self.deterministic:
+            index = self.completed_puts - 1
+        else:
+            if self.completed_puts <= 1:
+                index = 0
+            else:
+                index = int(random.random()*1000000) % (self.completed_puts-1)
+
+        next_value = self.unique_get(index, self.client_id, self.num_clients, self.random_factor)
+        req = request("get", next_value)
+        self.last_request = req
+        return req
+
+    def set_workload(self, workload):
+        if not workload in workload_write_percentage:
+            print("Unknown workload! " + workload)
+            exit(1)
+        self.workload = workload
+
+
+    def gen_next_operation(self, workload):
+        percentage = workload_write_percentage[workload]
+        if self.completed_puts == 0:
+            return "put"
+        if ((self.completed_requests * 1337) % 100) < percentage or self.completed_requests == 0:
+            return "put"
+        else:
+            return "get"
+
+    def next(self):
+        self.record_last_request()
+        if self.completed_requests >= self.total_requests:
+            return None
+        op = self.gen_next_operation(self.workload)
+        if op == "put":
+            return self.next_put()
+        elif op == "get":
+            return self.next_get()
+
+
+class client_state_machine(state_machine):
+    def __init__(self, config):
+        super().__init__(config)
+        self.config = config
+        self.total_inserts = config["total_inserts"]
+        self.id = config["id"]
+        self.state="idle"
+
+
+        #read state machine
+        self.current_read_key = None
+        self.outstanding_read_requests = 0
+        self.read_values_found = 0
+        self.read_values = []
+        self.duplicates_found = 0
+
+        workload_config = {
+            "workload": config["workload"],
+            "total_requests": self.total_inserts,
+            "id": self.id,
+            "num_clients": config["num_clients"],
+            "deterministic": config["deterministic"],
+        }
+        self.workload_config=workload_config
+        self.workload_driver = client_workload_driver(workload_config)
+
+    def clear_statistics(self):
+        self.state="idle"
+        #read state machine
+        self.current_read_key = None
+        self.outstanding_read_requests = 0
+        self.read_values_found = 0
+        self.read_values = []
+        self.duplicates_found = 0
+        return super().clear_statistics()
+
+    def set_workload(self, workload):
+        self.workload_driver.set_workload(workload)
+        self.config["workload"] = workload
+
+
+    def begin_read(self, messages):
+        self.outstanding_read_requests = len(messages)
+        self.read_values_found = 0
+        self.read_values = []
+        self.state = "reading"
+        self.reading=True
+        return messages
+
+    def read_complete(self):
+        return self.outstanding_read_requests ==  0
+
+    def read_successful(self, key):
+        if self.read_values_found == 0:
+            success = False
+            self.info("Read Incomplete: " + str(key)) if __debug__ else None
+        elif self.read_values_found == 1:
+            success = True
+            self.info("Read Complete: " + str(self.read_values)) if __debug__ else None
+        elif self.read_values_found > 1:
+            success = True
+            self.duplicates_found = self.duplicates_found + 1
+            self.info("Read Complete: " + str(self.read_values) + " Duplicate Found") if __debug__ else None
+            #todo we likely need a tie breaker here
+        return success
+
+
+    #return true if the read is complete
+    def wait_for_read_messages_fsm(self, table, message, key):
+        if message != None and vrdma.message_type(message) == "read_response":
+            self.info("unpacking read response " + str(message)) if __debug__ else None
+            #unpack and check the response for a valid read
+            args = vrdma.unpack_read_response(message)
+            vrdma.fill_local_table_with_read_response(table, args)
+            read = args["read"]
+
+            keys_found = vrdma.keys_contained_in_read_response(key, read)
+            self.read_values_found = self.read_values_found + keys_found
+            self.read_values.extend(vrdma.get_entries_from_read(key, read))
+            self.outstanding_read_requests = self.outstanding_read_requests - 1
+
+
+        complete = self.read_complete()
+        success = self.read_successful(key)
+        return complete, success
+
+
+    def general_idle_fsm(self, message):
+        if message != None:
+            self.critical("Idle state machine received a message" + str(message))
+            return None
+        #get the next operations
+        req = self.workload_driver.next()
+        self.info("Workload Request: " + str(req)) if __debug__ else None
+        if req == None:
+            self.complete=True
+            self.info("Workload Complete")
+            return None
+        elif req.request_type == "put":
+
+            self.current_insert_value = req.key
+            self.inserting=True
+            return self.put()
+
+        elif req.request_type == "get":
+            if req.key < 0:
+                return None
+            self.current_read_key = req.key
+            self.reading=True
+            return self.get()
+        else:
+            raise Exception("No generator for request : " + str(req.request_type))
+
+    def __str__(self):
+        return "Client " + str(self.id)
+
+    def get_stats(self):
+        stats = super().get_stats()
+        stats["workload_stats"] = self.workload_driver.get_stats()
+        return stats
+
+    def get(self):
+        self.critical("Get method should be overwritten")
+
+    def put(self):
+        self.critical("put method should be overwritten")
+
 
 
 class basic_memory_state_machine(state_machine):
@@ -448,17 +478,17 @@ class basic_memory_state_machine(state_machine):
             return None
 
         args = message.payload["function_args"]
-        if message.payload["function"] == read_table_entry:
+        if message.payload["function"] == vrdma.read_table_entry:
             self.info("Read: " + "Bucket: " + str(args["bucket_id"]) + " Offset: " + str(args["bucket_offset"]) + " Size: " + str(args["size"]))  if __debug__ else None
-            read = read_table_entry(self.table, **args)
-            response = Message({"function":fill_table_with_read, "function_args":{"read":read, "bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "size":args["size"]}})
+            read = vrdma.read_table_entry(self.table, **args)
+            response = vrdma.Message({"function":vrdma.fill_table_with_read, "function_args":{"read":read, "bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "size":args["size"]}})
             self.info("Read Response: " +  str(response.payload["function_args"]["read"])) if __debug__ else None
             return response
 
-        if message.payload["function"] == cas_table_entry:
+        if message.payload["function"] == vrdma.cas_table_entry:
             self.info("CAS: " + "Bucket: " + str(args["bucket_id"]) + " Offset: " + str(args["bucket_offset"]) + " Old: " + str(args["old"]) + " New: " + str(args["new"])) if __debug__ else None
-            success, value = cas_table_entry(self.table, **args)
-            response = Message({"function":fill_table_with_cas, "function_args":{"bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "value":value, "success":success}})
+            success, value = vrdma.cas_table_entry(self.table, **args)
+            response = vrdma.Message({"function":vrdma.fill_table_with_cas, "function_args":{"bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "value":value, "success":success}})
 
             # self.table.print_table()  if __debug__ else None
 
@@ -466,10 +496,11 @@ class basic_memory_state_machine(state_machine):
             self.info("Read Response: " +  "Success: " + str(rargs["success"]) + " Value: " + str(rargs["value"])) if __debug__ else None
             return response
 
-        if message.payload["function"] == masked_cas_lock_table:
+        if message.payload["function"] == vrdma.masked_cas_lock_table:
             #self.info("Masked CAS in Memory: "+ str(args["lock_index"]) + " Old: " + str(args["old"]) + " New: " + str(args["new"]) + " Mask: " + str(args["mask"]))
-            success, value = masked_cas_lock_table(self.table.lock_table, **args)
-            response = Message({"function": fill_lock_table_masked_cas, "function_args":{"lock_index":args["lock_index"], "success":success, "value": value, "mask":args["mask"]}})
+            success, value = vrdma.masked_cas_lock_table(self.table, **args)
+            response = vrdma.Message({"function": vrdma.fill_lock_table_masked_cas, "function_args":{"lock_index":args["lock_index"], "success":success, "value": value, "mask":args["mask"]}})
+            # self.table.print_table() if __debug__ else None
             return response
             
         else:

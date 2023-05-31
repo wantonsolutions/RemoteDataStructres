@@ -1,13 +1,11 @@
 import lib
-lib.import_rmem_simulator()
 
-import plot_cuckoo as plot_cuckoo
-import log as log
-import state_machines as sm
-import simulator as simulator
+import experiments.plot_cuckoo as plot_cuckoo
+import simulator.log as log
+import simulator.simulation_runtime as sim
 # import run_experiments as re
-import data_management as dm
-import cuckoo as cuckoo
+import experiments.data_management as dm
+import simulator.cuckoo as cuckoo
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
@@ -33,11 +31,10 @@ def run_insertion_range_protocol_cdf():
         config['max_fill'] = 90
         config['bucket_size']=8
         config['num_steps'] = 100000000
-        config['state_machine'] = cuckoo.rcuckoobatch
+        config['state_machine'] = cuckoo.rcuckoo
 
-        sim = simulator.Simulator(config)
         log.set_off()
-        runs.append(simulator.run_trials(config))
+        runs.append(sim.run_trials(config))
     dm.save_statistics(runs,dirname=data_dir)
 
 
@@ -99,5 +96,5 @@ def plot_insertion_range_protocol_cdf():
     plt.tight_layout()
     plt.savefig("insertion_span.pdf")
 
-# run_insertion_range_protocol_cdf()
+run_insertion_range_protocol_cdf()
 plot_insertion_range_protocol_cdf()

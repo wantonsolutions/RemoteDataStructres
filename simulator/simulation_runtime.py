@@ -1,13 +1,41 @@
-# import log
 import logging
-# from cuckoo import *
-# from state_machines import *
-# from hash import *
 from time import sleep
 import json
 import datetime
 from collections import deque
 import git
+from tqdm import tqdm
+import random
+import traceback
+import copy
+
+from . import rcuckoo_basic
+from . import state_machines
+from . import log
+
+
+simulator=False
+if simulator:
+    from . import hash
+    from . import tables
+    from . import search
+else:
+    import rcuckoo_wrap as hash
+    import rcuckoo_wrap as tables
+    import rcuckoo_wrap as search
+    tables.Table = tables.PyTable
+
+
+import logging
+logger = logging.getLogger('root')
+
+def messages_append_or_extend(messages, message):
+    if message != None:
+        if isinstance(message, list):
+            messages.extend(message)
+        else:
+            messages.append(message)
+    return messages
 
 class Node:
     def __init__(self, config):
@@ -50,17 +78,11 @@ class Client(Node):
         self.debug("Index Args: " + str(index_args)+"\n")
         self.index = index_func(**index_args)
 
-        state_machine_args = config['state_machine_args'] 
+        state_machine_args = config
+
         state_machine_args['table'] = self.index
         state_machine_args['id'] = self.client_id
-        state_machine_args['num_clients'] = config['num_clients']
-        state_machine_args['read_threshold_bytes'] = config['read_threshold_bytes']
-        state_machine_args['deterministic'] = config['deterministic']
-        state_machine_args['buckets_per_lock'] = config['buckets_per_lock']
-        state_machine_args['locks_per_message'] = config['locks_per_message']
-        state_machine_args['search_function'] = config['search_function']
-        state_machine_args['location_function'] = config['location_function']
-        state_machine_args['workload'] = config['workload']
+
         state_machine = config['state_machine']
         self.critical(str(state_machine))
         self.state_machine = state_machine(state_machine_args)
@@ -83,8 +105,9 @@ class Client(Node):
 
         #for now send all of the message to memory
         for i in range(len(messages)):
-            messages[i].payload["src"] = self.client_id
-            messages[i].payload["dest"] = "memory"
+            if(messages[i] != None):
+                messages[i].payload["src"] = self.client_id
+                messages[i].payload["dest"] = "memory"
         return messages
 
 
@@ -103,7 +126,7 @@ class Memory(Node):
         self.debug("Index Args: " + str(index_args)+"\n")
         self.index = index_func(**index_args)
 
-        state_machine_args = config['state_machine_args']
+        state_machine_args = config
         state_machine_args['table'] = self.index
         state_machine = config['state_machine']
 
@@ -294,7 +317,7 @@ class Simulator(Node):
         indexes=self.config['indexes']
         buckets_per_lock=self.config['buckets_per_lock']
         memory_size=entry_size * indexes
-        index_init_function=Table
+        index_init_function=tables.Table
         index_init_args={'memory_size': memory_size, 'bucket_size': bucket_size, 'buckets_per_lock': buckets_per_lock}
         self.deterministic = self.config['deterministic']
 
@@ -308,12 +331,12 @@ class Simulator(Node):
             client_config['num_clients'] = self.config['num_clients']
 
             client_config['bucket_size'] = bucket_size
-            client_config['index_init_function'] = Table
+            client_config['index_init_function'] = tables.Table
             client_config['index_init_args'] = index_init_args
+            client_config['total_inserts']=indexes * 20
 
             # client_config['state_machine']=lockless_a_star_insert_only_state_machine
             client_config['state_machine']=self.config["state_machine"]
-            client_config['state_machine_args']={'total_inserts': indexes * 20}
             client_config['read_threshold_bytes']=self.config['read_threshold_bytes']
             client_config['buckets_per_lock']=buckets_per_lock
             client_config['locks_per_message']=self.config['locks_per_message']
@@ -321,6 +344,8 @@ class Simulator(Node):
             client_config['location_function']=self.config['location_function']
             client_config['workload']=self.config['workload']
             client_config['deterministic']=self.config['deterministic']
+            client_config['search_module']=self.config['search_module']
+            client_config['hash_module']=self.config['hash_module']
 
             c = Client(client_config)
 
@@ -329,17 +354,21 @@ class Simulator(Node):
         #initialize memory
         memory_config = {'memory_id': 0}
         memory_config['bucket_size'] = bucket_size
-        memory_config['index_init_function'] = Table
+        memory_config['index_init_function'] = tables.Table
         memory_config['index_init_args'] = index_init_args
 
-        memory_config['state_machine']=basic_memory_state_machine
-        memory_config['state_machine_args']={'max_fill': self.config['max_fill']}
+        memory_config['state_machine']=state_machines.basic_memory_state_machine
+        memory_config['max_fill']=self.config['max_fill']
         self.memory = Memory(memory_config)
 
         #initialize switch
         switch_config = {'switch_id': 0}
         self.switch = Switch(switch_config)
-        self.config['state_machine']=get_state_machine_name(self.config['state_machine'])
+
+
+        self.config['state_machine']=state_machines.get_state_machine_name(self.config['state_machine'])
+        self.config['search_module']=self.config['search_module'].__name__
+        self.config['hash_module']=self.config['hash_module'].__name__
 
         print(self.config)
         self.config_set = True
@@ -403,7 +432,7 @@ class Simulator(Node):
 
         #simulator stats
         statistics['config'] = dict()
-        statistics['config'] = self.config
+        statistics['config'] = copy.copy(self.config)
         statistics['simulator'] = dict()
         statistics['simulator']['steps'] = self.step
 
@@ -455,10 +484,13 @@ def default_config():
     config['buckets_per_lock']=1
     config['locks_per_message']=64
     config['workload']="ycsb-w"
-    config['hash_factor']=hash.DEFAULT_FACTOR
-    config['state_machine']=rcuckoo
+    config['hash_factor']=hash.get_factor()
+    config['state_machine']=rcuckoo_basic.rcuckoo_basic
     config['search_function']="a_star"
     config['location_function']="dependent"
+
+    config['search_module']=search
+    config['hash_module']=hash
 
     config['date']=datetime.datetime.now().strftime("%Y-%m-%d")
     config['commit']=git.Repo(search_parent_directories=True).head.object.hexsha
@@ -470,17 +502,22 @@ def run_trials(config):
     runs = []
     trials = config['trials']
     for i in tqdm(range(trials)):
-        c=config.copy()
+        c=copy.copy(config)
         sim = Simulator(c)
         try:
             sim.run()
         except Exception as e:
+            if not "Table has reached max fill rate" in str(e):
+                print(traceback.format_exc())
             print(e)
+            # sim.memory.index.print_table()
             stats = sim.collect_stats()
             sim.validate_run()
+            # raise e
         sim.validate_run()
         stats = sim.collect_stats()
         runs.append(stats)
+        del sim
     return runs
 
 
@@ -525,23 +562,32 @@ def fill_then_run_trials(config, fill_to, max_fill, max_steps=1000000000):
 
 
 def main():
-    #test_hashes()
+
+    runs = []
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
     config = default_config()
-    simulator = Simulator(config)
-    simulator.run()
-    if not simulator.validate_run():
-        logger.error("Simulation failed check the logs")
-    simulator.collect_stats()
+    config['indexes'] = 16
+    config['num_clients'] = 1
+    config['num_steps'] = 5000000
+    config['read_threshold_bytes'] = 256
+    config["buckets_per_lock"] = 1
+    config["locks_per_message"] = 64
+    config["trials"] = 1
+    config["state_machine"]=rcuckoo_basic.rcuckoo_basic
+    # config["state_machine"]=cuckoo.rcuckoo
+    # config["state_machine"]=race.race
+    config['workload']='ycsb-w'
+    log.set_debug()
+
+
+
+    # simulator = Simulator(config)
+    # simulator.run()
+    # if not simulator.validate_run():
+    #     logger.error("Simulation failed check the logs")
+    # simulator.collect_stats()
+    runs.append(run_trials(config))
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-

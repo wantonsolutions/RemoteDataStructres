@@ -17,12 +17,12 @@ cdef extern from "hash.h":
     XXH64_hash_t h2(string key)
     XXH64_hash_t h3(string key)
 
-    unsigned int rcuckoo_primary_location(string key, int table_size)
+    unsigned int rcuckoo_primary_location(string key, unsigned int table_size)
     unsigned int h3_suffix_base_two(string key)
-    unsigned int rcuckoo_secondary_location(string key, float factor, int table_size)
-    unsigned int rcuckoo_secondary_location_independent(string key, int table_size)
-    hash_locations rcuckoo_hash_locations(string key, int table_size)
-    hash_locations rcuckoo_hash_locations_independent(string key, int table_size)
+    unsigned int rcuckoo_secondary_location(string key, float factor, unsigned int table_size)
+    unsigned int rcuckoo_secondary_location_independent(string key, unsigned int table_size)
+    hash_locations rcuckoo_hash_locations(string key, unsigned int table_size)
+    hash_locations rcuckoo_hash_locations_independent(string key, unsigned int table_size)
 
     struct race_bucket:
         unsigned int bucket

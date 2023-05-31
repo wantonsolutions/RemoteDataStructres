@@ -388,7 +388,7 @@ def messages_per_operation(ax, stats, x_axis="clients", decoration=True, twin=Tr
         l = messages_per_operation_line(axs, stat, label=state_machine_label, x_axis=x_axis)
         lines.extend(l)
     if decoration:
-        messages_per_operation_decoration(axs, axt, x_axis, lines)
+        messages_per_operation_decoration(axs[0], axs[1], x_axis, lines)
 
 def rtt_per_operation_decoration(ax, axt, x_axis, lines):
     ax.set_ylabel("insert - rtt/op")
@@ -477,7 +477,7 @@ def single_run_approx_throughput(stat):
     # approx_throughput =  stat['config']['num_clients'] / (stat['simulator']['steps']/3)
     # approx_throughput = sim_steps/
     # memory_steps=stat['memory']['steps']
-    print(stat)
+    # print(stat)
     normal_throughputs = []
     for client in stat['clients']:
         read_rtt = client['stats']['read_rtt_count']

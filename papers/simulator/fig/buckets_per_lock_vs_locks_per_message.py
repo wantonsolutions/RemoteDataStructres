@@ -1,13 +1,13 @@
 import lib
-lib.import_rmem_simulator()
 
-import plot_cuckoo as plot_cuckoo
-import log as log
-import state_machines as sm
-import simulator as simulator
-# import run_experiments as re
-import data_management as dm
-import cuckoo as cuckoo
+import experiments.plot_cuckoo as plot_cuckoo
+import experiments.data_management as dm
+
+import simulator.log as log
+import simulator.state_machines as sm
+import simulator.simulation_runtime as sim
+import simulator.cuckoo as cuckoo
+
 import matplotlib.pyplot as plt
 import matplotlib as matplotlib
 import numpy as np
@@ -26,6 +26,7 @@ def buckets_per_lock_vs_locks_per_message_experiment():
     buckets_per_lock_arr=[1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
     locks_per_message=[1,2,4,8,16,32,64]
     log.set_off()
+    # log.set_debug()
     # locks_per_message_arr=[1, 2]
     for lpm in locks_per_message:
         runs=[]
@@ -39,9 +40,9 @@ def buckets_per_lock_vs_locks_per_message_experiment():
             config['bucket_size']=8
             config["buckets_per_lock"] = buckets_per_lock
             config["locks_per_message"] = lpm
-            config["state_machine"] = cuckoo.rcuckoobatch
+            config["state_machine"] = cuckoo.rcuckoo
             config["max_fill"] = 100
-            runs.append(simulator.run_trials(config))
+            runs.append(sim.run_trials(config))
         all_runs.append(runs)
     dm.save_statistics(all_runs,dirname=data_dir)
 
@@ -112,5 +113,5 @@ def plot_buckets_per_lock_vs_locks_per_message_experiment():
     plt.tight_layout()
     plt.savefig("buckets_per_lock_vs_locks_per_message.pdf")
 
-# buckets_per_lock_vs_locks_per_message_experiment()
+buckets_per_lock_vs_locks_per_message_experiment()
 plot_buckets_per_lock_vs_locks_per_message_experiment()

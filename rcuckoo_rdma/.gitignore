@@ -1,6 +1,11 @@
 build
 cython_tutorial
 *.so
-hash_wrapper.cpp
-hash.o
-hash.so
+*.o
+old_wrappers/*.cpp
+rcuckoo_wrapper.cpp
+rcuckoo_wrapper.egg-info
+
+test/test_hash
+test/test_tables
+test/test_search

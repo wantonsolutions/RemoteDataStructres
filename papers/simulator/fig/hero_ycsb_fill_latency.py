@@ -1,13 +1,12 @@
 import lib
-lib.import_rmem_simulator()
 
-import plot_cuckoo as plot_cuckoo
-import log as log
-import state_machines as sm
-import simulator as simulator
+import experiments.plot_cuckoo as plot_cuckoo
+import experiments.data_management as dm
+import simulator.log as log
+import simulator.state_machines as sm
+import simulator.simulation_runtime as sim
 # import run_experiments as re
-import data_management as dm
-import cuckoo as cuckoo
+import simulator.cuckoo as cuckoo
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
@@ -48,7 +47,7 @@ def run_hero_ycsb_fill_latency():
                 config['workload']=workload
                 config['max_fill']=fill
                 steps = 1000000
-                r = simulator.fill_then_run_trials(config, fill_to=config['max_fill'], max_fill=config['max_fill']+5, max_steps=steps)
+                r = sim.fill_then_run_trials(config, fill_to=config['max_fill'], max_fill=config['max_fill']+5, max_steps=steps)
                 runs.append(r)
             # dm.save_statistics(runs)
             # plot_cuckoo.plot_general_stats_last_run()

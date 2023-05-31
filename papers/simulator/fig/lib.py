@@ -3,13 +3,9 @@ import os
 import numpy as np
 import matplotlib as matplotlib
 
-def import_rmem_simulator():
-    home_directory = os.path.expanduser( '~' )
-    sys.path.insert(1, home_directory + '/RemoteDataStructres/rmem_simulator')
 
 def get_config():
-    import_rmem_simulator()
-    import simulator as sim
+    import simulator.simulation_runtime as sim
     config = sim.default_config()
     config['description'] = "--"
     config['name'] = "--"

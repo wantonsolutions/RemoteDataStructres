@@ -1,13 +1,12 @@
 import lib
-lib.import_rmem_simulator()
 
-import plot_cuckoo as plot_cuckoo
-import log as log
-import state_machines as sm
+import experiments.plot_cuckoo as plot_cuckoo
+import simulator.log as log
+import simulator.state_machines as sm
 import simulator as simulator
 # import run_experiments as re
-import data_management as dm
-import cuckoo as cuckoo
+import experiments.data_management as dm
+import simulator.cuckoo as cuckoo
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
