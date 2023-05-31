@@ -1,8 +1,6 @@
 import logging
 logger = logging.getLogger('root')
 
-from . import hash
-
 class Message:
     def __init__(self, config):
         self.payload = dict()
@@ -35,6 +33,7 @@ def cas_table_entry(table, bucket_id, bucket_offset, old, new):
         return (False, v)
 
 def masked_cas_lock_table(table, lock_index, old, new, mask):
+    # print("Sanity check :::: masked_cas_lock_table", lock_index, old, new, mask)
     return table.lock_table_masked_cas(lock_index, old, new, mask)
 
 
@@ -323,8 +322,9 @@ def multi_bucket_read_message(buckets, row_size_bytes):
     message.payload["function_args"] = {'bucket_id':min_bucket, 'bucket_offset':0, 'size':size}
     return [message]
 
-def read_threshold_message(key, read_threshold_bytes, table_size, row_size_bytes):
-    buckets = hash.rcuckoo_hash_locations(key, table_size)
+def read_threshold_message(location_func, key, read_threshold_bytes, table_size, row_size_bytes):
+    # buckets = hash.rcuckoo_hash_locations(key, table_size)
+    buckets = location_func(key, table_size)
     if single_read_size_bytes(buckets, row_size_bytes) <= read_threshold_bytes:
         messages = multi_bucket_read_message(buckets, row_size_bytes)
     else:
@@ -361,8 +361,10 @@ def get_covering_read_from_lock_message(lock_message, buckets_per_lock, row_size
     #todo start here after chat, we have just gotten the spanning read message for a lock range
     return read_message[0]
 
-def race_messages(key, table_size, row_size_bytes):
-    locations = hash.race_hash_locations(key, table_size)
+def race_messages(location_func, key, table_size, row_size_bytes):
+    # locations = hash.race_hash_locations(key, table_size)
+    locations = location_func(key, table_size)
+
     #get the min of the overflow and index buckets
     l1 = min(locations[0])
     l2 = min(locations[1])
@@ -371,8 +373,9 @@ def race_messages(key, table_size, row_size_bytes):
     messages = single_bucket_read_messages(locations, double_size)
     return messages
 
-def race_message_read_key_location(key, table_size, row_size_bytes, location):
-    locations = hash.race_hash_locations(key, table_size)
+def race_message_read_key_location(location_func, key, table_size, row_size_bytes, location):
+    # locations = hash.race_hash_locations(key, table_size)
+    locations = location_func(key, table_size)
     #get the min of the overflow and index buckets
     l = min(locations[location])
     double_size = int(row_size_bytes * 2)

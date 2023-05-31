@@ -2,6 +2,7 @@
 #include <cmath>
 #include <string>
 #include <assert.h>
+#include <iostream>
 // #include <cstdlib>
 #include "hash.h"
 
@@ -94,6 +95,7 @@ hash_locations rcuckoo_hash_locations(string key, unsigned int table_size){
     hash_locations hl;
     hl.primary = rcuckoo_primary_location(key, table_size);
     hl.secondary = rcuckoo_secondary_location(key, DEFAULT_FACTOR, table_size);
+    // cout << "key " << key << "primary: " << hl.primary << " secondary: " << hl.secondary << endl;
     return hl;
 }
 

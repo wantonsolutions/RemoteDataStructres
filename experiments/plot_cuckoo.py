@@ -477,7 +477,7 @@ def single_run_approx_throughput(stat):
     # approx_throughput =  stat['config']['num_clients'] / (stat['simulator']['steps']/3)
     # approx_throughput = sim_steps/
     # memory_steps=stat['memory']['steps']
-    print(stat)
+    # print(stat)
     normal_throughputs = []
     for client in stat['clients']:
         read_rtt = client['stats']['read_rtt_count']

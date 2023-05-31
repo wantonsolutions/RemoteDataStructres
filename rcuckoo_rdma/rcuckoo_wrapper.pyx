@@ -1,5 +1,7 @@
 cimport rcuckoo_wrapper as rw
 # cimport rcuckoo_wrapper as t
+from libcpp.string cimport string
+
 
 def set_factor(x):
     return rw.set_factor(x)
@@ -34,9 +36,29 @@ def rcuckoo_secondary_location(key, factor, table_size):
 def rcuckoo_secondary_location_independent(key, table_size):
     return rw.rcuckoo_secondary_location_independent(key, table_size)
 
+def int_str_converter(orig_int):
+    output = ""
+    for i in range(4):
+        ret = int(orig_int % 256)
+        output += str(ret)
+        orig_int = int(orig_int / 256)
+    return output
+
 def rcuckoo_hash_locations(key, table_size):
-    bytes_key = str(key).encode('utf-8')
-    locations = rw.rcuckoo_hash_locations(bytes_key, table_size)
+
+    output_string = int_str_converter(key)
+    cdef string string_key = output_string.encode('utf-8')
+    # c_key.bytes = key.to_bytes(4, byteorder='little')
+    # print("do the ckey bytes at least look right? ", string_key)
+    # for i in range(4):
+    #     c_key.bytes[i] = key.to_bytes(4, byteorder='little')[i]
+
+
+
+    # tmp_string_key = str(c_key.bytes)
+    # string_key = tmp_string_key.encode('utf-8')
+
+    locations = rw.rcuckoo_hash_locations(string_key, table_size)
     return (locations.primary, locations.secondary)
 
 def rcuckoo_hash_locations_independent(key, table_size):
@@ -61,7 +83,7 @@ def race_secondary_location(key, table_size):
 def race_hash_locations(key, table_size):
     bytes_key = str(key).encode('utf-8')
     hash_buckets = rw.race_hash_locations(bytes_key, table_size)
-    return (hash_buckets.primary, hash_buckets.secondary)
+    return ((hash_buckets.primary.bucket,hash_buckets.primary.overflow), (hash_buckets.secondary.bucket,hash_buckets.secondary.overflow))
 
 def ten_k_hashes():
     return rw.ten_k_hashes()
@@ -122,6 +144,9 @@ cdef class PyTable:
         else:
             self.c_table = new rw.Table()
 
+    def __dealloc__(self):
+        del self.c_table
+
     def unlock_all(self):
         return self.c_table.unlock_all()
 
@@ -129,7 +154,23 @@ cdef class PyTable:
         return self.c_table.print_table()
 
     def lock_table_masked_cas(self, unsigned int lock_index, old, new_value, mask):
-        return self.c_table.lock_table_masked_cas(lock_index, old, new_value, mask)
+        cdef unsigned long long c_old =0 
+        cdef unsigned long long c_new_value =0
+        cdef unsigned long long c_mask =0
+
+        for i in range(0, 64):
+            # print("old[" + str(i) + "]: ", old[i])
+            c_old = c_old | (old[i] << i)
+            c_new_value = c_new_value | (new_value[i] << i)
+            c_mask = c_mask | (mask[i] << i )
+        # print("c_old: ", c_old)
+        # print("c_new_value: ", c_new_value)
+        # print("c_mask: ", c_mask)
+
+        # return self.c_table.lock_table_masked_cas(lock_index, old, new_value, mask)
+        atomic_response  = self.c_table.lock_table_masked_cas(lock_index, c_old, c_new_value, c_mask)
+        # print(atomic_response.success, atomic_response.original_value)
+        return (atomic_response.success, atomic_response.original_value)
 
 
     def fill_lock_table_masked_cas(self, unsigned int lock_index, bool success, value, mask):
@@ -152,11 +193,16 @@ cdef class PyTable:
 
     def get_entry(self, unsigned int bucket_index, unsigned int offset):
         e = self.c_table.get_entry(bucket_index, offset)
-        return e.key
+        bytes = e.key.bytes
+        # print("sanity checking get entries bytes: ", bytes)
+        key = int.from_bytes(bytes, "little")
+        return key
 
     def set_entry(self, unsigned int bucket_index, unsigned int offset, entry):
         cdef rw.Entry c_entry
+
         c_entry.key.bytes = entry.to_bytes(4, byteorder='little')
+        # print("sanity checking set entries bytes: ", c_entry.key.bytes)
         self.c_table.set_entry(bucket_index, offset, c_entry)
 
     
@@ -185,7 +231,7 @@ cdef class PyTable:
     def absolute_index_to_bucket_index(self, unsigned int absolute_index):
         return self.c_table.absolute_index_to_bucket_index(absolute_index)
     
-    def absolute_index_to_offset(self, unsigned int absolute_index):
+    def absolute_index_to_bucket_offset(self, unsigned int absolute_index):
         return self.c_table.absolute_index_to_offset(absolute_index)
     
     def assert_operation_in_table_bound(self, unsigned int bucket_index, unsigned int offset, unsigned int memory_size):
@@ -206,14 +252,39 @@ from cython.operator cimport dereference as deref
 from libcpp.vector cimport vector
 
 
-def search_path_to_buckets(vector[rw.path_element] path):
-    return rw.search_path_to_buckets(path)
+def search_path_to_buckets(path):
+    cdef vector[rw.path_element] c_path
+    cdef rw.path_element pe
+    for p in path:
+        pe.key.bytes = p.key.to_bytes(4, byteorder='little')
+        pe.table_index = p.table_index
+        pe.bucket_index = p.bucket_index
+        pe.offset = p.bucket_offset
+        c_path.push_back(pe)
+    return rw.search_path_to_buckets(c_path)
 
-def path_to_string(vector[rw.path_element] path):
-    return rw.path_to_string(path)
+def path_to_string(path):
+    cdef vector[rw.path_element] c_path
+    cdef rw.path_element pe
+    for p in path:
+        pe.key.bytes = p.key.to_bytes(4, byteorder='little')
+        pe.table_index = p.table_index
+        pe.bucket_index = p.bucket_index
+        pe.offset = p.bucket_offset
+        c_path.push_back(pe)
+    path_string = rw.path_to_string(c_path)
+    return str(path_string)
 
-def path_index_range(vector[rw.path_element] path):
-    return rw.path_index_range(path)
+def path_index_range(path):
+    cdef vector[rw.path_element] c_path
+    cdef rw.path_element pe
+    for p in path:
+        pe.key.bytes = p.key.to_bytes(4, byteorder='little')
+        pe.table_index = p.table_index
+        pe.bucket_index = p.bucket_index
+        pe.offset = p.bucket_offset
+        c_path.push_back(pe)
+    return rw.path_index_range(c_path)
 
 def bucket_cuckoo_a_star_insert(PyTable table, location_func, key, open_buckets=None):
     cdef vector[unsigned int] empty_buckets
@@ -241,7 +312,7 @@ def bucket_cuckoo_a_star_insert(PyTable table, location_func, key, open_buckets=
     ret_path = []
     for d in dict_path:
         bytes = d.key.bytes
-        key = int.from_bytes(bytes, "big")
+        key = int.from_bytes(bytes, "little")
         table_index = d.table_index
         bucket_index = d.bucket_index
         bucket_offset = d.offset

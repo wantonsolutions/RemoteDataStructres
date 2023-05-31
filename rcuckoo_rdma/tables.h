@@ -65,6 +65,7 @@ namespace cuckoo_tables {
 
         private:
             unsigned int _total_locks;
+            unsigned int _total_lock_entries;
             uint8_t *_locks;
     };
     

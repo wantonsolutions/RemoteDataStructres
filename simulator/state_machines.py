@@ -276,11 +276,12 @@ class client_workload_driver():
             print("Unknown request type! " + str(request))
             exit(1)
 
+    #the +1 in both unique get and put are to ensure we do not put a zero key
     def unique_insert(self, insert, client_id, total_clients, factor):
-        return (insert * total_clients * factor) + client_id
+        return ((insert + 1) * total_clients * factor) + client_id
 
     def unique_get(self, get, client_id, total_clients, factor):
-        return (get * total_clients * factor) + client_id
+        return ((get + 1) * total_clients * factor) + client_id
 
     def next_put(self):
         next_value = self.unique_insert(self.completed_puts, self.client_id, self.num_clients, self.random_factor)
@@ -311,8 +312,9 @@ class client_workload_driver():
 
     def gen_next_operation(self, workload):
         percentage = workload_write_percentage[workload]
-        # if int(random.random() * 100) < percentage:
-        if ((self.completed_requests * 1337) % 100) < percentage:
+        if self.completed_puts == 0:
+            return "put"
+        if ((self.completed_requests * 1337) % 100) < percentage or self.completed_requests == 0:
             return "put"
         else:
             return "get"
@@ -383,7 +385,7 @@ class client_state_machine(state_machine):
     def read_successful(self, key):
         if self.read_values_found == 0:
             success = False
-            self.info("Read Failed: " + str(key)) if __debug__ else None
+            self.info("Read Incomplete: " + str(key)) if __debug__ else None
         elif self.read_values_found == 1:
             success = True
             self.info("Read Complete: " + str(self.read_values)) if __debug__ else None
@@ -398,7 +400,7 @@ class client_state_machine(state_machine):
     #return true if the read is complete
     def wait_for_read_messages_fsm(self, table, message, key):
         if message != None and vrdma.message_type(message) == "read_response":
-
+            self.info("unpacking read response " + str(message)) if __debug__ else None
             #unpack and check the response for a valid read
             args = vrdma.unpack_read_response(message)
             vrdma.fill_local_table_with_read_response(table, args)
@@ -498,6 +500,7 @@ class basic_memory_state_machine(state_machine):
             #self.info("Masked CAS in Memory: "+ str(args["lock_index"]) + " Old: " + str(args["old"]) + " New: " + str(args["new"]) + " Mask: " + str(args["mask"]))
             success, value = vrdma.masked_cas_lock_table(self.table, **args)
             response = vrdma.Message({"function": vrdma.fill_lock_table_masked_cas, "function_args":{"lock_index":args["lock_index"], "success":success, "value": value, "mask":args["mask"]}})
+            # self.table.print_table() if __debug__ else None
             return response
             
         else:

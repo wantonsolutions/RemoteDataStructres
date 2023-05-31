@@ -1,12 +1,12 @@
 from . import state_machines
 from . import virtual_rdma as vrdma
-from . import hash
 
 class race(state_machines.client_state_machine):
     def __init__(self, config):
         super().__init__(config)
 
         self.table = config["table"]
+        self.hash_module = config["hash_module"]
 
     def idle_fsm(self, message):
         return self.general_idle_fsm(message)
@@ -20,7 +20,7 @@ class race(state_machines.client_state_machine):
         return messages
 
     def begin_insert_second_read(self):
-        messages = vrdma.race_messages(self.current_insert_value, self.table.get_row_count(), self.table.row_size_bytes())
+        messages = vrdma.race_messages(self.hash_module.race_hash_locations,self.current_insert_value, self.table.get_row_count(), self.table.row_size_bytes())
         self.outstanding_read_requests = len(messages)
         self.read_values_found = 0
         self.read_values = []
@@ -29,7 +29,7 @@ class race(state_machines.client_state_machine):
 
     def begin_extent_read(self):
         #todo read an extent, this currently just reads the table again
-        messages = vrdma.race_message_read_key_location(self.current_insert_value, self.table.get_row_count(), self.table.row_size_bytes(),0)
+        messages = vrdma.race_message_read_key_location(self.hash_module.race_hash_locations, self.current_insert_value, self.table.get_row_count(), self.table.row_size_bytes(),0)
         self.outstanding_read_requests = len(messages)
         self.read_values_found = 0
         self.read_values = []
@@ -37,12 +37,12 @@ class race(state_machines.client_state_machine):
         return messages
 
     def put(self):
-        messages = vrdma.race_messages(self.current_insert_value, self.table.get_row_count(), self.table.row_size_bytes())
+        messages = vrdma.race_messages(self.hash_module.race_hash_locations,self.current_insert_value, self.table.get_row_count(), self.table.row_size_bytes())
         self.current_insert_rtt+=1
         return self.begin_insert(messages)
 
     def get(self):
-        messages = vrdma.race_messages(self.current_read_key, self.table.get_row_count(), self.table.row_size_bytes())
+        messages = vrdma.race_messages(self.hash_module.race_hash_locations,self.current_read_key, self.table.get_row_count(), self.table.row_size_bytes())
         self.current_read_rtt+=1
         return self.begin_read(messages)
 
@@ -82,7 +82,7 @@ class race(state_machines.client_state_machine):
 
 
     def power_of_two_cas_location(self, key, table_size):
-        locations = hash.race_hash_locations(key, table_size)
+        locations = self.hash_module.race_hash_locations(key, table_size)
         bucket_0, overflow_0 = locations[0]
         bucket_1, overflow_1 = locations[1]
 

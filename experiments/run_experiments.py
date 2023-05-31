@@ -1,8 +1,6 @@
 import simulator.simulation_runtime as sim
 import simulator.cuckoo
-import simulator.state_machines as sm
 import simulator.race as race
-import simulator.hash as hash
 import simulator.log as log
 
 import simulator.rcuckoo_basic as rcuckoo_basic
@@ -781,24 +779,29 @@ def plot_race_bucket_fill_factor():
 
 def run_hero_ycsb():
     logger = log.setup_custom_logger('root')
-    logger.info("Starting simulator")
-    table_size = 1680
+    logger.info("Starting simulator Hero YCSB")
+    # table_size = 1680
+    table_size = 1680 * 10
     # table_size=420
-    # clients = [1,2,4,8,16,32,64,128]
-    clients = [1,2]
-    state_machines = [cuckoo.rcuckoo,race.race]
+    clients = [1,2,4,8,16,32,64,128]
+    # clients = [2]
+    state_machines = [cuckoo.rcuckoo]
 
     master_config = get_config()
     master_config["bucket_size"]=8
-    master_config['num_steps'] = 100000000000
+    master_config['num_steps'] = 10000000
     master_config['bucket_size'] = 8
     master_config['read_threshold_bytes'] = 512
     master_config['indexes'] = table_size
     master_config['trials'] = 1
     master_config['max_fill']= 90
+    master_config['deterministic'] = False
     # workloads = ["ycsb-a", "ycsb-b","ycsb-c", "ycsb-w"]
-    workloads = ["ycsb-a", "ycsb-b", "ycsb-w"]
+    # workloads = ["ycsb-a", "ycsb-b"]
+    workloads = ["ycsb-w"]
+    # workloads = ["ycsb-a", "ycsb-a"]
     log.set_off()
+    # log.set_debug()
 
     #ycsb-a
     for workload in workloads:

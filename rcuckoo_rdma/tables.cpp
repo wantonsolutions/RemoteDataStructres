@@ -54,6 +54,7 @@ namespace cuckoo_tables {
     /*lock table functions*/
     Lock_Table::Lock_Table(){
         _total_locks = 0;
+        _total_lock_entries = 0;
         _locks = NULL;
 
     }
@@ -64,25 +65,34 @@ namespace cuckoo_tables {
         unsigned int table_rows = row_size / bucket_size;
         assert(table_rows % buckets_per_lock == 0);
         _total_locks = table_rows / buckets_per_lock;
-        _locks = new uint8_t[_total_locks];
+        _total_lock_entries = (_total_locks / 8) + 4;
+        _locks = new uint8_t[_total_lock_entries];
         this->unlock_all();
 
     }
 
     void Lock_Table::unlock_all(){
-        for (unsigned int i = 0; i < _total_locks; i++){
+        for (unsigned int i = 0; i < _total_lock_entries; i++){
             _locks[i] = 0;
         }
     }
     CasOperationReturn Lock_Table::masked_cas(unsigned int index, uint64_t old, uint64_t new_value, uint64_t mask){
-
+        assert(index <= _total_lock_entries + 4);
+        // cout << "indexing into lock table: " << index << endl;
         uint64_t *va = (uint64_t *) &_locks[index];
         CasOperationReturn atomic_response = CasOperationReturn();
         atomic_response.original_value = *va;
+        atomic_response.success = false;
+        // cout << "original value pre operation " << atomic_response.original_value << endl;
+        // cout << "pointer value pre operation " << *va << endl;
+
         if (!((old ^ *va) & mask)) {
             *va = (*va & ~(mask)) | (new_value & mask);
+            atomic_response.success = true;
         }
-        atomic_response.success = (atomic_response.original_value == *va);
+
+        // cout << "original value post operation " << atomic_response.original_value << endl;
+        // cout << "pointer value post operation " << *va << endl;
         return atomic_response;
     }
 
@@ -97,7 +107,7 @@ namespace cuckoo_tables {
 
     string Lock_Table::to_string(){
         string output_string = "";
-        for (unsigned int i = 0; i < _total_locks; i++){
+        for (unsigned int i = 0; i < _total_lock_entries; i++){
             output_string += std::to_string(i) + ": " + std::to_string(_locks[i]) + "\n";
         }
         return output_string;
@@ -232,15 +242,16 @@ namespace cuckoo_tables {
 
     float Table::get_fill_percentage(){
         unsigned int max_fill = _table_size * _bucket_size;
-        unsigned int current_fill = 0;
-        for (unsigned int i = 0; i < _table_size; i++){
-            for (unsigned int j = 0; j < _bucket_size; j++){
-                if (!_table[i][j].is_empty()){
-                    current_fill++;
-                }
-            }
-        } 
-        return float(current_fill) / float(max_fill);
+        // unsigned int current_fill = 0;
+        // for (unsigned int i = 0; i < _table_size; i++){
+        //     for (unsigned int j = 0; j < _bucket_size; j++){
+        //         if (!_table[i][j].is_empty()){
+        //             current_fill++;
+        //         }
+        //     }
+        // } 
+        // return float(current_fill) / float(max_fill);
+        return float(_fill) / float(max_fill);
     }
 
     bool Table::full(){

@@ -1,6 +1,4 @@
 from . import state_machines
-from . import search
-from . import hash
 from . import virtual_rdma as vrdma
 
 class rcuckoo_basic(state_machines.client_state_machine):
@@ -8,6 +6,7 @@ class rcuckoo_basic(state_machines.client_state_machine):
         super().__init__(config)
         self.table = config["table"]
         self.search_module = config["search_module"]
+        self.hash_module = config["hash_module"]
 
         #inserting and locking
         self.current_insert_value = None
@@ -23,9 +22,20 @@ class rcuckoo_basic(state_machines.client_state_machine):
         self.current_locking_messages = []
         self.locking_message_index = 0
 
+        self.set_location_function(config)
+
+    def set_location_function(self, config):
+        location_function = config['location_function']
+        if location_function == "dependent":
+            self.location_function = self.hash_module.rcuckoo_hash_locations
+        elif location_function == "independent":
+            self.location_function = self.hash_module.rcuckoo_hash_locations_independent
+        else:
+            raise Exception("unknown location function")
+
 
     def get(self):
-        messages = vrdma.read_threshold_message(self.current_read_key, self.read_threshold_bytes, self.table.get_row_count(), self.table.row_size_bytes())
+        messages = vrdma.read_threshold_message(self.location_function, self.current_read_key, self.read_threshold_bytes, self.table.get_row_count(), self.table.row_size_bytes())
         return self.begin_read(messages)
 
     def put(self):
@@ -58,7 +68,7 @@ class rcuckoo_basic(state_machines.client_state_machine):
     def search(self, message=None):
         assert message == None, "there should be no message passed to search"
 
-        self.search_path=self.search_module.bucket_cuckoo_a_star_insert(self.table, hash.rcuckoo_hash_locations, self.current_insert_value)
+        self.search_path=self.search_module.bucket_cuckoo_a_star_insert(self.table, self.hash_module.rcuckoo_hash_locations, self.current_insert_value)
         if len(self.search_path) == 0:
             self.info("Search Failed: " + str(self.current_insert_value) + "| unable to continue, client " + str(self.id) + " is done")
             self.complete=True

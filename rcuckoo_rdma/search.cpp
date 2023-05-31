@@ -20,14 +20,22 @@ namespace cuckoo_search {
     //Take a path and return a vector of the bucket indices
     //The bucket indicies are unique
     vector<unsigned int> search_path_to_buckets(vector<path_element> path){
-        cout << "search_path_to_buckets not implemented" << endl;
         vector<unsigned int> buckets;
         for (auto pe : path){
             buckets.push_back(pe.bucket_index);
         }
         set<unsigned int> s( buckets.begin(), buckets.end() );
         buckets.assign( s.begin(), s.end() );
-        return buckets;
+
+        vector<unsigned int> set_sorted_buckets(s.begin(), s.end());
+        sort(set_sorted_buckets.begin(), set_sorted_buckets.end());
+
+        //todo fix this functionality
+        set_sorted_buckets.pop_back(); // This removes the -1 element which will be big 4294967295 after sorting unsigned ints (legacy from searching weird)
+        // for (auto b : set_sorted_buckets){
+        //     cout << "search path to buckets bucket " << b << endl;
+        // }
+        return set_sorted_buckets;
     }
 
     vector<path_element> random_dfs_search(Key key, unsigned int table_size){
@@ -89,14 +97,16 @@ namespace cuckoo_search {
         if (path.size() <= 0){
             return 0;
         }
+        //todo fix this functionality using this large value is bad
+        #define UNSIGNED_INT_MAX 4294967295
         assert(path.size() > 0 );
-        unsigned int min = path[0].bucket_index;
-        unsigned int max = path[0].bucket_index;
+        unsigned int min = UNSIGNED_INT_MAX;
+        unsigned int max = 0;
         for (auto pe : path){
             if (pe.bucket_index < min){
                 min = pe.bucket_index;
             }
-            if (pe.bucket_index > max){
+            if (pe.bucket_index > max and pe.bucket_index != UNSIGNED_INT_MAX){
                 max = pe.bucket_index;
             }
         }

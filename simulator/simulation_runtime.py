@@ -7,20 +7,23 @@ import git
 from tqdm import tqdm
 import random
 import traceback
+import copy
 
-from . import log
-from . import tables
 from . import rcuckoo_basic
 from . import state_machines
-from . import hash
-from . import search
+from . import log
 
 
-# import log
-# import tables
-# import cuckoo
-# import rcuckoo_basic
-# import search
+simulator=False
+if simulator:
+    from . import hash
+    from . import tables
+    from . import search
+else:
+    import rcuckoo_wrap as hash
+    import rcuckoo_wrap as tables
+    import rcuckoo_wrap as search
+    tables.Table = tables.PyTable
 
 
 import logging
@@ -342,6 +345,7 @@ class Simulator(Node):
             client_config['workload']=self.config['workload']
             client_config['deterministic']=self.config['deterministic']
             client_config['search_module']=self.config['search_module']
+            client_config['hash_module']=self.config['hash_module']
 
             c = Client(client_config)
 
@@ -364,6 +368,7 @@ class Simulator(Node):
 
         self.config['state_machine']=state_machines.get_state_machine_name(self.config['state_machine'])
         self.config['search_module']=self.config['search_module'].__name__
+        self.config['hash_module']=self.config['hash_module'].__name__
 
         print(self.config)
         self.config_set = True
@@ -427,7 +432,7 @@ class Simulator(Node):
 
         #simulator stats
         statistics['config'] = dict()
-        statistics['config'] = self.config
+        statistics['config'] = copy.copy(self.config)
         statistics['simulator'] = dict()
         statistics['simulator']['steps'] = self.step
 
@@ -485,6 +490,7 @@ def default_config():
     config['location_function']="dependent"
 
     config['search_module']=search
+    config['hash_module']=hash
 
     config['date']=datetime.datetime.now().strftime("%Y-%m-%d")
     config['commit']=git.Repo(search_parent_directories=True).head.object.hexsha
@@ -496,7 +502,7 @@ def run_trials(config):
     runs = []
     trials = config['trials']
     for i in tqdm(range(trials)):
-        c=config.copy()
+        c=copy.copy(config)
         sim = Simulator(c)
         try:
             sim.run()
@@ -511,6 +517,7 @@ def run_trials(config):
         sim.validate_run()
         stats = sim.collect_stats()
         runs.append(stats)
+        del sim
     return runs
 
 

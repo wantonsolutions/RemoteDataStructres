@@ -2,7 +2,6 @@
 from tqdm import tqdm
 import json
 
-from . import hash
 from . import state_machines
 from . import virtual_rdma as vrdma
 
@@ -41,6 +40,7 @@ class rcuckoo(state_machines.client_state_machine):
         # self.current_lock_read_messages = []
         # self.locking_message_index = 0
         self.search_module = config['search_module']
+        self.hash_module = config['hash_module']
 
         self.set_search_function(config)
         self.set_location_function(config)
@@ -68,15 +68,15 @@ class rcuckoo(state_machines.client_state_machine):
     def set_location_function(self, config):
         location_function = config['location_function']
         if location_function == "dependent":
-            self.location_function = hash.rcuckoo_hash_locations
+            self.location_function = self.hash_module.rcuckoo_hash_locations
         elif location_function == "independent":
-            self.location_function = hash.rcuckoo_hash_locations_independent
+            self.location_function = self.hash_module.rcuckoo_hash_locations_independent
         else:
             raise Exception("unknown location function")
 
     def get(self):
         self.current_read_rtt +=1
-        messages = vrdma.read_threshold_message(self.current_read_key, self.read_threshold_bytes, self.table.get_row_count(), self.table.row_size_bytes())
+        messages = vrdma.read_threshold_message(self.location_function, self.current_read_key, self.read_threshold_bytes, self.table.get_row_count(), self.table.row_size_bytes())
         return self.begin_read(messages)
 
     def put(self):
@@ -177,6 +177,8 @@ class rcuckoo(state_machines.client_state_machine):
 
     def table_search_function(self, limit_to_buckets=None):
         # return self.a_star_insert_self(limit_to_buckets)
+        print("This function should be overloaded with a search function for example", str(self.a_star_insert_self))
+        return
         raise Exception("This function should be overloaded with a search function for example", str(self.a_star_insert_self))
 
     def search(self, message=None):
@@ -188,8 +190,10 @@ class rcuckoo(state_machines.client_state_machine):
             self.complete=True
             self.state = "idle"
             return None
-
+        self.info("Current insert value " + str(self.current_insert_value)) if __debug__ else None
         self.info("Successful local search for [key: " + str(self.current_insert_value) + "] [path: " +self.search_module.path_to_string(self.search_path) + "]") if __debug__ else None
+        # self.info("Printing table in function search() Table:") if __debug__ else None
+        # self.table.print_table() if __debug__ else None
         self.state="aquire_locks"
         return self.aquire_locks()
 
