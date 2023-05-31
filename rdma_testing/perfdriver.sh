@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 packetsizes=( 1470 1500 2900 )
 numinst=$1
