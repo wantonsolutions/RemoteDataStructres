@@ -1,5 +1,5 @@
 TARGET := rdma_common.o rdma_client.o
-CFLAGS = -O3 -Wall -Wall -Wextra -pedantic -fPIC
+CFLAGS = -std=c++2a -O3 -Wall -Wall -Wextra -pedantic -fPIC
 
 # CC=gcc
 CC=g++

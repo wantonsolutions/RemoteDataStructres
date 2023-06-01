@@ -15,8 +15,8 @@ static struct ibv_context **devices;
 static struct rdma_event_channel *cm_event_channel = NULL;
 static struct rdma_cm_id *cm_client_qp_id[MAX_QPS];
 static struct ibv_pd *pd = NULL;
-static struct ibv_comp_channel *io_completion_channel = NULL;
-static struct ibv_cq *client_cq = NULL;
+// static struct ibv_comp_channel *io_completion_channel = NULL;
+// static struct ibv_cq *client_cq = NULL;
 static struct ibv_qp_init_attr qp_init_attr;
 static struct ibv_qp *client_qp[MAX_QPS];
 static struct ibv_device_attr dev_attr;
@@ -55,7 +55,8 @@ static struct ibv_comp_channel *io_completion_channel_threads[MAX_THREADS];
 
 /* Rdtsc blocks for time measurements */
 unsigned cycles_low, cycles_high, cycles_low1, cycles_high1;
-static __inline__ unsigned long long rdtsc(void)
+// static __inline__ unsigned long long rdtsc(void)
+static __inline__ void rdtsc(void)
 {
    __asm__ __volatile__ ("RDTSC\n\t"
             "mov %%edx, %0\n\t"
@@ -63,7 +64,8 @@ static __inline__ unsigned long long rdtsc(void)
             "%rax", "rbx", "rcx", "rdx");
 }
 
-static __inline__ unsigned long long rdtsc1(void)
+// static __inline__ unsigned long long rdtsc1(void)
+static __inline__ void rdtsc1(void)
 {
    __asm__ __volatile__ ("RDTSC\n\t"
             "mov %%edx, %0\n\t"
@@ -72,7 +74,8 @@ static __inline__ unsigned long long rdtsc1(void)
 }
 
 unsigned xcycles_low, xcycles_high, xcycles_low1, xcycles_high1;
-static __inline__ unsigned long long xrdtsc(void)
+// static __inline__ unsigned long long xrdtsc(void)
+static __inline__ void xrdtsc(void)
 {
    __asm__ __volatile__ ("RDTSC\n\t"
             "mov %%edx, %0\n\t"
@@ -80,7 +83,8 @@ static __inline__ unsigned long long xrdtsc(void)
             "%rax", "rbx", "rcx", "rdx");
 }
 
-static __inline__ unsigned long long xrdtsc1(void)
+// static __inline__ unsigned long long xrdtsc1(void)
+static __inline__ void xrdtsc1(void)
 {
    __asm__ __volatile__ ("RDTSC\n\t"
             "mov %%edx, %0\n\t"
@@ -646,7 +650,7 @@ void * xput_thread(void * args) {
     uint64_t local_server_address = server_qp_metadata_attr[0].address;
 
     int	buf_offset = 0, slot_num = 0;
-    int buf_num = 0;
+    // int buf_num = 0;
 
     // char * buf_ptr;
 
@@ -720,7 +724,7 @@ void * xput_thread(void * args) {
                     local_client_send_wr_batch[i].wr.atomic.remote_addr = local_server_address + buf_offset;
                     local_client_send_wr_batch[i].wr.atomic.compare_add = 1ULL;
                 }
-                buf_num     = targs->thread_id;
+                // buf_num     = targs->thread_id;
 
                 // ret = ibv_post_send(client_qp[qp_num], 
                 //         &local_client_send_wr_batch[i],
@@ -775,6 +779,7 @@ void * xput_thread(void * args) {
     result.cq_poll_count = poll_count * 1.0 / wr_acked;     // TODO: Is dividing by wr the right way to interpret this number?
     result.cq_empty_count = idle_count * 1.0 / wr_acked;     // TODO: Is dividing by wr the right way to interpret this number?
     thread_results[targs->thread_id]=result;
+    return NULL;
 
 }
 
@@ -814,6 +819,7 @@ static result_t measure_xput(
         return result;
     }
 
+    mr_mode=mr_mode; //to avoid warning
     /*
     num_lbuffers = (mr_mode == MR_MODE_PRE_REGISTER_WITH_ROTATE) ? num_lbuffers : 1;
     if (num_lbuffers <= 0) {
@@ -860,7 +866,7 @@ static result_t measure_xput(
     /* For sanity check, fill the client buffer with different alphabets in each message. 
      * We can verify this by reading the server buffer later. Only works for RDMA WRITEs though */
     for (i = 0; i < num_concur; i++)
-        memset(mr_buffers[0]->addr + (i*msg_size), 'a' + i%26, msg_size);
+        memset((uint8_t*)mr_buffers[0]->addr + (i*msg_size), 'a' + i%26, msg_size);
 
     /* Prepare a template WR for RDMA ops */
     client_send_sge.addr = (uint64_t) mr_buffers[0]->addr;  
@@ -961,7 +967,7 @@ static result_t measure_xput(
         //buf_offset  = slot_num * msg_size * 1024;
         buf_offset = get_buf_offset(slot_num,msg_size);
         buf_num     = (buf_num + 1) % num_lbuffers;
-	    buf_ptr     = (char *) (mr_buffers[buf_num]->addr + buf_offset);     /* We can always use mr_buffers[0] as all buffers point to same memory */
+	    buf_ptr     = (char *)((char *)(mr_buffers[buf_num]->addr) + buf_offset);     /* We can always use mr_buffers[0] as all buffers point to same memory */
         //printf("%p buf\n",buf_ptr);
         // buf_num     = rand_xorshf96() % num_lbuffers;
         qp_num      = (qp_num + 1) % num_qps;
@@ -1191,10 +1197,10 @@ int main(int argc, char **argv) {
     server_sockaddr.sin_family = AF_INET;
     server_sockaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     /* buffers are NULL */
-    char* dummy_text = "HELLO";
+    const char* dummy_text = "HELLO";
     src = dst = NULL; 
     int simple = 0, i;
-    int rtt_flag = 0, xput_flag = 0, xputv2_flag = 0;
+    int rtt_flag = 0, xput_flag = 0;
     int num_concur = 1;
     int num_mbuf = 1;
     int msg_size = 0;
@@ -1204,18 +1210,17 @@ int main(int argc, char **argv) {
 
     /* Parse Command Line Arguments */
     static const struct option options[] = {
-        {.name = "simple", .has_arg = no_argument, .val = 's'},
-        {.name = "rtt", .has_arg = no_argument, .val = 'r'},
-        {.name = "xput", .has_arg = no_argument, .val = 'x'},
-        {.name = "xputv2", .has_arg = no_argument, .val = 'y'},
-        {.name = "concur", .has_arg = required_argument, .val = 'c'},
-        {.name = "buffers", .has_arg = required_argument, .val = 'b'},
-        {.name = "msgsize", .has_arg = required_argument, .val = 'm'},
-        {.name = "out", .has_arg = required_argument, .val = 'o'},
-        {.name = "qps", .has_arg = required_argument, .val = 'q'},
+        {.name = "simple", .has_arg = no_argument, .flag=NULL, .val = 's'},
+        {.name = "rtt", .has_arg = no_argument, .flag=NULL, .val = 'r'},
+        {.name = "xput", .has_arg = no_argument, .flag=NULL, .val = 'x'},
+        {.name = "concur", .has_arg = required_argument, .flag=NULL, .val = 'c'},
+        {.name = "buffers", .has_arg = required_argument, .flag=NULL, .val = 'b'},
+        {.name = "msgsize", .has_arg = required_argument, .flag=NULL, .val = 'm'},
+        {.name = "out", .has_arg = required_argument, .flag=NULL, .val = 'o'},
+        {.name = "qps", .has_arg = required_argument, .flag=NULL, .val = 'q'},
         {}
     };
-    while ((option = getopt_long(argc, argv, "sa:p:rxyc:b:m:o:q:", options, NULL)) != -1) {
+    while ((option = getopt_long(argc, argv, "sa:p:rxc:b:m:o:q:", options, NULL)) != -1) {
         switch (option) {
             case 's':
                 /* run the basic example to test connection */
@@ -1226,7 +1231,7 @@ int main(int argc, char **argv) {
                     return -ENOMEM;
                 }
                 /* Copy the passes arguments */
-                strncpy(src, dummy_text, strlen(dummy_text));
+                memcpy(src, dummy_text, strlen(dummy_text));
                 dst = (char * )calloc(strlen(dummy_text), 1);
                 if (!dst) {
                     rdma_error("Failed to allocate destination memory, -ENOMEM\n");
@@ -1253,10 +1258,6 @@ int main(int argc, char **argv) {
             case 'x':
                 /* Run xput measurement */
                 xput_flag = 1;
-                break;
-            case 'y':
-                /* Run advanced xput measurements for different data transfer modes  */
-                xputv2_flag = 1;
                 break;
             case 'c':
                 /* concurrency i.e., number of requests in flight */
@@ -1382,16 +1383,16 @@ int main(int argc, char **argv) {
         }
             printf("done excanging metadata with server");
         
-        int min_num_concur = num_concur == 0 ? 1 : num_concur;
-        int max_num_concur = num_concur == 0 ? 256 : num_concur;        /* Empirically found that anything above this number does not matter for single core */
+        // int min_num_concur = num_concur == 0 ? 1 : num_concur;
+        // int max_num_concur = num_concur == 0 ? 256 : num_concur;        /* Empirically found that anything above this number does not matter for single core */
 
         int min_msg_size = msg_size == 0 ? 64 : msg_size;
         int max_msg_size = msg_size == 0 ? 4096 : msg_size;
         int msg_size_incr = 64;
 
-        int min_num_mbuf = num_mbuf == 0 ? 1 : num_mbuf;
+        // int min_num_mbuf = num_mbuf == 0 ? 1 : num_mbuf;
         // int max_num_mbuf = num_mbuf == 0 ? MAX_MR : num_mbuf;
-        int max_num_mbuf = num_mbuf == 0 ? 1e6 : num_mbuf;
+        // int max_num_mbuf = num_mbuf == 0 ? 1e6 : num_mbuf;
 
         /* Get roundtrip latencies for ops */
         if (rtt_flag) {
