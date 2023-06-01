@@ -145,3 +145,74 @@ single round trip, and all reads to finish in a max of 2
 round trips depending on how stale their local cache is.
 
 
+\subsection{Consistency Issues}
+
+Appending to the log, and steering with the middle box leads
+to some potential consistency issues. If two client both
+simultaneously issue write requests The write operation may
+be ordered by the switch and then reordered downstream by
+the receiving side nic. The reads which follow may witness
+only a partial write. This potential inconsistency demands a solution.
+
+\textbf{Single QP} The middlebox can steer all requests onto
+a single QP. If it is a reliable qp then all reads will be
+ordered after the writes. This solution is simple, but it
+requires that the middlebox maintain RDMA state, and it is
+also limited by the bottleneck of a single QP on the server.
+
+\textbf{Head and Tail Log pointers} The middlebox can track
+which requests have returned successfully from the log.
+Reads can be issued only to the tail pointer where all
+requests are guaranteed to have completed. This is similar
+to fawn. This has the downside that reads may not be up to
+date frequently. Clients may have to wait a short amount of
+time before their reads are valid. 
+
+One option here is for the switch to hold the read until it
+sees the write response. The other option is for the client
+to just wait 1/4 of the RTT and then issue the read.
+
+\textbf{CAS for commits} Clients could issue all of their
+writes as CAS operations. This ensures that clients can read
+anything at any pont and be sure that it is consistent.
+However they may still need to retry their read if it is
+stale. This limits the append ony operations to the speed of
+CAS operations. Second, the cas operations are limited in size, which restricts the scope of log entries.
+
+\textbf{CRCs} Each of the write operations could have a CRC
+attached. Clients can simply reconstruct the potentially
+incomplete log and check the CRC to determine if it's
+correct. only when inconsistency is found will the client
+need to re-issue a read. The problem here is that clients
+need to calculate CRC's, the CRC's take up extra space in
+the log, and it's not obvious that they are required.
+
+\subsection{Failures}
+
+Complex failure conditions exist which could lead to this
+idea being poor. Once the middlebox has steered an append,
+by all acounts it is commited. However there are many issues
+with this strategy. If an append is sent from the switch and
+then dropped, the client must repeat the operation. The
+switch has no control over how to move the operation forward
+itself. This means that until the client reissues the failed
+request all other clients must pause.
+
+If the failed message is followed by a client failure, the
+entire system fails. Reconstructing the log from this failed
+state is difficult re-swordbox. One potential solution is to
+simply skip over the failed operation, work on what to do
+with corrupted append only logs should have something to
+say.
+
+If the switch fails, this system can continue on swimmingly,
+however it can not issue writes correctly. Clients must rus
+a CAS + Write to an allocated location in the log. This must
+be done with 2 rtt for safety. I think only wat to go about
+this is to have an agreed upon protocol for log entries
+which are blank past a certian point. i.e if a log entry is
+not finished and is 100+ from the end of the log then it
+becomes invalid and the operation does not exist.
+
+
+
