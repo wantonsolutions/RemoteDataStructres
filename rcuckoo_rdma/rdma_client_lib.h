@@ -1,0 +1,77 @@
+#ifndef RDMA_CLIENT_LIB_H
+#define RDMA_CLIENT_LIB_H
+
+#define MAX_THREADS 32
+#define MULTI_CQ
+
+class RDMAConnectionManager {
+    public:
+        /* These are basic RDMA resources */
+        /* These are RDMA connection related resources */
+        static struct ibv_context **devices;
+        static struct rdma_event_channel *cm_event_channel;
+        static struct rdma_cm_id *cm_client_qp_id[MAX_QPS];
+        static struct ibv_pd *pd;
+        // static struct ibv_comp_channel *io_completion_channel = NULL;
+        // static struct ibv_cq *client_cq = NULL;
+        static struct ibv_qp_init_attr qp_init_attr;
+        static struct ibv_qp *client_qp[MAX_QPS];
+        static struct ibv_device_attr dev_attr;
+        /* These are memory buffers related resources */
+        static struct ibv_mr *client_qp_src_mr[MAX_QPS];
+        static struct ibv_mr *client_qp_dst_mr[MAX_QPS];
+        static struct ibv_mr *client_qp_metadata_mr[MAX_QPS];
+        static struct ibv_mr *server_qp_metadata_mr[MAX_QPS];
+        static struct rdma_buffer_attr client_qp_metadata_attr[MAX_QPS], server_qp_metadata_attr[MAX_QPS];
+        static struct ibv_send_wr client_send_wr, *bad_client_send_wr;
+        static struct ibv_recv_wr server_recv_wr, *bad_server_recv_wr;
+        static struct ibv_sge client_send_sge, server_recv_sge;
+        uint32_t thread_contexts[MAX_THREADS];
+        RDMAConnectionManager();
+        ~RDMAConnectionManager();
+        RDMAConnectionManager(unsigned int connections);
+
+        int client_setup_shared_resources();
+        int client_prepare_connection(struct sockaddr_in *s_addr, int qp_num, int port_num);
+        int client_pre_post_recv_buffer(int qp_num);
+        int client_connect_qp_to_server(int qp_num);
+        int client_xchange_metadata_with_server(int qp_num, char* buffer, uint32_t buffer_size);
+        int client_disconnect_and_clean(int qp_num);
+        int client_clean();
+
+
+    private:
+
+};
+
+/* List of ops that are being instrumented */
+enum rdma_measured_op { RDMA_READ_OP, RDMA_WRITE_OP, RDMA_CAS_OP, RDMA_FAA_OP};
+enum mem_reg_mode { 
+    MR_MODE_PRE_REGISTER,               // Use a pre-registered buffer and use it for all transactions
+    MR_MODE_PRE_REGISTER_WITH_ROTATE,   // Use a set of pre-registered buffers (for the same piece of memory) but rotate their usage
+    MR_MODE_REGISTER_IN_DATAPTH,        // Register buffers in datapath as necessary
+};
+
+struct xput_thread_args {
+    int thread_id;
+    int core;
+    int num_concur;
+    struct ibv_cq *cq_ptr;
+    int msg_size;
+    enum rdma_measured_op rdma_op;      // rdma op to use i.e., read or write
+    uint64_t start_cycles;
+    struct ibv_mr **mr_buffers;           /* Make sure to deregister these local MRs before exiting */
+    int num_lbuffers;
+};
+
+#define HIST_SIZE 32
+
+/* Data transfer modes */
+enum data_transfer_mode { 
+    DTR_MODE_NO_GATHER,         // Assume that data is already gathered in a single big buffer
+    DTR_MODE_CPU_GATHER,        // Assume that data is scattered but is gathered by CPU into a single big buffer before xmit
+    DTR_MODE_NIC_GATHER,        // Assume that data is scattered but is gathered by NIC with a scatter-gather op during xmit
+    DTR_MODE_PIECE_BY_PIECE,    // Assume that data is scattered but each piece is sent in a different rdma write op
+};
+
+#endif
