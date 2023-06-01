@@ -146,7 +146,7 @@ static int client_setup_shared_resources()
         * A completion channel is also tied to an RDMA device
         */
         io_completion_channel_threads[i] = ibv_create_comp_channel(devices[0]);
-        printf("io completion channel @ %p\n",io_completion_channel_threads[i]);
+        printf("io completion channel @ %p\n",(void*)io_completion_channel_threads[i]);
         if (!io_completion_channel_threads[i]) {
             rdma_error("Failed to create IO completion event channel %d, errno: %d\n",
                     i,-errno);
@@ -187,7 +187,7 @@ static int client_setup_shared_resources()
             rdma_error("Failed to create CQ, errno: %d \n", -errno);
             return -errno;
         }
-        printf("CQ created at %p with %d elements \n", client_cq_threads[i], client_cq_threads[i]->cqe);
+        printf("CQ created at %p with %d elements \n", (void*)client_cq_threads[i], client_cq_threads[i]->cqe);
         ret = ibv_req_notify_cq(client_cq_threads[i], 0);
         if (ret) {
             rdma_error("Failed to request notifications, errno: %d\n", -errno);
@@ -289,7 +289,7 @@ static int client_prepare_connection(struct sockaddr_in *s_addr, int qp_num, int
         return -errno;
     }
     client_qp[qp_num] = cm_client_qp_id[qp_num]->qp;
-    printf("QP %d created at %p \n", qp_num, client_qp[qp_num]);
+    printf("QP %d created at %p \n", qp_num, (void *)client_qp[qp_num]);
     return ret;
 }
 
@@ -440,10 +440,10 @@ static int client_remote_memory_ops(int qp_num)
 {
     struct ibv_wc wc;
     int ret = -1;
-    struct timeval start, end;
-    long ops_count = 0;
-    double duration = 0.0;
-    double throughput = 0.0;
+    // struct timeval start, end;
+    // long ops_count = 0;
+    // double duration = 0.0;
+    // double throughput = 0.0;
     uint64_t start_cycles, end_cycles;
 
     client_qp_dst_mr[qp_num] = rdma_buffer_register(pd,
@@ -569,7 +569,7 @@ void * xput_thread(void * args) {
     int msg_size = targs->msg_size;
     enum rdma_measured_op rdma_op = targs->rdma_op;
     struct ibv_mr **mr_buffers=targs->mr_buffers;           /* Make sure to deregister these local MRs before exiting */
-    int num_lbuffers = targs->num_lbuffers;
+    // int num_lbuffers = targs->num_lbuffers;
 
     uint64_t start_cycles, end_cycles;
     start_cycles=targs->start_cycles;
@@ -577,12 +577,12 @@ void * xput_thread(void * args) {
 
     struct ibv_wc* wc;
     int ret = -1, n, i;
-    uint64_t xstart_cycles, xend_cycles;
+    // uint64_t xstart_cycles, xend_cycles;
     struct timeval      start, end;
 
-    const uint64_t minimum_duration_secs = 20;  /* number of seconds to run the experiment for at least */
-    const uint64_t check_watch_interval = 1e6;  /* Check time every million requests as checking on every request might be too costly */
-    int stop_posting = 0;
+    // const uint64_t minimum_duration_secs = 20;  /* number of seconds to run the experiment for at least */
+    // const uint64_t check_watch_interval = 1e6;  /* Check time every million requests as checking on every request might be too costly */
+    // int stop_posting = 0;
     uint64_t poll_time = 0, poll_count = 0, idle_count = 0;
     uint64_t wr_posted = 0, wr_acked = 0;
     int qp_num = 0;
@@ -648,7 +648,7 @@ void * xput_thread(void * args) {
     int	buf_offset = 0, slot_num = 0;
     int buf_num = 0;
 
-    char * buf_ptr;
+    // char * buf_ptr;
 
     //printf("[Thread %d] io ref %d\n",targs->thread_id, cq_ptr->channel->refcnt);
 
@@ -707,7 +707,7 @@ void * xput_thread(void * args) {
 
                 //buf_offset = slot_num * msg_size;
                 buf_offset = get_buf_offset(slot_num,msg_size);
-                buf_ptr     = mr_buffers[buf_num]->addr + buf_offset;
+                // buf_ptr     = (char *)(mr_buffers[buf_num]->addr + buf_offset);
 
                 local_client_send_wr_batch[i].wr_id = wr_id.val;              /* User-assigned id to recognize this WR on completion */
                 local_client_send_wr_batch[i].wr.rdma.remote_addr = local_server_address + buf_offset;
@@ -791,12 +791,12 @@ static result_t measure_xput(
     int ret = -1, n, i;
     struct ibv_wc* wc;
     uint64_t start_cycles, end_cycles;
-    uint64_t xstart_cycles, xend_cycles;
-    struct timeval      start, end;
-    struct ibv_cq *cq_ptr = NULL;
+    // uint64_t xstart_cycles, xend_cycles;
+    struct timeval      start; //, end;
+    // struct ibv_cq *cq_ptr = NULL;
     void *context = NULL;
     struct ibv_mr **mr_buffers = NULL;           /* Make sure to deregister these local MRs before exiting */
-    struct ibv_mr *tmpbuffer = NULL;
+    // struct ibv_mr *tmpbuffer = NULL;
     result_t result;
     union work_req_id wr_id;
     int qp_num = 0;
@@ -911,10 +911,11 @@ static result_t measure_xput(
     start_cycles = ( ((int64_t)cycles_high << 32) | cycles_low );
 
     /* Post until number of max requests in flight is hit */
-    char *buf_ptr = mr_buffers[0]->addr;
+    char *buf_ptr = (char * )mr_buffers[0]->addr;
     int	buf_offset = 0, slot_num = 0;
     int buf_num = 0;
-    uint64_t wr_posted = 0, wr_acked = 0;
+    uint64_t wr_posted = 0;
+    // uint64_t wr_acked = 0;
 
     for (i = 0; i < num_concur; i++) {
         /* it is safe to reuse client_send_wr object after post_() returns */
@@ -960,7 +961,7 @@ static result_t measure_xput(
         //buf_offset  = slot_num * msg_size * 1024;
         buf_offset = get_buf_offset(slot_num,msg_size);
         buf_num     = (buf_num + 1) % num_lbuffers;
-	    buf_ptr     = mr_buffers[buf_num]->addr + buf_offset;     /* We can always use mr_buffers[0] as all buffers point to same memory */
+	    buf_ptr     = (char *) (mr_buffers[buf_num]->addr + buf_offset);     /* We can always use mr_buffers[0] as all buffers point to same memory */
         //printf("%p buf\n",buf_ptr);
         // buf_num     = rand_xorshf96() % num_lbuffers;
         qp_num      = (qp_num + 1) % num_qps;
@@ -1013,9 +1014,9 @@ static result_t measure_xput(
     }
 
     const uint64_t minimum_duration_secs = 10;  /* number of seconds to run the experiment for at least */
-    const uint64_t check_watch_interval = 1e6;  /* Check time every million requests as checking on every request might be too costly */
-    int stop_posting = 0;
-    uint64_t poll_time = 0, poll_count = 0, idle_count = 0;
+    // const uint64_t check_watch_interval = 1e6;  /* Check time every million requests as checking on every request might be too costly */
+    // int stop_posting = 0;
+    // uint64_t poll_time = 0, poll_count = 0, idle_count = 0;
 
 
     do {
@@ -1219,14 +1220,14 @@ int main(int argc, char **argv) {
             case 's':
                 /* run the basic example to test connection */
                 simple = 1;
-                src = calloc(strlen(dummy_text) , 1);
+                src = (char *) calloc(strlen(dummy_text) , 1);
                 if (!src) {
                     rdma_error("Failed to allocate memory : -ENOMEM\n");
                     return -ENOMEM;
                 }
                 /* Copy the passes arguments */
                 strncpy(src, dummy_text, strlen(dummy_text));
-                dst = calloc(strlen(dummy_text), 1);
+                dst = (char * )calloc(strlen(dummy_text), 1);
                 if (!dst) {
                     rdma_error("Failed to allocate destination memory, -ENOMEM\n");
                     free(src);

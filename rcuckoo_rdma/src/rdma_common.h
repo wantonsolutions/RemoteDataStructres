@@ -99,8 +99,13 @@ union work_req_id {
     uint64_t val;
 };
 
+inline ibv_access_flags operator|(ibv_access_flags a, ibv_access_flags b)
+{
+    return static_cast<ibv_access_flags>(static_cast<int>(a) | static_cast<int>(b));
+}
 
-#define MEMORY_PERMISSION (IBV_ACCESS_LOCAL_WRITE|IBV_ACCESS_REMOTE_READ|IBV_ACCESS_REMOTE_ATOMIC|IBV_ACCESS_REMOTE_WRITE)
+
+#define MEMORY_PERMISSION IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ|IBV_ACCESS_REMOTE_ATOMIC|IBV_ACCESS_REMOTE_WRITE
 
 /* 
  * We use attribute so that compiler does not step in and try to pad the structure.

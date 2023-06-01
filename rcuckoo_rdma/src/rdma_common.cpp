@@ -6,6 +6,8 @@
  */
 
 #include "rdma_common.h"
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 
 
 void show_rdma_cmid(struct rdma_cm_id *id)
@@ -89,7 +91,7 @@ void print_dev_attributes(struct ibv_device_attr_ex * attr) {
 
 struct ibv_mr* rdma_buffer_alloc_dm(struct ibv_pd *pd, uint32_t size, enum ibv_access_flags permission) {
 	
-	struct ibv_alloc_dm_attr dm_attr = {0};
+	struct ibv_alloc_dm_attr dm_attr = {0,0,0};
 	struct ibv_dm             *dm = {0};
 	struct ibv_mr			  *mr ={0};
 
@@ -100,14 +102,14 @@ struct ibv_mr* rdma_buffer_alloc_dm(struct ibv_pd *pd, uint32_t size, enum ibv_a
 		return NULL;
 	}
 
-	printf("max alloc size %d\n",attrx.max_dm_size);
+	printf("max alloc size %ld\n",attrx.max_dm_size);
 	if (!attrx.max_dm_size) {
 		printf("Device doesn't support dm allocation\n");
 		return NULL;
 	}
 
 	if (attrx.max_dm_size < size) {
-		rdma_error("Size of %ld larger than max alloc %ll",size,attrx.max_dm_size);
+		rdma_error("Size of %u larger than max alloc %ld",size,attrx.max_dm_size);
 		return NULL;
 	}
 
@@ -144,12 +146,12 @@ struct ibv_mr* rdma_buffer_alloc_dm(struct ibv_pd *pd, uint32_t size, enum ibv_a
 
 }
 
-struct ibv_mr *rdma_buffer_register_dm(struct ibv_pd *pd, 
-		void *addr, uint32_t length, 
-		enum ibv_access_flags permission)
-{
+// struct ibv_mr *rdma_buffer_register_dm(struct ibv_pd *pd, 
+// 		void *addr, uint32_t length, 
+// 		enum ibv_access_flags permission)
+// {
 
-}
+// }
 
 void rdma_buffer_free(struct ibv_mr *mr) 
 {
