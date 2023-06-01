@@ -1,2 +1,4 @@
 *.blg
 __pycache__
+paper.fls
+paper.fdb_latexmk

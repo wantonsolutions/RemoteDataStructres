@@ -5,6 +5,7 @@ cython_tutorial
 old_wrappers/*.cpp
 rcuckoo_wrapper.cpp
 rcuckoo_wrapper.egg-info
+rcuckoo_wrap.egg-info
 
 test/test_hash
 test/test_tables

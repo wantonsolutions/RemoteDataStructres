@@ -465,7 +465,7 @@ int main(int argc, char **argv)
     server_sockaddr.sin_addr.s_addr = htonl(INADDR_ANY); /* passed address */
     /* Parse Command Line Arguments, not the most reliable code */
     static const struct option options[] = {
-        {.name = "qps", .has_arg = required_argument, .val = 'q'},
+        {.name = "qps", .has_arg = required_argument, .flag=NULL, .val = 'q'},
         {}
     };
     while ((option = getopt_long(argc, argv, "a:p:q:", options, NULL)) != -1) {

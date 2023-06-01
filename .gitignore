@@ -11,3 +11,4 @@ build
 dist
 remotedatastructures.egg-info
 profiling
+.vscode

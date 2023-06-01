@@ -37,8 +37,6 @@
 #include <infiniband/verbs.h>
 
 
-const char * doubles = "doubles""tripples";
-
 /* Error Macro*/
 #define rdma_error(msg, ...) fprintf(stderr, "%s : %d : ERROR : "#msg, __FILE__, __LINE__, ## __VA_ARGS__);
 
