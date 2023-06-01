@@ -55,8 +55,6 @@ search.o: search.cpp search.h tables.o hash.o
 rdma_common.o:
 	$(CC) -c $(CFLAGS) $(INCLUDES) -fPIC rdma_common.cpp -o rdma_common.o
 
-rdma_client.o: rdma_common.o
-	$(CC) -c $(CFLAGS) $(INCLUDES) -fPIC rdma_client.cpp -o rdma_client.o rdma_common.o
 
 rdma_server.o: rdma_common.o
 	$(CC) -c $(CFLAGS) $(INCLUDES) -fPIC rdma_server.cpp -o rdma_server.o rdma_common.o
@@ -64,8 +62,11 @@ rdma_server.o: rdma_common.o
 rdma_server: rdma_server.o
 	$(CC) $(CFLAGS) $(INCLUDES) -fPIC rdma_server.o rdma_common.o -o rdma_server $(RDMA_LIBS)
 
-rdma_client: rdma_client.o
-	$(CC) $(CFLAGS) $(INCLUDES) -fPIC rdma_client.o rdma_common.o -o rdma_client $(RDMA_LIBS)
+rdma_client.o: rdma_common.o rdma_client_lib.o rdma_client.cpp rdma_client.h
+	$(CC) -c $(CFLAGS) $(INCLUDES) -fPIC rdma_client.cpp -o rdma_client.o rdma_common.o
+
+rdma_client: rdma_client.o rdma_client_lib.o
+	$(CC) $(CFLAGS) $(INCLUDES) -fPIC rdma_client.o rdma_common.o rdma_client_lib.o -o rdma_client $(RDMA_LIBS)
 
 
 test_hash : hash.o

@@ -4,6 +4,24 @@
 #define MAX_THREADS 32
 #define MULTI_CQ
 
+#include "rdma_common.h"
+
+typedef struct result_t {
+    double err_code;
+    double xput_ops;
+    double xput_bps;
+    double cq_poll_time_percent;        // in cpu cycles
+    double cq_poll_count;
+    double cq_empty_count;
+} result_t;
+
+
+typedef struct RDMAConnectionManagerArguments {
+    int num_qps;
+    int base_port;
+    struct sockaddr_in * server_sockaddr;
+} RDMAConnectionManagerArguments;
+
 class RDMAConnectionManager {
     public:
         /* These are basic RDMA resources */
@@ -12,37 +30,51 @@ class RDMAConnectionManager {
         static struct rdma_event_channel *cm_event_channel;
         static struct rdma_cm_id *cm_client_qp_id[MAX_QPS];
         static struct ibv_pd *pd;
-        // static struct ibv_comp_channel *io_completion_channel = NULL;
-        // static struct ibv_cq *client_cq = NULL;
         static struct ibv_qp_init_attr qp_init_attr;
         static struct ibv_qp *client_qp[MAX_QPS];
         static struct ibv_device_attr dev_attr;
+
         /* These are memory buffers related resources */
         static struct ibv_mr *client_qp_src_mr[MAX_QPS];
         static struct ibv_mr *client_qp_dst_mr[MAX_QPS];
         static struct ibv_mr *client_qp_metadata_mr[MAX_QPS];
         static struct ibv_mr *server_qp_metadata_mr[MAX_QPS];
-        static struct rdma_buffer_attr client_qp_metadata_attr[MAX_QPS], server_qp_metadata_attr[MAX_QPS];
+        static struct rdma_buffer_attr client_qp_metadata_attr[MAX_QPS];
+        static struct rdma_buffer_attr server_qp_metadata_attr[MAX_QPS];
+
+
+        result_t thread_results[MAX_THREADS];
+        static struct ibv_cq *client_cq_threads[MAX_THREADS];
+        static struct ibv_comp_channel *io_completion_channel_threads[MAX_THREADS];
+        uint32_t thread_contexts[MAX_THREADS];
+
+
         static struct ibv_send_wr client_send_wr, *bad_client_send_wr;
         static struct ibv_recv_wr server_recv_wr, *bad_server_recv_wr;
         static struct ibv_sge client_send_sge, server_recv_sge;
-        uint32_t thread_contexts[MAX_THREADS];
+
+
+        /* Source and Destination buffers, where RDMA operations source and sink */
+        static char *src , *dst; 
         RDMAConnectionManager();
         ~RDMAConnectionManager();
-        RDMAConnectionManager(unsigned int connections);
+        RDMAConnectionManager(RDMAConnectionManagerArguments arg);
+        //TODO move to an indivdidual connection
+        int client_xchange_metadata_with_server(int qp_num, char* buffer, uint32_t buffer_size);
 
+    private:
+        int _num_qps;
+        int _base_port;
+        struct sockaddr_in * _server_sockaddr;
         int client_setup_shared_resources();
         int client_prepare_connection(struct sockaddr_in *s_addr, int qp_num, int port_num);
         int client_pre_post_recv_buffer(int qp_num);
         int client_connect_qp_to_server(int qp_num);
-        int client_xchange_metadata_with_server(int qp_num, char* buffer, uint32_t buffer_size);
         int client_disconnect_and_clean(int qp_num);
         int client_clean();
 
-
-    private:
-
 };
+
 
 /* List of ops that are being instrumented */
 enum rdma_measured_op { RDMA_READ_OP, RDMA_WRITE_OP, RDMA_CAS_OP, RDMA_FAA_OP};
@@ -62,6 +94,7 @@ struct xput_thread_args {
     uint64_t start_cycles;
     struct ibv_mr **mr_buffers;           /* Make sure to deregister these local MRs before exiting */
     int num_lbuffers;
+    RDMAConnectionManager * cm;
 };
 
 #define HIST_SIZE 32

@@ -1,5 +1,33 @@
 #include "rdma_client_lib.h"
 #include "rdma_common.h"
+#include "rdma_client.h"
+#include <sys/time.h>
+
+
+
+uint32_t qp_rec_global[MAX_THREADS][HIST_SIZE];
+
+
+/* Source and Destination buffers, where RDMA operations source and sink */
+static char *src = NULL, *dst = NULL; 
+
+
+static int finished_running_xput=0;
+
+inline int get_buf_offset(int slot_num, int msg_size) {
+    return slot_num * (msg_size + GLOBAL_GAP_INTEGER);
+}
+
+int get_buffer_size(int num_concur,int msg_size) {
+    return num_concur *(get_buf_offset(1,msg_size) - get_buf_offset(0, msg_size));
+}
+
+/* This is our testing function */
+static int check_src_dst() 
+{
+    return memcmp((void*) src, (void*) dst, strlen(src));
+}
+
 
 /* Rdtsc blocks for time measurements */
 unsigned cycles_low, cycles_high, cycles_low1, cycles_high1;
@@ -45,8 +73,16 @@ static __inline__ void xrdtsc1(void)
  * 1) RDMA write from src -> remote buffer 
  * 2) RDMA read from remote bufer -> dst
  */ 
-static int client_remote_memory_ops(int qp_num) 
+static int client_remote_memory_ops(int qp_num, RDMAConnectionManager &cm) 
 {
+
+    struct ibv_send_wr client_send_wr;
+    struct ibv_sge client_send_sge;
+    struct ibv_sge server_recv_sge;
+    static struct ibv_send_wr client_send_wr, *bad_client_send_wr;
+    static struct ibv_recv_wr server_recv_wr, *bad_server_recv_wr;
+
+
     struct ibv_wc wc;
     int ret = -1;
     // struct timeval start, end;
@@ -55,20 +91,20 @@ static int client_remote_memory_ops(int qp_num)
     // double throughput = 0.0;
     uint64_t start_cycles, end_cycles;
 
-    client_qp_dst_mr[qp_num] = rdma_buffer_register(pd,
+    cm.client_qp_dst_mr[qp_num] = rdma_buffer_register(cm.pd,
         dst,
         strlen(src), MEMORY_PERMISSION
         );
-    if (!client_qp_dst_mr[qp_num]) {
+    if (!cm.client_qp_dst_mr[qp_num]) {
         rdma_error("We failed to create the destination buffer, -ENOMEM\n");
         return -ENOMEM;
     }
     /* Step 1: is to copy the local buffer into the remote buffer. We will 
      * reuse the previous variables. */
     /* now we fill up SGE */
-    client_send_sge.addr = (uint64_t) client_qp_src_mr[qp_num]->addr;
-    client_send_sge.length = (uint32_t) client_qp_src_mr[qp_num]->length;
-    client_send_sge.lkey = client_qp_src_mr[qp_num]->lkey;
+    client_send_sge.addr = (uint64_t) cm.client_qp_src_mr[qp_num]->addr;
+    client_send_sge.length = (uint32_t) cm.client_qp_src_mr[qp_num]->length;
+    client_send_sge.lkey = cm.client_qp_src_mr[qp_num]->lkey;
     /* now we link to the send work request */
     bzero(&client_send_wr, sizeof(client_send_wr));
     client_send_wr.sg_list = &client_send_sge;
@@ -76,13 +112,13 @@ static int client_remote_memory_ops(int qp_num)
     client_send_wr.opcode = IBV_WR_RDMA_WRITE;
     client_send_wr.send_flags = IBV_SEND_SIGNALED;
     /* we have to tell server side info for RDMA */
-    client_send_wr.wr.rdma.rkey = server_qp_metadata_attr[qp_num].stag.remote_stag;
-    client_send_wr.wr.rdma.remote_addr = server_qp_metadata_attr[qp_num].address;
+    client_send_wr.wr.rdma.rkey = cm.server_qp_metadata_attr[qp_num].stag.remote_stag;
+    client_send_wr.wr.rdma.remote_addr = cm.server_qp_metadata_attr[qp_num].address;
 
 
     rdtsc();
     /* Now we post it */
-    ret = ibv_post_send(client_qp[qp_num], 
+    ret = ibv_post_send(cm.client_qp[qp_num], 
                &client_send_wr,
            &bad_client_send_wr);
     if (ret) {
@@ -91,7 +127,7 @@ static int client_remote_memory_ops(int qp_num)
         return -errno;
     }
     /* at this point we are expecting 1 work completion for the write */
-    ret = process_work_completion_events(io_completion_channel_threads[qp_num], &wc, 1);
+    ret = process_work_completion_events(cm.io_completion_channel_threads[qp_num], &wc, 1);
     if(ret != 1) {
         rdma_error("We failed to get 1 work completions , ret = %d \n", ret);
         return ret;
@@ -104,9 +140,9 @@ static int client_remote_memory_ops(int qp_num)
     printf("Client side WRITE took %lf mu-sec\n", (end_cycles - start_cycles) * 1e6 / CPU_FREQ);
 
     /* Now we prepare a READ using same variables but for destination */
-    client_send_sge.addr = (uint64_t) client_qp_dst_mr[qp_num]->addr;
-    client_send_sge.length = (uint32_t) client_qp_dst_mr[qp_num]->length;
-    client_send_sge.lkey = client_qp_dst_mr[qp_num]->lkey;
+    client_send_sge.addr = (uint64_t) cm.client_qp_dst_mr[qp_num]->addr;
+    client_send_sge.length = (uint32_t) cm.client_qp_dst_mr[qp_num]->length;
+    client_send_sge.lkey = cm.client_qp_dst_mr[qp_num]->lkey;
     /* now we link to the send work request */
     bzero(&client_send_wr, sizeof(client_send_wr));
     client_send_wr.sg_list = &client_send_sge;
@@ -114,16 +150,16 @@ static int client_remote_memory_ops(int qp_num)
     client_send_wr.opcode = IBV_WR_RDMA_READ;
     client_send_wr.send_flags = IBV_SEND_SIGNALED;
     /* we have to tell server side info for RDMA */
-    client_send_wr.wr.rdma.rkey = server_qp_metadata_attr[qp_num].stag.remote_stag;
-    client_send_wr.wr.rdma.remote_addr = server_qp_metadata_attr[qp_num].address;
+    client_send_wr.wr.rdma.rkey = cm.server_qp_metadata_attr[qp_num].stag.remote_stag;
+    client_send_wr.wr.rdma.remote_addr = cm.server_qp_metadata_attr[qp_num].address;
     /* Now we post it */
-    ret = ibv_post_send(client_qp[qp_num], &client_send_wr, &bad_client_send_wr);
+    ret = ibv_post_send(cm.client_qp[qp_num], &client_send_wr, &bad_client_send_wr);
     if (ret) {
         rdma_error("Failed to read client dst buffer from the master, errno: %d \n", -errno);
         return -errno;
     }
     /* at this point we are expecting 1 work completion for the write */
-    ret = process_work_completion_events(io_completion_channel_threads[qp_num], &wc, 1);
+    ret = process_work_completion_events(cm.io_completion_channel_threads[qp_num], &wc, 1);
     if(ret != 1) {
         rdma_error("We failed to get 1 work completions , ret = %d \n", ret);
         return ret;
@@ -131,7 +167,7 @@ static int client_remote_memory_ops(int qp_num)
     debug("Client side READ is complete \n");
     
     // This buffer is local to this method, won't need it anymore.
-    rdma_buffer_deregister(client_qp_dst_mr[qp_num]);	
+    rdma_buffer_deregister(cm.client_qp_dst_mr[qp_num]);	
     return 0;
 }
 
@@ -148,9 +184,9 @@ void * xput_thread(void * args) {
     enum rdma_measured_op rdma_op = targs->rdma_op;
     struct ibv_mr **mr_buffers=targs->mr_buffers;           /* Make sure to deregister these local MRs before exiting */
     // int num_lbuffers = targs->num_lbuffers;
-
     uint64_t start_cycles, end_cycles;
     start_cycles=targs->start_cycles;
+    RDMAConnectionManager * cm = targs->cm;
 
 
     struct ibv_wc* wc;
@@ -201,27 +237,27 @@ void * xput_thread(void * args) {
         local_client_send_wr_batch[i].send_flags |= IBV_SEND_SIGNALED;          // NOTE: This tells the other NIC to send completion events
         //local_client_send_wr.send_flags = IBV_SEND_INLINE;          // NOTE: This tells the other NIC to send completion events
         /* we have to tell server side info for RDMA */
-        local_client_send_wr_batch[i].wr.rdma.rkey = server_qp_metadata_attr[0].stag.remote_stag;
-        local_client_send_wr_batch[i].wr.rdma.remote_addr = server_qp_metadata_attr[0].address;
+        local_client_send_wr_batch[i].wr.rdma.rkey = cm->server_qp_metadata_attr[0].stag.remote_stag;
+        local_client_send_wr_batch[i].wr.rdma.remote_addr = cm->server_qp_metadata_attr[0].address;
 
         //From clover setting up atomics (userspace_one_cs)
         if (rdma_op == RDMA_CAS_OP) {
-            local_client_send_wr_batch[i].wr.atomic.remote_addr = server_qp_metadata_attr[0].address;
-            local_client_send_wr_batch[i].wr.atomic.rkey = server_qp_metadata_attr[0].stag.remote_stag;
+            local_client_send_wr_batch[i].wr.atomic.remote_addr = cm->server_qp_metadata_attr[0].address;
+            local_client_send_wr_batch[i].wr.atomic.rkey = cm->server_qp_metadata_attr[0].stag.remote_stag;
             local_client_send_wr_batch[i].wr.atomic.compare_add = 0;
             local_client_send_wr_batch[i].wr.atomic.swap = 0;
         }
 
         if (rdma_op == RDMA_FAA_OP) {
-            local_client_send_wr_batch[i].wr.atomic.remote_addr = server_qp_metadata_attr[0].address;
-            local_client_send_wr_batch[i].wr.atomic.rkey = server_qp_metadata_attr[0].stag.remote_stag;
+            local_client_send_wr_batch[i].wr.atomic.remote_addr = cm->server_qp_metadata_attr[0].address;
+            local_client_send_wr_batch[i].wr.atomic.rkey = cm->server_qp_metadata_attr[0].stag.remote_stag;
             local_client_send_wr_batch[i].wr.atomic.compare_add = 1ULL;
         }
     }
 
     result_t result;
 
-    uint64_t local_server_address = server_qp_metadata_attr[0].address;
+    uint64_t local_server_address = cm->server_qp_metadata_attr[0].address;
 
     int	buf_offset = 0, slot_num = 0;
     // int buf_num = 0;
@@ -316,7 +352,7 @@ void * xput_thread(void * args) {
                 local_client_send_wr_batch[i].next=&local_client_send_wr_batch[i+1];
             }
             local_client_send_wr_batch[n-1].next=NULL;
-            ret = ibv_post_send(client_qp[qp_num], 
+            ret = ibv_post_send(cm->client_qp[qp_num], 
                     &local_client_send_wr_batch[0],
                     &local_bad_client_send_wr);
             if (ret) {
@@ -352,7 +388,7 @@ void * xput_thread(void * args) {
     result.cq_poll_time_percent = poll_time * 100.0 / CPU_FREQ / duration_rdtsc;
     result.cq_poll_count = poll_count * 1.0 / wr_acked;     // TODO: Is dividing by wr the right way to interpret this number?
     result.cq_empty_count = idle_count * 1.0 / wr_acked;     // TODO: Is dividing by wr the right way to interpret this number?
-    thread_results[targs->thread_id]=result;
+    cm->thread_results[targs->thread_id]=result;
     return NULL;
 
 }
@@ -365,8 +401,9 @@ static result_t measure_xput(
     enum rdma_measured_op rdma_op,      // rdma op to use i.e., read or write
     enum mem_reg_mode mr_mode,          // mem reg mode; see comments for each "enum mem_reg_mode" 
     int num_lbuffers,                   // number of pre-registed buffers to rotate between; only valid for MR_MODE_PRE_REGISTER_WITH_ROTATE
-    int num_qps                         // num of QPs to use
-) {
+    int num_qps,                         // num of QPs to use
+    RDMAConnectionManager &cm          // connection manager
+    ) { 
     int ret = -1, n, i;
     struct ibv_wc* wc;
     uint64_t start_cycles, end_cycles;
@@ -379,6 +416,13 @@ static result_t measure_xput(
     result_t result;
     union work_req_id wr_id;
     int qp_num = 0;
+
+
+    struct ibv_send_wr client_send_wr;
+    struct ibv_sge client_send_sge;
+    struct ibv_sge server_recv_sge;
+    static struct ibv_send_wr client_send_wr, *bad_client_send_wr;
+    static struct ibv_recv_wr server_recv_wr, *bad_server_recv_wr;
 
     
     /* Learned that the limit for number of outstanding requests for READ and ATOMIC ops 
@@ -406,7 +450,7 @@ static result_t measure_xput(
     mr_buffers = (struct ibv_mr**) malloc(num_lbuffers * sizeof(struct ibv_mr*));
     //size_t buf_size = msg_size * num_concur;
     size_t buf_size = get_buffer_size(num_concur,msg_size);
-    mr_buffers[0] = rdma_buffer_alloc(pd,
+    mr_buffers[0] = rdma_buffer_alloc(cm.pd,
         buf_size, MEMORY_PERMISSION
             
             );
@@ -421,7 +465,7 @@ static result_t measure_xput(
     if (num_lbuffers > 1) {
         /* Register rest of the buffers using same piece of memory */
         for (i = 1; i < num_lbuffers; i++) {
-            mr_buffers[i] = rdma_buffer_register(pd,
+            mr_buffers[i] = rdma_buffer_register(cm.pd,
                 mr_buffers[0]->addr,
                 buf_size, MEMORY_PERMISSION
                     );
@@ -469,19 +513,19 @@ static result_t measure_xput(
     //client_send_wr.opcode = rdma_op == RDMA_READ_OP ? IBV_WR_RDMA_READ : IBV_WR_RDMA_WRITE;
     client_send_wr.send_flags |= IBV_SEND_SIGNALED;          // NOTE: This tells the other NIC to send completion events
     /* we have to tell server side info for RDMA */
-    client_send_wr.wr.rdma.rkey = server_qp_metadata_attr[0].stag.remote_stag;
-    client_send_wr.wr.rdma.remote_addr = server_qp_metadata_attr[0].address;
+    client_send_wr.wr.rdma.rkey = cm.server_qp_metadata_attr[0].stag.remote_stag;
+    client_send_wr.wr.rdma.remote_addr = cm.server_qp_metadata_attr[0].address;
 
     //From clover setting up atomics (userspace_one_cs)
     if (rdma_op == RDMA_CAS_OP) {
-        client_send_wr.wr.atomic.remote_addr = server_qp_metadata_attr[0].address;
-        client_send_wr.wr.atomic.rkey = server_qp_metadata_attr[0].stag.remote_stag;
+        client_send_wr.wr.atomic.remote_addr = cm.server_qp_metadata_attr[0].address;
+        client_send_wr.wr.atomic.rkey = cm.server_qp_metadata_attr[0].stag.remote_stag;
         client_send_wr.wr.atomic.compare_add = 0;
         client_send_wr.wr.atomic.swap = 0;
     }
     if (rdma_op == RDMA_FAA_OP) {
-        client_send_wr.wr.atomic.remote_addr = server_qp_metadata_attr[0].address;
-        client_send_wr.wr.atomic.rkey = server_qp_metadata_attr[0].stag.remote_stag;
+        client_send_wr.wr.atomic.remote_addr = cm.server_qp_metadata_attr[0].address;
+        client_send_wr.wr.atomic.rkey = cm.server_qp_metadata_attr[0].stag.remote_stag;
         client_send_wr.wr.atomic.compare_add = 1ULL;
     }
 
@@ -508,21 +552,21 @@ static result_t measure_xput(
 
         //client_send_wr.wr_id = wr_id.val;                  /* User-assigned id to recognize this WR on completion */
         client_send_sge.addr = (uint64_t) buf_ptr;          /* Sets which mem addr to read from/write to locally */  // FIXME
-        client_send_wr.wr.rdma.remote_addr = server_qp_metadata_attr[0].address + buf_offset; 
+        client_send_wr.wr.rdma.remote_addr = cm.server_qp_metadata_attr[0].address + buf_offset; 
 
         if (rdma_op == RDMA_CAS_OP) {
-            client_send_wr.wr.atomic.remote_addr = server_qp_metadata_attr[0].address + buf_offset;
+            client_send_wr.wr.atomic.remote_addr = cm.server_qp_metadata_attr[0].address + buf_offset;
             client_send_wr.wr.atomic.compare_add = 0;
             client_send_wr.wr.atomic.swap = 0;
         }
 
         if (rdma_op == RDMA_FAA_OP) {
-            client_send_wr.wr.atomic.remote_addr = server_qp_metadata_attr[0].address + buf_offset;
+            client_send_wr.wr.atomic.remote_addr = cm.server_qp_metadata_attr[0].address + buf_offset;
             client_send_wr.wr.atomic.compare_add = 1ULL;
         }
 
         //printf("i %d\n",i);
-        ret = ibv_post_send(client_qp[qp_num], 
+        ret = ibv_post_send(cm.client_qp[qp_num], 
                 &client_send_wr,
                 &bad_client_send_wr);
         if (ret) {
@@ -559,7 +603,7 @@ static result_t measure_xput(
 
 
     for (int i=0;i<total_threads;i++){
-        ret = ibv_get_cq_event(io_completion_channel_threads[i], &local_client_cq_threads[i], &context);
+        ret = ibv_get_cq_event(cm.io_completion_channel_threads[i], &local_client_cq_threads[i], &context);
         //printf("Local CQ %p\n",local_client_cq_threads[i]);
         if (ret) {
             rdma_error("Failed to get next CQ event due to %d \n", -errno);
@@ -581,7 +625,7 @@ static result_t measure_xput(
         //targs[i].core=4+(2*i);
         targs[i].core=(2*i);
         targs[i].num_concur=num_concur;
-        targs[i].cq_ptr=client_cq_threads[i];
+        targs[i].cq_ptr=cm.client_cq_threads[i];
         //targs[i].cq_ptr=cq_ptr;
         targs[i].msg_size = msg_size;
         targs[i].rdma_op = rdma_op;
@@ -620,7 +664,7 @@ static result_t measure_xput(
     for (int i=0;i<total_threads;i++){
         do {
             //printf("Thread %d, CQ %p\n",targs->thread_id,cq_ptr);
-            n = ibv_poll_cq(client_cq_threads[i], num_concur, wc);       // get upto num_concur entries
+            n = ibv_poll_cq(cm.client_cq_threads[i], num_concur, wc);       // get upto num_concur entries
             //printf("exit poll\n");
             if (n < 0) {
                 printf("Failed to poll cq for wc due to %d\n", ret);
@@ -653,10 +697,10 @@ static result_t measure_xput(
     meta_result.xput_bps=0;
     meta_result.xput_ops=0;
     for (i=0;i<total_threads;i++){
-        meta_result.cq_empty_count+=thread_results[i].cq_empty_count;
-        meta_result.cq_poll_count+=thread_results[i].cq_poll_count;
-        meta_result.xput_bps+=thread_results[i].xput_bps;
-        meta_result.xput_ops+=thread_results[i].xput_ops;
+        meta_result.cq_empty_count+=cm.thread_results[i].cq_empty_count;
+        meta_result.cq_poll_count+=cm.thread_results[i].cq_poll_count;
+        meta_result.xput_bps+=cm.thread_results[i].xput_bps;
+        meta_result.xput_ops+=cm.thread_results[i].xput_ops;
     }
 
     return meta_result;
@@ -780,47 +824,19 @@ int main(int argc, char **argv) {
             }
         }
 
-    /* Setup shared resources */
-    ret = client_setup_shared_resources();
-    if (ret) { 
-        rdma_error("Failed to setup shared RDMA resources , ret = %d \n", ret);
-        return ret;
-    }
+    RDMAConnectionManagerArguments args;
+    args.num_qps = num_qps;
+    args.server_sockaddr = &server_sockaddr;
+    args.base_port = base_port;
 
-    /* Connect the local QPs to the ones on server. 
-     * NOTE: Make sure to connect all QPs before moving to 
-     * other activities that involve communication with the server as the 
-     * server runs on single core and waits for connect request for all 
-     * QPs before moving forward. */
-    for(i = 0; i < num_qps; i++) {
-        /* Each QP will try to connect to port numbers starting from base port */
-        ret = client_prepare_connection(&server_sockaddr, i, base_port + i);
-        if (ret) { 
-            rdma_error("Failed to setup client connection , ret = %d \n", ret);
-            return ret;
-        }
+    RDMAConnectionManager cm(args);
 
-        ret = client_pre_post_recv_buffer(i); 
-        if (ret) { 
-            rdma_error("Failed to setup client connection , ret = %d \n", ret);
-            return ret;
-        }
-        
-        ret = client_connect_qp_to_server(i);
-        if (ret) { 
-            rdma_error("Failed to setup client connection , ret = %d \n", ret);
-            return ret;
-        }
-
-        // Give server some time to prepare for the next QP
-        usleep(100 * 1000);     // 100ms
-    }
 
     /* Connection now set up and ready to play */
     if (simple) {
         /* If asked for a simple program, run the original example for all qps */
         for (i = 0; i < num_qps; i++) {
-            ret = client_xchange_metadata_with_server(i, src, strlen(src));
+            ret = cm.client_xchange_metadata_with_server(i, src, strlen(src));
             if (ret) {
                 rdma_error("Failed to setup client connection , ret = %d \n", ret);
                 return ret;
@@ -848,7 +864,7 @@ int main(int argc, char **argv) {
             #ifdef USE_DEVICE_MEMORY
             ret = client_xchange_metadata_with_server(i, NULL, (DEVICE_MEMORY_KB / (num_qps*2)));      // Relies on the server running CX5 TODO query remote device for mapped memory
             #else
-            ret = client_xchange_metadata_with_server(i, NULL, 1024*1024*64);      // 1 MB
+            ret = cm.client_xchange_metadata_with_server(i, NULL, 1024*1024*64);      // 1 MB
             #endif
             if (ret) {
                 rdma_error("Failed to setup client connection , ret = %d \n", ret);
@@ -888,8 +904,8 @@ int main(int argc, char **argv) {
             printf("=========== RTTs =============\n");
             printf("msg size,write,read\n");
             for (msg_size = min_msg_size; msg_size <= max_msg_size; msg_size += msg_size_incr) {
-                double wrtt = 1e6 / measure_xput(msg_size, 1, RDMA_WRITE_OP, MR_MODE_PRE_REGISTER_WITH_ROTATE, num_mbuf, num_qps).xput_ops;
-                double rrtt = 1e6 / measure_xput(msg_size, 1, RDMA_READ_OP, MR_MODE_PRE_REGISTER_WITH_ROTATE, num_mbuf, num_qps).xput_ops;
+                double wrtt = 1e6 / measure_xput(msg_size, 1, RDMA_WRITE_OP, MR_MODE_PRE_REGISTER_WITH_ROTATE, num_mbuf, num_qps, cm).xput_ops;
+                double rrtt = 1e6 / measure_xput(msg_size, 1, RDMA_READ_OP, MR_MODE_PRE_REGISTER_WITH_ROTATE, num_mbuf, num_qps, cm).xput_ops;
                 printf("%d,%.2lf,%.2lf\n", msg_size, wrtt, rrtt);
                 if (write_to_file) {
                     fprintf(fptr, "%d,%.2lf,%.2lf\n", msg_size, wrtt, rrtt);
@@ -930,10 +946,8 @@ int main(int argc, char **argv) {
 
 
             num_concur=92;
-            GLOBAL_GAP_INTEGER=8;
             //Set this value if we only want one key, it controls what happens in measure_xput.
             //GLOBAL_KEYS=1024;
-            GLOBAL_KEYS=8192;
             //for (GLOBAL_GAP_INTEGER=0;GLOBAL_GAP_INTEGER<1024;GLOBAL_GAP_INTEGER+=8) {
             //for (GLOBAL_KEYS=1;GLOBAL_KEYS<num_concur;GLOBAL_KEYS++) {
             //for (GLOBAL_KEYS=1;GLOBAL_KEYS<16;GLOBAL_KEYS++) {
@@ -946,7 +960,7 @@ int main(int argc, char **argv) {
             //for (num_concur = num_qps; num_concur <=num_qps*(MAX_RD_AT_IN_FLIGHT); num_concur+=num_qps) {
                 num_concur=372*num_qps;
                 //double rput_ops =  measure_xput(msg_size, num_concur, RDMA_READ_OP, MR_MODE_PRE_REGISTER, num_mbuf, num_qps).xput_ops;
-                double wput_ops = measure_xput(msg_size, num_concur, RDMA_WRITE_OP, MR_MODE_PRE_REGISTER, num_mbuf, num_qps).xput_ops; 
+                double wput_ops = measure_xput(msg_size, num_concur, RDMA_WRITE_OP, MR_MODE_PRE_REGISTER, num_mbuf, num_qps, cm).xput_ops; 
                 //double casput_ops = measure_xput(msg_size, num_concur, RDMA_CAS_OP, MR_MODE_PRE_REGISTER, num_mbuf, num_qps).xput_ops;
                 //double faa_ops = measure_xput(msg_size, num_concur, RDMA_FAA_OP, MR_MODE_PRE_REGISTER, num_mbuf, num_qps).xput_ops;
                 double rput_ops =1;
@@ -968,15 +982,6 @@ int main(int argc, char **argv) {
 
     }
 
-    for (i = 0; i < num_qps; i++) {
-        ret = client_disconnect_and_clean(i);
-        if (ret)
-            rdma_error("Failed to cleanly disconnect qp %d \n", i);
-    }
-    ret = client_clean();
-    if (ret)
-        rdma_error("Failed to clean client resources\n");
-    return ret;
 }
 
 void usage() {

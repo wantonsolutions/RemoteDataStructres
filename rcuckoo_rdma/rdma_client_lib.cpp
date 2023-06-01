@@ -7,53 +7,8 @@
 #include "rdma_common.h"
 #include <sys/time.h>
 #include <assert.h>
+#include <stdexcept>
 #include "rdma_client_lib.h"
-
-
-RDMAConnectionManager::RDMAConnectionManager() {
-    cm_event_channel = NULL;
-    pd = NULL;
-    client_send_wr, bad_client_send_wr = NULL;
-    server_recv_wr, bad_server_recv_wr = NULL;
-}
-
-/* Source and Destination buffers, where RDMA operations source and sink */
-static char *src = NULL, *dst = NULL; 
-
-static int GLOBAL_GAP_INTEGER=0;
-static int GLOBAL_KEYS=1;
-
-static int finished_running_xput=0;
-
-typedef struct {
-    double err_code;
-    double xput_ops;
-    double xput_bps;
-    double cq_poll_time_percent;        // in cpu cycles
-    double cq_poll_count;
-    double cq_empty_count;
-} result_t;
-
-result_t thread_results[MAX_THREADS];
-static struct ibv_cq *client_cq_threads[MAX_THREADS];
-static struct ibv_comp_channel *io_completion_channel_threads[MAX_THREADS];
-
-
-uint32_t qp_rec_global[MAX_THREADS][HIST_SIZE];
-
-inline int get_buf_offset(int slot_num, int msg_size) {
-    return slot_num * (msg_size + GLOBAL_GAP_INTEGER);
-}
-
-int get_buffer_size(int num_concur,int msg_size) {
-    return num_concur *(get_buf_offset(1,msg_size) - get_buf_offset(0, msg_size));
-}
-
-/* This is our testing function */
-static int check_src_dst() 
-{
-    return memcmp((void*) src, (void*) dst, strlen(src));
-}
 
 /* A fast but good enough pseudo-random number generator. Good enough for what? */
 /* Courtesy of https://stackoverflow.com/questions/1640258/need-a-fast-random-generator-for-c */
@@ -70,6 +25,77 @@ unsigned long rand_xorshf96(void) {          //period 2^96-1
     z = t ^ x ^ y;
     return z;
 }
+
+
+RDMAConnectionManager::RDMAConnectionManager() {
+
+}
+
+RDMAConnectionManager::RDMAConnectionManager(RDMAConnectionManagerArguments args) {
+
+    _num_qps = args.num_qps;
+    _base_port = args.base_port;
+    _server_sockaddr = args.server_sockaddr;
+
+
+    src , dst = NULL; 
+    cm_event_channel = NULL;
+    pd = NULL;
+    client_send_wr, bad_client_send_wr = NULL;
+    server_recv_wr, bad_server_recv_wr = NULL;
+
+    int ret;
+    /* Setup shared resources */
+    ret = client_setup_shared_resources();
+    if (ret) { 
+        rdma_error("Failed to setup shared RDMA resources , ret = %d \n", ret);
+        throw std::runtime_error("Failed to setup shared RDMA resources");
+    }
+
+    /* Connect the local QPs to the ones on server. 
+     * NOTE: Make sure to connect all QPs before moving to 
+     * other activities that involve communication with the server as the 
+     * server runs on single core and waits for connect request for all 
+     * QPs before moving forward. */
+    for(int i = 0; i < _num_qps; i++) {
+        /* Each QP will try to connect to port numbers starting from base port */
+        ret = client_prepare_connection(_server_sockaddr, i, _base_port + i);
+        if (ret) { 
+            rdma_error("Failed to setup client connection , ret = %d \n", ret);
+            throw std::runtime_error("Failed to setup client connection");
+        }
+
+        ret = client_pre_post_recv_buffer(i); 
+        if (ret) { 
+            rdma_error("Failed to setup client connection , ret = %d \n", ret);
+            throw std::runtime_error("Failed to setup client connection");
+        }
+        
+        ret = client_connect_qp_to_server(i);
+        if (ret) { 
+            rdma_error("Failed to setup client connection , ret = %d \n", ret);
+            throw std::runtime_error("Failed to setup client connection");
+        }
+
+        // Give server some time to prepare for the next QP
+        usleep(100 * 1000);     // 100ms
+    }
+}
+
+RDMAConnectionManager::~RDMAConnectionManager() {
+    int ret;
+    for (int i = 0; i < _num_qps; i++) {
+        ret = client_disconnect_and_clean(i);
+        if (ret)
+            rdma_error("Failed to cleanly disconnect qp %d \n", i);
+            throw std::runtime_error("Failed to cleanly disconnect qp");
+    }
+    ret = client_clean();
+    if (ret)
+        rdma_error("Failed to clean client resources\n");
+        throw std::runtime_error("Failed to clean client resources");
+}
+
 
 /* This function prepares client side shared resources for all connections */
 int RDMAConnectionManager::client_setup_shared_resources()
