@@ -55,7 +55,6 @@ class RDMAConnectionManager {
 
 
         /* Source and Destination buffers, where RDMA operations source and sink */
-        static char *src , *dst; 
         RDMAConnectionManager();
         ~RDMAConnectionManager();
         RDMAConnectionManager(RDMAConnectionManagerArguments arg);
@@ -74,6 +73,8 @@ class RDMAConnectionManager {
         int client_clean();
 
 };
+
+
 
 
 /* List of ops that are being instrumented */

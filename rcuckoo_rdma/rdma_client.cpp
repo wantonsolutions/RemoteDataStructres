@@ -7,11 +7,6 @@
 
 uint32_t qp_rec_global[MAX_THREADS][HIST_SIZE];
 
-
-/* Source and Destination buffers, where RDMA operations source and sink */
-static char *src = NULL, *dst = NULL; 
-
-
 static int finished_running_xput=0;
 
 inline int get_buf_offset(int slot_num, int msg_size) {
@@ -22,11 +17,6 @@ int get_buffer_size(int num_concur,int msg_size) {
     return num_concur *(get_buf_offset(1,msg_size) - get_buf_offset(0, msg_size));
 }
 
-/* This is our testing function */
-static int check_src_dst() 
-{
-    return memcmp((void*) src, (void*) dst, strlen(src));
-}
 
 
 /* Rdtsc blocks for time measurements */
@@ -68,6 +58,11 @@ static __inline__ void xrdtsc1(void)
             "%rax", "rbx", "rcx", "rdx");
 }
 
+/* This is our testing function */
+int check_src_dst(char *src, char *dst) {
+    return memcmp((void*) src, (void*) dst, strlen(src));
+}
+
 /* This function does the following for given QP:
  * 1) Prepare memory buffers for RDMA operations 
  * 1) RDMA write from src -> remote buffer 
@@ -76,13 +71,11 @@ static __inline__ void xrdtsc1(void)
 static int client_remote_memory_ops(int qp_num, RDMAConnectionManager &cm) 
 {
 
-    struct ibv_send_wr client_send_wr;
     struct ibv_sge client_send_sge;
     struct ibv_sge server_recv_sge;
     static struct ibv_send_wr client_send_wr, *bad_client_send_wr;
     static struct ibv_recv_wr server_recv_wr, *bad_server_recv_wr;
-
-
+    static char *src , *dst; 
     struct ibv_wc wc;
     int ret = -1;
     // struct timeval start, end;
@@ -418,7 +411,6 @@ static result_t measure_xput(
     int qp_num = 0;
 
 
-    struct ibv_send_wr client_send_wr;
     struct ibv_sge client_send_sge;
     struct ibv_sge server_recv_sge;
     static struct ibv_send_wr client_send_wr, *bad_client_send_wr;
@@ -716,7 +708,8 @@ int main(int argc, char **argv) {
     server_sockaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     /* buffers are NULL */
     const char* dummy_text = "HELLO";
-    src = dst = NULL; 
+    char * dst = NULL;
+    char * src = NULL; 
     int simple = 0, i;
     int rtt_flag = 0, xput_flag = 0;
     int num_concur = 1;
@@ -842,13 +835,13 @@ int main(int argc, char **argv) {
                 return ret;
             }
 
-            ret = client_remote_memory_ops(i);
+            ret = client_remote_memory_ops(i, cm);
             if (ret) {
                 rdma_error("Failed to finish remote memory ops, ret = %d \n", ret);
                 return ret;
             }
                 
-            if (check_src_dst()) {
+            if (check_src_dst(src, dst)) {
                 rdma_error("src and dst buffers do not match \n");
             } else {
                 printf("...\nSUCCESS, source and destination buffers match \n");

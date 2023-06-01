@@ -31,6 +31,7 @@ RDMAConnectionManager::RDMAConnectionManager() {
 
 }
 
+
 RDMAConnectionManager::RDMAConnectionManager(RDMAConnectionManagerArguments args) {
 
     _num_qps = args.num_qps;
@@ -38,7 +39,6 @@ RDMAConnectionManager::RDMAConnectionManager(RDMAConnectionManagerArguments args
     _server_sockaddr = args.server_sockaddr;
 
 
-    src , dst = NULL; 
     cm_event_channel = NULL;
     pd = NULL;
     client_send_wr, bad_client_send_wr = NULL;
