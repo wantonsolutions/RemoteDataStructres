@@ -220,10 +220,10 @@ void set_send_work_request(struct ibv_send_wr &client_send_wr, struct ibv_sge &c
 }
 
 
+#define BATCH_SIZE 1024
 
 void * xput_thread(void * args) {
     struct xput_thread_args * targs = (struct xput_thread_args *)args;
-    //printf("Hello from xput going to core %d\n",targs->core);
     stick_this_thread_to_core(targs->core);
 
     int num_concur = targs->num_concur;
@@ -231,60 +231,31 @@ void * xput_thread(void * args) {
     int msg_size = targs->msg_size;
     enum rdma_measured_op rdma_op = targs->rdma_op;
     struct ibv_mr **mr_buffers=targs->mr_buffers;           /* Make sure to deregister these local MRs before exiting */
-    // int num_lbuffers = targs->num_lbuffers;
     uint64_t start_cycles, end_cycles;
     start_cycles=targs->start_cycles;
     RDMAConnectionManager * cm = targs->cm;
 
-
     struct ibv_wc* wc;
     int ret = -1, n, i;
-    // uint64_t xstart_cycles, xend_cycles;
     struct timeval      start, end;
 
-    // const uint64_t minimum_duration_secs = 20;  /* number of seconds to run the experiment for at least */
-    // const uint64_t check_watch_interval = 1e6;  /* Check time every million requests as checking on every request might be too costly */
-    // int stop_posting = 0;
     uint64_t poll_time = 0, poll_count = 0, idle_count = 0;
     uint64_t wr_posted = 0, wr_acked = 0;
     int qp_num = 0;
     union work_req_id wr_id;
 
     struct ibv_sge local_client_send_sge;
-    local_client_send_sge.addr = (uint64_t) mr_buffers[targs->thread_id]->addr;  
-    local_client_send_sge.length = (uint32_t) msg_size;           // Send only msg_size
-    local_client_send_sge.lkey = mr_buffers[targs->thread_id]->lkey;
+    set_scatter_gather_entry(local_client_send_sge, (uint64_t) mr_buffers[targs->thread_id]->addr, (uint32_t) msg_size, mr_buffers[targs->thread_id]->lkey);
 
     struct ibv_send_wr local_client_send_wr, *local_bad_client_send_wr;
 
-    #define BATCH_SIZE 1024
     struct ibv_send_wr local_client_send_wr_batch[BATCH_SIZE];
     uint32_t remote_key = cm->server_qp_metadata_attr[0].stag.remote_stag;
     uint64_t remote_memory_base_address = cm->server_qp_metadata_attr[0].address;
 
 
-    bzero(&local_client_send_wr_batch, sizeof(local_client_send_wr)*BATCH_SIZE);
     for (int i=0;i<BATCH_SIZE;i++) {
-        local_client_send_wr_batch[i].sg_list = &local_client_send_sge;
-        local_client_send_wr_batch[i].num_sge = 1;
-        set_wr_op_code(local_client_send_wr_batch[i], rdma_op);
-
-        //client_send_wr.opcode = rdma_op == RDMA_READ_OP ? IBV_WR_RDMA_READ : IBV_WR_RDMA_WRITE;
-        local_client_send_wr_batch[i].send_flags |= IBV_SEND_SIGNALED;          // NOTE: This tells the other NIC to send completion events
-        //local_client_send_wr.send_flags = IBV_SEND_INLINE;          // NOTE: This tells the other NIC to send completion events
-        /* we have to tell server side info for RDMA */
-        local_client_send_wr_batch[i].wr.rdma.rkey = remote_key;
-        local_client_send_wr_batch[i].wr.rdma.remote_addr = remote_memory_base_address;
-
-        if (rdma_op == RDMA_CAS_OP) {
-            set_compare_and_swap_work_request(local_client_send_wr_batch[i], remote_memory_base_address, remote_key, 0, 0);
-        }
-
-        if (rdma_op == RDMA_FAA_OP) {
-            set_fetch_and_add_work_request(local_client_send_wr_batch[i], remote_memory_base_address, remote_key, 0);
-        }
-
-
+        set_send_work_request(local_client_send_wr_batch[i], local_client_send_sge, rdma_op, remote_key, remote_memory_base_address);
     }
 
     result_t result;
@@ -320,7 +291,6 @@ void * xput_thread(void * args) {
             }     
         } while (n < 1);
         /* For each completed request */
-        //hist_size[n]++;
         for (i = 0; i < n; i++) {
             /* Check that it succeeded */
             if (wc[i].status != IBV_WC_SUCCESS) {
@@ -331,27 +301,23 @@ void * xput_thread(void * args) {
             if (!finished_running_xput) {
                 /* Issue another request that reads/writes from same locations as the completed one */
 
-
                 wr_id.val =  wc[i].wr_id;
                 qp_rec[wr_id.s.qp_num]++;
                 qp_num = targs->thread_id;
                 slot_num = wr_id.s.window_slot;
 
-                //buf_offset = slot_num * msg_size;
                 buf_offset = get_buf_offset(slot_num,msg_size);
                 uint64_t remote_memory_address = local_server_address + buf_offset;
-                // buf_ptr     = (char *)(mr_buffers[buf_num]->addr + buf_offset);
+
                 local_client_send_wr_batch[i].wr_id = wr_id.val;              /* User-assigned id to recognize this WR on completion */
                 local_client_send_wr_batch[i].wr.rdma.remote_addr = remote_memory_address;
-                
-
                 if (rdma_op == RDMA_CAS_OP) {
                     set_compare_and_swap_work_request(local_client_send_wr_batch[i], remote_memory_address, remote_key, 0, 0);
                 }
-
                 if (rdma_op == RDMA_FAA_OP) {
                     set_fetch_and_add_work_request(local_client_send_wr_batch[i], remote_memory_address, remote_key, 0);
                 }
+
             }
         }
         //configure the list
@@ -479,7 +445,6 @@ static result_t measure_xput(
         }
     }
 
-
     gettimeofday (&start, NULL);
     rdtsc();
     start_cycles = ( ((int64_t)cycles_high << 32) | cycles_low );
@@ -489,14 +454,12 @@ static result_t measure_xput(
         memset((uint8_t*)mr_buffers[0]->addr + (i*msg_size), 'a' + i%26, msg_size);
 
 
-    uint32_t remote_key = cm.server_qp_metadata_attr[0].stag.remote_stag;
-
     /* Post until number of max requests in flight is hit */
+    uint32_t remote_key = cm.server_qp_metadata_attr[0].stag.remote_stag;
     char *buf_ptr = (char * )mr_buffers[0]->addr;
     int	buf_offset = 0, slot_num = 0;
     int buf_num = 0;
     uint64_t wr_posted = 0;
-
     for (int i = 0; i < num_concur; i++) {
 
         /* it is safe to reuse client_send_wr object after post_() returns */
@@ -533,9 +496,6 @@ static result_t measure_xput(
 
     }
 
-
-
-
     void * context = NULL;
     struct ibv_cq *local_client_cq_threads[MAX_THREADS];
     for (int i=0;i<num_qps;i++){
@@ -554,12 +514,7 @@ static result_t measure_xput(
         }
     }
 
-    printf("Starting threads\n");
-
     int32_t total_threads = num_qps;
-
-
-
     pthread_t threadId[MAX_THREADS];
     struct xput_thread_args targs[MAX_THREADS];
     for (int i=0;i<total_threads;i++){
@@ -581,11 +536,6 @@ static result_t measure_xput(
     }
 
     const uint64_t minimum_duration_secs = 10;  /* number of seconds to run the experiment for at least */
-    // const uint64_t check_watch_interval = 1e6;  /* Check time every million requests as checking on every request might be too costly */
-    // int stop_posting = 0;
-    // uint64_t poll_time = 0, poll_count = 0, idle_count = 0;
-
-
     do {
         rdtsc1();
         end_cycles = ( ((int64_t)cycles_high1 << 32) | cycles_low1 );
