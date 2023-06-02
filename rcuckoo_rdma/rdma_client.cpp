@@ -1,6 +1,6 @@
-#include "rdma_client_lib.h"
 #include "rdma_common.h"
 #include "rdma_client.h"
+#include "rdma_client_lib.h"
 #include <sys/time.h>
 
 
@@ -165,6 +165,61 @@ static int client_remote_memory_ops(int qp_num, RDMAConnectionManager &cm)
 }
 
 
+void set_wr_op_code(struct ibv_send_wr  &client_send_wr,  enum rdma_measured_op rdma_op) {
+    switch (rdma_op) {
+        case RDMA_READ_OP:
+            client_send_wr.opcode = IBV_WR_RDMA_READ;
+        break;
+        case RDMA_WRITE_OP:
+            client_send_wr.opcode = IBV_WR_RDMA_WRITE;
+            client_send_wr.send_flags |= IBV_SEND_INLINE;          // NOTE: This tells the other NIC to send completion events
+        break;
+        case RDMA_CAS_OP:
+            client_send_wr.opcode = IBV_WR_ATOMIC_CMP_AND_SWP;
+        break;
+        case RDMA_FAA_OP:
+            client_send_wr.opcode = IBV_WR_ATOMIC_FETCH_AND_ADD;
+            //client_send_wr.send_flags |= IBV_EXP_SEND_EXT_ATOMIC_INLINE;
+        break;
+    }
+}
+
+void set_compare_and_swap_work_request(struct ibv_send_wr  &client_send_wr, uint64_t address, uint32_t rkey, uint64_t compare_add, uint64_t swap) {
+    client_send_wr.wr.atomic.remote_addr = address;
+    client_send_wr.wr.atomic.rkey = rkey;
+    client_send_wr.wr.atomic.compare_add = compare_add;
+    client_send_wr.wr.atomic.swap = swap;
+}
+
+void set_fetch_and_add_work_request(struct ibv_send_wr  &client_send_wr, uint64_t address, uint32_t rkey, uint64_t swap) {
+    client_send_wr.wr.atomic.remote_addr = address;
+    client_send_wr.wr.atomic.rkey = rkey;
+    client_send_wr.wr.atomic.compare_add = 1ULL;
+    client_send_wr.wr.atomic.swap = swap;
+}
+
+void set_scatter_gather_entry(struct ibv_sge &client_send_sge, uint64_t address, uint32_t length, uint32_t lkey) {
+    client_send_sge.addr = address;
+    client_send_sge.length = length;
+    client_send_sge.lkey = lkey;
+}
+
+
+void set_send_work_request(struct ibv_send_wr &client_send_wr, struct ibv_sge &client_send_sge, enum rdma_measured_op rdma_op, uint32_t remote_key, uint64_t remote_address){
+
+    bzero(&client_send_wr, sizeof(client_send_wr));
+    client_send_wr.sg_list = &client_send_sge;
+    client_send_wr.num_sge = 1;
+
+    set_wr_op_code(client_send_wr, rdma_op);
+    client_send_wr.send_flags |= IBV_SEND_SIGNALED;          // NOTE: This tells the other NIC to send completion events
+
+    /* we have to tell server side info for RDMA */
+    client_send_wr.wr.rdma.rkey = remote_key;
+    client_send_wr.wr.rdma.remote_addr = remote_address;
+}
+
+
 
 void * xput_thread(void * args) {
     struct xput_thread_args * targs = (struct xput_thread_args *)args;
@@ -204,60 +259,37 @@ void * xput_thread(void * args) {
 
     #define BATCH_SIZE 1024
     struct ibv_send_wr local_client_send_wr_batch[BATCH_SIZE];
-    //local_client_send_wr = client_send_wr;
+    uint32_t remote_key = cm->server_qp_metadata_attr[0].stag.remote_stag;
+    uint64_t remote_memory_base_address = cm->server_qp_metadata_attr[0].address;
 
 
     bzero(&local_client_send_wr_batch, sizeof(local_client_send_wr)*BATCH_SIZE);
     for (int i=0;i<BATCH_SIZE;i++) {
         local_client_send_wr_batch[i].sg_list = &local_client_send_sge;
         local_client_send_wr_batch[i].num_sge = 1;
-        switch (rdma_op) {
-            case RDMA_READ_OP:
-                local_client_send_wr_batch[i].opcode = IBV_WR_RDMA_READ;
-            break;
-            case RDMA_WRITE_OP:
-                local_client_send_wr_batch[i].opcode = IBV_WR_RDMA_WRITE;
-                local_client_send_wr_batch[i].send_flags |= IBV_SEND_INLINE;          // NOTE: This tells the other NIC to send completion events
-            break;
-            case RDMA_CAS_OP:
-                local_client_send_wr_batch[i].opcode = IBV_WR_ATOMIC_CMP_AND_SWP;
-            break;
-            case RDMA_FAA_OP:
-                local_client_send_wr_batch[i].opcode = IBV_WR_ATOMIC_FETCH_AND_ADD;
-            break;
-        }
+        set_wr_op_code(local_client_send_wr_batch[i], rdma_op);
+
         //client_send_wr.opcode = rdma_op == RDMA_READ_OP ? IBV_WR_RDMA_READ : IBV_WR_RDMA_WRITE;
         local_client_send_wr_batch[i].send_flags |= IBV_SEND_SIGNALED;          // NOTE: This tells the other NIC to send completion events
         //local_client_send_wr.send_flags = IBV_SEND_INLINE;          // NOTE: This tells the other NIC to send completion events
         /* we have to tell server side info for RDMA */
-        local_client_send_wr_batch[i].wr.rdma.rkey = cm->server_qp_metadata_attr[0].stag.remote_stag;
-        local_client_send_wr_batch[i].wr.rdma.remote_addr = cm->server_qp_metadata_attr[0].address;
+        local_client_send_wr_batch[i].wr.rdma.rkey = remote_key;
+        local_client_send_wr_batch[i].wr.rdma.remote_addr = remote_memory_base_address;
 
-        //From clover setting up atomics (userspace_one_cs)
         if (rdma_op == RDMA_CAS_OP) {
-            local_client_send_wr_batch[i].wr.atomic.remote_addr = cm->server_qp_metadata_attr[0].address;
-            local_client_send_wr_batch[i].wr.atomic.rkey = cm->server_qp_metadata_attr[0].stag.remote_stag;
-            local_client_send_wr_batch[i].wr.atomic.compare_add = 0;
-            local_client_send_wr_batch[i].wr.atomic.swap = 0;
+            set_compare_and_swap_work_request(local_client_send_wr_batch[i], remote_memory_base_address, remote_key, 0, 0);
         }
 
         if (rdma_op == RDMA_FAA_OP) {
-            local_client_send_wr_batch[i].wr.atomic.remote_addr = cm->server_qp_metadata_attr[0].address;
-            local_client_send_wr_batch[i].wr.atomic.rkey = cm->server_qp_metadata_attr[0].stag.remote_stag;
-            local_client_send_wr_batch[i].wr.atomic.compare_add = 1ULL;
+            set_fetch_and_add_work_request(local_client_send_wr_batch[i], remote_memory_base_address, remote_key, 0);
         }
+
+
     }
 
     result_t result;
-
     uint64_t local_server_address = cm->server_qp_metadata_attr[0].address;
-
     int	buf_offset = 0, slot_num = 0;
-    // int buf_num = 0;
-
-    // char * buf_ptr;
-
-    //printf("[Thread %d] io ref %d\n",targs->thread_id, cq_ptr->channel->refcnt);
 
     gettimeofday (&start, NULL);
     rdtsc();
@@ -266,19 +298,13 @@ void * xput_thread(void * args) {
 
     bzero(qp_rec,HIST_SIZE*sizeof(uint32_t));
 
-    // printf("\n");
-    // for(int i=0;i<8;i++){
-    //     printf("(tid %d) %d\t%d \tqp_hist_loc[%p]\n",targs->thread_id,i,qp_rec[i],qp_rec);
-    // }
 
     wc = (struct ibv_wc *) calloc (num_concur, sizeof(struct ibv_wc));
     do {
         /* Poll the completion queue for the completion event for the earlier write */
         //xrdtsc();
         do {
-            //printf("Thread %d, CQ %p\n",targs->thread_id,cq_ptr);
             n = ibv_poll_cq(cq_ptr, num_concur, wc);       // get upto num_concur entries
-            //printf("exit poll\n");
             if (n < 0) {
                 printf("Failed to poll cq for wc due to %d\n", ret);
                 rdma_error("Failed to poll cq for wc due to %d \n", ret);
@@ -297,11 +323,10 @@ void * xput_thread(void * args) {
         //hist_size[n]++;
         for (i = 0; i < n; i++) {
             /* Check that it succeeded */
-            /*
             if (wc[i].status != IBV_WC_SUCCESS) {
                 rdma_error("Work completion (WC) has error status: %d, %s at index %ld\n",  
                     wc[i].status, ibv_wc_status_str(wc[i].status), wc[i].wr_id);
-            }*/
+            }
 
             if (!finished_running_xput) {
                 /* Issue another request that reads/writes from same locations as the completed one */
@@ -314,29 +339,19 @@ void * xput_thread(void * args) {
 
                 //buf_offset = slot_num * msg_size;
                 buf_offset = get_buf_offset(slot_num,msg_size);
+                uint64_t remote_memory_address = local_server_address + buf_offset;
                 // buf_ptr     = (char *)(mr_buffers[buf_num]->addr + buf_offset);
-
                 local_client_send_wr_batch[i].wr_id = wr_id.val;              /* User-assigned id to recognize this WR on completion */
-                local_client_send_wr_batch[i].wr.rdma.remote_addr = local_server_address + buf_offset;
+                local_client_send_wr_batch[i].wr.rdma.remote_addr = remote_memory_address;
                 
-                if(rdma_op == RDMA_CAS_OP){
-                    local_client_send_wr_batch[i].wr.atomic.remote_addr = local_server_address + buf_offset;
-                    local_client_send_wr_batch[i].wr.atomic.compare_add = 0;
-                    local_client_send_wr_batch[i].wr.atomic.swap = 0;
-                } else if(rdma_op == RDMA_FAA_OP){
-                    local_client_send_wr_batch[i].wr.atomic.remote_addr = local_server_address + buf_offset;
-                    local_client_send_wr_batch[i].wr.atomic.compare_add = 1ULL;
-                }
-                // buf_num     = targs->thread_id;
 
-                // ret = ibv_post_send(client_qp[qp_num], 
-                //         &local_client_send_wr_batch[i],
-                //         &local_bad_client_send_wr);
-                // if (ret) {
-                //     rdma_error("Failed to write client src buffer, errno: %d \n", -errno);
-                //     exit(1);
-                // }
-                // wr_posted++;
+                if (rdma_op == RDMA_CAS_OP) {
+                    set_compare_and_swap_work_request(local_client_send_wr_batch[i], remote_memory_address, remote_key, 0, 0);
+                }
+
+                if (rdma_op == RDMA_FAA_OP) {
+                    set_fetch_and_add_work_request(local_client_send_wr_batch[i], remote_memory_address, remote_key, 0);
+                }
             }
         }
         //configure the list
@@ -386,6 +401,9 @@ void * xput_thread(void * args) {
 
 }
 
+
+
+
 /* Measures throughput for RDMA READ/WRITE ops for a specified message size and number of concurrent messages (i.e., requests in flight) */
 /* Returns xput in ops/sec */
 static result_t measure_xput(
@@ -400,12 +418,8 @@ static result_t measure_xput(
     int ret = -1, n, i;
     struct ibv_wc* wc;
     uint64_t start_cycles, end_cycles;
-    // uint64_t xstart_cycles, xend_cycles;
     struct timeval      start; //, end;
-    // struct ibv_cq *cq_ptr = NULL;
-    void *context = NULL;
     struct ibv_mr **mr_buffers = NULL;           /* Make sure to deregister these local MRs before exiting */
-    // struct ibv_mr *tmpbuffer = NULL;
     result_t result;
     union work_req_id wr_id;
     int qp_num = 0;
@@ -413,8 +427,8 @@ static result_t measure_xput(
 
     struct ibv_sge client_send_sge;
     struct ibv_sge server_recv_sge;
-    static struct ibv_send_wr client_send_wr, *bad_client_send_wr;
-    static struct ibv_recv_wr server_recv_wr, *bad_server_recv_wr;
+    struct ibv_send_wr client_send_wr, *bad_client_send_wr;
+    struct ibv_recv_wr server_recv_wr, *bad_server_recv_wr;
 
     
     /* Learned that the limit for number of outstanding requests for READ and ATOMIC ops 
@@ -430,17 +444,9 @@ static result_t measure_xput(
     }
 
     mr_mode=mr_mode; //to avoid warning
-    /*
-    num_lbuffers = (mr_mode == MR_MODE_PRE_REGISTER_WITH_ROTATE) ? num_lbuffers : 1;
-    if (num_lbuffers <= 0) {
-        rdma_error("Invalid number of client-side buffers provided: %d\n", num_lbuffers);
-        result.err_code = -EINVAL;
-        return result; 
-    }*/
 
     /* Allocate client buffers to read/write from (use the same piece of underlying memory) */
     mr_buffers = (struct ibv_mr**) malloc(num_lbuffers * sizeof(struct ibv_mr*));
-    //size_t buf_size = msg_size * num_concur;
     size_t buf_size = get_buffer_size(num_concur,msg_size);
     mr_buffers[0] = rdma_buffer_alloc(cm.pd,
         buf_size, MEMORY_PERMISSION
@@ -473,92 +479,43 @@ static result_t measure_xput(
         }
     }
 
-    /* For sanity check, fill the client buffer with different alphabets in each message. 
-     * We can verify this by reading the server buffer later. Only works for RDMA WRITEs though */
-    for (i = 0; i < num_concur; i++)
-        memset((uint8_t*)mr_buffers[0]->addr + (i*msg_size), 'a' + i%26, msg_size);
-
-    /* Prepare a template WR for RDMA ops */
-    client_send_sge.addr = (uint64_t) mr_buffers[0]->addr;  
-    client_send_sge.length = (uint32_t) msg_size;           // Send only msg_size
-    client_send_sge.lkey = mr_buffers[0]->lkey;
-    /* now we link to the send work request */
-    bzero(&client_send_wr, sizeof(client_send_wr));
-    client_send_wr.sg_list = &client_send_sge;
-    client_send_wr.num_sge = 1;
-    switch (rdma_op) {
-        case RDMA_READ_OP:
-            client_send_wr.opcode = IBV_WR_RDMA_READ;
-        break;
-        case RDMA_WRITE_OP:
-            client_send_wr.opcode = IBV_WR_RDMA_WRITE;
-            client_send_wr.send_flags |= IBV_SEND_INLINE;          // NOTE: This tells the other NIC to send completion events
-        break;
-        case RDMA_CAS_OP:
-            client_send_wr.opcode = IBV_WR_ATOMIC_CMP_AND_SWP;
-        break;
-        case RDMA_FAA_OP:
-            client_send_wr.opcode = IBV_WR_ATOMIC_FETCH_AND_ADD;
-            //client_send_wr.send_flags |= IBV_EXP_SEND_EXT_ATOMIC_INLINE;
-        break;
-    }
-    //client_send_wr.opcode = rdma_op == RDMA_READ_OP ? IBV_WR_RDMA_READ : IBV_WR_RDMA_WRITE;
-    client_send_wr.send_flags |= IBV_SEND_SIGNALED;          // NOTE: This tells the other NIC to send completion events
-    /* we have to tell server side info for RDMA */
-    client_send_wr.wr.rdma.rkey = cm.server_qp_metadata_attr[0].stag.remote_stag;
-    client_send_wr.wr.rdma.remote_addr = cm.server_qp_metadata_attr[0].address;
-
-    //From clover setting up atomics (userspace_one_cs)
-    if (rdma_op == RDMA_CAS_OP) {
-        client_send_wr.wr.atomic.remote_addr = cm.server_qp_metadata_attr[0].address;
-        client_send_wr.wr.atomic.rkey = cm.server_qp_metadata_attr[0].stag.remote_stag;
-        client_send_wr.wr.atomic.compare_add = 0;
-        client_send_wr.wr.atomic.swap = 0;
-    }
-    if (rdma_op == RDMA_FAA_OP) {
-        client_send_wr.wr.atomic.remote_addr = cm.server_qp_metadata_attr[0].address;
-        client_send_wr.wr.atomic.rkey = cm.server_qp_metadata_attr[0].stag.remote_stag;
-        client_send_wr.wr.atomic.compare_add = 1ULL;
-    }
-
 
     gettimeofday (&start, NULL);
     rdtsc();
     start_cycles = ( ((int64_t)cycles_high << 32) | cycles_low );
+
+    // //Sanity starts here
+    for (int i = 0; i < num_concur; i++)
+        memset((uint8_t*)mr_buffers[0]->addr + (i*msg_size), 'a' + i%26, msg_size);
+
+
+    uint32_t remote_key = cm.server_qp_metadata_attr[0].stag.remote_stag;
 
     /* Post until number of max requests in flight is hit */
     char *buf_ptr = (char * )mr_buffers[0]->addr;
     int	buf_offset = 0, slot_num = 0;
     int buf_num = 0;
     uint64_t wr_posted = 0;
-    // uint64_t wr_acked = 0;
 
-    for (i = 0; i < num_concur; i++) {
+    for (int i = 0; i < num_concur; i++) {
+
         /* it is safe to reuse client_send_wr object after post_() returns */
-        client_send_sge.lkey = mr_buffers[buf_num]->lkey;   /* Sets which MR to use to access the local address */   
-        //wr_id.s.qp_num = qp_num;
-        //wr_id.s.window_slot = slot_num;
+        uint64_t remote_memory_address= cm.server_qp_metadata_attr[0].address + buf_offset;
+        set_scatter_gather_entry(client_send_sge, (uint64_t) buf_ptr, msg_size, mr_buffers[buf_num]->lkey);
+        set_send_work_request(client_send_wr, client_send_sge, rdma_op, remote_key, remote_memory_address);
         wr_id.s.qp_num=qp_num;
         wr_id.s.window_slot=slot_num;
         client_send_wr.wr_id = wr_id.val;                  /* User-assigned id to recognize this WR on completion */
 
-        //client_send_wr.wr_id = wr_id.val;                  /* User-assigned id to recognize this WR on completion */
-        client_send_sge.addr = (uint64_t) buf_ptr;          /* Sets which mem addr to read from/write to locally */  // FIXME
-        client_send_wr.wr.rdma.remote_addr = cm.server_qp_metadata_attr[0].address + buf_offset; 
-
         if (rdma_op == RDMA_CAS_OP) {
-            client_send_wr.wr.atomic.remote_addr = cm.server_qp_metadata_attr[0].address + buf_offset;
-            client_send_wr.wr.atomic.compare_add = 0;
-            client_send_wr.wr.atomic.swap = 0;
+            set_compare_and_swap_work_request(client_send_wr, remote_memory_address, remote_key, 0, 0);
         }
 
         if (rdma_op == RDMA_FAA_OP) {
-            client_send_wr.wr.atomic.remote_addr = cm.server_qp_metadata_attr[0].address + buf_offset;
-            client_send_wr.wr.atomic.compare_add = 1ULL;
+            set_fetch_and_add_work_request(client_send_wr, remote_memory_address, remote_key, 0);
         }
 
-        //printf("i %d\n",i);
-        ret = ibv_post_send(cm.client_qp[qp_num], 
+        int ret = ibv_post_send(cm.client_qp[qp_num], 
                 &client_send_wr,
                 &bad_client_send_wr);
         if (ret) {
@@ -568,34 +525,21 @@ static result_t measure_xput(
         }
         	
         wr_posted++;
-
-        #define PARALLEL_KEYS 1
-        //slot_num    = (slot_num + 1) % num_concur;
         slot_num    = (slot_num + 1) % GLOBAL_KEYS;
-
-
-        //buf_offset  = slot_num * msg_size * 1024;
         buf_offset = get_buf_offset(slot_num,msg_size);
         buf_num     = (buf_num + 1) % num_lbuffers;
 	    buf_ptr     = (char *)((char *)(mr_buffers[buf_num]->addr) + buf_offset);     /* We can always use mr_buffers[0] as all buffers point to same memory */
-        //printf("%p buf\n",buf_ptr);
-        // buf_num     = rand_xorshf96() % num_lbuffers;
         qp_num      = (qp_num + 1) % num_qps;
 
     }
 
-    pthread_t threadId[MAX_THREADS];
-    int32_t total_threads = num_qps;
 
+
+
+    void * context = NULL;
     struct ibv_cq *local_client_cq_threads[MAX_THREADS];
-
-    // for (int i=0;i<total_threads;i++){
-    //     printf("Global CQ %p\n",client_cq_threads[i]);
-    // }
-
-
-    for (int i=0;i<total_threads;i++){
-        ret = ibv_get_cq_event(cm.io_completion_channel_threads[i], &local_client_cq_threads[i], &context);
+    for (int i=0;i<num_qps;i++){
+        int ret = ibv_get_cq_event(cm.io_completion_channel_threads[i], &local_client_cq_threads[i], &context);
         //printf("Local CQ %p\n",local_client_cq_threads[i]);
         if (ret) {
             rdma_error("Failed to get next CQ event due to %d \n", -errno);
@@ -610,7 +554,13 @@ static result_t measure_xput(
         }
     }
 
+    printf("Starting threads\n");
 
+    int32_t total_threads = num_qps;
+
+
+
+    pthread_t threadId[MAX_THREADS];
     struct xput_thread_args targs[MAX_THREADS];
     for (int i=0;i<total_threads;i++){
         targs[i].thread_id=i;
@@ -624,6 +574,7 @@ static result_t measure_xput(
         targs[i].num_lbuffers = num_lbuffers;
         targs[i].start_cycles = start_cycles;
         targs[i].mr_buffers = mr_buffers;
+        targs[i].cm = &cm;
         finished_running_xput=0;
         pthread_create(&threadId[i], NULL, &xput_thread, (void*)&targs[i]);
         //Setupt next itt
@@ -823,6 +774,7 @@ int main(int argc, char **argv) {
     args.base_port = base_port;
 
     RDMAConnectionManager cm(args);
+    printf("RDMAConnectionManager created\n");
 
 
     /* Connection now set up and ready to play */

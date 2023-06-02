@@ -4,10 +4,10 @@
  *         atrivedi@apache.org
  */
 
-#include "rdma_common.h"
 #include <sys/time.h>
 #include <assert.h>
 #include <stdexcept>
+#include "rdma_common.h"
 #include "rdma_client_lib.h"
 
 /* A fast but good enough pseudo-random number generator. Good enough for what? */
@@ -487,9 +487,6 @@ int RDMAConnectionManager::client_clean()
             // we continue anyways;
         }
     }
-    /* We free the buffers */
-    free(src);
-    free(dst);
     /* Destroy protection domain */
     ret = ibv_dealloc_pd(pd);
     if (ret) {

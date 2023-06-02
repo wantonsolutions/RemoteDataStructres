@@ -26,32 +26,32 @@ class RDMAConnectionManager {
     public:
         /* These are basic RDMA resources */
         /* These are RDMA connection related resources */
-        static struct ibv_context **devices;
-        static struct rdma_event_channel *cm_event_channel;
-        static struct rdma_cm_id *cm_client_qp_id[MAX_QPS];
-        static struct ibv_pd *pd;
-        static struct ibv_qp_init_attr qp_init_attr;
-        static struct ibv_qp *client_qp[MAX_QPS];
-        static struct ibv_device_attr dev_attr;
+        struct ibv_context **devices;
+        struct rdma_event_channel *cm_event_channel;
+        struct rdma_cm_id *cm_client_qp_id[MAX_QPS];
+        struct ibv_pd *pd;
+        struct ibv_qp_init_attr qp_init_attr;
+        struct ibv_qp *client_qp[MAX_QPS];
+        struct ibv_device_attr dev_attr;
 
         /* These are memory buffers related resources */
-        static struct ibv_mr *client_qp_src_mr[MAX_QPS];
-        static struct ibv_mr *client_qp_dst_mr[MAX_QPS];
-        static struct ibv_mr *client_qp_metadata_mr[MAX_QPS];
-        static struct ibv_mr *server_qp_metadata_mr[MAX_QPS];
-        static struct rdma_buffer_attr client_qp_metadata_attr[MAX_QPS];
-        static struct rdma_buffer_attr server_qp_metadata_attr[MAX_QPS];
+        struct ibv_mr *client_qp_src_mr[MAX_QPS];
+        struct ibv_mr *client_qp_dst_mr[MAX_QPS];
+        struct ibv_mr *client_qp_metadata_mr[MAX_QPS];
+        struct ibv_mr *server_qp_metadata_mr[MAX_QPS];
+        struct rdma_buffer_attr client_qp_metadata_attr[MAX_QPS];
+        struct rdma_buffer_attr server_qp_metadata_attr[MAX_QPS];
 
 
         result_t thread_results[MAX_THREADS];
-        static struct ibv_cq *client_cq_threads[MAX_THREADS];
-        static struct ibv_comp_channel *io_completion_channel_threads[MAX_THREADS];
+        struct ibv_cq *client_cq_threads[MAX_THREADS];
+        struct ibv_comp_channel *io_completion_channel_threads[MAX_THREADS];
         uint32_t thread_contexts[MAX_THREADS];
 
 
-        static struct ibv_send_wr client_send_wr, *bad_client_send_wr;
-        static struct ibv_recv_wr server_recv_wr, *bad_server_recv_wr;
-        static struct ibv_sge client_send_sge, server_recv_sge;
+        struct ibv_send_wr client_send_wr, *bad_client_send_wr;
+        struct ibv_recv_wr server_recv_wr, *bad_server_recv_wr;
+        struct ibv_sge client_send_sge, server_recv_sge;
 
 
         /* Source and Destination buffers, where RDMA operations source and sink */

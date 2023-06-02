@@ -1,6 +1,6 @@
 # NAME = tables hash
 
-# CC = g++ # define the C/C++ compiler to use
+CC = g++ # define the C/C++ compiler to use
 # CFLAGS = -O3 -Wall -Wall -Wextra -pedantic -fPIC
 # # define any directories containing header files other than /usr/include
 XXHASH_INC = /usr/local/home/ssgrant/RemoteDataStructres/rcuckoo_rdma/xxHash
@@ -8,7 +8,7 @@ INCLUDES = -I$(XXHASH_INC)
 LIBRARIES = -L$(XXHASH_INC) -lxxhash
 
 
-CFLAGS = -std=c++2a -O3 -Wall -Wall -Wextra -pedantic -fPIC
+CFLAGS = -std=c++2a -g -O3 -Wall -Wall -Wextra -pedantic -fPIC
 RDMA_LIBS = -lrdmacm -libverbs -lpthread
 # # define the C++ source files
 # SRCS = $(NAME).cpp 
@@ -56,17 +56,22 @@ rdma_common.o:
 	$(CC) -c $(CFLAGS) $(INCLUDES) -fPIC rdma_common.cpp -o rdma_common.o
 
 
-rdma_server.o: rdma_common.o
-	$(CC) -c $(CFLAGS) $(INCLUDES) -fPIC rdma_server.cpp -o rdma_server.o rdma_common.o
+rdma_client_lib.o: rdma_common.o rdma_client_lib.cpp rdma_client_lib.h
+	$(CC) -c $(CFLAGS) $(INCLUDES) -fPIC rdma_client_lib.cpp rdma_common.o -o rdma_client_lib.o
 
-rdma_server: rdma_server.o
-	$(CC) $(CFLAGS) $(INCLUDES) -fPIC rdma_server.o rdma_common.o -o rdma_server $(RDMA_LIBS)
 
 rdma_client.o: rdma_common.o rdma_client_lib.o rdma_client.cpp rdma_client.h
 	$(CC) -c $(CFLAGS) $(INCLUDES) -fPIC rdma_client.cpp -o rdma_client.o rdma_common.o
 
 rdma_client: rdma_client.o rdma_client_lib.o
-	$(CC) $(CFLAGS) $(INCLUDES) -fPIC rdma_client.o rdma_common.o rdma_client_lib.o -o rdma_client $(RDMA_LIBS)
+	$(CC) $(CFLAGS) $(INCLUDES) -fPIC  -o rdma_client rdma_client.o rdma_common.o rdma_client_lib.o  $(RDMA_LIBS)
+
+
+rdma_server.o: rdma_common.o
+	$(CC) -c $(CFLAGS) $(INCLUDES) -fPIC rdma_server.cpp -o rdma_server.o rdma_common.o
+
+rdma_server: rdma_server.o
+	$(CC) $(CFLAGS) $(INCLUDES) -fPIC -o rdma_server rdma_server.o rdma_common.o $(RDMA_LIBS)
 
 
 test_hash : hash.o
