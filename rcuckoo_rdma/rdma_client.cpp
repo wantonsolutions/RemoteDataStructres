@@ -220,6 +220,30 @@ void set_send_work_request(struct ibv_send_wr &client_send_wr, struct ibv_sge &c
 
 #define BATCH_SIZE 1024
 
+int bulk_poll(struct ibv_cq *cq, int num_entries, struct ibv_wc *wc, uint64_t *poll_count, uint64_t *idle_count) {
+    int n = 0;
+    int ret = 0;
+    do {
+        n = ibv_poll_cq(cq, num_entries, wc);       // get upto num_concur entries
+        if (n < 0) {
+            printf("Failed to poll cq for wc due to %d\n", ret);
+            rdma_error("Failed to poll cq for wc due to %d \n", ret);
+            exit(1);
+        }
+        //todo put the poll count and idle count here 
+        (*poll_count)++;
+        if (n == 0) {
+            (*idle_count)++;
+            //todo deal with a global variable being used to break the polling here
+            //we should deal with finished running xput elsewhere (hard to tell where though)
+            if (finished_running_xput) {
+                break;
+            }
+        }     
+    } while (n < 1);
+    return n
+}
+
 void * xput_thread(void * args) {
     struct xput_thread_args * targs = (struct xput_thread_args *)args;
     stick_this_thread_to_core(targs->core);
@@ -271,23 +295,7 @@ void * xput_thread(void * args) {
     wc = (struct ibv_wc *) calloc (num_concur, sizeof(struct ibv_wc));
     do {
         /* Poll the completion queue for the completion event for the earlier write */
-        //xrdtsc();
-        do {
-            n = ibv_poll_cq(cq_ptr, num_concur, wc);       // get upto num_concur entries
-            if (n < 0) {
-                printf("Failed to poll cq for wc due to %d\n", ret);
-                rdma_error("Failed to poll cq for wc due to %d \n", ret);
-                exit(1);
-            }
-            poll_count++;
-            if (n == 0) {
-                idle_count++;
-                if (finished_running_xput) {
-                    //printf("IDLE BREAK FROM FINSIHED RUN %d\n",wr_posted++);
-                    break;
-                }
-            }     
-        } while (n < 1);
+        n = bulk_poll(cq_ptr, num_concur, wc, &poll_count, &idle_count);
         /* For each completed request */
         for (i = 0; i < n; i++) {
             /* Check that it succeeded */
@@ -364,65 +372,6 @@ void * xput_thread(void * args) {
     return NULL;
 
 }
-
-
-resut_t sanity_check_remote_memory() {
-    for (int i = 0; i < num_concur; i++) {
-        /* it is safe to reuse client_send_wr object after post_() returns */
-        uint64_t remote_memory_address= cm.server_qp_metadata_attr[0].address + buf_offset;
-        set_scatter_gather_entry(client_send_sge, (uint64_t) buf_ptr, msg_size, mr_buffers[buf_num]->lkey);
-        set_send_work_request(client_send_wr, client_send_sge, rdma_op, remote_key, remote_memory_address);
-        wr_id.s.qp_num=qp_num;
-        wr_id.s.window_slot=slot_num;
-        client_send_wr.wr_id = wr_id.val;                  /* User-assigned id to recognize this WR on completion */
-
-        if (rdma_op == RDMA_CAS_OP) {
-            set_compare_and_swap_work_request(client_send_wr, remote_memory_address, remote_key, 0, 0);
-        }
-
-        if (rdma_op == RDMA_FAA_OP) {
-            set_fetch_and_add_work_request(client_send_wr, remote_memory_address, remote_key, 0);
-        }
-
-        int ret = ibv_post_send(cm.client_qp[qp_num], 
-                &client_send_wr,
-                &bad_client_send_wr);
-        if (ret) {
-            rdma_error("Failed to write client src buffer, errno: %d \n", -errno);
-            result.err_code = -errno;
-            return result;
-        }
-        	
-        wr_posted++;
-        slot_num    = (slot_num + 1) % GLOBAL_KEYS;
-        buf_offset = get_buf_offset(slot_num,msg_size);
-        buf_num     = (buf_num + 1) % num_lbuffers;
-	    buf_ptr     = (char *)((char *)(mr_buffers[buf_num]->addr) + buf_offset);     /* We can always use mr_buffers[0] as all buffers point to same memory */
-        qp_num      = (qp_num + 1) % num_qps;
-
-    }
-
-    void * context = NULL;
-    struct ibv_cq *local_client_cq_threads[MAX_THREADS];
-    for (int i=0;i<num_qps;i++){
-        int ret = ibv_get_cq_event(cm.io_completion_channel_threads[i], &local_client_cq_threads[i], &context);
-        //printf("Local CQ %p\n",local_client_cq_threads[i]);
-        if (ret) {
-            rdma_error("Failed to get next CQ event due to %d \n", -errno);
-            result.err_code = -errno;
-            return result;
-        }
-        ret = ibv_req_notify_cq(local_client_cq_threads[i], 0);
-        if (ret) {
-            rdma_error("Failed to request further notifications %d \n", -errno);
-            result.err_code = -errno;
-            return result;
-        }
-    }
-
-}
-
-
 
 
 /* Measures throughput for RDMA READ/WRITE ops for a specified message size and number of concurrent messages (i.e., requests in flight) */
@@ -515,8 +464,60 @@ static result_t measure_xput(
     int	buf_offset = 0, slot_num = 0;
     int buf_num = 0;
     uint64_t wr_posted = 0;
-    
-    sanity_check_remote_memory();
+
+
+    for (int i = 0; i < num_concur; i++) {
+        /* it is safe to reuse client_send_wr object after post_() returns */
+        uint64_t remote_memory_address= cm.server_qp_metadata_attr[0].address + buf_offset;
+        set_scatter_gather_entry(client_send_sge, (uint64_t) buf_ptr, msg_size, mr_buffers[buf_num]->lkey);
+        set_send_work_request(client_send_wr, client_send_sge, rdma_op, remote_key, remote_memory_address);
+        wr_id.s.qp_num=qp_num;
+        wr_id.s.window_slot=slot_num;
+        client_send_wr.wr_id = wr_id.val;                  /* User-assigned id to recognize this WR on completion */
+
+        if (rdma_op == RDMA_CAS_OP) {
+            set_compare_and_swap_work_request(client_send_wr, remote_memory_address, remote_key, 0, 0);
+        }
+
+        if (rdma_op == RDMA_FAA_OP) {
+            set_fetch_and_add_work_request(client_send_wr, remote_memory_address, remote_key, 0);
+        }
+
+        int ret = ibv_post_send(cm.client_qp[qp_num], 
+                &client_send_wr,
+                &bad_client_send_wr);
+        if (ret) {
+            rdma_error("Failed to write client src buffer, errno: %d \n", -errno);
+            result.err_code = -errno;
+            return result;
+        }
+        	
+        wr_posted++;
+        slot_num    = (slot_num + 1) % GLOBAL_KEYS;
+        buf_offset = get_buf_offset(slot_num,msg_size);
+        buf_num     = (buf_num + 1) % num_lbuffers;
+	    buf_ptr     = (char *)((char *)(mr_buffers[buf_num]->addr) + buf_offset);     /* We can always use mr_buffers[0] as all buffers point to same memory */
+        qp_num      = (qp_num + 1) % num_qps;
+
+    }
+
+    void * context = NULL;
+    struct ibv_cq *local_client_cq_threads[MAX_THREADS];
+    for (int i=0;i<num_qps;i++){
+        int ret = ibv_get_cq_event(cm.io_completion_channel_threads[i], &local_client_cq_threads[i], &context);
+        //printf("Local CQ %p\n",local_client_cq_threads[i]);
+        if (ret) {
+            rdma_error("Failed to get next CQ event due to %d \n", -errno);
+            result.err_code = -errno;
+            return result;
+        }
+        ret = ibv_req_notify_cq(local_client_cq_threads[i], 0);
+        if (ret) {
+            rdma_error("Failed to request further notifications %d \n", -errno);
+            result.err_code = -errno;
+            return result;
+        }
+    }
 
     int32_t total_threads = num_qps;
     pthread_t threadId[MAX_THREADS];
