@@ -301,6 +301,7 @@ static int send_server_metadata_to_client(int qp_num)
     /* We need to setup requested memory buffer. This is where the client will 
     * do RDMA READs and WRITEs. */
 
+
     #ifndef USE_DEVICE_MEMORY
     server_qp_buffer_mr[qp_num] = rdma_buffer_alloc(pd /* which protection domain */, 
             client_qp_metadata_attr[qp_num].length /* what size to allocate */, 
@@ -454,6 +455,24 @@ void usage()
     exit(1);
 }
 
+
+void print_periodically(int num_qps, int time_seconds) {
+
+    //print buffers every second
+    int print_step=0;
+    while(true) {
+        sleep(time_seconds);
+        printf("Printing buffers after %d seconds\n", print_step * time_seconds);
+        print_step++;
+
+        for(int i = 0; i < num_qps; i++) {
+            printf("buffer (%d)\n", i);
+            printf("%s\n", (char*)(server_qp_buffer_mr[i]->addr));
+        }
+    }
+
+}
+
 int main(int argc, char **argv) 
 {
     int ret, option;
@@ -541,6 +560,9 @@ int main(int argc, char **argv)
             return ret;
         }
     }
+    printf("All server setup complete, now serving memory requests\n");
+
+    print_periodically(num_qps, 1 /* sec */);
 
     ret = disconnect_and_cleanup(num_qps);
     if (ret) { 

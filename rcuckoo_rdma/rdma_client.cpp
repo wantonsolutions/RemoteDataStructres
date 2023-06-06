@@ -173,6 +173,7 @@ void set_wr_op_code(struct ibv_send_wr  &client_send_wr,  enum rdma_measured_op 
             client_send_wr.send_flags |= IBV_SEND_INLINE;          // NOTE: This tells the other NIC to send completion events
         break;
         case RDMA_CAS_OP:
+            printf("setting cas in header\n");
             client_send_wr.opcode = IBV_WR_ATOMIC_CMP_AND_SWP;
         break;
         case RDMA_FAA_OP:
@@ -392,8 +393,17 @@ void * xput_thread(void * args) {
     return NULL;
 }
 
-void single_write(uint64_t remote_address, uint64_t local_address, uint32_t size) {
-
+void drain_all_concurrent_requests(int num_concur, struct ibv_cq *cq_ptr, struct ibv_wc* wc, performance_statistics * ps) {
+    int n = 0;
+    while (n < num_concur) {
+        int single_n = bulk_poll(cq_ptr, num_concur, wc, ps);
+        // printf("total recieved during drain %d\n", single_n);
+        // printf("work completion recieved %d\n", wc[0].status);
+        // printf("work completion recieved qp %d\n", wc[0].qp_num);
+        // printf("work completion recieved wr_id %d\n", wc[0].wr_id);
+        n += single_n;
+        printf("QP %d: Draining concurrent requests %d/%d\n", wc->qp_num, n , num_concur);
+    }
 }
 
 void * read_write_cas_test(void * args) {
@@ -418,46 +428,40 @@ void * read_write_cas_test(void * args) {
     struct ibv_sge local_client_send_sge;
     set_scatter_gather_entry(local_client_send_sge, (uint64_t) mr_buffers[qp_num]->addr, (uint32_t) msg_size, mr_buffers[qp_num]->lkey);
 
+
+
     struct ibv_send_wr local_client_send_wr_batch[BATCH_SIZE];
     uint32_t remote_key = cm->server_qp_metadata_attr[0].stag.remote_stag;
     uint64_t local_server_address = cm->server_qp_metadata_attr[0].address;
 
-    char local_write_value[8] = {'a','b','c','d','e','f','g','x'};
+
+
+    char local_write_value[8] = {'x','x','x','x','x','x','x','x'};
+    // bzero(local_write_value, 8);
     memcpy(mr_buffers[qp_num]->addr, local_write_value, 8);
 
     rdma_measured_op first_write = RDMA_WRITE_OP;
 
     //Empty the buffer from the writes that occured earlier
-    bulk_poll(cq_ptr, 1, wc, &ps);
     int n =0;
-    while (n < (num_concur-1)) {
-        int single_n = bulk_poll(cq_ptr, num_concur, wc, &ps);
-        printf("total recieved during drain %d\n", single_n);
-        printf("work completion recieved %d\n", wc[0].status);
-        printf("work completion recieved qp %d\n", wc[0].qp_num);
-        printf("work completion recieved wr_id %d\n", wc[0].wr_id);
-        n += single_n;
-        printf("currently at %d/%d\n", n, num_concur);
-    }
+    drain_all_concurrent_requests(num_concur, cq_ptr, wc, &ps);
 
-
-
+    //write
+    sleep(1);
     local_client_send_wr_batch[0].wr_id = 1337;              /* User-assigned id to recognize this WR on completion */
     local_client_send_wr_batch[0].wr.rdma.remote_addr = local_server_address;
     set_send_work_request(local_client_send_wr_batch[0], local_client_send_sge, first_write, remote_key, local_server_address);
-    printf("sending write request\n");
+    printf("sending write request [%s]\n", local_write_value);
     send_bulk(1, qp_num, cm, local_client_send_wr_batch);
-    //Value sent
+    printf("polling for write completion\n");
     bulk_poll(cq_ptr, 1, wc, &ps);
-    printf("work completion recieved %d\n", wc[0].status);
-    printf("work completion recieved qp %d\n", wc[0].qp_num);
-    printf("work completion recieved wr_id %d\n", wc[0].wr_id);
+    printf("write work completion recieved qp %d wr_id %d\n", wc[0].qp_num, wc[0].wr_id);
 
 
-
-    char local_overwrite_write_value[8] = {'a','b','c','d','e','f','g','o'};
+    //read
+    sleep(1);
+    char local_overwrite_write_value[8] = {'X','b','c','d','e','f','g','\0'};
     memcpy(mr_buffers[qp_num]->addr, local_overwrite_write_value, 8);
-
 
     printf("We have sent the value and recived it, time to read that value back\n");
     char local_read[8];
@@ -470,68 +474,64 @@ void * read_write_cas_test(void * args) {
     //Value sent
     bulk_poll(cq_ptr, 1, wc, &ps);
 
+    printf("wc[0].status: %d\n", wc[0].status);
+    printf("wc[0].opcode: %d\n", wc[0].opcode);
+    printf("wc[0].wr_id: %d\n", wc[0].wr_id);
+    printf("wc[0].qp_num: %d\n", wc[0].qp_num);
+
     memcpy(local_read, mr_buffers[qp_num]->addr, 8);
     printf("The value read back is %s\n", local_read);
+    if (memcmp(local_read, local_write_value, 8) == 0) {
+        printf("write then read was a success\n");
+    } else {
+        printf("write then read was a failure\n");
+    }
+
+    //Now CAS the value
+    sleep(1);
+    char local_cas_value[8];
+    uint64_t compare_value = *(uint64_t *) local_write_value;
+    char local_cas_write_value_new[8] = {'a','a','z','d','e','f','g','f'};
+    uint64_t swap_value = *(uint64_t *) local_cas_write_value_new;
+    // printf("compare value: %s\n", (char*) compare_value);
+    // printf("swap value: %s\n", (char*) swap_value);
+
+    rdma_measured_op cas_op = RDMA_CAS_OP;
+    local_client_send_wr_batch[0].wr_id = 0;              /* User-assigned id to recognize this WR on completion */
+    // local_client_send_wr_batch[0].wr.rdma.remote_addr = local_server_address;
+    set_send_work_request(local_client_send_wr_batch[0], local_client_send_sge, cas_op, remote_key, local_server_address);
+    set_compare_and_swap_work_request(local_client_send_wr_batch[0], local_server_address, remote_key, compare_value, swap_value);
+
+    local_client_send_wr_batch[0].send_flags = IBV_SEND_SIGNALED;
+    local_client_send_wr_batch[0].opcode = IBV_WR_ATOMIC_CMP_AND_SWP;
+    local_client_send_wr_batch[0].wr.atomic.remote_addr = local_server_address;
+    local_client_send_wr_batch[0].wr.atomic.compare_add = compare_value;
+    local_client_send_wr_batch[0].wr.atomic.swap = swap_value;
+    local_client_send_wr_batch[0].wr.atomic.rkey = remote_key;
+
+    send_bulk(1, qp_num, cm, local_client_send_wr_batch);
+    //Value sent
+    bulk_poll(cq_ptr, 1, wc, &ps);
+    printf("wc[0].status: %d\n", wc[0].status);
+    printf("wc[0].opcode: %d\n", wc[0].opcode);
+    printf("wc[0].wr_id: %d\n", wc[0].wr_id);
+    printf("wc[0].qp_num: %d\n", wc[0].qp_num);
+    printf("cq_ptr->comp_events_completed: %d\n", cq_ptr->comp_events_completed);
+    printf("The value read back from the cas is %s\n", mr_buffers[qp_num]->addr);
 
 
+    local_client_send_wr_batch[0].wr_id = 1337;              /* User-assigned id to recognize this WR on completion */
+    local_client_send_wr_batch[0].wr.rdma.remote_addr = local_server_address;
+    set_send_work_request(local_client_send_wr_batch[0], local_client_send_sge, cas_op, remote_key, local_server_address);
+    set_compare_and_swap_work_request(local_client_send_wr_batch[0], local_server_address, remote_key, compare_value, swap_value);
+    send_bulk(1, qp_num, cm, local_client_send_wr_batch);
+    //Value sent
+    bulk_poll(cq_ptr, 1, wc, &ps);
 
 
-
-    // for (int i=0;i<BATCH_SIZE;i++) {
-    //     set_send_work_request(local_client_send_wr_batch[i], local_client_send_sge, rdma_op, remote_key, local_server_address);
-    // }
-
-    // gettimeofday (&ps.start, NULL);
-    // rdtsc();
-    // ps.start_cycles = ( ((int64_t)cycles_high << 32) | cycles_low );
+    printf("The value read back from the cas is %s\n", mr_buffers[qp_num]->addr);
 
 
-    // struct ibv_wc* wc;
-    // int n, i;
-    // wc = (struct ibv_wc *) calloc (num_concur, sizeof(struct ibv_wc));
-    // do {
-    //     /* Poll the completion queue for the completion event for the earlier write */
-    //     n = bulk_poll(cq_ptr, num_concur, wc, &ps);
-
-    //     for (i = 0; i < n; i++) {
-    //         /* Check that it succeeded */
-    //         check_work_completion_success(&(wc[i]));
-
-    //         if (!finished_running_xput) {
-    //             /* calculate the remote memory location of the request and then set each of the requests */
-
-    //             uint64_t remote_memory_address = get_xput_thread_remote_address(local_server_address, &(wc[i]), msg_size);
-
-    //             local_client_send_wr_batch[i].wr_id = wc[i].wr_id;              /* User-assigned id to recognize this WR on completion */
-    //             local_client_send_wr_batch[i].wr.rdma.remote_addr = remote_memory_address;
-
-    //             if (rdma_op == RDMA_CAS_OP) {
-    //                 set_compare_and_swap_work_request(local_client_send_wr_batch[i], remote_memory_address, remote_key, 0, 0);
-    //             }
-    //             if (rdma_op == RDMA_FAA_OP) {
-    //                 set_fetch_and_add_work_request(local_client_send_wr_batch[i], remote_memory_address, remote_key, 0);
-    //             }
-
-    //         }
-    //     }
-
-    //     //send all of the messages
-    //     if (!finished_running_xput) {
-    //         send_bulk(n, qp_num, cm, local_client_send_wr_batch);
-    //         ps.wr_posted+=n;
-    //     }
-    //     ps.wr_acked += n;
-
-    // } while(!finished_running_xput);
-    
-    // rdtsc1();
-    // ps.end_cycles = ( ((int64_t)cycles_high1 << 32) | cycles_low1 );
-    // gettimeofday (&ps.end, NULL);
-
-    // cm->thread_results[targs->thread_id]=get_thread_performance_results(&ps);
-    // return NULL;
-
-    printf("here we are at the read write cas test for thread %d\n", targs->thread_id);
     return NULL;
 
 }
