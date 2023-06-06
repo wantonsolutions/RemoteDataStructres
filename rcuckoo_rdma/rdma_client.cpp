@@ -2,6 +2,7 @@
 #include "rdma_client.h"
 #include "rdma_client_lib.h"
 #include <sys/time.h>
+#include <assert.h>     /* assert */
 
 
 
@@ -241,7 +242,25 @@ int bulk_poll(struct ibv_cq *cq, int num_entries, struct ibv_wc *wc, uint64_t *p
             }
         }     
     } while (n < 1);
-    return n
+    return n;
+}
+
+void send_bulk(int n, int qp_num, RDMAConnectionManager *cm, struct ibv_send_wr *send_work_request_batch, struct ibv_send_wr **bad_send_wr) {
+    assert(n <= BATCH_SIZE);
+    assert(n > 0);
+    assert(send_work_request_batch);
+    assert(bad_send_wr);
+    for (int i = 0; i < n; i++) {
+        send_work_request_batch[i].next=&(send_work_request_batch[i+1]);
+    }
+    send_work_request_batch[n-1].next=NULL;
+    int ret = ibv_post_send(cm->client_qp[qp_num], 
+            &(send_work_request_batch[0]),
+            bad_send_wr);
+    if (ret) {
+        rdma_error("Failed to write client src buffer, errno: %d \n", -errno);
+        exit(1);
+    }
 }
 
 void * xput_thread(void * args) {
@@ -328,17 +347,7 @@ void * xput_thread(void * args) {
         }
         //configure the list
         if (!finished_running_xput) {
-            for (i = 0; i < n-1; i++) {
-                local_client_send_wr_batch[i].next=&local_client_send_wr_batch[i+1];
-            }
-            local_client_send_wr_batch[n-1].next=NULL;
-            ret = ibv_post_send(cm->client_qp[qp_num], 
-                    &local_client_send_wr_batch[0],
-                    &local_bad_client_send_wr);
-            if (ret) {
-                rdma_error("Failed to write client src buffer, errno: %d \n", -errno);
-                exit(1);
-            }
+            send_bulk(n, qp_num, cm, local_client_send_wr_batch, &local_bad_client_send_wr);
             wr_posted+=n;
         }
 

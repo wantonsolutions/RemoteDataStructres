@@ -9,6 +9,8 @@ LIBRARIES = -L$(XXHASH_INC) -lxxhash
 
 
 CFLAGS = -std=c++2a -g -O3 -Wall -Wall -Wextra -pedantic -fPIC
+# CFLAGS = -std=c++2a -g  -Wall -Wall -Wextra -pedantic -fPIC
+# CFLAGS =  -Wall -Wall -Wextra -pedantic -fPIC
 RDMA_LIBS = -lrdmacm -libverbs -lpthread
 # # define the C++ source files
 # SRCS = $(NAME).cpp 
