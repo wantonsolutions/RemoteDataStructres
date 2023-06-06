@@ -6,7 +6,6 @@
 
 
 
-uint32_t qp_rec_global[MAX_THREADS][HIST_SIZE];
 
 static int finished_running_xput=0;
 
@@ -220,8 +219,20 @@ void set_send_work_request(struct ibv_send_wr &client_send_wr, struct ibv_sge &c
 
 
 #define BATCH_SIZE 1024
+typedef struct performance_statistics {
+    uint64_t start_cycles;
+    uint64_t end_cycles;
+    uint64_t poll_count;
+    uint64_t idle_count;
+    uint64_t poll_time;
+    uint64_t wr_posted;
+    uint64_t wr_acked;
+    struct timeval start;
+    struct timeval end;
+    uint32_t message_size;
+} performance_statistics;
 
-int bulk_poll(struct ibv_cq *cq, int num_entries, struct ibv_wc *wc, uint64_t *poll_count, uint64_t *idle_count) {
+int bulk_poll(struct ibv_cq *cq, int num_entries, struct ibv_wc *wc, performance_statistics *ps) {
     int n = 0;
     int ret = 0;
     do {
@@ -232,9 +243,9 @@ int bulk_poll(struct ibv_cq *cq, int num_entries, struct ibv_wc *wc, uint64_t *p
             exit(1);
         }
         //todo put the poll count and idle count here 
-        (*poll_count)++;
+        (ps->poll_count)++;
         if (n == 0) {
-            (*idle_count)++;
+            (ps->idle_count)++;
             //todo deal with a global variable being used to break the polling here
             //we should deal with finished running xput elsewhere (hard to tell where though)
             if (finished_running_xput) {
@@ -245,11 +256,11 @@ int bulk_poll(struct ibv_cq *cq, int num_entries, struct ibv_wc *wc, uint64_t *p
     return n;
 }
 
-void send_bulk(int n, int qp_num, RDMAConnectionManager *cm, struct ibv_send_wr *send_work_request_batch, struct ibv_send_wr **bad_send_wr) {
+void send_bulk(int n, int qp_num, RDMAConnectionManager *cm, struct ibv_send_wr *send_work_request_batch) {
     assert(n <= BATCH_SIZE);
     assert(n > 0);
     assert(send_work_request_batch);
-    assert(bad_send_wr);
+    struct ibv_send_wr **bad_send_wr;
     for (int i = 0; i < n; i++) {
         send_work_request_batch[i].next=&(send_work_request_batch[i+1]);
     }
@@ -263,79 +274,98 @@ void send_bulk(int n, int qp_num, RDMAConnectionManager *cm, struct ibv_send_wr 
     }
 }
 
+
+result_t get_thread_performance_results(performance_statistics *ps){ 
+    /* Calculate duration. See if RDTSC timer agrees with regular ctime.
+     * ctime is more accurate on longer timescales as rdtsc depends on cpu frequency which is not stable
+     * but rdtsc is low overhead so we can use that from (roughly) keeping track of time while we use ctime 
+     * to calculate numbers */
+    result_t result;
+    double duration_rdtsc = (ps->end_cycles - ps->start_cycles) / CPU_FREQ;
+    double duration_ctime = (double)((ps->end.tv_sec - ps->start.tv_sec) + (ps->end.tv_usec - ps->start.tv_usec) * 1.0e-6);
+    //printf("Duration as measured by RDTSC: %.2lf secs, by ctime: %.2lf secs\n", duration_rdtsc, duration_ctime);
+
+    double goodput_pps = ps->wr_acked / duration_ctime;
+    double goodput_bps = goodput_pps * ps->message_size * 8;
+    //printf("Goodput = %.2lf Gbps. Sampled for %.2lf seconds\n", goodput_bps / 1e9, duration_ctime);
+    
+    /* Fill in result */
+    result.xput_bps = goodput_bps / 1e9;
+    result.xput_ops = goodput_pps;
+    result.cq_poll_time_percent = ps->poll_time * 100.0 / CPU_FREQ / duration_rdtsc;
+    result.cq_poll_count = ps->poll_count * 1.0 / ps->wr_acked;     // TODO: Is dividing by wr the right way to interpret this number?
+    result.cq_empty_count = ps->idle_count * 1.0 / ps->wr_acked;     // TODO: Is dividing by wr the right way to interpret this number?
+    return result;
+}
+
+uint64_t get_xput_thread_remote_address(uint64_t local_server_address, struct ibv_wc* wc, int message_size){
+        union work_req_id wr_id;
+        wr_id.val =  wc->wr_id;
+        int slot_num = wr_id.s.window_slot;
+        uint64_t remote_memory_address = local_server_address + get_buf_offset(slot_num,message_size);
+        return remote_memory_address;
+}
+
+void check_work_completion_success(struct ibv_wc * wc){
+    if (wc->status != IBV_WC_SUCCESS) {
+        rdma_error("Work completion (WC) has error status: %d, %s at index %ld\n",  
+            wc->status, ibv_wc_status_str(wc->status), wc->wr_id);
+    }
+}
+
 void * xput_thread(void * args) {
     struct xput_thread_args * targs = (struct xput_thread_args *)args;
     stick_this_thread_to_core(targs->core);
 
+    //Unpack thread arguments
     int num_concur = targs->num_concur;
     struct ibv_cq *cq_ptr = targs->cq_ptr;
     int msg_size = targs->msg_size;
     enum rdma_measured_op rdma_op = targs->rdma_op;
     struct ibv_mr **mr_buffers=targs->mr_buffers;           /* Make sure to deregister these local MRs before exiting */
-    uint64_t start_cycles, end_cycles;
-    start_cycles=targs->start_cycles;
     RDMAConnectionManager * cm = targs->cm;
+    int qp_num = targs->thread_id;
 
-    struct ibv_wc* wc;
-    int ret = -1, n, i;
-    struct timeval      start, end;
-
-    uint64_t poll_time = 0, poll_count = 0, idle_count = 0;
-    uint64_t wr_posted = 0, wr_acked = 0;
-    int qp_num = 0;
-    union work_req_id wr_id;
+    //Initialize performance statistics
+    performance_statistics ps;
+    ps.start_cycles=targs->start_cycles;
+    ps.message_size=msg_size;
 
     struct ibv_sge local_client_send_sge;
-    set_scatter_gather_entry(local_client_send_sge, (uint64_t) mr_buffers[targs->thread_id]->addr, (uint32_t) msg_size, mr_buffers[targs->thread_id]->lkey);
-
-    struct ibv_send_wr local_client_send_wr, *local_bad_client_send_wr;
+    set_scatter_gather_entry(local_client_send_sge, (uint64_t) mr_buffers[qp_num]->addr, (uint32_t) msg_size, mr_buffers[qp_num]->lkey);
 
     struct ibv_send_wr local_client_send_wr_batch[BATCH_SIZE];
     uint32_t remote_key = cm->server_qp_metadata_attr[0].stag.remote_stag;
-    uint64_t remote_memory_base_address = cm->server_qp_metadata_attr[0].address;
-
+    uint64_t local_server_address = cm->server_qp_metadata_attr[0].address;
 
     for (int i=0;i<BATCH_SIZE;i++) {
-        set_send_work_request(local_client_send_wr_batch[i], local_client_send_sge, rdma_op, remote_key, remote_memory_base_address);
+        set_send_work_request(local_client_send_wr_batch[i], local_client_send_sge, rdma_op, remote_key, local_server_address);
     }
 
-    result_t result;
-    uint64_t local_server_address = cm->server_qp_metadata_attr[0].address;
-    int	buf_offset = 0, slot_num = 0;
-
-    gettimeofday (&start, NULL);
+    gettimeofday (&ps.start, NULL);
     rdtsc();
-    start_cycles = ( ((int64_t)cycles_high << 32) | cycles_low );
-    uint32_t *qp_rec=qp_rec_global[targs->thread_id];
-
-    bzero(qp_rec,HIST_SIZE*sizeof(uint32_t));
+    ps.start_cycles = ( ((int64_t)cycles_high << 32) | cycles_low );
 
 
+    struct ibv_wc* wc;
+    int n, i;
     wc = (struct ibv_wc *) calloc (num_concur, sizeof(struct ibv_wc));
     do {
         /* Poll the completion queue for the completion event for the earlier write */
-        n = bulk_poll(cq_ptr, num_concur, wc, &poll_count, &idle_count);
-        /* For each completed request */
+        n = bulk_poll(cq_ptr, num_concur, wc, &ps);
+
         for (i = 0; i < n; i++) {
             /* Check that it succeeded */
-            if (wc[i].status != IBV_WC_SUCCESS) {
-                rdma_error("Work completion (WC) has error status: %d, %s at index %ld\n",  
-                    wc[i].status, ibv_wc_status_str(wc[i].status), wc[i].wr_id);
-            }
+            check_work_completion_success(&(wc[i]));
 
             if (!finished_running_xput) {
-                /* Issue another request that reads/writes from same locations as the completed one */
+                /* calculate the remote memory location of the request and then set each of the requests */
 
-                wr_id.val =  wc[i].wr_id;
-                qp_rec[wr_id.s.qp_num]++;
-                qp_num = targs->thread_id;
-                slot_num = wr_id.s.window_slot;
+                uint64_t remote_memory_address = get_xput_thread_remote_address(local_server_address, &(wc[i]), msg_size);
 
-                buf_offset = get_buf_offset(slot_num,msg_size);
-                uint64_t remote_memory_address = local_server_address + buf_offset;
-
-                local_client_send_wr_batch[i].wr_id = wr_id.val;              /* User-assigned id to recognize this WR on completion */
+                local_client_send_wr_batch[i].wr_id = wc[i].wr_id;              /* User-assigned id to recognize this WR on completion */
                 local_client_send_wr_batch[i].wr.rdma.remote_addr = remote_memory_address;
+
                 if (rdma_op == RDMA_CAS_OP) {
                     set_compare_and_swap_work_request(local_client_send_wr_batch[i], remote_memory_address, remote_key, 0, 0);
                 }
@@ -345,42 +375,25 @@ void * xput_thread(void * args) {
 
             }
         }
-        //configure the list
+
+        //send all of the messages
         if (!finished_running_xput) {
-            send_bulk(n, qp_num, cm, local_client_send_wr_batch, &local_bad_client_send_wr);
-            wr_posted+=n;
+            send_bulk(n, qp_num, cm, local_client_send_wr_batch);
+            ps.wr_posted+=n;
         }
+        ps.wr_acked += n;
 
-
-        wr_acked += n;
     } while(!finished_running_xput);
     
     rdtsc1();
-    end_cycles = ( ((int64_t)cycles_high1 << 32) | cycles_low1 );
-    gettimeofday (&end, NULL);
+    ps.end_cycles = ( ((int64_t)cycles_high1 << 32) | cycles_low1 );
+    gettimeofday (&ps.end, NULL);
 
-    /* Calculate duration. See if RDTSC timer agrees with regular ctime.
-     * ctime is more accurate on longer timescales as rdtsc depends on cpu frequency which is not stable
-     * but rdtsc is low overhead so we can use that from (roughly) keeping track of time while we use ctime 
-     * to calculate numbers */
-    double duration_rdtsc = (end_cycles - start_cycles) / CPU_FREQ;
-    double duration_ctime = (double)((end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) * 1.0e-6);
-    //printf("Duration as measured by RDTSC: %.2lf secs, by ctime: %.2lf secs\n", duration_rdtsc, duration_ctime);
-
-    double goodput_pps = wr_acked / duration_ctime;
-    double goodput_bps = goodput_pps * msg_size * 8;
-    //printf("Goodput = %.2lf Gbps. Sampled for %.2lf seconds\n", goodput_bps / 1e9, duration_ctime);
-    
-    /* Fill in result */
-    result.xput_bps = goodput_bps / 1e9;
-    result.xput_ops = goodput_pps;
-    result.cq_poll_time_percent = poll_time * 100.0 / CPU_FREQ / duration_rdtsc;
-    result.cq_poll_count = poll_count * 1.0 / wr_acked;     // TODO: Is dividing by wr the right way to interpret this number?
-    result.cq_empty_count = idle_count * 1.0 / wr_acked;     // TODO: Is dividing by wr the right way to interpret this number?
-    cm->thread_results[targs->thread_id]=result;
+    cm->thread_results[targs->thread_id]=get_thread_performance_results(&ps);
     return NULL;
 
 }
+
 
 
 /* Measures throughput for RDMA READ/WRITE ops for a specified message size and number of concurrent messages (i.e., requests in flight) */
