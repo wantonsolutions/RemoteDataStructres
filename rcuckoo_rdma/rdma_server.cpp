@@ -112,27 +112,52 @@ int setup_client_qp(int qp_num) {
         rdma_error("Client id %d is still NULL \n", qp_num);
         return -EINVAL;
     }
-    bzero(&qp_init_attr, sizeof qp_init_attr);
-    qp_init_attr.cap.max_recv_sge = MAX_SGE; /* Maximum SGE per receive posting */
-    qp_init_attr.cap.max_recv_wr = MAX_WR; /* Maximum receive posting capacity */
-    qp_init_attr.cap.max_send_sge = MAX_SGE; /* Maximum SGE per send posting */
-    qp_init_attr.cap.max_send_wr = MAX_WR; /* Maximum send posting capacity */
-    qp_init_attr.qp_type = IBV_QPT_RC; /* QP type, RC = Reliable connection */
-    /* We use same completion queue, but one can use different queues */
-    qp_init_attr.recv_cq = cq; /* Where should I notify for receive completion operations */
-    qp_init_attr.send_cq = cq; /* Where should I notify for send completion operations */
-    /*Lets create a QP */
-    ret = rdma_create_qp(cm_client_qp_id[qp_num] /* which connection id */,
-            pd /* which protection domain*/,
-            &qp_init_attr /* Initial attributes */);
-    if (ret) {
-        rdma_error("Failed to create QP due to errno: %d\n", -errno);
-        return -errno;
+    bool experimental = true;
+    if (experimental) {
+        struct ibv_exp_qp_init_attr qp_init_attr_exp;
+        bzero(&qp_init_attr_exp, sizeof(qp_init_attr_exp));
+        qp_init_attr_exp.comp_mask = IBV_EXP_QP_INIT_ATTR_CREATE_FLAGS | IBV_EXP_QP_INIT_ATTR_PD | IBV_EXP_QP_INIT_ATTR_ATOMICS_ARG;
+        qp_init_attr_exp.cap.max_recv_sge = MAX_SGE;    /* Maximum SGE per receive posting;*/
+        qp_init_attr_exp.cap.max_recv_wr = MAX_WR;      /* Maximum receive posting capacity; */
+        qp_init_attr_exp.cap.max_send_sge = MAX_SGE;    /* Maximum SGE per send posting;*/
+        qp_init_attr_exp.cap.max_send_wr = MAX_WR;      /* Maximum send posting capacity; */
+        qp_init_attr_exp.cap.max_inline_data = 128;      /* Maximum amount of inline data */
+        qp_init_attr_exp.qp_type = IBV_QPT_RC;                  /* QP type, RC = Reliable connection */
+        qp_init_attr_exp.exp_create_flags = IBV_EXP_QP_CREATE_ATOMIC_BE_REPLY;
+        qp_init_attr_exp.pd = pd;
+        qp_init_attr_exp.recv_cq = cq; /* Where should I notify for receive completion operations */
+        qp_init_attr_exp.send_cq = cq; /* Where should I notify for send completion operations */
+        client_qp[qp_num] = ibv_exp_create_qp(devices[0], &qp_init_attr_exp);
+        if (!client_qp[qp_num]) {
+            rdma_error("Failed to EXP create QP, errno: %d \n", -errno);
+            return -errno;
+        }
+        // client_qp[qp_num] = cm_client_qp_id[qp_num]->qp;
+        printf("EXP QP %d created at %p \n", qp_num, (void *)client_qp[qp_num]);
+
+    } else {
+        bzero(&qp_init_attr, sizeof qp_init_attr);
+        qp_init_attr.cap.max_recv_sge = MAX_SGE; /* Maximum SGE per receive posting */
+        qp_init_attr.cap.max_recv_wr = MAX_WR; /* Maximum receive posting capacity */
+        qp_init_attr.cap.max_send_sge = MAX_SGE; /* Maximum SGE per send posting */
+        qp_init_attr.cap.max_send_wr = MAX_WR; /* Maximum send posting capacity */
+        qp_init_attr.qp_type = IBV_QPT_RC; /* QP type, RC = Reliable connection */
+        /* We use same completion queue, but one can use different queues */
+        qp_init_attr.recv_cq = cq; /* Where should I notify for receive completion operations */
+        qp_init_attr.send_cq = cq; /* Where should I notify for send completion operations */
+        /*Lets create a QP */
+        ret = rdma_create_qp(cm_client_qp_id[qp_num] /* which connection id */,
+                pd /* which protection domain*/,
+                &qp_init_attr /* Initial attributes */);
+        if (ret) {
+            rdma_error("Failed to create QP due to errno: %d\n", -errno);
+            return -errno;
+        }
+        /* Save the reference for handy typing but is not required */
+        client_qp[qp_num] = cm_client_qp_id[qp_num]->qp;
+        debug("Client QP created at %p\n", client_qp[qp_num]);
+        return ret;
     }
-    /* Save the reference for handy typing but is not required */
-    client_qp[qp_num] = cm_client_qp_id[qp_num]->qp;
-    debug("Client QP created at %p\n", client_qp[qp_num]);
-    return ret;
 }
 
 /* Starts an RDMA server by allocating basic connection resources for all QPs */
@@ -301,6 +326,7 @@ static int send_server_metadata_to_client(int qp_num)
     /* We need to setup requested memory buffer. This is where the client will 
     * do RDMA READs and WRITEs. */
 
+
     #ifndef USE_DEVICE_MEMORY
     server_qp_buffer_mr[qp_num] = rdma_buffer_alloc(pd /* which protection domain */, 
             client_qp_metadata_attr[qp_num].length /* what size to allocate */, 
@@ -454,6 +480,24 @@ void usage()
     exit(1);
 }
 
+
+void print_periodically(int num_qps, int time_seconds) {
+
+    //print buffers every second
+    int print_step=0;
+    while(true) {
+        sleep(time_seconds);
+        printf("Printing buffers after %d seconds\n", print_step * time_seconds);
+        print_step++;
+
+        for(int i = 0; i < num_qps; i++) {
+            printf("buffer (%d)\n", i);
+            printf("%s\n", (char*)(server_qp_buffer_mr[i]->addr));
+        }
+    }
+
+}
+
 int main(int argc, char **argv) 
 {
     int ret, option;
@@ -541,6 +585,9 @@ int main(int argc, char **argv)
             return ret;
         }
     }
+    printf("All server setup complete, now serving memory requests\n");
+
+    print_periodically(num_qps, 1 /* sec */);
 
     ret = disconnect_and_cleanup(num_qps);
     if (ret) { 

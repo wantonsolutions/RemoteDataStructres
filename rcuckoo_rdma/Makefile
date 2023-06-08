@@ -1,11 +1,17 @@
 # NAME = tables hash
 
-# CC = g++ # define the C/C++ compiler to use
-CFLAGS = -O3 -Wall -Wall -Wextra -pedantic -fPIC
+CC = g++ # define the C/C++ compiler to use
+# CFLAGS = -O3 -Wall -Wall -Wextra -pedantic -fPIC
 # # define any directories containing header files other than /usr/include
 XXHASH_INC = /usr/local/home/ssgrant/RemoteDataStructres/rcuckoo_rdma/xxHash
 INCLUDES = -I$(XXHASH_INC)
 LIBRARIES = -L$(XXHASH_INC) -lxxhash
+
+
+CFLAGS = -std=c++2a -g -O3 -Wall -Wall -Wextra -pedantic -fPIC
+# CFLAGS = -std=c++2a -g  -Wall -Wall -Wextra -pedantic -fPIC
+# CFLAGS =  -Wall -Wall -Wextra -pedantic -fPIC
+RDMA_LIBS = -lrdmacm -libverbs -lpthread
 # # define the C++ source files
 # SRCS = $(NAME).cpp 
 # # define the C/C++ object files 
@@ -34,7 +40,7 @@ LIBRARIES = -L$(XXHASH_INC) -lxxhash
 # .c.o:
 # 	$(CC) $(CFLAGS) $(INCLUDES) -cpp $<  -o $@
 
-TARGET := test_hash test_tables test_search
+TARGET := test_hash test_tables test_search rdma_server rdma_client
 test_dir := ./test
 
 all: $(TARGET)
@@ -47,6 +53,27 @@ tables.o: tables.cpp tables.h
 
 search.o: search.cpp search.h tables.o hash.o
 	g++ -c $(CFLAGS) $(INCLUDES) -fPIC search.cpp -o search.o tables.o hash.o
+
+rdma_common.o:
+	$(CC) -c $(CFLAGS) $(INCLUDES) -fPIC rdma_common.cpp -o rdma_common.o
+
+
+rdma_client_lib.o: rdma_common.o rdma_client_lib.cpp rdma_client_lib.h
+	$(CC) -c $(CFLAGS) $(INCLUDES) -fPIC rdma_client_lib.cpp rdma_common.o -o rdma_client_lib.o
+
+
+rdma_client.o: rdma_common.o rdma_client_lib.o rdma_client.cpp rdma_client.h
+	$(CC) -c $(CFLAGS) $(INCLUDES) -fPIC rdma_client.cpp -o rdma_client.o rdma_common.o
+
+rdma_client: rdma_client.o rdma_client_lib.o
+	$(CC) $(CFLAGS) $(INCLUDES) -fPIC  -o rdma_client rdma_client.o rdma_common.o rdma_client_lib.o  $(RDMA_LIBS)
+
+
+rdma_server.o: rdma_common.o
+	$(CC) -c $(CFLAGS) $(INCLUDES) -fPIC rdma_server.cpp -o rdma_server.o rdma_common.o
+
+rdma_server: rdma_server.o
+	$(CC) $(CFLAGS) $(INCLUDES) -fPIC -o rdma_server rdma_server.o rdma_common.o $(RDMA_LIBS)
 
 
 test_hash : hash.o
