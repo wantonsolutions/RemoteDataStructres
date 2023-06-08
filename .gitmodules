@@ -4,3 +4,6 @@
 [submodule "rdma_testing/spark-nic"]
 	path = rdma_testing/spark-nic
 	url = git@github.com:anilkyelam/spark-nic.git
+[submodule "systems/Sherman"]
+	path = systems/Sherman
+	url = https://github.com/thustorage/Sherman.git
