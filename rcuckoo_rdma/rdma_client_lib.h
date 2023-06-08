@@ -33,6 +33,7 @@ class RDMAConnectionManager {
         struct ibv_qp_init_attr qp_init_attr;
         struct ibv_qp *client_qp[MAX_QPS];
         struct ibv_device_attr dev_attr;
+        struct ibv_exp_qp_init_attr qp_init_attr_exp;
 
         /* These are memory buffers related resources */
         struct ibv_mr *client_qp_src_mr[MAX_QPS];
@@ -60,6 +61,12 @@ class RDMAConnectionManager {
         RDMAConnectionManager(RDMAConnectionManagerArguments arg);
         //TODO move to an indivdidual connection
         int client_xchange_metadata_with_server(int qp_num, char* buffer, uint32_t buffer_size);
+
+        void CheckDMSupported(struct ibv_context *ctx);
+        void CheckGeneralExtendedAttributes(struct ibv_context *ctx);
+        void CheckExtendedAttributes2(struct ibv_context *ctx);
+        void CheckCapabilities();
+        void CheckAdvancedTransport(struct ibv_context *ctx);
 
     private:
         int _num_qps;

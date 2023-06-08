@@ -1,6 +1,7 @@
 #include "rdma_common.h"
 #include "rdma_client.h"
 #include "rdma_client_lib.h"
+#include <infiniband/verbs_exp.h>
 #include <sys/time.h>
 #include <assert.h>     /* assert */
 
@@ -182,6 +183,8 @@ void set_wr_op_code(struct ibv_send_wr  &client_send_wr,  enum rdma_measured_op 
         break;
     }
 }
+
+
 
 void set_send_work_request(struct ibv_send_wr &client_send_wr, struct ibv_sge &client_send_sge, enum rdma_measured_op rdma_op, uint32_t remote_key, uint64_t remote_address){
 
@@ -406,6 +409,105 @@ void drain_all_concurrent_requests(int num_concur, struct ibv_cq *cq_ptr, struct
     }
 }
 
+
+static inline void fillSgeWr(ibv_sge &sg, ibv_exp_send_wr &wr, uint64_t source,
+                             uint64_t size, uint32_t lkey) {
+  memset(&sg, 0, sizeof(sg));
+  sg.addr = (uint64_t)source;
+  sg.length = size;
+  sg.lkey = lkey;
+
+  memset(&wr, 0, sizeof(wr));
+  wr.wr_id = 0;
+  wr.sg_list = &sg;
+  wr.num_sge = 1;
+}
+
+
+bool rdmaCompareAndSwapMask(ibv_qp *qp, uint64_t source, uint64_t dest,
+                            uint64_t compare, uint64_t swap, uint32_t lkey,
+                            uint32_t remoteRKey, uint64_t mask, bool singal,
+                            int opcode
+                            ) {
+  struct ibv_sge sg;
+  struct ibv_exp_send_wr wr;
+  struct ibv_exp_send_wr *wrBad;
+
+    printf("running attomic mask\n");
+    printf("source %lu\n", source);
+    printf("dest %lu\n", dest);
+    printf("compare %lu\n", compare);
+    printf("swap %lu\n", swap);
+    printf("lkey %u\n", lkey);
+    printf("remoteRKey %u\n", remoteRKey);
+    printf("mask %lu\n", mask);
+    printf("singal %d\n", singal);
+
+  fillSgeWr(sg, wr, source, 8, lkey);
+
+  wr.next = NULL;
+//   printf("other opcode %d\n", IB_WR_MASKED_ATOMIC_CMP_AND_SWAP);
+  wr.exp_opcode = IBV_EXP_WR_EXT_MASKED_ATOMIC_CMP_AND_SWP;
+  wr.exp_opcode = (enum ibv_exp_wr_opcode) 0x14;
+  wr.exp_opcode = (enum ibv_exp_wr_opcode) opcode;
+//   wr.exp_opcode = (enum ibv_exp_wr_opcode) IBV_WR_RDMA_WRITE;
+//   wr.exp_opcode = IBV_EXP_WR_ATOMIC_CMP_AND_SWP;
+  wr.exp_send_flags = IBV_EXP_SEND_EXT_ATOMIC_INLINE;
+
+  printf("sg addr %lu\n", sg.addr);
+  printf("sg length %lu\n", sg.length);
+  printf("sg lkey %u\n", sg.lkey);
+
+  if (singal) {
+    wr.exp_send_flags |= IBV_EXP_SEND_SIGNALED;
+  }
+
+//   wr.wr.atomic.remote_addr = dest;
+//   wr.wr.atomic.rkey = remoteRKey;
+//   wr.wr.atomic.compare_add = compare;
+//   wr.wr.atomic.swap = swap;
+
+
+  wr.ext_op.masked_atomics.log_arg_sz = 3;
+  wr.ext_op.masked_atomics.remote_addr = dest;
+  wr.ext_op.masked_atomics.rkey = remoteRKey;
+//   wr.wr_id = 1337;
+
+  auto &op = wr.ext_op.masked_atomics.wr_data.inline_data.op.cmp_swap;
+  op.compare_val = compare;
+  op.swap_val = swap;
+
+  op.compare_mask = mask;
+  op.swap_mask = mask;
+
+
+
+
+  int ret = ibv_exp_post_send(qp, &wr, &wrBad);
+  if (ret) {
+    // Debug::notifyError("Send with MASK AT
+    printf("MSKCAS FAILED : Return code %d\n", ret);
+    printf("MSKCAS FAILED : FUCK we failed the rdma compare and swap\n");
+    if (ret == EINVAL) {
+        printf("invalid value provided in wr\n");
+    }
+    if (ret == ENOMEM) {
+        printf("send queue is full\n");
+    }
+    if ( ret == EFAULT) {
+        printf("something wrong with the QP pointer\n");
+    }
+    if(wrBad) {
+        printf("the Bad send wr is %d\n",wrBad->op);
+        printf("wrBad opcode %d\n",wrBad->exp_opcode);
+    }
+    return false;
+  }
+  return true;
+}
+
+
+
 void * read_write_cas_test(void * args) {
     struct xput_thread_args * targs = (struct xput_thread_args *)args;
     stick_this_thread_to_core(targs->core);
@@ -473,12 +575,6 @@ void * read_write_cas_test(void * args) {
     send_bulk(1, qp_num, cm, local_client_send_wr_batch);
     //Value sent
     bulk_poll(cq_ptr, 1, wc, &ps);
-
-    printf("wc[0].status: %d\n", wc[0].status);
-    printf("wc[0].opcode: %d\n", wc[0].opcode);
-    printf("wc[0].wr_id: %d\n", wc[0].wr_id);
-    printf("wc[0].qp_num: %d\n", wc[0].qp_num);
-
     memcpy(local_read, mr_buffers[qp_num]->addr, 8);
     printf("The value read back is %s\n", local_read);
     if (memcmp(local_read, local_write_value, 8) == 0) {
@@ -492,9 +588,8 @@ void * read_write_cas_test(void * args) {
     char local_cas_value[8];
     uint64_t compare_value = *(uint64_t *) local_write_value;
     char local_cas_write_value_new[8] = {'a','a','z','d','e','f','g','f'};
+    bzero(local_cas_write_value_new, 8);
     uint64_t swap_value = *(uint64_t *) local_cas_write_value_new;
-    // printf("compare value: %s\n", (char*) compare_value);
-    // printf("swap value: %s\n", (char*) swap_value);
 
     rdma_measured_op cas_op = RDMA_CAS_OP;
     local_client_send_wr_batch[0].wr_id = 0;              /* User-assigned id to recognize this WR on completion */
@@ -502,31 +597,67 @@ void * read_write_cas_test(void * args) {
     set_send_work_request(local_client_send_wr_batch[0], local_client_send_sge, cas_op, remote_key, local_server_address);
     set_compare_and_swap_work_request(local_client_send_wr_batch[0], local_server_address, remote_key, compare_value, swap_value);
 
-    local_client_send_wr_batch[0].send_flags = IBV_SEND_SIGNALED;
-    local_client_send_wr_batch[0].opcode = IBV_WR_ATOMIC_CMP_AND_SWP;
-    local_client_send_wr_batch[0].wr.atomic.remote_addr = local_server_address;
-    local_client_send_wr_batch[0].wr.atomic.compare_add = compare_value;
-    local_client_send_wr_batch[0].wr.atomic.swap = swap_value;
-    local_client_send_wr_batch[0].wr.atomic.rkey = remote_key;
-
     send_bulk(1, qp_num, cm, local_client_send_wr_batch);
     //Value sent
     bulk_poll(cq_ptr, 1, wc, &ps);
-    printf("wc[0].status: %d\n", wc[0].status);
-    printf("wc[0].opcode: %d\n", wc[0].opcode);
-    printf("wc[0].wr_id: %d\n", wc[0].wr_id);
-    printf("wc[0].qp_num: %d\n", wc[0].qp_num);
-    printf("cq_ptr->comp_events_completed: %d\n", cq_ptr->comp_events_completed);
-    printf("The value read back from the cas is %s\n", mr_buffers[qp_num]->addr);
+    printf("CAS operation completed\n");
 
 
-    local_client_send_wr_batch[0].wr_id = 1337;              /* User-assigned id to recognize this WR on completion */
-    local_client_send_wr_batch[0].wr.rdma.remote_addr = local_server_address;
-    set_send_work_request(local_client_send_wr_batch[0], local_client_send_sge, cas_op, remote_key, local_server_address);
-    set_compare_and_swap_work_request(local_client_send_wr_batch[0], local_server_address, remote_key, compare_value, swap_value);
-    send_bulk(1, qp_num, cm, local_client_send_wr_batch);
-    //Value sent
+
+
+    // local_client_send_wr_batch[0].wr_id = 1337;              /* User-assigned id to recognize this WR on completion */
+    // local_client_send_wr_batch[0].wr.rdma.remote_addr = local_server_address;
+    // set_send_work_request(local_client_send_wr_batch[0], local_client_send_sge, cas_op, remote_key, local_server_address);
+    // set_compare_and_swap_work_request(local_client_send_wr_batch[0], local_server_address, remote_key, compare_value, swap_value);
+    // send_bulk(1, qp_num, cm, local_client_send_wr_batch);
+    // //Value sent
+    // bulk_poll(cq_ptr, 1, wc, &ps);
+
+    //Doing the masked CAS now
+    printf("preparing masked cas\n");
+    sleep(1);
+    /*
+    bool rdmaCompareAndSwapMask(ibv_qp *qp, 
+    uint64_t source, 
+    uint64_t dest,
+    uint64_t compare, 
+    uint64_t swap,
+    uint32_t lkey,
+    uint32_t remoteRKey, 
+    uint64_t mask,
+    bool singal) {
+        */
+    compare_value = 0;
+    char masked_cas_value[8] = {'m','a','s','k','d','c','a','s'};
+    uint64_t mask = 0x0FFFFFFFFFFFFFF0;
+    int opcode = 0x14;
+
+    for(int opcode = 99; opcode < 0xFF; opcode++) {
+        printf("\n\nrunning opcode %x\n", opcode);
+
+    swap_value = *(uint64_t*) masked_cas_value;
+    printf("sending masked CAS\n");
+    rdmaCompareAndSwapMask(
+        cm->client_qp[qp_num], 
+        (uint64_t)mr_buffers[qp_num]->addr, 
+        local_server_address, 
+        compare_value, 
+        swap_value, 
+        mr_buffers[qp_num]->lkey, 
+        remote_key, 
+        mask, 
+        true,
+        opcode);
+    printf("polling for masked cas response\n") ;
     bulk_poll(cq_ptr, 1, wc, &ps);
+    printf("maksed cas response recived\n");
+    printf("wc status is %d\n", wc[0].status);
+    printf("wc opcode is %d\n", wc[0].opcode);
+    printf("wc wr_id is %d\n", wc[0].wr_id);
+    printf("wc vendor_err is %d\n", wc[0].vendor_err);
+    printf("maksed cas response recived\n");
+
+    }
 
 
     printf("The value read back from the cas is %s\n", mr_buffers[qp_num]->addr);

@@ -9,6 +9,8 @@
 #include <stdexcept>
 #include "rdma_common.h"
 #include "rdma_client_lib.h"
+#include <netinet/in.h>
+#include <inttypes.h>
 
 /* A fast but good enough pseudo-random number generator. Good enough for what? */
 /* Courtesy of https://stackoverflow.com/questions/1640258/need-a-fast-random-generator-for-c */
@@ -31,6 +33,197 @@ RDMAConnectionManager::RDMAConnectionManager() {
 
 }
 
+void RDMAConnectionManager::CheckDMSupported(struct ibv_context *ctx) {
+  // thanks https://github.com/thustorage/Sherman/blob/main/src/rdma/Utility.cpp
+  struct ibv_exp_device_attr attrs;
+
+  attrs.comp_mask = IBV_EXP_DEVICE_ATTR_UMR;
+  attrs.comp_mask |= IBV_EXP_DEVICE_ATTR_MAX_DM_SIZE;
+
+  if (ibv_exp_query_device(ctx, &attrs)) {
+    printf("Couldn't query device attributes\n");
+  }
+
+  if (!(attrs.comp_mask & IBV_EXP_DEVICE_ATTR_MAX_DM_SIZE)) {
+    fprintf(stderr, "Can not support device memory!\n");
+    exit(-1);
+  } else if (!(attrs.max_dm_size)) {
+  } else {
+    int kMaxDeviceMemorySize = attrs.max_dm_size;
+    printf("The RNIC has %dKB device memory\n", kMaxDeviceMemorySize / 1024);
+  }
+}
+
+void RDMAConnectionManager::CheckGeneralExtendedAttributes(struct ibv_context *ctx) {
+    //https://github.com/redn-io/RedN/blob/2609ea622be38698445e03f2ef439143de7f12b0/src/rdma/connection.c#L234
+    struct ibv_exp_device_attr attr;
+    if(ibv_exp_query_device(ctx, &attr)){
+        printf("ibv_exp_query_device() failed\n");
+        exit(0);
+    }
+    
+
+    printf("Maximum # of QPs: %d\n", attr.max_qp);
+    printf("Maximum # of outstanding WRs: %d\n", attr.max_qp_wr);
+    printf("Maximum # of outstanding Atoms/Rds: %d\n", attr.max_qp_rd_atom);
+    printf("Maximum depth for Atoms/Rds: %d\n", attr.max_qp_init_rd_atom);
+    printf("-- Supported features --\n");
+    printf("Atomic BEndian replies: %s\n", attr.exp_atomic_cap & IBV_EXP_ATOMIC_HCA_REPLY_BE ? "YES":"NO");
+    printf("Core-direct: %s\n", attr.exp_device_cap_flags & IBV_EXP_DEVICE_CROSS_CHANNEL ? "YES":"NO");
+    printf("Collectives:\n");
+    printf("  [int operations]\n");
+    printf("	* ADD    -> %s\n", attr.calc_cap.int_ops & IBV_EXP_CALC_OP_ADD ? "YES":"NO");
+    printf("	* BAND   -> %s\n", attr.calc_cap.int_ops & IBV_EXP_CALC_OP_BAND ? "YES":"NO");
+    printf("	* BXOR   -> %s\n", attr.calc_cap.int_ops & IBV_EXP_CALC_OP_BXOR ? "YES":"NO");
+    printf("	* BOR    -> %s\n", attr.calc_cap.int_ops & IBV_EXP_CALC_OP_BOR ? "YES":"NO");
+    printf("	* MAXLOC -> %s\n", attr.calc_cap.int_ops & IBV_EXP_CALC_OP_MAXLOC ? "YES":"NO");
+    printf("  [uint operations]\n");
+    printf("	* ADD    -> %s\n", attr.calc_cap.uint_ops & IBV_EXP_CALC_OP_ADD ? "YES":"NO");
+    printf("	* BAND   -> %s\n", attr.calc_cap.uint_ops & IBV_EXP_CALC_OP_BAND ? "YES":"NO");
+    printf("	* BXOR   -> %s\n", attr.calc_cap.uint_ops & IBV_EXP_CALC_OP_BXOR ? "YES":"NO");
+    printf("	* BOR    -> %s\n", attr.calc_cap.uint_ops & IBV_EXP_CALC_OP_BOR ? "YES":"NO");
+    printf("	* MAXLOC -> %s\n", attr.calc_cap.uint_ops & IBV_EXP_CALC_OP_MAXLOC ? "YES":"NO");
+    printf("  [fp operations]\n");
+    printf("	* ADD    -> %s\n", attr.calc_cap.fp_ops & IBV_EXP_CALC_OP_ADD ? "YES":"NO");
+    printf("	* BAND   -> %s\n", attr.calc_cap.fp_ops & IBV_EXP_CALC_OP_BAND ? "YES":"NO");
+    printf("	* BXOR   -> %s\n", attr.calc_cap.fp_ops & IBV_EXP_CALC_OP_BXOR ? "YES":"NO");
+    printf("	* BOR    -> %s\n", attr.calc_cap.fp_ops & IBV_EXP_CALC_OP_BOR ? "YES":"NO");
+    printf("	* MAXLOC -> %s\n", attr.calc_cap.fp_ops & IBV_EXP_CALC_OP_MAXLOC ? "YES":"NO");
+
+}
+
+void RDMAConnectionManager::CheckAdvancedTransport(struct ibv_context *ctx) {
+    //thansk -- https://github.com/lastweek/rdma_bench_dirty/blob/0060794d8456209c1af0d100046ed8a70f2acb22/drivers/libmlx5-1.0.2mlnx1/src/verbs.c#L1593
+
+    struct ibv_exp_device_attr attr;
+    if(ibv_exp_query_device(ctx, &attr)){
+        printf("ibv_exp_query_device() failed\n");
+        exit(0);
+    }
+
+    printf("UMR %s\n", attr.comp_mask & IBV_EXP_DEVICE_ATTR_UMR ? "YES":"NO");
+    printf("ODP %s\n", attr.comp_mask & IBV_EXP_DEVICE_ATTR_ODP ? "YES":"NO");
+    // printf("ODP MR %s\n", attr.comp_mask & IBV_EXP_DEVICE_ATTR_ODP_MR ? "YES":"NO");
+    printf("Extended Atomics %s\n", attr.comp_mask & IBV_EXP_DEVICE_EXT_ATOMICS? "YES":"NO");
+    printf("Extended Masked Atomics: %s\n", attr.comp_mask & IBV_EXP_DEVICE_EXT_MASKED_ATOMICS ? "YES":"NO");
+    printf("Extended Capabilities %s\n", attr.comp_mask & IBV_EXP_DEVICE_ATTR_EXP_CAP_FLAGS ? "YES":"NO");
+    printf("EXT ATOMICS %s\n", attr.comp_mask & IBV_EXP_DEVICE_ATTR_EXT_ATOMIC_ARGS ? "YES":"NO");
+
+    printf("MASKED ATOMICS %s\n", attr.comp_mask & IBV_EXP_DEVICE_ATTR_MASKED_ATOMICS ? "YES":"NO");
+    printf("CROSS CHANNEL %s\n", attr.exp_device_cap_flags & IBV_EXP_DEVICE_CROSS_CHANNEL ? "YES":"NO");
+	return;
+}
+
+static void print_caps_exp(uint64_t caps)
+{
+	uint64_t unknown_flags = ~(IBV_EXP_DEVICE_DC_TRANSPORT |
+				   IBV_EXP_DEVICE_QPG |
+				   IBV_EXP_DEVICE_UD_RSS |
+				   IBV_EXP_DEVICE_UD_TSS |
+				   IBV_EXP_DEVICE_CROSS_CHANNEL |
+				   IBV_EXP_DEVICE_MR_ALLOCATE |
+				   IBV_EXP_DEVICE_MR_ALLOCATE |
+				   IBV_EXP_DEVICE_EXT_ATOMICS |
+				   IBV_EXP_DEVICE_NOP |
+				   IBV_EXP_DEVICE_UMR |
+				   IBV_EXP_DEVICE_ODP |
+				   IBV_EXP_DEVICE_VXLAN_SUPPORT |
+				   IBV_EXP_DEVICE_RX_CSUM_TCP_UDP_PKT |
+				   IBV_EXP_DEVICE_RX_CSUM_IP_PKT |
+				   IBV_EXP_DEVICE_DC_INFO |
+				   IBV_EXP_DEVICE_EXT_MASKED_ATOMICS |
+				   IBV_EXP_DEVICE_RX_TCP_UDP_PKT_TYPE |
+				   IBV_EXP_DEVICE_SCATTER_FCS |
+				   IBV_EXP_DEVICE_WQ_DELAY_DROP |
+				   IBV_EXP_DEVICE_PHYSICAL_RANGE_MR |
+				   IBV_EXP_DEVICE_CAPI |
+				   IBV_EXP_DEVICE_UMR_FIXED_SIZE |
+				   IBV_EXP_DEVICE_PACKET_BASED_CREDIT_MODE);
+
+	if (caps & IBV_EXP_DEVICE_DC_TRANSPORT)
+		printf("\t\t\t\t\tEXP_DC_TRANSPORT\n");
+	if (caps & IBV_EXP_DEVICE_QPG)
+		printf("\t\t\t\t\tEXP_DEVICE_QPG\n");
+	if (caps & IBV_EXP_DEVICE_UD_RSS)
+		printf("\t\t\t\t\tEXP_UD_RSS\n");
+	if (caps & IBV_EXP_DEVICE_UD_TSS)
+		printf("\t\t\t\t\tEXP_UD_TSS\n");
+	if (caps & IBV_EXP_DEVICE_CROSS_CHANNEL)
+		printf("\t\t\t\t\tEXP_CROSS_CHANNEL\n");
+	if (caps & IBV_EXP_DEVICE_MR_ALLOCATE)
+		printf("\t\t\t\t\tEXP_MR_ALLOCATE\n");
+	if (caps & IBV_EXP_DEVICE_SHARED_MR)
+		printf("\t\t\t\t\tEXP_SHARED_MR\n");
+	if (caps & IBV_EXP_DEVICE_EXT_ATOMICS)
+		printf("\t\t\t\t\tEXT_ATOMICS\n");
+	if (caps & IBV_EXP_DEVICE_NOP)
+		printf("\t\t\t\t\tEXT_SEND NOP\n");
+	if (caps & IBV_EXP_DEVICE_UMR)
+		printf("\t\t\t\t\tEXP_UMR\n");
+	if (caps & IBV_EXP_DEVICE_ODP)
+		printf("\t\t\t\t\tEXP_ODP\n");
+	if (caps & IBV_EXP_DEVICE_VXLAN_SUPPORT)
+		printf("\t\t\t\t\tEXP_VXLAN_SUPPORT\n");
+	if (caps & IBV_EXP_DEVICE_RX_CSUM_TCP_UDP_PKT)
+		printf("\t\t\t\t\tEXP_RX_CSUM_TCP_UDP_PKT\n");
+	if (caps & IBV_EXP_DEVICE_RX_CSUM_IP_PKT)
+		printf("\t\t\t\t\tEXP_RX_CSUM_IP_PKT\n");
+	if (caps & IBV_EXP_DEVICE_DC_INFO)
+		printf("\t\t\t\t\tEXP_DC_INFO\n");
+	if (caps & IBV_EXP_DEVICE_EXT_MASKED_ATOMICS)
+		printf("\t\t\t\t\tEXP_MASKED_ATOMICS\n");
+	if (caps & IBV_EXP_DEVICE_RX_TCP_UDP_PKT_TYPE)
+		printf("\t\t\t\t\tEXP_RX_TCP_UDP_PKT_TYPE\n");
+	if (caps & IBV_EXP_DEVICE_SCATTER_FCS)
+		printf("\t\t\t\t\tEXP_SCATTER_FCS\n");
+	if (caps & IBV_EXP_DEVICE_WQ_DELAY_DROP)
+		printf("\t\t\t\t\tEXP_WQ_DELAY_DROP\n");
+	if (caps & IBV_EXP_DEVICE_PHYSICAL_RANGE_MR)
+		printf("\t\t\t\t\tEXP_PHYSICAL_RANGE_MR\n");
+	if (caps & IBV_EXP_DEVICE_CAPI)
+		printf("\t\t\t\t\tEXP_DEVICE_CAPI\n");
+	if (caps & IBV_EXP_DEVICE_UMR_FIXED_SIZE)
+		printf("\t\t\t\t\tEXP_UMR_FIXED_SIZE\n");
+	if (caps & IBV_EXP_DEVICE_PACKET_BASED_CREDIT_MODE)
+		printf("\t\t\t\t\tEXP_PACKET_BASED_CREDIT_MODE\n");
+	if (caps & unknown_flags)
+		printf("\t\t\t\t\tUnknown flags: 0x%" PRIX64 "\n", caps & unknown_flags);
+}
+
+void RDMAConnectionManager::CheckExtendedAttributes2(struct ibv_context *ctx) {
+    //thansk -- https://github.com/emersonford/Freeflow/blob/8b807b7ca28afeea67407894bcbfdbbda30f1e87/libraries/libibverbs-1.2.1mlnx1/examples/devinfo.c#L299
+    struct ibv_exp_device_attr device_attr;
+    memset(&device_attr, 0, sizeof(device_attr));
+	device_attr.comp_mask = 0xffffffff;
+	device_attr.comp_mask_2 = IBV_EXP_DEVICE_ATTR_RESERVED_2 - 1;
+    if(ibv_exp_query_device(ctx, &device_attr)){
+        printf("ibv_exp_query_device() failed\n");
+        exit(0);
+    }
+    if (strlen(device_attr.fw_ver))
+		printf("\tfw_ver:\t\t\t\t%s\n", device_attr.fw_ver);
+	// printf("\tnode_guid:\t\t\t%s\n", guid_str(device_attr.node_guid, buf));
+	// printf("\tsys_image_guid:\t\t\t%s\n", guid_str(device_attr.sys_image_guid, buf));
+	printf("\tvendor_id:\t\t\t0x%04x\n", device_attr.vendor_id);
+	printf("\tvendor_part_id:\t\t\t%d\n", device_attr.vendor_part_id);
+	printf("\thw_ver:\t\t\t\t0x%X\n", device_attr.hw_ver);
+    print_caps_exp(device_attr.exp_device_cap_flags & ~(IBV_EXP_START_FLAG - 1));
+}
+
+
+
+
+
+void RDMAConnectionManager::CheckCapabilities() {
+    printf("Checking Device Capabilities\n");
+    // check if device memory is supported
+    assert(devices[0]);
+    CheckDMSupported(devices[0]);
+    CheckAdvancedTransport(devices[0]);
+    CheckGeneralExtendedAttributes(devices[0]);
+    CheckExtendedAttributes2(devices[0]);
+}
+
 
 RDMAConnectionManager::RDMAConnectionManager(RDMAConnectionManagerArguments args) {
 
@@ -51,6 +244,8 @@ RDMAConnectionManager::RDMAConnectionManager(RDMAConnectionManagerArguments args
         rdma_error("Failed to setup shared RDMA resources , ret = %d \n", ret);
         throw std::runtime_error("Failed to setup shared RDMA resources");
     }
+
+    CheckCapabilities();
 
     /* Connect the local QPs to the ones on server. 
      * NOTE: Make sure to connect all QPs before moving to 
@@ -251,29 +446,60 @@ int RDMAConnectionManager::client_prepare_connection(struct sockaddr_in *s_addr,
     /* Now the last step, set up the queue pair (send, recv) queues and their capacity.
     * Set capacity to device limits (since we use only one qp and one application) 
     * This only sets the limits; this will let us play around with the actual numbers */
-    bzero(&qp_init_attr, sizeof qp_init_attr);
-    qp_init_attr.cap.max_recv_sge = MAX_SGE;    /* Maximum SGE per receive posting;*/
-    qp_init_attr.cap.max_recv_wr = MAX_WR;      /* Maximum receive posting capacity; */
-    qp_init_attr.cap.max_send_sge = MAX_SGE;    /* Maximum SGE per send posting;*/
-    qp_init_attr.cap.max_send_wr = MAX_WR;      /* Maximum send posting capacity; */
-    qp_init_attr.cap.max_inline_data = 128;      /* Maximum amount of inline data */
-    qp_init_attr.qp_type = IBV_QPT_RC;                  /* QP type, RC = Reliable connection */
+    bool experimental = false;
+    if (!experimental) {
+        bzero(&qp_init_attr, sizeof qp_init_attr);
+        qp_init_attr.cap.max_recv_sge = MAX_SGE;    /* Maximum SGE per receive posting;*/
+        qp_init_attr.cap.max_recv_wr = MAX_WR;      /* Maximum receive posting capacity; */
+        qp_init_attr.cap.max_send_sge = MAX_SGE;    /* Maximum SGE per send posting;*/
+        qp_init_attr.cap.max_send_wr = MAX_WR;      /* Maximum send posting capacity; */
+        qp_init_attr.cap.max_inline_data = 128;      /* Maximum amount of inline data */
+        qp_init_attr.qp_type = IBV_QPT_RC;                  /* QP type, RC = Reliable connection */
 
-    /* We use same completion queue, but one can use different queues */
-    #ifdef MULTI_CQ
-    qp_init_attr.recv_cq = client_cq_threads[qp_num]; /* Where should I notify for receive completion operations */
-    qp_init_attr.send_cq = client_cq_threads[qp_num]; /* Where should I notify for send completion operations */
-    #else
-    qp_init_attr.recv_cq = client_cq; /* Where should I notify for receive completion operations */
-    qp_init_attr.send_cq = client_cq; /* Where should I notify for send completion operations */
-    #endif
-    ret = rdma_create_qp(cm_client_qp_id[qp_num], pd, &qp_init_attr);
-    if (ret) {
-        rdma_error("Failed to create QP, errno: %d \n", -errno);
-        return -errno;
+
+        /* We use same completion queue, but one can use different queues */
+        #ifdef MULTI_CQ
+        qp_init_attr.recv_cq = client_cq_threads[qp_num]; /* Where should I notify for receive completion operations */
+        qp_init_attr.send_cq = client_cq_threads[qp_num]; /* Where should I notify for send completion operations */
+        #else
+        qp_init_attr.recv_cq = client_cq; /* Where should I notify for receive completion operations */
+        qp_init_attr.send_cq = client_cq; /* Where should I notify for send completion operations */
+        #endif
+        ret = rdma_create_qp(cm_client_qp_id[qp_num], pd, &qp_init_attr);
+        if (ret) {
+            rdma_error("Failed to create QP, errno: %d \n", -errno);
+            return -errno;
+        }
+        client_qp[qp_num] = cm_client_qp_id[qp_num]->qp;
+        printf("QP %d created at %p \n", qp_num, (void *)client_qp[qp_num]);
+    } else {
+        bzero(&qp_init_attr_exp, sizeof(qp_init_attr_exp));
+        qp_init_attr_exp.comp_mask = IBV_EXP_QP_INIT_ATTR_CREATE_FLAGS | IBV_EXP_QP_INIT_ATTR_PD | IBV_EXP_QP_INIT_ATTR_ATOMICS_ARG;
+        qp_init_attr_exp.cap.max_recv_sge = MAX_SGE;    /* Maximum SGE per receive posting;*/
+        qp_init_attr_exp.cap.max_recv_wr = MAX_WR;      /* Maximum receive posting capacity; */
+        qp_init_attr_exp.cap.max_send_sge = MAX_SGE;    /* Maximum SGE per send posting;*/
+        qp_init_attr_exp.cap.max_send_wr = MAX_WR;      /* Maximum send posting capacity; */
+        qp_init_attr_exp.cap.max_inline_data = 128;      /* Maximum amount of inline data */
+        qp_init_attr_exp.qp_type = IBV_QPT_RC;                  /* QP type, RC = Reliable connection */
+        qp_init_attr_exp.exp_create_flags = IBV_EXP_QP_CREATE_ATOMIC_BE_REPLY;
+        qp_init_attr_exp.pd = pd;
+        /* We use same completion queue, but one can use different queues */
+        #ifdef MULTI_CQ
+        qp_init_attr_exp.recv_cq = client_cq_threads[qp_num]; /* Where should I notify for receive completion operations */
+        qp_init_attr_exp.send_cq = client_cq_threads[qp_num]; /* Where should I notify for send completion operations */
+        #else
+        qp_init_attr_exp.recv_cq = client_cq; /* Where should I notify for receive completion operations */
+        qp_init_attr_exp.send_cq = client_cq; /* Where should I notify for send completion operations */
+        #endif
+        client_qp[qp_num] = ibv_exp_create_qp(devices[0], &qp_init_attr_exp);
+        if (!client_qp[qp_num]) {
+            rdma_error("Failed to EXP create QP, errno: %d \n", -errno);
+            return -errno;
+        }
+        // client_qp[qp_num] = cm_client_qp_id[qp_num]->qp;
+        printf("EXP QP %d created at %p \n", qp_num, (void *)client_qp[qp_num]);
     }
-    client_qp[qp_num] = cm_client_qp_id[qp_num]->qp;
-    printf("QP %d created at %p \n", qp_num, (void *)client_qp[qp_num]);
+
     return ret;
 }
 
@@ -326,6 +552,9 @@ int RDMAConnectionManager::client_connect_qp_to_server(int qp_num)
     ret = process_rdma_cm_event(cm_event_channel, 
             RDMA_CM_EVENT_ESTABLISHED,
             &cm_event);
+    // ret = process_rdma_cm_event(cm_event_channel, 
+    //         RDMA_CM_EVENT_CONNECT_RESPONSE,
+    //         &cm_event);
     if (ret) {
         rdma_error("Failed to get cm event, ret = %d \n", ret);
            return ret;
