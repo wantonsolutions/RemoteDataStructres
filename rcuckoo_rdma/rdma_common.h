@@ -35,7 +35,7 @@
 
 #include <rdma/rdma_cma.h>
 #include <infiniband/verbs.h>
-#include <infiniband/verbs_exp.h>
+// #include <infiniband/verbs_exp.h>
 // #include <infiniband/kern-abi.h>
 
 

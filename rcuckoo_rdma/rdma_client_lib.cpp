@@ -111,6 +111,11 @@ void RDMAConnectionManager::CheckAdvancedTransport(struct ibv_context *ctx) {
 
     printf("MASKED ATOMICS %s\n", attr.comp_mask & IBV_EXP_DEVICE_ATTR_MASKED_ATOMICS ? "YES":"NO");
     printf("CROSS CHANNEL %s\n", attr.exp_device_cap_flags & IBV_EXP_DEVICE_CROSS_CHANNEL ? "YES":"NO");
+
+    attr.comp_mask &= IBV_EXP_DEVICE_ATTR_MASKED_ATOMICS;
+    attr.comp_mask &= IBV_EXP_DEVICE_ATTR_EXP_CAP_FLAGS;
+    attr.comp_mask &= IBV_EXP_DEVICE_ATTR_EXT_ATOMIC_ARGS;
+
 	return;
 }
 
@@ -446,7 +451,7 @@ int RDMAConnectionManager::client_prepare_connection(struct sockaddr_in *s_addr,
     /* Now the last step, set up the queue pair (send, recv) queues and their capacity.
     * Set capacity to device limits (since we use only one qp and one application) 
     * This only sets the limits; this will let us play around with the actual numbers */
-    bool experimental = false;
+    bool experimental = true;
     if (!experimental) {
         bzero(&qp_init_attr, sizeof qp_init_attr);
         qp_init_attr.cap.max_recv_sge = MAX_SGE;    /* Maximum SGE per receive posting;*/
@@ -474,16 +479,8 @@ int RDMAConnectionManager::client_prepare_connection(struct sockaddr_in *s_addr,
         printf("QP %d created at %p \n", qp_num, (void *)client_qp[qp_num]);
     } else {
         bzero(&qp_init_attr_exp, sizeof(qp_init_attr_exp));
-        qp_init_attr_exp.comp_mask = IBV_EXP_QP_INIT_ATTR_CREATE_FLAGS | IBV_EXP_QP_INIT_ATTR_PD | IBV_EXP_QP_INIT_ATTR_ATOMICS_ARG;
-        qp_init_attr_exp.cap.max_recv_sge = MAX_SGE;    /* Maximum SGE per receive posting;*/
-        qp_init_attr_exp.cap.max_recv_wr = MAX_WR;      /* Maximum receive posting capacity; */
-        qp_init_attr_exp.cap.max_send_sge = MAX_SGE;    /* Maximum SGE per send posting;*/
-        qp_init_attr_exp.cap.max_send_wr = MAX_WR;      /* Maximum send posting capacity; */
-        qp_init_attr_exp.cap.max_inline_data = 128;      /* Maximum amount of inline data */
         qp_init_attr_exp.qp_type = IBV_QPT_RC;                  /* QP type, RC = Reliable connection */
-        qp_init_attr_exp.exp_create_flags = IBV_EXP_QP_CREATE_ATOMIC_BE_REPLY;
-        qp_init_attr_exp.pd = pd;
-        /* We use same completion queue, but one can use different queues */
+        qp_init_attr_exp.sq_sig_all = 0;
         #ifdef MULTI_CQ
         qp_init_attr_exp.recv_cq = client_cq_threads[qp_num]; /* Where should I notify for receive completion operations */
         qp_init_attr_exp.send_cq = client_cq_threads[qp_num]; /* Where should I notify for send completion operations */
@@ -491,7 +488,24 @@ int RDMAConnectionManager::client_prepare_connection(struct sockaddr_in *s_addr,
         qp_init_attr_exp.recv_cq = client_cq; /* Where should I notify for receive completion operations */
         qp_init_attr_exp.send_cq = client_cq; /* Where should I notify for send completion operations */
         #endif
+        qp_init_attr_exp.pd = pd;
+        if (qp_init_attr_exp.qp_type == IBV_QPT_RC) {
+            qp_init_attr_exp.comp_mask = IBV_EXP_QP_INIT_ATTR_CREATE_FLAGS |
+                            IBV_EXP_QP_INIT_ATTR_PD | IBV_EXP_QP_INIT_ATTR_ATOMICS_ARG;
+            qp_init_attr_exp.max_atomic_arg = 32;
+        } else {
+            qp_init_attr_exp.comp_mask = IBV_EXP_QP_INIT_ATTR_PD;
+        }
+        qp_init_attr_exp.cap.max_send_wr = MAX_WR;      /* Maximum send posting capacity; */
+        qp_init_attr_exp.cap.max_recv_wr = MAX_WR;      /* Maximum receive posting capacity; */
+        qp_init_attr_exp.cap.max_send_sge = MAX_SGE;    /* Maximum SGE per send posting;*/
+        qp_init_attr_exp.cap.max_recv_sge = MAX_SGE;    /* Maximum SGE per receive posting;*/
+        qp_init_attr_exp.cap.max_inline_data = 128;      /* Maximum amount of inline data */
+
+        // qp_init_attr_exp.exp_create_flags = IBV_EXP_QP_CREATE_ATOMIC_BE_REPLY;
+        /* We use same completion queue, but one can use different queues */
         client_qp[qp_num] = ibv_exp_create_qp(devices[0], &qp_init_attr_exp);
+        cm_client_qp_id[qp_num]->qp = client_qp[qp_num];
         if (!client_qp[qp_num]) {
             rdma_error("Failed to EXP create QP, errno: %d \n", -errno);
             return -errno;
@@ -548,13 +562,14 @@ int RDMAConnectionManager::client_connect_qp_to_server(int qp_num)
         rdma_error("Failed to connect to remote host , errno: %d\n", -errno);
         return -errno;
     }
-    debug("waiting for cm event: RDMA_CM_EVENT_ESTABLISHED\n");
-    ret = process_rdma_cm_event(cm_event_channel, 
-            RDMA_CM_EVENT_ESTABLISHED,
-            &cm_event);
+    debug("waiting for cm event: RDMA_CM_EVENT_ESTABLISHED on qp num %d\n", qp_num);
     // ret = process_rdma_cm_event(cm_event_channel, 
     //         RDMA_CM_EVENT_CONNECT_RESPONSE,
     //         &cm_event);
+    // printf("received a cm event: RDMA_CM_CONNECT_RESPONSE\n");
+    ret = process_rdma_cm_event(cm_event_channel, 
+            RDMA_CM_EVENT_ESTABLISHED,
+            &cm_event);
     if (ret) {
         rdma_error("Failed to get cm event, ret = %d \n", ret);
            return ret;

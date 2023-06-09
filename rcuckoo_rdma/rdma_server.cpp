@@ -112,7 +112,7 @@ int setup_client_qp(int qp_num) {
         rdma_error("Client id %d is still NULL \n", qp_num);
         return -EINVAL;
     }
-    bool experimental = true;
+    bool experimental = false;
     if (experimental) {
         struct ibv_exp_qp_init_attr qp_init_attr_exp;
         bzero(&qp_init_attr_exp, sizeof(qp_init_attr_exp));
@@ -492,7 +492,8 @@ void print_periodically(int num_qps, int time_seconds) {
 
         for(int i = 0; i < num_qps; i++) {
             printf("buffer (%d)\n", i);
-            printf("%s\n", (char*)(server_qp_buffer_mr[i]->addr));
+            printf("%x\n", *(uint64_t *)(server_qp_buffer_mr[i]->addr));
+            // printf("%s\n", (char *)(server_qp_buffer_mr[i]->addr));
         }
     }
 

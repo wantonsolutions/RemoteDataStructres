@@ -1,9 +1,12 @@
+// #include <infiniband/mlx5.h>
 #include "rdma_common.h"
 #include "rdma_client.h"
 #include "rdma_client_lib.h"
-#include <infiniband/verbs_exp.h>
+// #include <infiniband/verbs_exp.h>
+#include <infiniband/verbs.h>
 #include <sys/time.h>
 #include <assert.h>     /* assert */
+ #include <byteswap.h>
 
 
 
@@ -426,9 +429,7 @@ static inline void fillSgeWr(ibv_sge &sg, ibv_exp_send_wr &wr, uint64_t source,
 
 bool rdmaCompareAndSwapMask(ibv_qp *qp, uint64_t source, uint64_t dest,
                             uint64_t compare, uint64_t swap, uint32_t lkey,
-                            uint32_t remoteRKey, uint64_t mask, bool singal,
-                            int opcode
-                            ) {
+                            uint32_t remoteRKey, uint64_t mask, bool singal) {
   struct ibv_sge sg;
   struct ibv_exp_send_wr wr;
   struct ibv_exp_send_wr *wrBad;
@@ -448,11 +449,13 @@ bool rdmaCompareAndSwapMask(ibv_qp *qp, uint64_t source, uint64_t dest,
   wr.next = NULL;
 //   printf("other opcode %d\n", IB_WR_MASKED_ATOMIC_CMP_AND_SWAP);
   wr.exp_opcode = IBV_EXP_WR_EXT_MASKED_ATOMIC_CMP_AND_SWP;
-  wr.exp_opcode = (enum ibv_exp_wr_opcode) 0x14;
-  wr.exp_opcode = (enum ibv_exp_wr_opcode) opcode;
+//   wr.exp_opcode = IBV_EXP_WR_EXT_MASKED_ATOMIC_FETCH_AND_ADD;
+//   wr.exp_opcode = (enum ibv_exp_wr_opcode) 0x14;
+//   wr.exp_opcode = (enum ibv_exp_wr_opcode) opcode;
 //   wr.exp_opcode = (enum ibv_exp_wr_opcode) IBV_WR_RDMA_WRITE;
 //   wr.exp_opcode = IBV_EXP_WR_ATOMIC_CMP_AND_SWP;
   wr.exp_send_flags = IBV_EXP_SEND_EXT_ATOMIC_INLINE;
+
 
   printf("sg addr %lu\n", sg.addr);
   printf("sg length %lu\n", sg.length);
@@ -627,15 +630,15 @@ void * read_write_cas_test(void * args) {
     uint64_t mask,
     bool singal) {
         */
-    compare_value = 0;
-    char masked_cas_value[8] = {'m','a','s','k','d','c','a','s'};
-    uint64_t mask = 0x0FFFFFFFFFFFFFF0;
-    int opcode = 0x14;
+    // compare_value = 0x00000000000000FF;
+    // compare_value = 0x000000000000000F;
+    compare_value = 0x000000000000FFFF;
+    char masked_cas_value[8] = {'m','a','s','k','c','a','s','s'};
+    uint64_t mask = 0xFFFFFFFFFFFF0000;
 
-    for(int opcode = 99; opcode < 0xFF; opcode++) {
-        printf("\n\nrunning opcode %x\n", opcode);
 
     swap_value = *(uint64_t*) masked_cas_value;
+    // swap_value = bswap_64(swap_value);
     printf("sending masked CAS\n");
     rdmaCompareAndSwapMask(
         cm->client_qp[qp_num], 
@@ -646,8 +649,7 @@ void * read_write_cas_test(void * args) {
         mr_buffers[qp_num]->lkey, 
         remote_key, 
         mask, 
-        true,
-        opcode);
+        true);
     printf("polling for masked cas response\n") ;
     bulk_poll(cq_ptr, 1, wc, &ps);
     printf("maksed cas response recived\n");
@@ -656,8 +658,6 @@ void * read_write_cas_test(void * args) {
     printf("wc wr_id is %d\n", wc[0].wr_id);
     printf("wc vendor_err is %d\n", wc[0].vendor_err);
     printf("maksed cas response recived\n");
-
-    }
 
 
     printf("The value read back from the cas is %s\n", mr_buffers[qp_num]->addr);

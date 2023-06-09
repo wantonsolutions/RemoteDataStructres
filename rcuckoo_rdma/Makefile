@@ -4,7 +4,8 @@ CC = g++ # define the C/C++ compiler to use
 # CFLAGS = -O3 -Wall -Wall -Wextra -pedantic -fPIC
 # # define any directories containing header files other than /usr/include
 XXHASH_INC = /usr/local/home/ssgrant/RemoteDataStructres/rcuckoo_rdma/xxHash
-INCLUDES = -I$(XXHASH_INC)
+MLX5_INC = /usr/include/infiniband
+INCLUDES = -I$(XXHASH_INC) -I$(MLX5_INC)
 LIBRARIES = -L$(XXHASH_INC) -lxxhash
 
 
