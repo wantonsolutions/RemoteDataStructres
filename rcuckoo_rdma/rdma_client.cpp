@@ -426,6 +426,19 @@ static inline void fillSgeWr(ibv_sge &sg, ibv_exp_send_wr &wr, uint64_t source,
   wr.num_sge = 1;
 }
 
+static inline void fillSgeWr(ibv_sge &sg, ibv_send_wr &wr, uint64_t source,
+                             uint64_t size, uint32_t lkey) {
+  memset(&sg, 0, sizeof(sg));
+  sg.addr = (uintptr_t)source;
+  sg.length = size;
+  sg.lkey = lkey;
+
+  memset(&wr, 0, sizeof(wr));
+  wr.wr_id = 0;
+  wr.sg_list = &sg;
+  wr.num_sge = 1;
+}
+
 
 bool rdmaCompareAndSwapMask(ibv_qp *qp, uint64_t source, uint64_t dest,
                             uint64_t compare, uint64_t swap, uint32_t lkey,
@@ -433,48 +446,19 @@ bool rdmaCompareAndSwapMask(ibv_qp *qp, uint64_t source, uint64_t dest,
   struct ibv_sge sg;
   struct ibv_exp_send_wr wr;
   struct ibv_exp_send_wr *wrBad;
-
-    printf("running attomic mask\n");
-    printf("source %lu\n", source);
-    printf("dest %lu\n", dest);
-    printf("compare %lu\n", compare);
-    printf("swap %lu\n", swap);
-    printf("lkey %u\n", lkey);
-    printf("remoteRKey %u\n", remoteRKey);
-    printf("mask %lu\n", mask);
-    printf("singal %d\n", singal);
-
   fillSgeWr(sg, wr, source, 8, lkey);
 
   wr.next = NULL;
-//   printf("other opcode %d\n", IB_WR_MASKED_ATOMIC_CMP_AND_SWAP);
   wr.exp_opcode = IBV_EXP_WR_EXT_MASKED_ATOMIC_CMP_AND_SWP;
-//   wr.exp_opcode = IBV_EXP_WR_EXT_MASKED_ATOMIC_FETCH_AND_ADD;
-//   wr.exp_opcode = (enum ibv_exp_wr_opcode) 0x14;
-//   wr.exp_opcode = (enum ibv_exp_wr_opcode) opcode;
-//   wr.exp_opcode = (enum ibv_exp_wr_opcode) IBV_WR_RDMA_WRITE;
-//   wr.exp_opcode = IBV_EXP_WR_ATOMIC_CMP_AND_SWP;
   wr.exp_send_flags = IBV_EXP_SEND_EXT_ATOMIC_INLINE;
-
-
-  printf("sg addr %lu\n", sg.addr);
-  printf("sg length %lu\n", sg.length);
-  printf("sg lkey %u\n", sg.lkey);
 
   if (singal) {
     wr.exp_send_flags |= IBV_EXP_SEND_SIGNALED;
   }
 
-//   wr.wr.atomic.remote_addr = dest;
-//   wr.wr.atomic.rkey = remoteRKey;
-//   wr.wr.atomic.compare_add = compare;
-//   wr.wr.atomic.swap = swap;
-
-
   wr.ext_op.masked_atomics.log_arg_sz = 3;
   wr.ext_op.masked_atomics.remote_addr = dest;
   wr.ext_op.masked_atomics.rkey = remoteRKey;
-//   wr.wr_id = 1337;
 
   auto &op = wr.ext_op.masked_atomics.wr_data.inline_data.op.cmp_swap;
   op.compare_val = compare;
@@ -483,32 +467,13 @@ bool rdmaCompareAndSwapMask(ibv_qp *qp, uint64_t source, uint64_t dest,
   op.compare_mask = mask;
   op.swap_mask = mask;
 
-
-
-
   int ret = ibv_exp_post_send(qp, &wr, &wrBad);
   if (ret) {
-    // Debug::notifyError("Send with MASK AT
     printf("MSKCAS FAILED : Return code %d\n", ret);
-    printf("MSKCAS FAILED : FUCK we failed the rdma compare and swap\n");
-    if (ret == EINVAL) {
-        printf("invalid value provided in wr\n");
-    }
-    if (ret == ENOMEM) {
-        printf("send queue is full\n");
-    }
-    if ( ret == EFAULT) {
-        printf("something wrong with the QP pointer\n");
-    }
-    if(wrBad) {
-        printf("the Bad send wr is %d\n",wrBad->op);
-        printf("wrBad opcode %d\n",wrBad->exp_opcode);
-    }
     return false;
   }
   return true;
 }
-
 
 
 void * read_write_cas_test(void * args) {
@@ -527,13 +492,9 @@ void * read_write_cas_test(void * args) {
     // //Initialize performance statistics
     performance_statistics ps;
     struct ibv_wc *wc = (struct ibv_wc *) calloc (num_concur, sizeof(struct ibv_wc));
-    // ps.start_cycles=targs->start_cycles;
-    // ps.message_size=msg_size;
 
     struct ibv_sge local_client_send_sge;
     set_scatter_gather_entry(local_client_send_sge, (uint64_t) mr_buffers[qp_num]->addr, (uint32_t) msg_size, mr_buffers[qp_num]->lkey);
-
-
 
     struct ibv_send_wr local_client_send_wr_batch[BATCH_SIZE];
     uint32_t remote_key = cm->server_qp_metadata_attr[0].stag.remote_stag;
@@ -605,33 +566,10 @@ void * read_write_cas_test(void * args) {
     bulk_poll(cq_ptr, 1, wc, &ps);
     printf("CAS operation completed\n");
 
-
-
-
-    // local_client_send_wr_batch[0].wr_id = 1337;              /* User-assigned id to recognize this WR on completion */
-    // local_client_send_wr_batch[0].wr.rdma.remote_addr = local_server_address;
-    // set_send_work_request(local_client_send_wr_batch[0], local_client_send_sge, cas_op, remote_key, local_server_address);
-    // set_compare_and_swap_work_request(local_client_send_wr_batch[0], local_server_address, remote_key, compare_value, swap_value);
-    // send_bulk(1, qp_num, cm, local_client_send_wr_batch);
-    // //Value sent
-    // bulk_poll(cq_ptr, 1, wc, &ps);
-
     //Doing the masked CAS now
     printf("preparing masked cas\n");
     sleep(1);
-    /*
-    bool rdmaCompareAndSwapMask(ibv_qp *qp, 
-    uint64_t source, 
-    uint64_t dest,
-    uint64_t compare, 
-    uint64_t swap,
-    uint32_t lkey,
-    uint32_t remoteRKey, 
-    uint64_t mask,
-    bool singal) {
-        */
-    // compare_value = 0x00000000000000FF;
-    // compare_value = 0x000000000000000F;
+
     compare_value = 0x000000000000FFFF;
     char masked_cas_value[8] = {'m','a','s','k','c','a','s','s'};
     uint64_t mask = 0xFFFFFFFFFFFF0000;
@@ -652,6 +590,30 @@ void * read_write_cas_test(void * args) {
         true);
     printf("polling for masked cas response\n") ;
     bulk_poll(cq_ptr, 1, wc, &ps);
+
+    printf("Second Masked Cas");
+    sleep(1);
+
+    char compare_value_2[8] = {'D','D','s','k','c','a','s','s'};
+    char masked_cas_value_2[8] = {'N','O','M','A','S','K','s','s'};
+    swap_value=(*(uint64_t*)masked_cas_value_2);
+    mask = 0xFFFFFFFFFFFF0000;
+
+    rdmaCompareAndSwapMask(
+        cm->client_qp[qp_num], 
+        (uint64_t)mr_buffers[qp_num]->addr, 
+        local_server_address, 
+        *(uint64_t*)compare_value_2, 
+        swap_value, 
+        mr_buffers[qp_num]->lkey, 
+        remote_key, 
+        mask, 
+        true);
+    printf("polling for masked cas response\n") ;
+    bulk_poll(cq_ptr, 1, wc, &ps);
+
+
+
     printf("maksed cas response recived\n");
     printf("wc status is %d\n", wc[0].status);
     printf("wc opcode is %d\n", wc[0].opcode);
@@ -661,8 +623,6 @@ void * read_write_cas_test(void * args) {
 
 
     printf("The value read back from the cas is %s\n", mr_buffers[qp_num]->addr);
-
-
     return NULL;
 
 }
