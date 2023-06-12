@@ -41,7 +41,8 @@ RDMA_LIBS = -lrdmacm -libverbs -lpthread
 # .c.o:
 # 	$(CC) $(CFLAGS) $(INCLUDES) -cpp $<  -o $@
 
-TARGET := test_hash test_tables test_search rdma_server rdma_client
+# TARGET := test_hash test_tables test_search rdma_server rdma_client
+TARGET := test_hash test_tables test_search test_state_machines
 test_dir := ./test
 
 all: $(TARGET)
@@ -54,6 +55,9 @@ tables.o: tables.cpp tables.h
 
 search.o: search.cpp search.h tables.o hash.o
 	g++ -c $(CFLAGS) $(INCLUDES) -fPIC search.cpp -o search.o tables.o hash.o
+
+state_machines.o: state_machines.cpp state_machines.h tables.o hash.o search.o
+	g++ -c $(CFLAGS) $(INCLUDES) -fPIC state_machines.cpp -o state_machines.o
 
 rdma_common.o:
 	$(CC) -c $(CFLAGS) $(INCLUDES) -fPIC rdma_common.cpp -o rdma_common.o
@@ -89,6 +93,10 @@ test_tables : tables.o
 test_search : search.o
 	g++ $(CFLAGS)  $(test_dir)/test_search.cpp -o test_search search.o tables.o hash.o $(LIBRARIES)
 	mv test_search $(test_dir)/test_search
+
+test_state_machines : state_machines.o
+	g++ $(CFLAGS)  $(test_dir)/test_state_machines.cpp -o test_state_machines state_machines.o tables.o hash.o search.o $(LIBRARIES)
+	mv test_state_machines $(test_dir)/test_state_machines
 
 
 clean:

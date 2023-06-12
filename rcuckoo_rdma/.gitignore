@@ -10,6 +10,7 @@ rcuckoo_wrap.egg-info
 test/test_hash
 test/test_tables
 test/test_search
+test/test_state_machines
 
 rdma_client
 rdma_server

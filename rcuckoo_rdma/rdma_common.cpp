@@ -94,7 +94,7 @@ void print_dev_attributes(struct ibv_device_attr_ex * attr) {
 
 struct ibv_mr* rdma_buffer_alloc_dm(struct ibv_pd *pd, uint32_t size, enum ibv_access_flags permission) {
 	
-	struct ibv_exp_alloc_dm_attr dm_attr = {0};
+	// struct ibv_exp_alloc_dm_attr dm_attr = {0};
 	struct ibv_dm             *dm = {0};
 	struct ibv_mr			  *mr ={0};
 
