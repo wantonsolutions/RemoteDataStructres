@@ -135,3 +135,12 @@ cdef extern from "search.h" namespace "cuckoo_search":
     vector[path_element] a_star_search(Table table, hash_locations (*location_func) (string, unsigned int), Key key, vector[unsigned int] open_buckets)
     vector[path_element] bucket_cuckoo_a_star_insert(Table table, hash_locations (*location_func) (string, unsigned int), Key key, vector[unsigned int] open_buckets)
     vector[path_element] bucket_cuckoo_random_insert(Table table, hash_locations (*location_func) (string, unsigned int), Key key, vector[unsigned int] open_buckets)
+
+cdef extern from "state_machines.h" namespace "cuckoo_state_machine":
+    
+    struct Request:
+        unsigned int op
+        Key key
+        Value value
+
+    

@@ -3,31 +3,17 @@
 #define STATE_MACHINES_H
 
 #include "tables.h"
+#include "virtual_rdma.h"
 #include <string>
 #include <unordered_map>
 #include <vector>
 #include <any>
 
 using namespace std;
+using namespace cuckoo_virtual_rdma;
+
 namespace cuckoo_state_machines {
 
-    enum operation {
-        GET,
-        PUT,
-        DELETE
-    };
-
-    typedef struct Request {
-        enum operation op;
-        Key key;
-        Value value;
-
-        Request();
-        Request(operation op, Key key, Value value);
-        ~Request() {}
-        string to_string();
-
-    } Request;
 
     class State_Machine {
         public:
@@ -36,11 +22,16 @@ namespace cuckoo_state_machines {
             ~State_Machine() {}
             void clear_statistics();
 
+            bool is_complete();
+            vector<Key> get_completed_inserts();
+            void set_max_fill(float max_fill);
+
             void complete_read_stats(bool success, Key read_key);
             void complete_insert_stats(bool success);
             unordered_map<string, any> get_stats();
 
-
+            vector<VRMessage> fsm();
+            vector<VRMessage> fsm_logic(vector<VRMessage> messages);
 
 
         protected:
@@ -89,6 +80,9 @@ namespace cuckoo_state_machines {
             uint32_t _current_read_rtt;
             vector<int> _read_rtt;
             uint64_t _read_rtt_count;
+
+        private:
+            void update_message_stats(vector<VRMessage>);
     };
 
 
