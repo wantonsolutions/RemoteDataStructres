@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <any>
 
 using namespace std;
 namespace cuckoo_state_machines {
@@ -35,6 +36,11 @@ namespace cuckoo_state_machines {
             ~State_Machine() {}
             void clear_statistics();
 
+            void complete_read_stats(bool success, Key read_key);
+            void complete_insert_stats(bool success);
+            unordered_map<string, any> get_stats();
+
+
 
 
         protected:
@@ -54,13 +60,15 @@ namespace cuckoo_state_machines {
             uint32_t _total_cas;
             uint32_t _total_cas_failures;
 
+            Key _current_insert_key;
+
             vector<int> _insert_path_lengths;
             vector<int> _index_range_per_insert;
             uint32_t _current_insert_messages;
             vector<int> _messages_per_insert;
             vector<Key> _completed_inserts;
             uint32_t _completed_insert_count;
-            vector<int> _failed_inserts;
+            vector<Key> _failed_inserts;
             uint32_t _failed_insert_count;
             uint64_t _insert_operation_bytes;
             uint64_t _insert_operation_messages;
