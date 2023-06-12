@@ -399,14 +399,11 @@ void * xput_thread(void * args) {
     return NULL;
 }
 
-void drain_all_concurrent_requests(int num_concur, struct ibv_cq *cq_ptr, struct ibv_wc* wc, performance_statistics * ps) {
+void drain_all_concurrent_requests(int num_concur, struct ibv_cq *cq_ptr, struct ibv_wc* wc) {
+    performance_statistics ps;
     int n = 0;
     while (n < num_concur) {
-        int single_n = bulk_poll(cq_ptr, num_concur, wc, ps);
-        // printf("total recieved during drain %d\n", single_n);
-        // printf("work completion recieved %d\n", wc[0].status);
-        // printf("work completion recieved qp %d\n", wc[0].qp_num);
-        // printf("work completion recieved wr_id %d\n", wc[0].wr_id);
+        int single_n = bulk_poll(cq_ptr, num_concur, wc, &ps);
         n += single_n;
         printf("QP %d: Draining concurrent requests %d/%d\n", wc->qp_num, n , num_concur);
     }
@@ -510,7 +507,7 @@ void * read_write_cas_test(void * args) {
 
     //Empty the buffer from the writes that occured earlier
     int n =0;
-    drain_all_concurrent_requests(num_concur, cq_ptr, wc, &ps);
+    drain_all_concurrent_requests(num_concur, cq_ptr, wc);
 
     //write
     sleep(1);
