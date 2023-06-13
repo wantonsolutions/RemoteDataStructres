@@ -144,7 +144,8 @@ cdef extern from "virtual_rdma.h" namespace "cuckoo_virtual_rdma":
         Value value
 
     struct VRMessage:
-        unordered_map[string, string] payload
+        string function
+        unordered_map[string, string] function_args
 
 # cdef extern from "state_machines.h" namespace "cuckoo_state_machines":
 

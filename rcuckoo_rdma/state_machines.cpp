@@ -15,7 +15,7 @@ using namespace std;
 template <typename T>
 string array_to_string(vector<T> array) {
     string result = "";
-    for (int i = 0; i < array.size(); i++) {
+    for (auto i = 0; i < array.size(); i++) {
         result += to_string(array[i]);
         if (i < array.size() - 1) {
             result += ",";
@@ -26,7 +26,7 @@ string array_to_string(vector<T> array) {
 
 string key_array_to_string(vector<Key> array) {
     string result = "";
-    for (int i = 0; i < array.size(); i++) {
+    for (auto i = 0; i < array.size(); i++) {
         result += array[i].to_string();
         if (i < array.size() - 1) {
             result += ",";
@@ -184,12 +184,62 @@ namespace cuckoo_state_machines {
     }
 
     void State_Machine::update_message_stats(vector<VRMessage> messages){
-        printf("TODO implement update virtual message stats\n");
+
+        for (auto message : messages) {
+            uint32_t message_size_bytes = message.get_message_size_bytes();
+            if (_inserting) {
+                _current_insert_messages++;
+                _insert_operation_bytes += message_size_bytes;
+                _insert_operation_messages++;
+            } else if (_reading) {
+                _current_read_messages++;
+                _read_operation_bytes += message_size_bytes;
+                _read_operation_messages++;
+            } else {
+                printf("ERROR: update_message_stats called when not reading or inserting\n");
+                throw logic_error("ERROR: update_message_stats called when not reading or inserting");
+            }
+
+            _total_bytes += message_size_bytes;
+            switch (message.get_message_type()){
+            case READ_REQUEST:
+                _total_reads++;
+                _read_bytes += message_size_bytes;
+                break;
+            case READ_RESPONSE:
+                _read_bytes += message_size_bytes;
+                break;
+            case WRITE_REQUEST:
+                printf("TODO track writes\n");
+                break;
+            case WRITE_RESPONSE:
+                printf("TODO track writes\n");
+                break;
+            case CAS_REQUEST:
+            case MASKED_CAS_REQUEST:
+                _total_cas++;
+                _cas_bytes += message_size_bytes;
+                break;
+            case CAS_RESPONSE:
+            case MASKED_CAS_RESPONSE:
+                _cas_bytes += message_size_bytes;
+                if (message.function_args["success"] == "false") {
+                    _total_cas_failures++;
+                }
+                break;
+            default:
+                printf("ERROR: unknown message type\n");
+                throw logic_error("ERROR: unknown message type");
+            }
+        }
+
     }
 
     vector<VRMessage> State_Machine::fsm(vector<VRMessage> messages) {
-        printf("TODO implement fsm\n");
-        return vector<VRMessage>();
+        update_message_stats(messages);
+        vector<VRMessage> output_messages = fsm_logic(messages);
+        update_message_stats(output_messages);
+        return output_messages;
     }
 
     vector<VRMessage> State_Machine::fsm_logic(vector<VRMessage> messages) {
