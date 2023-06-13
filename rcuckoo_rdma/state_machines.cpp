@@ -234,6 +234,162 @@ namespace cuckoo_state_machines {
         }
 
     }
+    // int _total_requests;
+    // int _client_id;
+    // int _num_clients;
+    // bool _deterministic;
+    // int _random_factor;
+    // int _completed_requests;
+    // int _completed_puts;
+    // int _completed_gets;
+    // Request _last_request;
+    Client_Workload_Driver::Client_Workload_Driver(){
+        _total_requests = 0;
+        _client_id = 0;
+        _num_clients = 0;
+        _deterministic = false;
+        _random_factor = 0;
+        _completed_requests = 0;
+        _completed_puts = 0;
+        _completed_gets = 0;
+        _workload = A;
+        _last_request = Request();
+    }
+
+    Client_Workload_Driver::Client_Workload_Driver(unordered_map<string, string> config) {
+        _completed_requests = 0;
+        _completed_puts = 0;
+        _completed_gets = 0;
+        _last_request = Request();
+        try{
+            
+            _total_requests = stoi(config["total_requests"]);
+            _client_id = stoi(config["client_id"]);
+            _num_clients = stoi(config["num_clients"]);
+            _deterministic = config["deterministic"] == "true";
+            set_workload(config["workload"]);
+        } catch (exception& e) {
+            printf("ERROR: Client_Workload_Driver config missing required field\n");
+            throw logic_error("ERROR: Client_Workload_Driver config missing required field");
+        }
+        
+        if (_deterministic) {
+            _random_factor = 1;
+        } else {
+            _random_factor = rand() % 100;
+        }
+    }
+
+    unordered_map<string,string> get_stats() {
+        printf("TODO implement get stats!\n");
+        exit(1);
+    }
+
+    void Client_Workload_Driver::set_workload(ycsb_workload workload) {
+        _workload = workload;
+    }
+
+    void Client_Workload_Driver::set_workload(string workload) {
+        if (workload == "ycsb-a"){
+            _workload = A;
+        } else if (workload == "ycsb-b"){
+            _workload = B;
+        } else if (workload == "ycsb-c"){
+            _workload = C;
+        } else if (workload == "ycsb-w"){
+            _workload = W;
+        } else {
+            printf("ERROR: unknown workload\n");
+            throw logic_error("ERROR: unknown workload");
+        }
+    }
+
+    void Client_Workload_Driver::record_last_request() {
+        if (_last_request.op == PUT) {
+            _completed_puts++;
+        } else if (_last_request.op == GET) {
+            _completed_gets++;
+        } else if (_last_request.op == DELETE) {
+            printf("ERROR: Delete not implemented\n");
+            throw logic_error("ERROR: not implemented operation DELETE");
+        } else {
+            printf("ERROR: unknown operation\n");
+            throw logic_error("ERROR: unknown operation");
+        }
+    }
+
+    Key Client_Workload_Driver::unique_insert(int insert_index, int client_id, int total_clients, int factor) {
+        uint64_t key_int = ((insert_index + 1) * total_clients * factor) + client_id;
+        Key key;
+        key.set(key_int);
+        return key;
+    }
+
+    Key Client_Workload_Driver::unique_get(int get_index, int client_id, int total_clients, int factor) {
+        uint64_t key_int = ((get_index + 1) * total_clients * factor) + client_id;
+        Key key;
+        key.set(key_int);
+        return key;
+    }
+
+
+    Request Client_Workload_Driver::next_put() {
+        Key key = unique_insert(_completed_puts, _client_id, _num_clients, _random_factor);
+        Value val = Value();
+        Request req = Request{PUT, key, val};
+        return req;
+
+    }
+
+    Request Client_Workload_Driver::next_get() {
+        uint32_t next_key_index;
+        if (_deterministic){
+            next_key_index = _completed_puts - 1;
+        } else {
+            if (_completed_puts <=1 ) {
+                next_key_index = 0;
+            } else {
+                next_key_index = rand() % (_completed_puts - 1);
+            }
+        }
+        Key key = unique_get(next_key_index, _client_id, _num_clients, _random_factor);
+        Request req = Request{GET, key, Value()};
+        _last_request = req;
+        return req;
+    }
+
+    operation Client_Workload_Driver::gen_next_operation() {
+        if (_workload == A) {
+            return (rand() % 100) < 50 ? GET : PUT;
+        } else if (_workload == B) {
+            return (rand() % 100) < 95 ? GET : PUT;
+        } else if (_workload == C) {
+            return GET;
+        } else if (_workload == W) {
+            return PUT;
+        } else {
+            printf("ERROR: unknown workload\n");
+            throw logic_error("ERROR: unknown workload");
+        }
+    }
+
+    Request Client_Workload_Driver::next() {
+        record_last_request();
+        if (_completed_requests >= _total_requests) {
+            return Request{NO_OP, Key(), Value()};
+        }
+        operation op = gen_next_operation();
+        if (op == PUT) {
+            return next_put();
+        } else if (op == GET) {
+            return next_get();
+        } else {
+            printf("ERROR: unknown operation\n");
+            throw logic_error("ERROR: unknown operation");
+        }
+    }
+
+
 
     vector<VRMessage> State_Machine::fsm(vector<VRMessage> messages) {
         update_message_stats(messages);

@@ -14,7 +14,8 @@ namespace cuckoo_virtual_rdma {
     enum operation {
         GET,
         PUT,
-        DELETE
+        DELETE,
+        NO_OP
     };
 
     enum message_type {

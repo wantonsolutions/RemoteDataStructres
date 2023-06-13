@@ -86,6 +86,45 @@ namespace cuckoo_state_machines {
             void update_message_stats(vector<VRMessage>);
     };
 
+    enum ycsb_workload {
+        A,
+        B,
+        C,
+        W,
+    };
+
+    class Client_Workload_Driver {
+        public:
+            Client_Workload_Driver();
+            Client_Workload_Driver(unordered_map<string, string> config);
+            ~Client_Workload_Driver() {}
+            unordered_map<string,string> get_stats();
+            void set_workload(ycsb_workload workload);
+            void set_workload(string workload);
+            Request next();
+
+        private:
+            int _total_requests;
+            int _client_id;
+            int _num_clients;
+            bool _deterministic;
+            int _random_factor;
+            int _completed_requests;
+            int _completed_puts;
+            int _completed_gets;
+            ycsb_workload _workload;
+            Request _last_request;
+
+            void record_last_request();
+            Key unique_insert(int insert_index, int client_id, int total_clients, int factor);
+            Key unique_get(int get_index, int client_id, int total_clients, int factor);
+            Request next_put();
+            Request next_get();
+            operation gen_next_operation();
+
+    };
+
+
 
     class Client_State_Machine : public State_Machine {
         public:

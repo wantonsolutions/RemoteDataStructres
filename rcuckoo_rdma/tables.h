@@ -28,6 +28,12 @@ namespace cuckoo_tables {
             }
             return true;
         }
+        template <typename T>
+        void set(T val) {
+            for (int i = 0; i < KEY_SIZE && i < sizeof(val); i++){
+                bytes[i] = (val >> (8 * i)) & 0xFF;
+            }
+        }
 
     } Key;
 
