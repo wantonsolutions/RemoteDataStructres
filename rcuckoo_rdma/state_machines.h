@@ -22,13 +22,14 @@ namespace cuckoo_state_machines {
             ~State_Machine() {}
             void clear_statistics();
 
+            string get_state_machine_name();
             bool is_complete();
             vector<Key> get_completed_inserts();
             void set_max_fill(float max_fill);
 
             void complete_read_stats(bool success, Key read_key);
             void complete_insert_stats(bool success);
-            unordered_map<string, any> get_stats();
+            unordered_map<string, string> get_stats();
 
             vector<VRMessage> fsm();
             vector<VRMessage> fsm_logic(vector<VRMessage> messages);
@@ -87,6 +88,11 @@ namespace cuckoo_state_machines {
 
 
     class Client_State_Machine : public State_Machine {
+        public:
+            Client_State_Machine();
+            Client_State_Machine(unordered_map<string, string> config);
+            ~Client_State_Machine() {}
+            string get_state_machine_name();
 
     };
 }

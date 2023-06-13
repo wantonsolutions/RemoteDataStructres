@@ -62,6 +62,9 @@ virtual_rdma.o: virtual_rdma.cpp virtual_rdma.h
 state_machines.o: state_machines.cpp state_machines.h tables.o hash.o search.o virtual_rdma.o
 	g++ -c $(CFLAGS) $(INCLUDES) -fPIC state_machines.cpp -o state_machines.o virtual_rdma.o
 
+cuckoo.o: cuckoo.cpp cuckoo.h state_machines.o tables.o hash.o search.o virtual_rdma.o
+	g++ -c $(CFLAGS) $(INCLUDES) -fPIC cuckoo.cpp -o cuckoo.o state_machines.o tables.o hash.o search.o virtual_rdma.o
+
 rdma_common.o:
 	$(CC) -c $(CFLAGS) $(INCLUDES) -fPIC rdma_common.cpp -o rdma_common.o
 
@@ -97,7 +100,7 @@ test_search : search.o
 	g++ $(CFLAGS)  $(test_dir)/test_search.cpp -o test_search search.o tables.o hash.o $(LIBRARIES)
 	mv test_search $(test_dir)/test_search
 
-test_state_machines : state_machines.o
+test_state_machines : state_machines.o cuckoo.o
 	g++ $(CFLAGS)  $(test_dir)/test_state_machines.cpp -o test_state_machines state_machines.o tables.o hash.o search.o virtual_rdma.o $(LIBRARIES)
 	mv test_state_machines $(test_dir)/test_state_machines
 

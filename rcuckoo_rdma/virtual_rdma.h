@@ -17,7 +17,7 @@ namespace cuckoo_virtual_rdma {
     };
 
     typedef struct VRMessage {
-        unordered_map<string,any> payload;
+        unordered_map<string,string> payload;
     } VRMessage;
 
     typedef struct Request {

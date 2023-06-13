@@ -261,11 +261,12 @@ def insertion_debug():
     config["buckets_per_lock"] = 1
     config["locks_per_message"] = 64
     config["trials"] = 1
+    import rcuckoo_wrap as cuckoo
     
-    config['max_fill']= 50
+    config['max_fill']= 90
     # config['deterministic']=True
     # config["state_machine"]=race.race
-    config["state_machine"]=cuckoo.rcuckoo
+    config["state_machine"]=cuckoo.PyRCuckoo
     config['workload']='ycsb-w'
     # log.set_debug()
     log.set_off()
@@ -967,8 +968,8 @@ def plot_hero_ycsb_fill_latency():
 # buckets_per_lock_vs_locks_per_message_experiment()
 # plot_buckets_per_lock_vs_locks_per_message_experiment()
 
-run_hero_ycsb()
-plot_hero_ycsb()
+# run_hero_ycsb()
+# plot_hero_ycsb()
 # 
 
 # plot_insertion_range_cdf()
@@ -982,8 +983,8 @@ plot_hero_ycsb()
 
 # todos()
 
-# insertion_debug()
-# plot_general_stats_last_run()
+insertion_debug()
+plot_general_stats_last_run()
 # plot_hash_factor_distance_cdf()
 
 # success_rate_contention_machines()

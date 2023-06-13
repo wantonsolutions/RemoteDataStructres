@@ -9,8 +9,6 @@ import random
 import traceback
 import copy
 
-from . import rcuckoo_basic
-from . import state_machines
 from . import log
 
 
@@ -19,11 +17,20 @@ if simulator:
     from . import hash
     from . import tables
     from . import search
+    from . import rcuckoo_basic
+    from . import state_machines
 else:
     import rcuckoo_wrap as hash
-    import rcuckoo_wrap as tables
     import rcuckoo_wrap as search
+    import rcuckoo_wrap as state_machines
+
+    import rcuckoo_wrap as tables
     tables.Table = tables.PyTable
+    import rcuckoo_wrap as rcuckoo_basic
+    rcuckoo_basic.rcuckoo_basic = rcuckoo_basic.PyRCuckoo
+
+    from . import state_machines as sim_state_machines
+    state_machines.basic_memory_state_machine = sim_state_machines.basic_memory_state_machine
 
 
 import logging
@@ -36,6 +43,12 @@ def messages_append_or_extend(messages, message):
         else:
             messages.append(message)
     return messages
+
+def get_state_machine_name(state_machine_class_pointer):
+    str_name = str(state_machine_class_pointer)
+    back = str_name.split(".")[1]
+    front = back.split("'")[0]
+    return front
 
 class Node:
     def __init__(self, config):
@@ -254,9 +267,7 @@ class Simulator(Node):
 
     def clients_complete(self):
         for i in range(len(self.client_list)):
-            # if self.client_list[i].state_machine.state != "complete":
-            #     return False
-            if not self.client_list[i].state_machine.complete:
+            if not self.client_list[i].state_machine.is_complete():
                 return False
         return True
 
@@ -272,7 +283,7 @@ class Simulator(Node):
         self.step = self.step+1
 
     def random_single_simulation_step(self):
-        # self.warning("Step: " + str(self.step))
+        self.warning("Step: " + str(self.step))
         value = int(random.random() * 10000)
         selection = value % 3
         clients = 0
@@ -346,6 +357,7 @@ class Simulator(Node):
             client_config['deterministic']=self.config['deterministic']
             client_config['search_module']=self.config['search_module']
             client_config['hash_module']=self.config['hash_module']
+            client_config['max_fill']=self.config['max_fill']
 
             c = Client(client_config)
 
@@ -366,7 +378,7 @@ class Simulator(Node):
         self.switch = Switch(switch_config)
 
 
-        self.config['state_machine']=state_machines.get_state_machine_name(self.config['state_machine'])
+        self.config['state_machine']=get_state_machine_name(self.config['state_machine'])
         self.config['search_module']=self.config['search_module'].__name__
         self.config['hash_module']=self.config['hash_module'].__name__
 
@@ -399,8 +411,7 @@ class Simulator(Node):
         #check to make sure that all of the values inserted are actually in the hash table
         for i in range(len(self.client_list)):
             client = self.client_list[i]
-            for j in range(len(client.state_machine.completed_inserts)):
-                value = client.state_machine.completed_inserts[j]
+            for value in client.state_machine.get_completed_inserts():
                 if self.memory.index.contains(value) == False:
                     self.critical("Memory does not contain value: " + str(value) + "inserted by " + str(client.client_id))
                     return False
@@ -420,7 +431,7 @@ class Simulator(Node):
 
 
     def set_max_fill(self, fill):
-        self.memory.state_machine.max_fill = fill
+        self.memory.state_machine.set_max_fill(fill)
         self.config['max_fill'] = fill
     
     def reset_step_max(self, max_steps):
@@ -563,30 +574,31 @@ def fill_then_run_trials(config, fill_to, max_fill, max_steps=1000000000):
 
 def main():
 
-    runs = []
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
+
+    table_size = 4096
+    runs = []
+    print("table size: ", table_size)
+
     config = default_config()
-    config['indexes'] = 16
+    config['indexes'] = table_size
     config['num_clients'] = 1
-    config['num_steps'] = 5000000
+    config['bucket_size'] = 8
+    config['num_steps'] = 25
     config['read_threshold_bytes'] = 256
     config["buckets_per_lock"] = 1
     config["locks_per_message"] = 64
     config["trials"] = 1
-    config["state_machine"]=rcuckoo_basic.rcuckoo_basic
-    # config["state_machine"]=cuckoo.rcuckoo
+    import rcuckoo_wrap as cuckoo
+    
+    config['max_fill']= 90
+    # config['deterministic']=True
     # config["state_machine"]=race.race
+    config["state_machine"]=cuckoo.PyRCuckoo
     config['workload']='ycsb-w'
     log.set_debug()
-
-
-
-    # simulator = Simulator(config)
-    # simulator.run()
-    # if not simulator.validate_run():
-    #     logger.error("Simulation failed check the logs")
-    # simulator.collect_stats()
+    # log.set_off()
     runs.append(run_trials(config))
 
 if __name__ == "__main__":

@@ -334,3 +334,74 @@ def bucket_cuckoo_random_insert(PyTable table, location_func, rw.Key key, open_b
         return rw.bucket_cuckoo_random_insert(deref(table.c_table), sub_function, key, empty_buckets)
     else:
         return rw.bucket_cuckoo_random_insert(deref(table.c_table), sub_function, key, open_buckets)
+
+
+from libcpp.unordered_map cimport unordered_map
+
+# cdef class PyState_Machine:
+#     cdef rw.State_Machine *c_state_machine
+
+#     def __init__(self, config=None):
+#         cdef unordered_map[string,string] c_config
+#         if config is not None:
+#             for k, v in config.items():
+#                 c_config[k] = v
+#         self.c_state_machine = new rw.State_Machine(c_config)
+
+
+#     # def get_state_machine_name(self):
+#     #     return self.c_state_machine.get_state_machine_name()
+
+# cdef class PyClient_State_Machine(PyState_Machine):
+#     cdef rw.Client_State_Machine *c_client_state_machine
+
+#     def __init__(self, config=None):
+#         cdef unordered_map[string,string] c_config
+#         if config is not None:
+#             for k, v in config:
+#                 c_config[k] = v
+#         self.c_client_state_machine = new rw.Client_State_Machine(c_config)
+    
+#     # def get_state_machine_name(self):
+#     #     return self.c_client_state_machine.get_state_machine_name()
+
+cdef class PyRCuckoo:
+    cdef rw.RCuckoo *c_rcuckoo
+
+    def __init__(self, config=None):
+        cdef unordered_map[string,string] c_config
+        if config is not None:
+            print(config)
+            for k in config:
+                print("key:", k, "value: ", config[k])
+                c_config[k.encode('utf8')] = str(config[k]).encode('utf8')
+        self.c_rcuckoo = new rw.RCuckoo(c_config)
+
+    def get_state_machine_name(self):
+        return self.c_rcuckoo.get_state_machine_name()
+
+    def clear_statistics(self):
+        self.c_rcuckoo.clear_statistics()
+
+    def is_complete(self):
+        return self.c_rcuckoo.is_complete()
+
+    def get_completed_inserts(self):
+        cdef vector[rw.Key] c_keys
+        c_keys = self.c_rcuckoo.get_completed_inserts()
+        ret_keys = []
+        for k in c_keys:
+            ret_keys.append(int.from_bytes(k.bytes, "little"))
+        return ret_keys
+
+    def set_max_fill(self, float max_fill):
+        self.c_rcuckoo.set_max_fill(max_fill)
+    
+    def get_stats(self):
+        cdef unordered_map[string,string] c_stats
+        c_stats = self.c_rcuckoo.get_stats()
+        ret_stats = {}
+        for k, v in c_stats:
+            ret_stats[k] = v
+        return ret_stats
+    

@@ -19,11 +19,6 @@ class request():
     def __repr__(self):
         return self.__str__()
 
-def get_state_machine_name(state_machine_class_pointer):
-    str_name = str(state_machine_class_pointer)
-    back = str_name.split(".")[1]
-    front = back.split("'")[0]
-    return front
 
 #cuckoo protocols
 class state_machine:
@@ -72,12 +67,22 @@ class state_machine:
         self.read_rtt = []
         self.read_rtt_count = 0
 
+
     def __init__(self, config):
         self.logger = logging.getLogger("root")
         self.config = config
         self.clear_statistics()
         #spiritually these are the high level states of the state machine
         #these are considered less configurable than the self.state variable I use in the children
+
+    def is_complete(self):
+        return self.complete
+
+    def get_completed_inserts(self):
+        return self.completed_inserts
+
+    def set_max_fill(self, max_fill):
+        print(" (SET MAX FILL) This is for memory only really, overload in subclass")
 
     def complete_read_stats(self, success, read_value):
         if success:
@@ -337,6 +342,7 @@ class client_state_machine(state_machine):
         self.total_inserts = config["total_inserts"]
         self.id = config["id"]
         self.state="idle"
+        self.max_fill = config["max_fill"]
 
 
         #read state machine
@@ -355,6 +361,9 @@ class client_state_machine(state_machine):
         }
         self.workload_config=workload_config
         self.workload_driver = client_workload_driver(workload_config)
+
+    def set_max_fill(self, max_fill):
+        self.max_fill = max_fill
 
     def clear_statistics(self):
         self.state="idle"
@@ -466,6 +475,9 @@ class basic_memory_state_machine(state_machine):
         self.state = "memory... state not being used"
         self.max_fill = config["max_fill"]
 
+
+    def set_max_fill(self, max_fill):
+        self.max_fill = max_fill
 
     def __str__(self):
         return "Memory"

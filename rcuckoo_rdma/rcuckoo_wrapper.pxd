@@ -136,11 +136,39 @@ cdef extern from "search.h" namespace "cuckoo_search":
     vector[path_element] bucket_cuckoo_a_star_insert(Table table, hash_locations (*location_func) (string, unsigned int), Key key, vector[unsigned int] open_buckets)
     vector[path_element] bucket_cuckoo_random_insert(Table table, hash_locations (*location_func) (string, unsigned int), Key key, vector[unsigned int] open_buckets)
 
-cdef extern from "state_machines.h" namespace "cuckoo_state_machine":
+cdef extern from "virtual_rdma.h" namespace "cuckoo_virtual_rdma":
     
     struct Request:
         unsigned int op
         Key key
         Value value
 
-    
+    struct VRMessage:
+        unordered_map[string, string] payload
+
+# cdef extern from "state_machines.h" namespace "cuckoo_state_machines":
+
+#     cdef cppclass State_Machine:
+#         State_Machine() except +
+#         State_Machine(unordered_map[string, string] config) except +
+#         # string get_state_machine_name()
+
+#     cdef cppclass Client_State_Machine(State_Machine):
+#         Client_State_Machine() except +
+#         Client_State_Machine(unordered_map[string, string] config) except +
+#         # string get_state_machine_name()
+
+
+cdef extern from "cuckoo.h" namespace "cuckoo_rcuckoo":
+
+    cdef cppclass RCuckoo:
+        RCuckoo() except +
+        RCuckoo(unordered_map[string, string] config) except +
+        string get_state_machine_name()
+        void clear_statistics()
+        bool is_complete()
+        vector[Key] get_completed_inserts()
+        void set_max_fill(float max_fill)
+        unordered_map[string, string] get_stats()
+
+

@@ -72,6 +72,9 @@ namespace cuckoo_state_machines {
         _read_rtt_count = 0;
     }
 
+    string State_Machine::get_state_machine_name() {
+        return "State Machine Super Class";
+    }
 
     bool State_Machine::is_complete(){
         return _complete;
@@ -118,40 +121,40 @@ namespace cuckoo_state_machines {
         _current_insert_rtt = 0;
 
     }
-    unordered_map<string, any> State_Machine::get_stats(){
-        unordered_map<string, any> stats;
-        stats["total_bytes"] = _total_bytes;
-        stats["read_bytes"] = _read_bytes;
-        stats["write_bytes"] = _write_bytes;
-        stats["cas_bytes"] = _cas_bytes;
+    unordered_map<string, string> State_Machine::get_stats(){
+        unordered_map<string, string> stats;
+        stats["total_bytes"] = to_string(_total_bytes);
+        stats["read_bytes"] = to_string(_read_bytes);
+        stats["write_bytes"] = to_string(_write_bytes);
+        stats["cas_bytes"] = to_string(_cas_bytes);
 
-        stats["total_reads"] = _total_reads;
-        stats["total_writes"] = _total_writes;
-        stats["total_cas"] = _total_cas;
-        stats["total_cas_failures"] = _total_cas_failures;
+        // stats["total_reads"] = _total_reads;
+        // stats["total_writes"] = _total_writes;
+        // stats["total_cas"] = _total_cas;
+        // stats["total_cas_failures"] = _total_cas_failures;
 
-        stats["insert_path_lengths"] = _insert_path_lengths;
-        stats["index_range_per_insert"] = _index_range_per_insert;
-        stats["messages_per_insert"] = _messages_per_insert;
-        stats["completed_inserts"] = _completed_inserts;
-        stats["completed_insert_count"] = _completed_insert_count;
-        stats["failed_inserts"] = _failed_inserts;
-        stats["failed_insert_count"] = _failed_insert_count;
-        stats["insert_operation_bytes"] = _insert_operation_bytes;
-        stats["insert_operation_messages"] = _insert_operation_messages;
+        // stats["insert_path_lengths"] = _insert_path_lengths;
+        // stats["index_range_per_insert"] = _index_range_per_insert;
+        // stats["messages_per_insert"] = _messages_per_insert;
+        // stats["completed_inserts"] = _completed_inserts;
+        // stats["completed_insert_count"] = _completed_insert_count;
+        // stats["failed_inserts"] = _failed_inserts;
+        // stats["failed_insert_count"] = _failed_insert_count;
+        // stats["insert_operation_bytes"] = _insert_operation_bytes;
+        // stats["insert_operation_messages"] = _insert_operation_messages;
 
-        stats["insert_rtt"] = _insert_rtt;
-        stats["insert_rtt_count"] = _insert_rtt_count;
+        // stats["insert_rtt"] = _insert_rtt;
+        // stats["insert_rtt_count"] = _insert_rtt_count;
 
-        stats["messages_per_read"] = _messages_per_read;
-        stats["completed_reads"] = _completed_reads;
-        stats["completed_read_count"] = _completed_read_count;
-        stats["failed_reads"] = _failed_reads;
-        stats["failed_read_count"] = _failed_read_count;
-        stats["read_operation_bytes"] = _read_operation_bytes;
-        stats["read_operation_messages"] = _read_operation_messages;
-        stats["read_rtt"] = _read_rtt;
-        stats["read_rtt_count"] = _read_rtt_count;
+        // stats["messages_per_read"] = _messages_per_read;
+        // stats["completed_reads"] = _completed_reads;
+        // stats["completed_read_count"] = _completed_read_count;
+        // stats["failed_reads"] = _failed_reads;
+        // stats["failed_read_count"] = _failed_read_count;
+        // stats["read_operation_bytes"] = _read_operation_bytes;
+        // stats["read_operation_messages"] = _read_operation_messages;
+        // stats["read_rtt"] = _read_rtt;
+        // stats["read_rtt_count"] = _read_rtt_count;
 
         return stats;
     }
@@ -168,6 +171,20 @@ namespace cuckoo_state_machines {
     vector<VRMessage> State_Machine::fsm_logic(vector<VRMessage> messages) {
         printf("FSM Logic must be implemented by a subclass");
         throw logic_error("FSM Logic must be implemented by a subclass");
+    }
+
+    Client_State_Machine::Client_State_Machine() {
+        printf("client state machine constructor with no argument\n");
+
+    }
+
+
+    Client_State_Machine::Client_State_Machine(unordered_map<string,string> config) : State_Machine(config) {
+        printf("client state machine constructor with config argument\n");
+    }
+
+    string Client_State_Machine::get_state_machine_name() {
+        return "Client State Machine Super Class";
     }
 
 }
