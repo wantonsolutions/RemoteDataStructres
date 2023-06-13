@@ -577,7 +577,7 @@ def main():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
 
-    table_size = 4096
+    table_size = 128
     runs = []
     print("table size: ", table_size)
 

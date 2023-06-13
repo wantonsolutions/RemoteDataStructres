@@ -170,5 +170,6 @@ cdef extern from "cuckoo.h" namespace "cuckoo_rcuckoo":
         vector[Key] get_completed_inserts()
         void set_max_fill(float max_fill)
         unordered_map[string, string] get_stats()
+        vector[VRMessage] fsm(vector[VRMessage] messages)
 
 

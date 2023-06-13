@@ -160,16 +160,16 @@ namespace cuckoo_state_machines {
     }
 
     void State_Machine::update_message_stats(vector<VRMessage> messages){
-        printf("TODO implement update virtual message stats");
+        printf("TODO implement update virtual message stats\n");
     }
 
-    vector<VRMessage> State_Machine::fsm() {
-        printf("TODO implement fsm");
+    vector<VRMessage> State_Machine::fsm(vector<VRMessage> messages) {
+        printf("TODO implement fsm\n");
         return vector<VRMessage>();
     }
 
     vector<VRMessage> State_Machine::fsm_logic(vector<VRMessage> messages) {
-        printf("FSM Logic must be implemented by a subclass");
+        printf("FSM Logic must be implemented by a subclass\n");
         throw logic_error("FSM Logic must be implemented by a subclass");
     }
 

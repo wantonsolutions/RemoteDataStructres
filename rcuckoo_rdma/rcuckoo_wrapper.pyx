@@ -404,4 +404,18 @@ cdef class PyRCuckoo:
         for k, v in c_stats:
             ret_stats[k] = v
         return ret_stats
+
+    def fsm(self, messages=None):
+        cdef vector[rw.VRMessage] c_messages
+        print("todo translate messages input messages to fsm")
+        if not messages is None:
+            for m in messages:
+                print("gotta translate:", m)
+        output_messages = self.c_rcuckoo.fsm(c_messages)
+        if len(output_messages) > 0:
+            for m in output_messages:
+                print("gotta translate output messages: ", m)
+        ret_messages = []
+        return ret_messages
+
     
