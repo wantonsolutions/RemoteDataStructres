@@ -365,6 +365,40 @@ from libcpp.unordered_map cimport unordered_map
 #     # def get_state_machine_name(self):
 #     #     return self.c_client_state_machine.get_state_machine_name()
 
+def tryeval(val):
+    import ast
+    try:
+        val = ast.literal_eval(val)
+    except:
+        return None
+    return val
+
+def decode_cpp_stats(client_stats):
+    decoded_stats = dict()
+    for key in client_stats:
+        value = client_stats[key]
+        # print("key: ", key, " value: ", client_stats[key])
+        dec_key = key.decode('utf-8')
+        dec_str_value = value.decode('utf-8')
+        # print("dec_key: ", dec_key, " dec_str_value: ", dec_str_value)
+        #I think the rule here is that if the value is nothign, then it's an empty array.
+        #if it was a simple type, I should be able to cast it.
+        #I believe that I'm only returning ints from the cpp code
+        try_evaled = tryeval(dec_str_value)
+        if try_evaled != None:
+            decoded_stats[dec_key] = try_evaled
+        else:
+            if dec_str_value == "":
+                decoded_stats[dec_key] = []
+            elif dec_str_value.contains(","):
+                decoded_stats[dec_key] = dec_str_value.split(",")
+            else:
+                print("ERROR: I don't know how to decode this value: ", value)
+                exit(1)
+
+    print("translation_time_over")
+    return decoded_stats
+
 cdef class PyRCuckoo:
     cdef rw.RCuckoo *c_rcuckoo
 
@@ -403,7 +437,7 @@ cdef class PyRCuckoo:
         ret_stats = {}
         for k, v in c_stats:
             ret_stats[k] = v
-        return ret_stats
+        return decode_cpp_stats(ret_stats)
 
     def fsm(self, messages=None):
         cdef vector[rw.VRMessage] c_messages

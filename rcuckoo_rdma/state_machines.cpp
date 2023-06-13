@@ -11,6 +11,30 @@
 
 
 using namespace std;
+
+template <typename T>
+string array_to_string(vector<T> array) {
+    string result = "";
+    for (int i = 0; i < array.size(); i++) {
+        result += to_string(array[i]);
+        if (i < array.size() - 1) {
+            result += ",";
+        }
+    }
+    return result;
+}
+
+string key_array_to_string(vector<Key> array) {
+    string result = "";
+    for (int i = 0; i < array.size(); i++) {
+        result += array[i].to_string();
+        if (i < array.size() - 1) {
+            result += ",";
+        }
+    }
+    return result;
+}
+
 namespace cuckoo_state_machines {
 
 
@@ -128,33 +152,33 @@ namespace cuckoo_state_machines {
         stats["write_bytes"] = to_string(_write_bytes);
         stats["cas_bytes"] = to_string(_cas_bytes);
 
-        // stats["total_reads"] = _total_reads;
-        // stats["total_writes"] = _total_writes;
-        // stats["total_cas"] = _total_cas;
-        // stats["total_cas_failures"] = _total_cas_failures;
+        stats["total_reads"] = to_string(_total_reads);
+        stats["total_writes"] = to_string(_total_writes);
+        stats["total_cas"] = to_string(_total_cas);
+        stats["total_cas_failures"] = to_string(_total_cas_failures);
 
-        // stats["insert_path_lengths"] = _insert_path_lengths;
-        // stats["index_range_per_insert"] = _index_range_per_insert;
-        // stats["messages_per_insert"] = _messages_per_insert;
-        // stats["completed_inserts"] = _completed_inserts;
-        // stats["completed_insert_count"] = _completed_insert_count;
-        // stats["failed_inserts"] = _failed_inserts;
-        // stats["failed_insert_count"] = _failed_insert_count;
-        // stats["insert_operation_bytes"] = _insert_operation_bytes;
-        // stats["insert_operation_messages"] = _insert_operation_messages;
+        stats["insert_path_lengths"] = array_to_string(_insert_path_lengths);
+        stats["index_range_per_insert"] = array_to_string(_index_range_per_insert);
+        stats["messages_per_insert"] = array_to_string(_messages_per_insert);
+        stats["completed_inserts"] = key_array_to_string(_completed_inserts);
+        stats["completed_insert_count"] = to_string(_completed_insert_count);
+        stats["failed_inserts"] = key_array_to_string(_failed_inserts);
+        stats["failed_insert_count"] = to_string(_failed_insert_count);
+        stats["insert_operation_bytes"] = to_string(_insert_operation_bytes);
+        stats["insert_operation_messages"] = to_string(_insert_operation_messages);
 
-        // stats["insert_rtt"] = _insert_rtt;
-        // stats["insert_rtt_count"] = _insert_rtt_count;
+        stats["insert_rtt"] = array_to_string(_insert_rtt);
+        stats["insert_rtt_count"] = to_string(_insert_rtt_count);
 
-        // stats["messages_per_read"] = _messages_per_read;
-        // stats["completed_reads"] = _completed_reads;
-        // stats["completed_read_count"] = _completed_read_count;
-        // stats["failed_reads"] = _failed_reads;
-        // stats["failed_read_count"] = _failed_read_count;
-        // stats["read_operation_bytes"] = _read_operation_bytes;
-        // stats["read_operation_messages"] = _read_operation_messages;
-        // stats["read_rtt"] = _read_rtt;
-        // stats["read_rtt_count"] = _read_rtt_count;
+        stats["messages_per_read"] = array_to_string(_messages_per_read);
+        stats["completed_reads"] = key_array_to_string(_completed_reads);
+        stats["completed_read_count"] = to_string(_completed_read_count);
+        stats["failed_reads"] = key_array_to_string(_failed_reads);
+        stats["failed_read_count"] = to_string(_failed_read_count);
+        stats["read_operation_bytes"] = to_string(_read_operation_bytes);
+        stats["read_operation_messages"] = to_string(_read_operation_messages);
+        stats["read_rtt"] = array_to_string(_read_rtt);
+        stats["read_rtt_count"] = to_string(_read_rtt_count);
 
         return stats;
     }

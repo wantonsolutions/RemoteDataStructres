@@ -50,6 +50,9 @@ def get_state_machine_name(state_machine_class_pointer):
     front = back.split("'")[0]
     return front
 
+
+
+
 class Node:
     def __init__(self, config):
         self.logger = logging.getLogger("root")
@@ -465,6 +468,7 @@ class Simulator(Node):
             client = self.client_list[i]
             client_stats = dict()
             client_stats['client_id'] = client.client_id
+            # client_stats['stats'] = client.state_machine.get_stats()
             client_stats['stats'] = client.state_machine.get_stats()
             client_stats['steps'] = client.get_steps()
             statistics['clients'].append(client_stats)
@@ -527,6 +531,7 @@ def run_trials(config):
             # raise e
         sim.validate_run()
         stats = sim.collect_stats()
+        print(stats)
         runs.append(stats)
         del sim
     return runs
