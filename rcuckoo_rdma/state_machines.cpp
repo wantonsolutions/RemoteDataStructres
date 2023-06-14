@@ -236,14 +236,16 @@ namespace cuckoo_state_machines {
 
     }
 
-    vector<VRMessage> State_Machine::fsm(vector<VRMessage> messages) {
+    vector<VRMessage> State_Machine::fsm(VRMessage message) {
+        vector<VRMessage> messages;
+        messages.push_back(message);
         update_message_stats(messages);
-        vector<VRMessage> output_messages = fsm_logic(messages);
+        vector<VRMessage> output_messages = fsm_logic(message);
         update_message_stats(output_messages);
         return output_messages;
     }
 
-    vector<VRMessage> State_Machine::fsm_logic(vector<VRMessage> messages) {
+    vector<VRMessage> State_Machine::fsm_logic(VRMessage messages) {
         printf("FSM Logic must be implemented by a subclass\n");
         throw logic_error("FSM Logic must be implemented by a subclass");
     }
@@ -558,5 +560,46 @@ namespace cuckoo_state_machines {
     string Client_State_Machine::get_state_machine_name() {
         return "Client State Machine Super Class";
     }
+
+    //Memory State Machine implementation
+    Memory_State_Machine::Memory_State_Machine() : State_Machine() {
+        _table = Table();
+        _max_fill = 0;
+    }
+
+    Memory_State_Machine::Memory_State_Machine(unordered_map<string,string> config) : State_Machine(config) {
+        try {
+            printf("TODO fill table with actual arguments in memory state machine\n");
+            _table = Table();
+            _max_fill = stoi(config["max_fill"]);
+        } catch (exception& e) {
+            printf("ERROR: Memory_State_Machine config missing required field\n");
+            throw logic_error("ERROR: Memory_State_Machine config missing required field");
+        }
+    }
+
+    void Memory_State_Machine::set_max_fill(int max_fill) {
+        _max_fill = max_fill;
+        return;
+    }
+
+    vector<VRMessage> Memory_State_Machine::fsm_logic(VRMessage message) {
+        // if (!messages){
+        //     printf("Messages are not set, returning an empty set of messages");
+        //     return vector<VRMessage>();
+        // }
+
+        if (_table.get_fill_percentage() * 100 > _max_fill) {
+            printf("Table is full (don't do anything except end experiment\n");
+            throw logic_error("Table is full (don't do anything except end experiment :)");
+        }
+
+        //TODO implement logic for memory state machine
+        printf("figure out what we want to pass to this function\n");
+
+
+
+    }
+
 
 }

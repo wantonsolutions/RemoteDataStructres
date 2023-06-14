@@ -31,8 +31,8 @@ namespace cuckoo_state_machines {
             void complete_insert_stats(bool success);
             unordered_map<string, string> get_stats();
 
-            vector<VRMessage> fsm(vector<VRMessage> messages);
-            vector<VRMessage> fsm_logic(vector<VRMessage> messages);
+            vector<VRMessage> fsm(VRMessage messages);
+            vector<VRMessage> fsm_logic(VRMessage messages);
 
 
         protected:
@@ -172,8 +172,18 @@ namespace cuckoo_state_machines {
             vector<Key> _read_values;
             uint32_t _duplicates_found;
             Client_Workload_Driver _workload_driver;
+    };
 
+    class Memory_State_Machine : public State_Machine {
+        public:
+            Memory_State_Machine();
+            Memory_State_Machine(unordered_map<string, string> config);
+            void set_max_fill(int max_fill);
+            vector<VRMessage> fsm_logic(VRMessage messages);
 
+        private:
+            Table _table;
+            uint32_t _max_fill;
     };
 }
 
