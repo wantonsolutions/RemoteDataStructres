@@ -61,6 +61,15 @@ namespace cuckoo_virtual_rdma {
         return size;
     }
 
+    string VRMessage::to_string(){
+        string s = "";
+        s += function + " ";
+        for (auto const& x : function_args) {
+            s += x.first + ":" + x.second + " ";
+        }
+        return s;
+    }
+
 
     uint32_t header_size(message_type type){
         switch(type){
@@ -84,5 +93,93 @@ namespace cuckoo_virtual_rdma {
                 printf("error unknown enum\n");
                 exit(0);
         }
+    }
+
+    unordered_map<string,string> unpack_read_read_response(VRMessage &msg) {
+        assert (msg.get_message_type() == READ_RESPONSE);
+        printf("unpacking read response %s\n", msg.to_string().c_str());
+        return msg.function_args;
+    }
+
+    void fill_table_with_read(Table &table, uint32_t bucket_id, uint32_t bucket_offset, uint32_t size, vector<Entry> &entries) {
+        table.assert_operation_in_table_bound(bucket_id, bucket_offset, size);
+        uint32_t total_indexes = size / sizeof(Entry);
+        assert (entries.size() == total_indexes);
+
+        uint32_t base = bucket_id * table.get_buckets_per_row() + bucket_offset;
+
+        for (int i=0; i<total_indexes; i++) {
+            uint32_t bucket = table.absolute_index_to_bucket_index(base + i);
+            uint32_t offset = table.absolute_index_to_bucket_offset(base + i);
+            table.set_entry(bucket, offset, entries[i]);
+        }
+        return;
+
+    }
+
+    vector<string> split(const string &str, const string &delim)
+    {
+        vector<string> tokens;
+        size_t prev = 0, pos = 0;
+        do
+        {
+            pos = str.find(delim, prev);
+            if (pos == string::npos)
+                pos = str.length();
+            string token = str.substr(prev, pos - prev);
+            if (!token.empty())
+                tokens.push_back(token);
+            prev = pos + delim.length();
+        } while (pos < str.length() && prev < str.length());
+        return tokens;
+    }
+
+    vector<Entry> decode_entries_from_string(string str_entries) {
+        vector<Entry> entries;
+        vector<string> entries_str = split(str_entries, ",");
+        for (int i=0; i<entries_str.size(); i++) {
+            vector<string> kv = split(entries_str[i], ":");
+            Entry e = Entry(kv[0], kv[1]);
+            entries.push_back(e);
+        }
+        return entries;
+    }
+
+    string encode_entries_to_string(vector<Entry> &entries) {
+        string entries_str;
+        for (int i=0; i<entries.size(); i++) {
+            entries_str += entries[i].to_string();
+            if (i != entries.size() - 1) {
+                entries_str += ",";
+            }
+        }
+        return entries_str;
+    }
+
+    void fill_local_table_with_read_response(Table &table, unordered_map<string,string> &args) {
+        try {
+            uint32_t bucket_id = stoi(args["bucket_id"]);
+            uint32_t bucket_offset = stoi(args["bucket_offset"]);
+            uint32_t size = stoi(args["size"]);
+            string read = args["read"];
+            //This parsing assumes the encoding
+            //key1:value1,key2:value2,key3:value3
+            vector<Entry> entries = decode_entries_from_string(args["read"]);
+            fill_table_with_read(table, bucket_id, bucket_offset, size, entries);
+        } catch (exception &e) {
+            printf("error in fill_local_table_with_read_response %s\n", e.what());
+            exit(1);
+        }
+        return;
+    }
+
+    int keys_contained_in_read_response(const Key &key, const vector<Entry> &entries) {
+        int count = 0;
+        for (int i=0; i<entries.size(); i++) {
+            if (entries[i].key == key) {
+                count++;
+            }
+        }
+        return count;
     }
 }

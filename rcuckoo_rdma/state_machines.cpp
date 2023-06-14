@@ -248,6 +248,11 @@ namespace cuckoo_state_machines {
         throw logic_error("FSM Logic must be implemented by a subclass");
     }
 
+
+    const char* get_ycsb_workload_name(ycsb_workload workload) {
+        return ycsb_workload_names[workload];
+    }
+
     Client_Workload_Driver::Client_Workload_Driver(){
         _total_requests = 0;
         _client_id = 0;
@@ -404,6 +409,9 @@ namespace cuckoo_state_machines {
         }
     }
 
+    const char* get_client_state_name(client_state state) {
+        return client_state_names[state];
+    }
 
     Client_State_Machine::Client_State_Machine() : State_Machine() {
         printf("TODO client state machine constructor with no argument\n");
@@ -420,18 +428,132 @@ namespace cuckoo_state_machines {
             _state = IDLE;
 
             _current_read_key = Key();
-            outstanding_read_requests = 0;
-            read_values_found = 0;
+            _outstanding_read_requests = 0;
+            _read_values_found = 0;
             _read_values = vector<Key>();
-            duplicates_found = 0;
+            _duplicates_found = 0;
             _workload_driver = Client_Workload_Driver(config);
         } catch (exception& e) {
             printf("ERROR: Client_State_Machine config missing required field\n");
             throw logic_error("ERROR: Client_State_Machine config missing required field");
         }
         printf("Completed Client_State_Machine Init\n");
-
     }
+
+    void Client_State_Machine::set_max_fill(int max_fill) {
+        _max_fill = max_fill;
+        return;
+    }
+
+    void Client_State_Machine::clear_statistics() {
+        _state=IDLE;
+        _current_read_key = Key();
+        _outstanding_read_requests = 0;
+        _read_values_found = 0;
+        _read_values = vector<Key>();
+        _duplicates_found = 0;
+        // _workload_driver.clear_statistics();
+        State_Machine::clear_statistics();
+        return;
+    }
+
+    void Client_State_Machine::set_workload(ycsb_workload workload) {
+        _workload_driver.set_workload(workload);
+        _config["workload"] = get_ycsb_workload_name(workload);
+        return;
+    }
+
+    vector<VRMessage> Client_State_Machine::begin_read(vector<VRMessage> messages) {
+        _outstanding_read_requests = messages.size();
+        _read_values_found = 0;
+        _read_values = vector<Key>();
+        _state = READING;
+        _reading = true;
+        return messages;
+    }
+
+    bool Client_State_Machine::read_complete() {
+        return _outstanding_read_requests == 0;
+    }
+
+    bool Client_State_Machine::read_successful(Key key) {
+        bool success = false;
+        if (_read_values_found == 0) {
+            success = false;
+            printf("Read incomplete (key: %s)\n", key.to_string().c_str());
+        } else if (_read_values_found == 1) {
+            success = true;
+            printf("Read success (key: %s)\n", key.to_string().c_str());
+        } else {
+            success = false;
+            _duplicates_found += (_read_values_found -1);
+            printf("Read Success (key: %s) but duplicate found\n", key.to_string().c_str());
+        }
+    }
+
+    read_status Client_State_Machine::wait_for_read_messages_fsm(Table& table, VRMessage* message, const Key& key){
+        if (message && message->get_message_type() == READ_RESPONSE) {
+            printf("unpacking read response %s\n", message->to_string().c_str());
+            unordered_map<string,string> args = unpack_read_read_response(*message);
+            fill_local_table_with_read_response(table, args);
+
+            vector <Entry> entries = decode_entries_from_string(args["read"]);
+            int keys_found = keys_contained_in_read_response(key, entries);
+            if (keys_found > 0) {
+                _read_values_found += keys_found;
+                _read_values.push_back(key);
+            }
+            _outstanding_read_requests--;
+        }
+        read_status rs;
+        rs.complete = read_complete();
+        rs.success = read_successful(key);
+        return rs;
+    }
+
+    vector<VRMessage> Client_State_Machine::general_idle_fsm(vector<VRMessage> *messages) {
+        if (!messages){
+            printf("Messages are not set, returning an empty set of messages");
+            return vector<VRMessage>();
+        }
+        Request next_request = _workload_driver.next();
+        printf("next request is %s\n", next_request.to_string().c_str());
+
+        if (next_request.op == NO_OP) {
+            printf("No more requests to generate\n");
+            return vector<VRMessage>();
+        } else if (next_request.op == PUT) {
+            printf("Generating put request\n");
+            _current_insert_key = next_request.key;
+            return put();
+        } else if (next_request.op == GET) {
+            printf("Generating get request\n");
+            return get();
+        } else {
+            printf("ERROR: unknown operation\n");
+            throw logic_error("ERROR: unknown operation");
+        }
+    }
+
+    unordered_map<string, string> Client_State_Machine::get_stats(){
+        unordered_map<string, string> stats = State_Machine::get_stats();
+        unordered_map<string, string> workload_stats = _workload_driver.get_stats();
+        stats.insert(workload_stats.begin(), workload_stats.end());
+        return stats;
+    }
+
+    vector<VRMessage> Client_State_Machine::put() {
+        printf("TODO: implement put in subclass\n");
+        vector<VRMessage> messages;
+        return messages;
+    }
+
+    vector<VRMessage> Client_State_Machine::get() {
+        printf("TODO: implement gut in subclass\n");
+        vector<VRMessage> messages;
+        return messages;
+    }
+        
 
     string Client_State_Machine::get_state_machine_name() {
         return "Client State Machine Super Class";

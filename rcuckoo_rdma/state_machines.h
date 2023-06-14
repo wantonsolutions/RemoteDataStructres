@@ -93,6 +93,9 @@ namespace cuckoo_state_machines {
         W,
     };
 
+    static const char *ycsb_workload_names[] = {"ycsb-a", "ycsb-b", "ycsb-c", "ycsb-w"};
+    const char* get_ycsb_workload_name(ycsb_workload workload);
+
     class Client_Workload_Driver {
         public:
             Client_Workload_Driver();
@@ -127,14 +130,33 @@ namespace cuckoo_state_machines {
 
     enum client_state {
         IDLE,
+        READING,
     };
+    static const char *client_state_names[] = {"idle", "reading"};
+    const char* get_client_state_name(client_state state);
+
+    typedef struct read_status {
+        bool complete;
+        bool success;
+    } read_status;
 
     class Client_State_Machine : public State_Machine {
         public:
             Client_State_Machine();
             Client_State_Machine(unordered_map<string, string> config);
+            void set_max_fill(int max_fill);
             ~Client_State_Machine() {}
+            void clear_statistics();
+            void set_workload(ycsb_workload workload);
+            vector<VRMessage> begin_read(vector<VRMessage> messages);
+            bool read_complete();
+            bool read_successful(Key key);
+            read_status wait_for_read_messages_fsm(Table &table, VRMessage *message, const Key &key);
             string get_state_machine_name();
+            vector<VRMessage> general_idle_fsm(vector<VRMessage> *messages);
+            unordered_map<string, string> get_stats();
+            vector<VRMessage> put();
+            vector<VRMessage> get();
 
         private:
             uint32_t _total_inserts;
@@ -144,10 +166,11 @@ namespace cuckoo_state_machines {
 
             //Read State Machine
             Key _current_read_key;
-            uint32_t outstanding_read_requests;
-            uint32_t read_values_found;
+            Key _current_insert_key;
+            uint32_t _outstanding_read_requests;
+            uint32_t _read_values_found;
             vector<Key> _read_values;
-            uint32_t duplicates_found;
+            uint32_t _duplicates_found;
             Client_Workload_Driver _workload_driver;
 
 

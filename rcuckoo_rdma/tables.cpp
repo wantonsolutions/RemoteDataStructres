@@ -9,6 +9,7 @@ namespace cuckoo_tables {
 
     using namespace std;
 
+
     string Key::to_string(){
         string s = "";
         for (int i = 0; i < KEY_SIZE; i++){
@@ -296,7 +297,7 @@ namespace cuckoo_tables {
     unsigned int Table::absolute_index_to_bucket_index(unsigned int absolute_index){
         return absolute_index / _bucket_size;
     }
-    unsigned int Table::absolute_index_to_offset(unsigned int absolute_index){
+    unsigned int Table::absolute_index_to_bucket_offset(unsigned int absolute_index){
         return absolute_index % _bucket_size;
     }
     void Table::assert_operation_in_table_bound(unsigned int bucket_index, unsigned int offset, unsigned int read_size){

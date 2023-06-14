@@ -34,6 +34,7 @@ namespace cuckoo_virtual_rdma {
         unordered_map<string,string> function_args;
         message_type get_message_type();
         uint32_t get_message_size_bytes();
+        string to_string();
     } VRMessage;
 
     typedef struct Request {
@@ -74,6 +75,14 @@ namespace cuckoo_virtual_rdma {
 
 
     uint32_t header_size(message_type type);
+    unordered_map<string,string> unpack_read_read_response(VRMessage &msg);
+    void fill_local_table_with_read_response(Table &table, unordered_map<string,string> &args);
+
+    //Encoding and decoding functions
+    vector<string> split(const string &str, const string &delim);
+    vector<Entry> decode_entries_from_string(string str_entries);
+    string encode_entries_to_string(vector<Entry> &entries);
+    int keys_contained_in_read_response(const Key &key, const vector<Entry> &entries);
 
 }
 

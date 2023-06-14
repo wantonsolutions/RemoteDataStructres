@@ -35,6 +35,17 @@ namespace cuckoo_tables {
             }
         }
 
+        Key(std::string key) {
+            for (int i = 0; i < KEY_SIZE && i < key.size(); i++){
+                bytes[i] = key[i];
+            }
+        }
+        Key(){
+            for (int i = 0; i < KEY_SIZE; i++){
+                bytes[i] = 0;
+            }
+        }
+
     } Key;
 
 
@@ -43,6 +54,36 @@ namespace cuckoo_tables {
         uint8_t bytes[VALUE_SIZE];
         std::string to_string();
         bool is_empty();
+        bool operator==(const Value& rhs) const {
+            for (int i = 0; i < VALUE_SIZE; i++){
+                if (bytes[i] != rhs.bytes[i]){
+                    return false;
+                }
+            }
+            return true;
+        }
+        bool operator=(const Value& rhs) {
+            for (int i = 0; i < VALUE_SIZE; i++){
+                bytes[i] = rhs.bytes[i];
+            }
+            return true;
+        }
+        template <typename T>
+        void set(T val) {
+            for (int i = 0; i < VALUE_SIZE && i < sizeof(val); i++){
+                bytes[i] = (val >> (8 * i)) & 0xFF;
+            }
+        }
+        Value(std::string value){
+            for (int i = 0; i < VALUE_SIZE && i < value.size(); i++){
+                bytes[i] = value[i];
+            }
+        }
+        Value(){
+            for (int i = 0; i < VALUE_SIZE; i++){
+                bytes[i] = 0;
+            }
+        }
     } Value;
 
     typedef struct Entry {
@@ -51,6 +92,14 @@ namespace cuckoo_tables {
         Value value;
         std::string to_string();
         bool is_empty();
+        Entry() {
+            this->key = Key();
+            this->value = Value();
+        }
+        Entry(std::string str_key, std::string str_value) {
+            this->key = Key(str_key);
+            this->value = Value(str_value);
+        }
     } Entry;
 
     typedef struct CasOperationReturn {
@@ -98,7 +147,7 @@ namespace cuckoo_tables {
             bool full();
             Entry ** generate_bucket_cuckoo_hash_index(unsigned int memory_size, unsigned int bucket_size);
             unsigned int absolute_index_to_bucket_index(unsigned int absolute_index);
-            unsigned int absolute_index_to_offset(unsigned int absolute_index);
+            unsigned int absolute_index_to_bucket_offset(unsigned int absolute_index);
             void assert_operation_in_table_bound(unsigned int bucket_index, unsigned int offset, unsigned int read_size);
             bool contains_duplicates();
             unsigned int ** get_duplicates();
