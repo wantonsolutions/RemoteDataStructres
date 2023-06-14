@@ -10,6 +10,7 @@
 #include "virtual_rdma.h"
 
 
+
 using namespace std;
 
 template <typename T>
@@ -234,15 +235,19 @@ namespace cuckoo_state_machines {
         }
 
     }
-    // int _total_requests;
-    // int _client_id;
-    // int _num_clients;
-    // bool _deterministic;
-    // int _random_factor;
-    // int _completed_requests;
-    // int _completed_puts;
-    // int _completed_gets;
-    // Request _last_request;
+
+    vector<VRMessage> State_Machine::fsm(vector<VRMessage> messages) {
+        update_message_stats(messages);
+        vector<VRMessage> output_messages = fsm_logic(messages);
+        update_message_stats(output_messages);
+        return output_messages;
+    }
+
+    vector<VRMessage> State_Machine::fsm_logic(vector<VRMessage> messages) {
+        printf("FSM Logic must be implemented by a subclass\n");
+        throw logic_error("FSM Logic must be implemented by a subclass");
+    }
+
     Client_Workload_Driver::Client_Workload_Driver(){
         _total_requests = 0;
         _client_id = 0;
@@ -261,15 +266,18 @@ namespace cuckoo_state_machines {
         _completed_puts = 0;
         _completed_gets = 0;
         _last_request = Request();
+
+        // for (auto it = config.begin(); it != config.end(); ++it) {
+        //     printf("client workload driver : %s %s\n", it->first.c_str(), it->second.c_str());
+        // }
         try{
-            
             _total_requests = stoi(config["total_requests"]);
-            _client_id = stoi(config["client_id"]);
+            _client_id = stoi(config["id"]);
             _num_clients = stoi(config["num_clients"]);
             _deterministic = config["deterministic"] == "true";
             set_workload(config["workload"]);
         } catch (exception& e) {
-            printf("ERROR: Client_Workload_Driver config missing required field\n");
+            printf("ERROR: Client_Workload_Driver config missing required field :%s \n", e.what());
             throw logic_error("ERROR: Client_Workload_Driver config missing required field");
         }
         
@@ -280,9 +288,16 @@ namespace cuckoo_state_machines {
         }
     }
 
-    unordered_map<string,string> get_stats() {
-        printf("TODO implement get stats!\n");
-        exit(1);
+    unordered_map<string,string> Client_Workload_Driver::get_stats() {
+        unordered_map<string, string> stats;
+        stats["completed_requests"] = to_string(_completed_requests);
+        stats["completed_puts"] = to_string(_completed_puts);
+        stats["completed_gets"] = to_string(_completed_gets);
+        stats["workload"] = to_string(_workload);
+        stats["total_requests"] = to_string(_total_requests);
+        stats["client_id"] = to_string(_client_id);
+        stats["num_clients"] = to_string(_num_clients);
+        return stats;
     }
 
     void Client_Workload_Driver::set_workload(ycsb_workload workload) {
@@ -390,27 +405,32 @@ namespace cuckoo_state_machines {
     }
 
 
-
-    vector<VRMessage> State_Machine::fsm(vector<VRMessage> messages) {
-        update_message_stats(messages);
-        vector<VRMessage> output_messages = fsm_logic(messages);
-        update_message_stats(output_messages);
-        return output_messages;
+    Client_State_Machine::Client_State_Machine() : State_Machine() {
+        printf("TODO client state machine constructor with no argument\n");
+        exit(1);
     }
-
-    vector<VRMessage> State_Machine::fsm_logic(vector<VRMessage> messages) {
-        printf("FSM Logic must be implemented by a subclass\n");
-        throw logic_error("FSM Logic must be implemented by a subclass");
-    }
-
-    Client_State_Machine::Client_State_Machine() {
-        printf("client state machine constructor with no argument\n");
-
-    }
-
 
     Client_State_Machine::Client_State_Machine(unordered_map<string,string> config) : State_Machine(config) {
-        printf("client state machine constructor with config argument\n");
+        printf("Client State Machine Init with config\n");
+        _config = config;
+        try{
+            _total_inserts = stoi(config["total_inserts"]);
+            _id = stoi(config["id"]);
+            _max_fill = stoi(config["max_fill"]);
+            _state = IDLE;
+
+            _current_read_key = Key();
+            outstanding_read_requests = 0;
+            read_values_found = 0;
+            _read_values = vector<Key>();
+            duplicates_found = 0;
+            _workload_driver = Client_Workload_Driver(config);
+        } catch (exception& e) {
+            printf("ERROR: Client_State_Machine config missing required field\n");
+            throw logic_error("ERROR: Client_State_Machine config missing required field");
+        }
+        printf("Completed Client_State_Machine Init\n");
+
     }
 
     string Client_State_Machine::get_state_machine_name() {

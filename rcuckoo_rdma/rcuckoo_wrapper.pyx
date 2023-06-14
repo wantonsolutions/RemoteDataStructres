@@ -408,7 +408,8 @@ cdef class PyRCuckoo:
             print(config)
             for k in config:
                 print("key:", k, "value: ", config[k])
-                c_config[k.encode('utf8')] = str(config[k]).encode('utf8')
+                s_conf = str(config[k])
+                c_config[k.encode('utf8')] = s_conf.encode('utf8')
         self.c_rcuckoo = new rw.RCuckoo(c_config)
 
     def get_state_machine_name(self):

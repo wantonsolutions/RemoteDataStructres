@@ -125,6 +125,9 @@ namespace cuckoo_state_machines {
     };
 
 
+    enum client_state {
+        IDLE,
+    };
 
     class Client_State_Machine : public State_Machine {
         public:
@@ -132,6 +135,21 @@ namespace cuckoo_state_machines {
             Client_State_Machine(unordered_map<string, string> config);
             ~Client_State_Machine() {}
             string get_state_machine_name();
+
+        private:
+            uint32_t _total_inserts;
+            uint32_t _id;
+            client_state _state;
+            uint32_t _max_fill;
+
+            //Read State Machine
+            Key _current_read_key;
+            uint32_t outstanding_read_requests;
+            uint32_t read_values_found;
+            vector<Key> _read_values;
+            uint32_t duplicates_found;
+            Client_Workload_Driver _workload_driver;
+
 
     };
 }

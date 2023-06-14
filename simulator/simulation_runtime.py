@@ -348,6 +348,7 @@ class Simulator(Node):
             client_config['index_init_function'] = tables.Table
             client_config['index_init_args'] = index_init_args
             client_config['total_inserts']=indexes * 20
+            client_config['total_requests']=client_config['total_inserts']
 
             # client_config['state_machine']=lockless_a_star_insert_only_state_machine
             client_config['state_machine']=self.config["state_machine"]
