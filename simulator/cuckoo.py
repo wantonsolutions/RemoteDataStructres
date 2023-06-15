@@ -22,7 +22,13 @@ class entry:
 class rcuckoo(state_machines.client_state_machine):
     def __init__(self, config):
         super().__init__(config)
-        self.table = config["table"]
+        # self.table = config["table"]
+
+        index_func = config['index_init_function']
+        index_args = config['index_init_args']
+        self.debug("Table Function: " + str(index_func.__name__))
+        self.debug("Table Args: " + str(index_args)+"\n")
+        self.table = index_func(**index_args)
 
         #inserting and locking
         # self.current_insert_value = None

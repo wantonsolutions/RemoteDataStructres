@@ -3,6 +3,7 @@
 #include <cassert>
 #include <string>
 #include <iostream>
+#include <vector>
 // #include "spdlog/spdlog.h" //sudo apt install libspdlog-dev
 
 namespace cuckoo_tables {
@@ -77,11 +78,12 @@ namespace cuckoo_tables {
             _locks[i] = 0;
         }
     }
+
     CasOperationReturn Lock_Table::masked_cas(unsigned int index, uint64_t old, uint64_t new_value, uint64_t mask){
         assert(index <= _total_lock_entries + 4);
         // cout << "indexing into lock table: " << index << endl;
         uint64_t *va = (uint64_t *) &_locks[index];
-        CasOperationReturn atomic_response = CasOperationReturn();
+        CasOperationReturn atomic_response;
         atomic_response.original_value = *va;
         atomic_response.success = false;
         // cout << "original value pre operation " << atomic_response.original_value << endl;
@@ -230,15 +232,21 @@ namespace cuckoo_tables {
     }
 
     bool Table::bucket_contains(unsigned int bucket_index, Key key){
-        bool contains = false;
         for (unsigned int i = 0; i < _bucket_size; i++){
             if (_table[bucket_index][i].key == key){
-                contains = true;
-                break;
+                return true;
             }
         }
-        return contains;
+        return false;
+    }
 
+    bool Table::contains(Key key){
+        for (unsigned int i = 0; i < _table_size; i++){
+            if (bucket_contains(i, key)){
+                return true;
+            }
+        }
+        return false;
     }
 
     float Table::get_fill_percentage(){
@@ -312,9 +320,10 @@ namespace cuckoo_tables {
         //todo implement
         return true;
     }
-    unsigned int ** Table::get_duplicates(){
+
+    vector<Duplicate_Entry> Table::get_duplicates(){
         cout << "Table::get_duplicates NOT IMPLEMENTED" << endl;
         //todo implement
-        return NULL;
+        return vector<Duplicate_Entry>();
     }
 }

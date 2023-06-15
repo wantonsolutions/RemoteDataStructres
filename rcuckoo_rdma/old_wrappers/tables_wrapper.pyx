@@ -119,8 +119,8 @@ cdef class PyTable:
     def absolute_index_to_bucket_index(self, unsigned int absolute_index):
         return self.c_table.absolute_index_to_bucket_index(absolute_index)
     
-    def absolute_index_to_offset(self, unsigned int absolute_index):
-        return self.c_table.absolute_index_to_offset(absolute_index)
+    def absolute_index_to_bucket_offset(self, unsigned int absolute_index):
+        return self.c_table.absolute_index_to_bucket_offset(absolute_index)
     
     def assert_operation_in_table_bound(self, unsigned int bucket_index, unsigned int offset, unsigned int memory_size):
         return self.c_table.assert_operation_in_table_bound(bucket_index, offset, memory_size)

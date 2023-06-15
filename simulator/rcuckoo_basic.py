@@ -4,7 +4,14 @@ from . import virtual_rdma as vrdma
 class rcuckoo_basic(state_machines.client_state_machine):
     def __init__(self, config):
         super().__init__(config)
-        self.table = config["table"]
+
+        index_func = config['index_init_function']
+        index_args = config['index_init_args']
+        self.debug("Table Function: " + str(index_func.__name__))
+        self.debug("Table Args: " + str(index_args)+"\n")
+        self.table = index_func(**index_args)
+
+
         self.search_module = config["search_module"]
         self.hash_module = config["hash_module"]
 

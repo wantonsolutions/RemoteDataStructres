@@ -420,7 +420,6 @@ class client_state_machine(state_machine):
             self.read_values.extend(vrdma.get_entries_from_read(key, read))
             self.outstanding_read_requests = self.outstanding_read_requests - 1
 
-
         complete = self.read_complete()
         success = self.read_successful(key)
         return complete, success
@@ -471,16 +470,39 @@ class client_state_machine(state_machine):
 class basic_memory_state_machine(state_machine):
     def __init__(self,config):
         super().__init__(config)
-        self.table = config["table"]
+        index_func = config['index_init_function']
+        index_args = config['index_init_args']
+        self.debug("Table Function: " + str(index_func.__name__))
+        self.debug("Table Args: " + str(index_args)+"\n")
+        self.table = index_func(**index_args)
+
         self.state = "memory... state not being used"
         self.max_fill = config["max_fill"]
 
 
-    def set_max_fill(self, max_fill):
-        self.max_fill = max_fill
 
     def __str__(self):
         return "Memory"
+
+    #table wrappers
+    def set_max_fill(self, max_fill):
+        self.max_fill = max_fill
+
+    def contains_duplicates(self):
+        return self.table.contains_duplicates()
+
+    def get_duplicates(self):
+        return self.table.get_duplicates()
+
+    def contains(self, key):
+        return self.table.contains(key)
+
+    def get_fill_percentage(self):
+        return self.table.get_fill_percentage()
+
+    def print_table(self):
+        self.table.print_table()
+    #end table wrappers
     
     def fsm_logic(self, message=None):
 

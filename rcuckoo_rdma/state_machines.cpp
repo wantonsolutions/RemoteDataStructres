@@ -250,7 +250,6 @@ namespace cuckoo_state_machines {
         throw logic_error("FSM Logic must be implemented by a subclass");
     }
 
-
     const char* get_ycsb_workload_name(ycsb_workload workload) {
         return ycsb_workload_names[workload];
     }
@@ -583,6 +582,40 @@ namespace cuckoo_state_machines {
         return;
     }
 
+
+    bool Memory_State_Machine::contains_duplicates(){
+        return _table.contains_duplicates();
+    }
+
+    vector<Duplicate_Entry> Memory_State_Machine::get_duplicates(){
+        return _table.get_duplicates();
+    }
+
+    bool Memory_State_Machine::contains(Key key){
+        return _table.contains(key);
+    }
+
+    float Memory_State_Machine::get_fill_percentage(){
+        return _table.get_fill_percentage();
+    }
+
+    void Memory_State_Machine::print_table(){
+        _table.print_table();
+    }
+
+    string uint64t_to_bin_string(uint64_t num){
+        string s = "";
+        for (int i = 0; i < 64; i++){
+            if (num & 1){
+                s = "1" + s;
+            } else {
+                s = "0" + s;
+            }
+            num = num >> 1;
+        }
+        return s;
+    }
+
     vector<VRMessage> Memory_State_Machine::fsm_logic(VRMessage message) {
         // if (!messages){
         //     printf("Messages are not set, returning an empty set of messages");
@@ -594,12 +627,66 @@ namespace cuckoo_state_machines {
             throw logic_error("Table is full (don't do anything except end experiment :)");
         }
 
-        //TODO implement logic for memory state machine
-        printf("figure out what we want to pass to this function\n");
-
-
-
+        switch (message.get_message_type()) {
+            case READ_REQUEST:
+                printf("unpacking read request %s\n", message.to_string().c_str());
+                try{
+                    uint32_t bucket_id = stoi(message.function_args["bucket_id"]);
+                    uint32_t offset = stoi(message.function_args["bucket_offset"]);
+                    uint32_t size = stoi(message.function_args["size"]);
+                    vector<Entry> entries = read_table_entry(_table, bucket_id, offset, size);
+                    printf("Read success (bucket_id: %d, offset: %d, size: %d)\n", bucket_id, offset, size);
+                    vector<VRMessage> response;
+                    VRMessage r;
+                    r.function = message_type_to_function_string(READ_RESPONSE);
+                    r.function_args["read"] = encode_entries_to_string(entries);
+                    response.push_back(r);
+                    return response;
+                } catch (exception& e) {
+                    printf("ERROR: read request missing required field %s\n", e.what());
+                    throw logic_error("ERROR: read request missing required field");
+                }
+            case CAS_REQUEST:
+                printf("unpacking write response %s\n", message.to_string().c_str());
+                try {
+                    uint32_t bucket_id = stoi(message.function_args["bucket_id"]);
+                    uint32_t offset = stoi(message.function_args["bucket_offset"]);
+                    uint64_t old = stoull(message.function_args["old"], nullptr, 2);
+                    uint64_t new_val = stoull(message.function_args["new"], nullptr, 2);
+                    CasOperationReturn cas_ret = cas_table_entry(_table, bucket_id, offset, old, new_val);
+                    vector<VRMessage> response;
+                    VRMessage r;
+                    r.function = message_type_to_function_string(CAS_RESPONSE);
+                    r.function_args["success"] = to_string(cas_ret.success);
+                    r.function_args["old"] = uint64t_to_bin_string(cas_ret.original_value);
+                    response.push_back(r);
+                    return response;
+                } catch (exception& e){
+                    printf("ERROR: cas request missing required field %s\n", e.what());
+                    throw logic_error("ERROR: cas request missing required field");
+                }
+            case MASKED_CAS_REQUEST:
+                printf("unpacking masked cas request %s\n", message.to_string().c_str());
+                try {
+                    uint32_t lock_index = stoi(message.function_args["lock_index"]);
+                    uint64_t old = stoull(message.function_args["old"], nullptr, 2);
+                    uint64_t new_val = stoull(message.function_args["new"], nullptr, 2);
+                    uint64_t mask = stoull(message.function_args["mask"], nullptr, 2);
+                    CasOperationReturn masked_cas_ret = masked_cas_lock_table(_table,lock_index,old, new_val,mask);
+                    vector<VRMessage> response;
+                    VRMessage r;
+                    r.function = message_type_to_function_string(CAS_RESPONSE);
+                    r.function_args["success"] = to_string(masked_cas_ret.success);
+                    r.function_args["old"] = uint64t_to_bin_string(masked_cas_ret.original_value);
+                    response.push_back(r);
+                    return response;
+                } catch (exception& e){
+                    printf("ERROR: cas request missing required field %s\n", e.what());
+                    throw logic_error("ERROR: cas request missing required field");
+                }
+            default:
+                printf("ERROR: unknown message type\n");
+                throw logic_error("ERROR: unknown message type");
+        }
     }
-
-
 }

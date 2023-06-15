@@ -48,7 +48,7 @@ cdef extern from "tables.h" namespace "cuckoo_tables":
         bool full()
         Entry ** generate_bucket_cuckoo_hash_index(unsigned int memory_size, unsigned int bucket_size)
         unsigned int absolute_index_to_bucket_index(unsigned int absolute_index)
-        unsigned int absolute_index_to_offset(unsigned int absolute_index)
+        unsigned int absolute_index_to_bucket_offset(unsigned int absolute_index)
         void assert_operation_in_table_bound(unsigned int bucket_index, unsigned int offset, unsigned int memory_size)
         bool contains_duplicates()
         unsigned int ** get_duplicates()

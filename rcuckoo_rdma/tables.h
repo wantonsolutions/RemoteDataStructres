@@ -4,6 +4,10 @@
 
 #include <stdint.h>
 #include <string>
+#include <vector>
+#include <assert.h>
+
+using namespace std;
 
 
 namespace cuckoo_tables {
@@ -12,7 +16,7 @@ namespace cuckoo_tables {
     #define VALUE_SIZE 4
     typedef struct Key { 
         uint8_t bytes[KEY_SIZE];
-        std::string to_string();
+        string to_string();
         bool is_empty();
         bool operator==(const Key& rhs) const {
             for (int i = 0; i < KEY_SIZE; i++){
@@ -35,7 +39,7 @@ namespace cuckoo_tables {
             }
         }
 
-        Key(std::string key) {
+        Key(string key) {
             for (int i = 0; i < KEY_SIZE && i < key.size(); i++){
                 bytes[i] = key[i];
             }
@@ -52,7 +56,7 @@ namespace cuckoo_tables {
 
     typedef struct Value { 
         uint8_t bytes[VALUE_SIZE];
-        std::string to_string();
+        string to_string();
         bool is_empty();
         bool operator==(const Value& rhs) const {
             for (int i = 0; i < VALUE_SIZE; i++){
@@ -74,7 +78,7 @@ namespace cuckoo_tables {
                 bytes[i] = (val >> (8 * i)) & 0xFF;
             }
         }
-        Value(std::string value){
+        Value(string value){
             for (int i = 0; i < VALUE_SIZE && i < value.size(); i++){
                 bytes[i] = value[i];
             }
@@ -90,22 +94,61 @@ namespace cuckoo_tables {
         //todo add some entry functions
         Key key;
         Value value;
-        std::string to_string();
+        string to_string();
         bool is_empty();
         Entry() {
             this->key = Key();
             this->value = Value();
         }
-        Entry(std::string str_key, std::string str_value) {
+        Entry(string str_key, string str_value) {
             this->key = Key(str_key);
             this->value = Value(str_value);
+        }
+        uint64_t get_as_uint64_t() {
+            assert(sizeof(Entry) == 8);
+            uint64_t entry64 = 0;
+            int i=0;
+            for (; i < KEY_SIZE; i++){
+                entry64 |= (uint64_t) this->key.bytes[i] << (8 * i);
+            }
+            for(; i < VALUE_SIZE;i++){
+                entry64 |= (uint64_t) this->value.bytes[i - KEY_SIZE] << (8 * i);
+            }
+            return entry64;
+        }
+        void set_as_uint64_t(uint64_t entry64) {
+            assert(sizeof(Entry) == 8);
+            int i=0;
+            for (; i < KEY_SIZE; i++){
+                this->key.bytes[i] = (entry64 >> (8 * i)) & 0xFF;
+            }
+            for(; i < VALUE_SIZE;i++){
+                this->value.bytes[i - KEY_SIZE] = (entry64 >> (8 * i)) & 0xFF;
+            }
         }
     } Entry;
 
     typedef struct CasOperationReturn {
         bool success;
         uint64_t original_value;
+        CasOperationReturn(){
+            this->success = false;
+            this->original_value = 0;
+        }
+        CasOperationReturn(bool success, uint64_t original_value) {
+            this->success = success;
+            this->original_value = original_value;
+        }
     } CasOperationReturn;
+
+    typedef struct Duplicate_Entry {
+        Entry first_entry;
+        int first_entry_row;
+        int first_entry_column;
+        Entry second_entry;
+        int second_entry_row;
+        int second_entry_column;
+    } Duplicate_Entry;
 
 
     class Lock_Table {
@@ -116,7 +159,7 @@ namespace cuckoo_tables {
             void unlock_all();
             CasOperationReturn masked_cas(unsigned int index, uint64_t old, uint64_t new_value, uint64_t mask);
             void fill_masked_cas(unsigned int index, bool success, uint64_t new_value, uint64_t mask);
-            std::string to_string();
+            string to_string();
 
         private:
             unsigned int _total_locks;
@@ -142,6 +185,8 @@ namespace cuckoo_tables {
             void set_entry(unsigned int bucket_index, unsigned int offset, Entry entry);
             bool bucket_has_empty(unsigned int bucket_index);
             unsigned int get_first_empty_index(unsigned int bucket_index);
+
+            bool contains(Key key);
             bool bucket_contains(unsigned int bucket_index, Key key);
             float get_fill_percentage();
             bool full();
@@ -150,7 +195,7 @@ namespace cuckoo_tables {
             unsigned int absolute_index_to_bucket_offset(unsigned int absolute_index);
             void assert_operation_in_table_bound(unsigned int bucket_index, unsigned int offset, unsigned int read_size);
             bool contains_duplicates();
-            unsigned int ** get_duplicates();
+            vector<Duplicate_Entry> get_duplicates();
 
         private:
             unsigned int _memory_size;

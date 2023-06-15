@@ -74,9 +74,16 @@ namespace cuckoo_virtual_rdma {
     #define MASKED_CAS_RESPONSE_SIZE (BASE_ROCE_SIZE + MASKED_CAS_RESPONSE_HEADER)
 
 
+    string message_type_to_function_string(message_type type);
     uint32_t header_size(message_type type);
     unordered_map<string,string> unpack_read_read_response(VRMessage &msg);
     void fill_local_table_with_read_response(Table &table, unordered_map<string,string> &args);
+
+    void fill_table_with_read(Table &table, uint32_t bucket_id, uint32_t bucket_offset, uint32_t size, vector<Entry> &entries);
+    vector<Entry> read_table_entry(Table &table, uint32_t bucket_id, uint32_t bucket_offset, uint32_t size);
+
+    CasOperationReturn cas_table_entry(Table &table, uint32_t bucket_id, uint32_t bucket_offset, uint64_t old, uint64_t new_value);
+    CasOperationReturn masked_cas_lock_table(Table &table, uint32_t lock_index, uint64_t old, uint64_t new_value, uint64_t mask);
 
     //Encoding and decoding functions
     vector<string> split(const string &str, const string &delim);

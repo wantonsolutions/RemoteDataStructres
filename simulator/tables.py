@@ -191,6 +191,12 @@ class Table:
     def bucket_contains(self, bucket_index, value):
         return value in self.table[bucket_index]
 
+    def contains(self, value):
+        for i in range(len(self.table)):
+            if self.bucket_contains(i, value):
+                return True
+        return False
+
     def get_fill_percentage(self):
         return float(self.fill)/float(self.get_row_count() * self.bucket_size)
 

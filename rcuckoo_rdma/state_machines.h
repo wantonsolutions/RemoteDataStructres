@@ -179,6 +179,11 @@ namespace cuckoo_state_machines {
             Memory_State_Machine();
             Memory_State_Machine(unordered_map<string, string> config);
             void set_max_fill(int max_fill);
+            bool contains_duplicates();
+            vector<Duplicate_Entry> get_duplicates();
+            bool contains(Key key);
+            float get_fill_percentage();
+            void print_table();
             vector<VRMessage> fsm_logic(VRMessage messages);
 
         private:

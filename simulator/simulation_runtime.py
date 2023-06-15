@@ -12,13 +12,14 @@ import copy
 from . import log
 
 
-simulator=False
+simulator=True
 if simulator:
     from . import hash
     from . import tables
     from . import search
     from . import rcuckoo_basic
     from . import state_machines
+    from . import cuckoo
 else:
     import rcuckoo_wrap as hash
     import rcuckoo_wrap as search
@@ -85,18 +86,14 @@ class Client(Node):
         self.config = config
         self.client_id = config['client_id']
 
-        self.bucket_size = config['bucket_size']
-        #create the index structure
-        index_func = config['index_init_function']
-        index_args = config['index_init_args']
+        # index_func = config['index_init_function']
+        # index_args = config['index_init_args']
 
-        self.debug("Index Function: " + str(index_func.__name__))
-        self.debug("Index Args: " + str(index_args)+"\n")
-        self.index = index_func(**index_args)
+        # self.debug("Index Function: " + str(index_func.__name__))
+        # self.debug("Index Args: " + str(index_args)+"\n")
+        # self.index = index_func(**index_args)
 
         state_machine_args = config
-
-        state_machine_args['table'] = self.index
         state_machine_args['id'] = self.client_id
 
         state_machine = config['state_machine']
@@ -135,15 +132,14 @@ class Memory(Node):
         self.bucket_size = config['bucket_size']
 
         #create the index structure
-        self.debug("Initializing memory Index")
-        index_func = config['index_init_function']
-        index_args = config['index_init_args']
-        self.debug("Index Function: " + str(index_func.__name__))
-        self.debug("Index Args: " + str(index_args)+"\n")
-        self.index = index_func(**index_args)
+        # self.debug("Initializing memory Index")
+        # index_func = config['index_init_function']
+        # index_args = config['index_init_args']
+        # self.debug("Index Function: " + str(index_func.__name__))
+        # self.debug("Index Args: " + str(index_args)+"\n")
+        # self.index = index_func(**index_args)
 
         state_machine_args = config
-        state_machine_args['table'] = self.index
         state_machine = config['state_machine']
 
 
@@ -406,8 +402,8 @@ class Simulator(Node):
 
     def validate_run(self):
         #check that there are no duplicates in the table
-        if self.memory.index.contains_duplicates():
-            duplicates = self.memory.index.get_duplicates()
+        if self.memory.state_machine.contains_duplicates():
+            duplicates = self.memory.state_machine.get_duplicates()
             self.critical("Memory contains duplicates")
             self.critical(str(duplicates))
             return False
@@ -416,7 +412,7 @@ class Simulator(Node):
         for i in range(len(self.client_list)):
             client = self.client_list[i]
             for value in client.state_machine.get_completed_inserts():
-                if self.memory.index.contains(value) == False:
+                if self.memory.state_machine.contains(value) == False:
                     self.critical("Memory does not contain value: " + str(value) + "inserted by " + str(client.client_id))
                     return False
 
@@ -453,10 +449,10 @@ class Simulator(Node):
 
         #memory stats
         statistics['memory'] = dict()
-        fill = self.memory.index.get_fill_percentage()
+        fill = self.memory.state_machine.get_fill_percentage()
         statistics['memory']['fill'] = fill
         statistics['memory']['steps'] = self.memory.get_steps()
-        self.memory.index.print_table()
+        self.memory.state_machine.print_table()
 
         statistics['hash'] = dict()
         statistics['hash']['factor'] = hash.get_factor()
@@ -591,17 +587,18 @@ def main():
     config['indexes'] = table_size
     config['num_clients'] = 1
     config['bucket_size'] = 8
-    config['num_steps'] = 25
+    config['num_steps'] = 2500
     config['read_threshold_bytes'] = 256
     config["buckets_per_lock"] = 1
     config["locks_per_message"] = 64
     config["trials"] = 1
-    import rcuckoo_wrap as cuckoo
+    # import rcuckoo_wrap as cuckoo
     
     config['max_fill']= 90
     # config['deterministic']=True
     # config["state_machine"]=race.race
-    config["state_machine"]=cuckoo.PyRCuckoo
+    # config["state_machine"]=cuckoo.PyRCuckoo
+    config["state_machine"]=cuckoo.rcuckoo
     config['workload']='ycsb-w'
     log.set_debug()
     # log.set_off()

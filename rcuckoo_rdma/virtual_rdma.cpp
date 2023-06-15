@@ -52,6 +52,31 @@ namespace cuckoo_virtual_rdma {
         }
     }
 
+    string message_type_to_function_string(message_type type){
+        switch(type){
+            case READ_REQUEST:
+                return "read_table_entry";
+            case READ_RESPONSE:
+                return "fill_table_with_read";
+            // case WRITE_REQUEST:
+            //     return "write_table_entry";
+            // case WRITE_RESPONSE:
+            //     return "fill_table_with_write";
+            case CAS_REQUEST:
+                return "cas_table_entry";
+            case CAS_RESPONSE:
+                return "fill_table_with_cas";
+            case MASKED_CAS_REQUEST:
+                return "masked_cas_lock_table";
+            case MASKED_CAS_RESPONSE:
+                return "fill_lock_table_masked_cas";
+            default:
+                printf("Error unknown message type %d\n", type);
+                exit(1);
+        }
+    }
+
+
     uint32_t VRMessage::get_message_size_bytes() {
         uint32_t size = 0;
         size += header_size(get_message_type());
@@ -115,6 +140,38 @@ namespace cuckoo_virtual_rdma {
         }
         return;
 
+    }
+
+    vector<Entry> read_table_entry(Table &table, uint32_t bucket_id, uint32_t bucket_offset, uint32_t size) {
+        table.assert_operation_in_table_bound(bucket_id, bucket_offset, size);
+        uint32_t total_indexes = size / sizeof(Entry);
+        vector<Entry> entries;
+        uint32_t base = bucket_id * table.get_buckets_per_row() + bucket_offset;
+
+        for (int i=0; i<total_indexes; i++) {
+            uint32_t bucket = table.absolute_index_to_bucket_index(base + i);
+            uint32_t offset = table.absolute_index_to_bucket_offset(base + i);
+            entries.push_back(table.get_entry(bucket, offset));
+        }
+        return entries;
+    }
+
+
+    CasOperationReturn cas_table_entry(Table &table, uint32_t bucket_id, uint32_t bucket_offset, uint64_t old, uint64_t new_value) {
+        Entry e = table.get_entry(bucket_id, bucket_offset);
+        uint64_t ret_val = e.get_as_uint64_t();
+        bool success = false;
+        Entry new_entry;
+
+        if (ret_val == old) {
+            new_entry.set_as_uint64_t(new_value);
+            success = true;
+        } 
+        return CasOperationReturn(success, ret_val);
+    }
+
+    CasOperationReturn masked_cas_lock_table(Table &table, uint32_t lock_index, uint64_t old, uint64_t new_value, uint64_t mask) {
+        return table.lock_table_masked_cas(lock_index, old, new_value, mask);
     }
 
     vector<string> split(const string &str, const string &delim)

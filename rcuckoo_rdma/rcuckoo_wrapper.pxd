@@ -54,6 +54,15 @@ cdef extern from "tables.h" namespace "cuckoo_tables":
         Key key
         Value value
 
+
+    struct Duplicate_Entry:
+        Entry first_entry
+        int first_entry_row
+        int first_entry_column
+        Entry second_entry
+        int second_entry_row
+        int second_entry_column
+
     struct CasOperationReturn:
         bool success
         stdint.uint64_t original_value
@@ -86,7 +95,7 @@ cdef extern from "tables.h" namespace "cuckoo_tables":
         bool full()
         Entry ** generate_bucket_cuckoo_hash_index(unsigned int memory_size, unsigned int bucket_size)
         unsigned int absolute_index_to_bucket_index(unsigned int absolute_index)
-        unsigned int absolute_index_to_offset(unsigned int absolute_index)
+        unsigned int absolute_index_to_bucket_offset(unsigned int absolute_index)
         void assert_operation_in_table_bound(unsigned int bucket_index, unsigned int offset, unsigned int memory_size)
         bool contains_duplicates()
         unsigned int ** get_duplicates()
@@ -147,6 +156,7 @@ cdef extern from "virtual_rdma.h" namespace "cuckoo_virtual_rdma":
         string function
         unordered_map[string, string] function_args
 
+
 # cdef extern from "state_machines.h" namespace "cuckoo_state_machines":
 
 #     cdef cppclass State_Machine:
@@ -171,6 +181,17 @@ cdef extern from "cuckoo.h" namespace "cuckoo_rcuckoo":
         vector[Key] get_completed_inserts()
         void set_max_fill(float max_fill)
         unordered_map[string, string] get_stats()
-        vector[VRMessage] fsm(vector[VRMessage] messages)
+        vector[VRMessage] fsm(VRMessage message)
 
 
+cdef extern from "state_machines.h" namespace "cuckoo_state_machines":
+    cdef cppclass Memory_State_Machine:
+        Memory_State_Machine() except +
+        Memory_State_Machine(unordered_map[string, string] config) except +
+        void set_max_fill(int max_fill)
+        bool contains_duplicates()
+        vector[Duplicate_Entry] get_duplicates()
+        bool contains(Key key)
+        float get_fill_percentage()
+        void print_table()
+        vector[VRMessage] fsm_logic(VRMessage message)

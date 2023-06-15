@@ -232,7 +232,7 @@ cdef class PyTable:
         return self.c_table.absolute_index_to_bucket_index(absolute_index)
     
     def absolute_index_to_bucket_offset(self, unsigned int absolute_index):
-        return self.c_table.absolute_index_to_offset(absolute_index)
+        return self.c_table.absolute_index_to_bucket_offset(absolute_index)
     
     def assert_operation_in_table_bound(self, unsigned int bucket_index, unsigned int offset, unsigned int memory_size):
         return self.c_table.assert_operation_in_table_bound(bucket_index, offset, memory_size)
@@ -440,13 +440,12 @@ cdef class PyRCuckoo:
             ret_stats[k] = v
         return decode_cpp_stats(ret_stats)
 
-    def fsm(self, messages=None):
-        cdef vector[rw.VRMessage] c_messages
+    def fsm(self, message=None):
+        cdef rw.VRMessage c_message
         print("todo translate messages input messages to fsm")
-        if not messages is None:
-            for m in messages:
-                print("gotta translate:", m)
-        output_messages = self.c_rcuckoo.fsm(c_messages)
+        if not message is None:
+            print("gotta translate:", message)
+        output_messages = self.c_rcuckoo.fsm(c_message)
         if len(output_messages) > 0:
             for m in output_messages:
                 print("gotta translate output messages: ", m)
@@ -454,3 +453,55 @@ cdef class PyRCuckoo:
         return ret_messages
 
     
+cdef class PyMemory_State_Machine:
+    cdef rw.Memory_State_Machine *c_memory_state_machine
+
+    def __init__(self, config=None):
+        cdef unordered_map[string,string] c_config
+        if config is not None:
+            print(config)
+            for k in config:
+                print("key:", k, "value: ", config[k])
+                s_conf = str(config[k])
+                c_config[k.encode('utf8')] = s_conf.encode('utf8')
+        self.c_memory_state_machine = new rw.Memory_State_Machine(c_config)
+
+    def set_max_fill(self, int max_fill):
+        self.c_memory_state_machine.set_max_fill(max_fill)
+
+    def contains_duplicates(self):
+        return self.c_memory_state_machine.contains_duplicates()
+
+    def get_duplicates(self):
+        print("todo translate duplicates -- currently the get duplicates function does not translate keys")
+        cdef vector[rw.Duplicate_Entry] c_duplicates
+        c_duplicates = self.c_memory_state_machine.get_duplicates()
+        ret_duplicates = []
+        for d in c_duplicates:
+            ret_duplicates.append(d)
+        return ret_duplicates
+
+    def contains(self, key):
+        cdef rw.Key c_key
+        #copy the key over
+        c_key.bytes = key.to_bytes(4, byteorder='little')
+        return self.c_memory_state_machine.contains(c_key)
+
+
+    def get_fill_percentage(self):
+        return self.c_memory_state_machine.get_fill_percentage()
+
+    def print_table(self):
+        self.c_memory_state_machine.print_table()
+
+    def fsm_logic(self, message=None):
+        cdef rw.VRMessage c_message
+        print("todo translate messages input messages to fsm")
+        if not message is None:
+            print("gotta translate:", message)
+        output_messages = self.c_memory_state_machine.fsm_logic(c_message)
+        if len(output_messages) > 0:
+            for m in output_messages:
+                print("gotta translate output messages: ", m)
+        ret_messages = []
+        return ret_messages
