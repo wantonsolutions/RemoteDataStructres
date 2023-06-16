@@ -196,10 +196,12 @@ namespace cuckoo_state_machines {
                 _current_read_messages++;
                 _read_operation_bytes += message_size_bytes;
                 _read_operation_messages++;
-            } else {
-                printf("ERROR: update_message_stats called when not reading or inserting\n");
-                throw logic_error("ERROR: update_message_stats called when not reading or inserting");
-            }
+            } 
+            
+            // else {
+            //     printf("ERROR: update_message_stats called when not reading or inserting\n");
+            //     throw logic_error("ERROR: update_message_stats called when not reading or inserting");
+            // }
 
             _total_bytes += message_size_bytes;
             switch (message.get_message_type()){
@@ -568,8 +570,12 @@ namespace cuckoo_state_machines {
 
     Memory_State_Machine::Memory_State_Machine(unordered_map<string,string> config) : State_Machine(config) {
         try {
-            printf("TODO fill table with actual arguments in memory state machine\n");
-            _table = Table();
+            
+            unsigned int memory_size = stoi(config["memory_size"]);
+            unsigned int bucket_size = stoi(config["bucket_size"]);
+            unsigned int buckets_per_lock = stoi(config["buckets_per_lock"]);
+            _table = Table(memory_size, bucket_size, buckets_per_lock);
+            _table.print_table();
             _max_fill = stoi(config["max_fill"]);
         } catch (exception& e) {
             printf("ERROR: Memory_State_Machine config missing required field\n");
@@ -640,6 +646,9 @@ namespace cuckoo_state_machines {
                     VRMessage r;
                     r.function = message_type_to_function_string(READ_RESPONSE);
                     r.function_args["read"] = encode_entries_to_string(entries);
+                    r.function_args["bucket_id"] = to_string(bucket_id);
+                    r.function_args["bucket_offset"] = to_string(offset);
+                    r.function_args["size"] = to_string(size);
                     response.push_back(r);
                     return response;
                 } catch (exception& e) {
@@ -675,7 +684,7 @@ namespace cuckoo_state_machines {
                     CasOperationReturn masked_cas_ret = masked_cas_lock_table(_table,lock_index,old, new_val,mask);
                     vector<VRMessage> response;
                     VRMessage r;
-                    r.function = message_type_to_function_string(CAS_RESPONSE);
+                    r.function = message_type_to_function_string(MASKED_CAS_RESPONSE);
                     r.function_args["success"] = to_string(masked_cas_ret.success);
                     r.function_args["old"] = uint64t_to_bin_string(masked_cas_ret.original_value);
                     response.push_back(r);

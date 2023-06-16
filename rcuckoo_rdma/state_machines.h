@@ -32,7 +32,7 @@ namespace cuckoo_state_machines {
             unordered_map<string, string> get_stats();
 
             vector<VRMessage> fsm(VRMessage messages);
-            vector<VRMessage> fsm_logic(VRMessage messages);
+            virtual vector<VRMessage> fsm_logic(VRMessage messages);
 
 
         protected:

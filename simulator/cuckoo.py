@@ -139,8 +139,13 @@ class rcuckoo(state_machines.client_state_machine):
         return self.current_locking_messages
 
     def aquire_locks_with_reads_fsm(self, message):
+        self.debug("cuckoo fsm: message Type: "+ str(vrdma.message_type(message))) if __debug__ else None
         if vrdma.message_type(message) == "masked_cas_response":
+            self.debug("aquire_locks_with_reads_fsm") if __debug__ else None
+            self.debug("message in aquire_locks_with_reads_fsm" + str(message)) if __debug__ else None
+            self.debug("success " + str(message.payload["function_args"]["success"])) if __debug__ else None
             if message.payload["function_args"]["success"] == True:
+                self.debug("Recieved successful locking message") if __debug__ else None
                 self.receieve_successful_locking_message(message)
             #1) retransmit if we did not make process
             #2) or just select the next message
@@ -149,6 +154,9 @@ class rcuckoo(state_machines.client_state_machine):
                 return self.get_current_locking_message_with_covering_read()
 
         if vrdma.message_type(message) == "read_response":
+            self.debug("aquire_locks_with_reads_fsm") if __debug__ else None
+            self.debug("message in aquire_locks_with_reads_fsm" + str(message)) if __debug__ else None
+            self.debug(str(message.payload["function_args"]["read"])) if __debug__ else None
             #unpack and check the response for a valid read
             args = vrdma.unpack_read_response(message)
             vrdma.fill_local_table_with_read_response(self.table, args)

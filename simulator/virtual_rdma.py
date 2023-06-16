@@ -87,6 +87,15 @@ function_to_type_map = {
     fill_table_with_read: "read_response",
 }
 
+function_name_to_function_pointer_map = {
+    "cas_table_entry": cas_table_entry,
+    "fill_table_with_cas": fill_table_with_cas,
+    "masked_cas_lock_table": masked_cas_lock_table,
+    "fill_lock_table_masked_cas": fill_lock_table_masked_cas,
+    "read_table_entry": read_table_entry,
+    "fill_table_with_read": fill_table_with_read,
+}
+
 def message_type(message):
     if message == None:
         return "None"

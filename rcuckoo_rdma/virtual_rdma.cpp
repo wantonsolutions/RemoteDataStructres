@@ -47,7 +47,7 @@ namespace cuckoo_virtual_rdma {
         } else if (function == "fill_table_with_read") {
             return READ_RESPONSE;
         } else {
-            printf("Error unknown function %s\n", function.c_str());
+            printf("Error unknown function (%s)\n", function.c_str());
             exit(1);
         }
     }

@@ -2,6 +2,8 @@ cimport rcuckoo_wrapper as rw
 # cimport rcuckoo_wrapper as t
 from libcpp.string cimport string
 
+from simulator import virtual_rdma as vrdma
+
 
 def set_factor(x):
     return rw.set_factor(x)
@@ -452,6 +454,62 @@ cdef class PyRCuckoo:
         ret_messages = []
         return ret_messages
 
+def lock_array_to_binary_string(lock_array):
+    l_string = ""
+    for l in lock_array:
+        l_string += str(l)
+    return l_string
+
+def binary_string_to_lock_array(l_string):
+    lock_array = []
+    for l in l_string:
+        lock_array.append(int(l))
+    return lock_array
+
+def decode_entries_from_string(entries_string):
+    entries = []
+    for e in entries_string.split(","):
+        k, v = e.split(":")
+        entries.append(int(k))
+    return entries
+
+def encode_py_message_to_cpp_message(message):
+    cdef rw.VRMessage c_message
+    print(message)
+    c_message.function = message["function"].__name__.encode('utf8')
+    for k in message["function_args"]:
+        if k == "lock_index" or k == "bucket_id" or k == "bucket_offset" or k == "size":
+            c_message.function_args[k.encode('utf8')] = str(message["function_args"][k]).encode('utf8')
+        elif k == "old" or k == "new" or k == "mask":
+            c_message.function_args[k.encode('utf8')] = (lock_array_to_binary_string(message["function_args"][k])).encode('utf8')
+        else:
+            print("Unknown key: ", k)
+            exit(0)
+    return c_message
+
+def decode_cpp_message_to_python(rw.VRMessage c_message):
+
+    print("decoding messages INPUT: ", c_message)
+    message = vrdma.Message({})
+    message.payload['function'] = vrdma.function_name_to_function_pointer_map[c_message.function.decode('utf8')]
+    message.payload["function_args"] = {}
+    for k, v in c_message.function_args:
+        k= k.decode('utf8')
+        if k == "lock_index" or k == "bucket_id" or k == "bucket_offset" or k == "size":
+            message.payload["function_args"][k] = int(v.decode('utf8'))
+        elif k == "old":
+            message.payload["function_args"][k] = binary_string_to_lock_array(v.decode('utf8'))
+        elif k == "read":
+            message.payload["function_args"][k] = decode_entries_from_string(v.decode('utf8'))
+        elif k == "success":
+            message.payload["function_args"][k] = (v.decode('utf8') == '1')
+        else:
+            print("Unknown key: ", k)
+            exit(0)
+    print ("decoding messages OUTPUT: ", message)
+    return message
+            
+
     
 cdef class PyMemory_State_Machine:
     cdef rw.Memory_State_Machine *c_memory_state_machine
@@ -494,14 +552,14 @@ cdef class PyMemory_State_Machine:
     def print_table(self):
         self.c_memory_state_machine.print_table()
 
-    def fsm_logic(self, message=None):
+    def fsm(self, message=None):
         cdef rw.VRMessage c_message
-        print("todo translate messages input messages to fsm")
         if not message is None:
-            print("gotta translate:", message)
-        output_messages = self.c_memory_state_machine.fsm_logic(c_message)
+            c_message = encode_py_message_to_cpp_message(message.payload)
+
+        output_messages = self.c_memory_state_machine.fsm(c_message)
+        ret_messages = []
         if len(output_messages) > 0:
             for m in output_messages:
-                print("gotta translate output messages: ", m)
-        ret_messages = []
+                ret_messages.append(decode_cpp_message_to_python(m))
         return ret_messages

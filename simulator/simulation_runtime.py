@@ -12,14 +12,14 @@ import copy
 from . import log
 
 
-simulator=True
+from . import cuckoo
+simulator=False
 if simulator:
     from . import hash
     from . import tables
     from . import search
     from . import rcuckoo_basic
     from . import state_machines
-    from . import cuckoo
 else:
     import rcuckoo_wrap as hash
     import rcuckoo_wrap as search
@@ -27,11 +27,12 @@ else:
 
     import rcuckoo_wrap as tables
     tables.Table = tables.PyTable
-    import rcuckoo_wrap as rcuckoo_basic
-    rcuckoo_basic.rcuckoo_basic = rcuckoo_basic.PyRCuckoo
+    # import rcuckoo_wrap as cuckoo
+    # cuckoo.rcuckoo = cuckoo.PyRCuckoo
 
-    from . import state_machines as sim_state_machines
-    state_machines.basic_memory_state_machine = sim_state_machines.basic_memory_state_machine
+    # from . import state_machines as sim_state_machines
+    # state_machines.basic_memory_state_machine = sim_state_machines.basic_memory_state_machine
+    state_machines.basic_memory_state_machine = state_machines.PyMemory_State_Machine
 
 
 import logging
@@ -343,6 +344,8 @@ class Simulator(Node):
             client_config['bucket_size'] = bucket_size
             client_config['index_init_function'] = tables.Table
             client_config['index_init_args'] = index_init_args
+            for key in client_config['index_init_args']:
+                client_config[key] = client_config['index_init_args'][key]
             client_config['total_inserts']=indexes * 20
             client_config['total_requests']=client_config['total_inserts']
 
@@ -368,6 +371,8 @@ class Simulator(Node):
         memory_config['bucket_size'] = bucket_size
         memory_config['index_init_function'] = tables.Table
         memory_config['index_init_args'] = index_init_args
+        for key in memory_config['index_init_args']:
+            memory_config[key] = memory_config['index_init_args'][key]
 
         memory_config['state_machine']=state_machines.basic_memory_state_machine
         memory_config['max_fill']=self.config['max_fill']
@@ -497,7 +502,7 @@ def default_config():
     config['locks_per_message']=64
     config['workload']="ycsb-w"
     config['hash_factor']=hash.get_factor()
-    config['state_machine']=rcuckoo_basic.rcuckoo_basic
+    config['state_machine']=cuckoo.rcuckoo
     config['search_function']="a_star"
     config['location_function']="dependent"
 
@@ -587,7 +592,7 @@ def main():
     config['indexes'] = table_size
     config['num_clients'] = 1
     config['bucket_size'] = 8
-    config['num_steps'] = 2500
+    config['num_steps'] = 25
     config['read_threshold_bytes'] = 256
     config["buckets_per_lock"] = 1
     config["locks_per_message"] = 64
@@ -595,7 +600,7 @@ def main():
     # import rcuckoo_wrap as cuckoo
     
     config['max_fill']= 90
-    # config['deterministic']=True
+    config['deterministic']=True
     # config["state_machine"]=race.race
     # config["state_machine"]=cuckoo.PyRCuckoo
     config["state_machine"]=cuckoo.rcuckoo
