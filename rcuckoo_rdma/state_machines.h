@@ -131,6 +131,7 @@ namespace cuckoo_state_machines {
     enum client_state {
         IDLE,
         READING,
+        AQUIRE_LOCKS,
     };
     static const char *client_state_names[] = {"idle", "reading"};
     const char* get_client_state_name(client_state state);

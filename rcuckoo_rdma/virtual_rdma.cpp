@@ -1,5 +1,7 @@
 #include "virtual_rdma.h"
 #include <string.h>
+#include <algorithm>
+#include<iostream>
 
 using namespace std;
 namespace cuckoo_virtual_rdma {
@@ -248,6 +250,101 @@ namespace cuckoo_virtual_rdma {
         return (buckets.distance() + 1) * row_size_bytes;
     }
 
+    vector<unsigned int> get_unique_lock_indexes(vector<unsigned int> buckets, unsigned int buckets_per_lock) {
+        vector<unsigned int> buckets_chunked_by_lock;
+        for (int i=0; i<buckets.size(); i++) {
+            unsigned int lock_index = buckets[i] / buckets_per_lock;
+            buckets_chunked_by_lock.push_back(lock_index);
+        }
+        std::sort(buckets_chunked_by_lock.begin(), buckets_chunked_by_lock.end());
+        buckets_chunked_by_lock.erase(std::unique(buckets_chunked_by_lock.begin(), buckets_chunked_by_lock.end()), buckets_chunked_by_lock.end());
+        return buckets_chunked_by_lock;
+    }
+
+    unsigned int byte_aligned_index(unsigned int index) {
+        return (index / 8) * 8;
+    }
+
+    vector<vector<unsigned int>> break_lock_indexes_into_chunks(vector<unsigned int> lock_indexes, unsigned int locks_per_message) {
+        vector<vector<unsigned int>> lock_indexes_chunked;
+        vector<unsigned int> current_chunk;
+        unsigned int min_lock_index;
+        unsigned int bits_in_uint64_t = sizeof(uint64_t) * 8;
+        for (int i=0; i<lock_indexes.size(); i+=locks_per_message) {
+            if(current_chunk.size() == 0) {
+                min_lock_index = byte_aligned_index(lock_indexes[i]);
+            }
+
+            if((lock_indexes[i] - min_lock_index) < bits_in_uint64_t && current_chunk.size() < locks_per_message) {
+                current_chunk.push_back(lock_indexes[i]);
+            } else {
+                lock_indexes_chunked.push_back(current_chunk);
+                current_chunk.clear();
+                min_lock_index = byte_aligned_index(lock_indexes[i]);
+                current_chunk.push_back(lock_indexes[i]);
+            }
+        }
+        if(current_chunk.size() > 0) {
+            lock_indexes_chunked.push_back(current_chunk);
+        }
+        return lock_indexes_chunked;
+    }
+
+    vector<VRMaskedCasData> lock_chunks_to_masked_cas_data(vector<vector<unsigned int>> lock_chunks) {
+        vector<VRMaskedCasData> masked_cas_data;
+        for (int i=0; i<lock_chunks.size(); i++) {
+            VRMaskedCasData mcd;
+            vector<unsigned int> normalized_indexes;
+            unsigned int min_index = byte_aligned_index(lock_chunks[i][0]);
+            for (int j=0; j<lock_chunks[i].size(); j++) {
+                normalized_indexes.push_back(lock_chunks[i][j] - min_index);
+            }
+
+            uint64_t lock = 0;
+            //#todo we can optimize this by setting the bits right away in the prior loop
+            //but this is more readable
+            // lock |= (1 << (lock_chunks[i][j] - min_index));
+            for (int j=0; j<normalized_indexes.size(); j++) {
+                printf("%u ", normalized_indexes[j]);
+                lock |= (1 << normalized_indexes[j]);
+            }
+            mcd.old = 0;
+            mcd.new_value = lock;
+            mcd.mask = lock;
+            masked_cas_data.push_back(mcd);
+        }
+        return masked_cas_data;
+    }
+
+    vector<VRMaskedCasData> unlock_chunks_to_masked_cas_data(vector<vector<unsigned int>> lock_chunks){ 
+        vector<VRMaskedCasData> masked_cas_data = lock_chunks_to_masked_cas_data(lock_chunks);
+        for (int i=0; i<masked_cas_data.size(); i++) {
+            masked_cas_data[i].old = masked_cas_data[i].new_value;
+            masked_cas_data[i].new_value = 0;
+        }
+    }
+
+    vector<VRMaskedCasData> get_lock_or_unlock_list(vector<unsigned int> buckets, unsigned int buckets_per_lock, unsigned int locks_per_message, bool locking) {
+        assert(locks_per_message < 64);
+        vector<unsigned int> unique_lock_indexes = get_unique_lock_indexes(buckets, buckets_per_lock);
+        vector<vector<unsigned int>> lock_chunks = break_lock_indexes_into_chunks(unique_lock_indexes, locks_per_message);
+        if (locking) {
+            return lock_chunks_to_masked_cas_data(lock_chunks);
+        } else {
+            return unlock_chunks_to_masked_cas_data(lock_chunks);
+        }
+    }
+
+    vector<VRMaskedCasData> get_lock_list(vector<unsigned int> buckets, unsigned int buckets_per_lock, unsigned int locks_per_message) {
+        bool get_lock_messages = true;
+        return get_lock_or_unlock_list(buckets,buckets_per_lock,locks_per_message, get_lock_messages);
+    }
+
+    vector<VRMaskedCasData> get_unlock_list(vector<unsigned int> buckets, unsigned int buckets_per_lock, unsigned int locks_per_message) {
+        bool get_lock_messages = false;
+        return get_lock_or_unlock_list(buckets,buckets_per_lock,locks_per_message, get_lock_messages);
+    }
+
     VRMessage read_request_message(unsigned int start_bucket, unsigned int offset, unsigned int size) {
         VRMessage message;
         message.function = message_type_to_function_string(READ_REQUEST);
@@ -255,7 +352,7 @@ namespace cuckoo_virtual_rdma {
         message.function_args["bucket_offset"] = to_string(offset);
         message.function_args["size"] = to_string(size);
         return message;
-    }\
+    }
 
     vector<VRMessage> multi_bucket_read_message(hash_locations buckets, unsigned int row_size_bytes) {
         vector<VRMessage> messages;

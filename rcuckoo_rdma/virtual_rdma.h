@@ -50,6 +50,14 @@ namespace cuckoo_virtual_rdma {
 
     } Request;
 
+
+    typedef struct VRMaskedCasData {
+        unsigned int min_lock_index;
+        uint64_t mask;
+        uint64_t new_value;
+        uint64_t old;
+    } VRMaskedCasData;
+
     #define ETHERNET_SIZE 18
     #define IP_SIZE 20
     #define UDP_SIZE 8
@@ -93,9 +101,25 @@ namespace cuckoo_virtual_rdma {
     int keys_contained_in_read_response(const Key &key, const vector<Entry> &entries);
 
     unsigned int single_read_size_bytes(hash_locations buckets, unsigned int row_size_bytes);
-
     vector<VRMessage> read_threshold_message(hash_locations (*location_function)(string, unsigned int), Key current_read_key, unsigned int read_threshold_bytes,unsigned int table_size,unsigned int row_size_bytes);
 
+
+
+    vector<VRMaskedCasData> get_lock_list(vector<unsigned int> buckets, unsigned int buckets_per_lock, unsigned int locks_per_message);
+
+    vector<unsigned int> get_unique_lock_indexes(vector<unsigned int> buckets, unsigned int buckets_per_lock);
+    unsigned int byte_aligned_index(unsigned int index);
+    vector<vector<unsigned int>> break_lock_indexes_into_chunks(vector<unsigned int> lock_indexes, unsigned int locks_per_message);
+    vector<VRMaskedCasData> lock_chunks_to_masked_cas_data(vector<vector<unsigned int>> lock_chunks);
+    vector<VRMaskedCasData> unlock_chunks_to_masked_cas_data(vector<vector<unsigned int>> lock_chunks);
+    vector<VRMaskedCasData> get_lock_or_unlock_list(vector<unsigned int> buckets, unsigned int buckets_per_lock, unsigned int locks_per_message, bool locking);
+    vector<VRMaskedCasData> get_lock_list(vector<unsigned int> buckets, unsigned int buckets_per_lock, unsigned int locks_per_message);
+    vector<VRMaskedCasData> get_unlock_list(vector<unsigned int> buckets, unsigned int buckets_per_lock, unsigned int locks_per_message);
+    VRMessage read_request_message(unsigned int start_bucket, unsigned int offset, unsigned int size);
+    vector<VRMessage> multi_bucket_read_message(hash_locations buckets, unsigned int row_size_bytes);
+    VRMessage single_bucket_read_message(unsigned int bucket, unsigned int row_size_bytes);
+    vector<VRMessage> single_bucket_read_messages(hash_locations buckets, unsigned int row_size_bytes);
+    vector<VRMessage> read_threshold_message(hash_locations (*location_function)(string, unsigned int), Key key, unsigned int read_threshold_bytes,unsigned int table_size,unsigned int row_size_bytes);
 }
 
 #endif

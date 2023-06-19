@@ -1,6 +1,8 @@
 // #include "state_machines.h"
 #include <string>
 #include <unordered_map>
+#include <iostream>
+#include <sstream>
 #include <vector>
 #include "cuckoo.h"
 #include "tables.h"
@@ -35,6 +37,8 @@ namespace cuckoo_rcuckoo {
         try{
             _read_threshold_bytes = stoi(config["read_threshold_bytes"]);
             _buckets_per_lock = stoi(config["buckets_per_lock"]);
+            _locks_per_message = stoi(config["locks_per_message"]);
+
         } catch (exception& e) {
             printf("ERROR: RCuckoo config missing required field\n");
             throw logic_error("ERROR: RCuckoo config missing required field");
@@ -48,12 +52,12 @@ namespace cuckoo_rcuckoo {
     void RCuckoo::clear_statistics(){
         Client_State_Machine::clear_statistics();
         _current_insert_key = Key();
-        _search_path = vector<Key>();
+        _search_path = vector<path_element>();
         _search_path_index = 0;
         _locks_held = vector<int>();
         _current_locking_messages = vector<VRMessage>();
         _current_locking_read_messages = vector<VRMessage>();
-        _current_locking_message_index = 0;
+        _locking_message_index = 0;
         return;
     }
 
@@ -93,6 +97,45 @@ namespace cuckoo_rcuckoo {
         _current_read_rtt++;
         vector<VRMessage> messages = read_threshold_message(_location_function, _current_read_key, _read_threshold_bytes, _table.get_row_count(), _table.row_size_bytes());
         return Client_State_Machine::begin_read(messages);
+    }
+
+    vector<VRMessage> RCuckoo::aquire_locks() {
+        _locking_message_index = 0;
+        vector<unsigned int> buckets = search_path_to_buckets(_search_path);
+        
+        #ifdef DEBUG
+        stringstream ss;
+        copy(buckets.begin(), buckets.end(), ostream_iterator<unsigned int>(ss, " "));
+        printf("gathering locks for buckets %s\n", ss.str().c_str());
+        #endif
+
+        vector<VRMaskedCasData> lock_list = get_lock_list(buckets, _buckets_per_lock, _locks_per_message);
+        return ;
+    }
+
+    vector<VRMessage> RCuckoo::search() {
+        vector<unsigned int> searchable_buckets;
+        _search_path = (this->*_table_search_function)(searchable_buckets);
+        //Search failed
+        if (_search_path.size() <= 0) {
+            printf("Search Failed for key %s unable to continue client %d is done\n", _current_insert_key.to_string().c_str(), _id);
+            _complete=true;
+            _state = IDLE;
+            return vector<VRMessage>();
+        }
+
+        #ifdef DEBUG
+        printf("Current insert Value %s\n", _current_insert_key.to_string());
+        printf("Successful local search for [key %s] -> [path %s]\n", _current_insert_key.to_string().c_str(), path_to_string(_search_path).c_str());
+        #endif
+
+        _state = AQUIRE_LOCKS;
+        return aquire_locks();
+    }
+
+    vector<VRMessage> RCuckoo::put() {
+        _current_insert_rtt++;
+        return search();
     }
 
 

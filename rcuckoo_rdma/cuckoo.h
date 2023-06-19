@@ -11,6 +11,8 @@ using namespace cuckoo_state_machines;
 using namespace cuckoo_search;
 
 namespace cuckoo_rcuckoo {
+
+
     class RCuckoo : public Client_State_Machine {
         public:
             RCuckoo();
@@ -21,7 +23,9 @@ namespace cuckoo_rcuckoo {
 
             vector<VRMessage> fsm_logic(VRMessage messages);
             vector<VRMessage> get();
+            vector<VRMessage> aquire_locks();
             vector<VRMessage> put();
+            vector<VRMessage> search();
 
             void clear_statistics();
             string get_state_machine_name();
@@ -30,15 +34,16 @@ namespace cuckoo_rcuckoo {
 
             unsigned int _read_threshold_bytes;
             unsigned int _buckets_per_lock;
+            unsigned int _locks_per_message;
 
             Table _table;
             Key _current_insert_key;
-            vector<Key> _search_path;
+            vector<path_element> _search_path;
             int _search_path_index;
             vector<int> _locks_held;
             vector<VRMessage> _current_locking_messages;
             vector<VRMessage> _current_locking_read_messages;
-            int _current_locking_message_index;
+            int _locking_message_index;
 
 
             hash_locations  (*_location_function)(string, unsigned int);
