@@ -100,18 +100,25 @@ namespace cuckoo_tables {
         CasOperationReturn atomic_response;
         atomic_response.original_value = *va;
         atomic_response.success = false;
+
+        #ifdef DEBUG
         cout << to_string() << endl;
-        cout << "original value pre operation " << std::hex << atomic_response.original_value << endl;
-        cout << "pointer value pre operation  " << std::hex << *va << endl;
+        cout << "original value pre operation  " << std::hex << atomic_response.original_value << endl;
+        cout << "pointer value pre operation   " << std::hex << *va << endl;
+        #endif
 
         if (!((old ^ *va) & mask)) {
             *va = (*va & ~(mask)) | (new_value & mask);
             atomic_response.success = true;
         }
 
+
+        #ifdef DEBUG
         cout << "original value post operation " << std::hex << atomic_response.original_value << endl;
         cout << "pointer value post operation  " << std::hex << *va << endl;
         cout << to_string() << endl;
+        #endif
+
         return atomic_response;
     }
 

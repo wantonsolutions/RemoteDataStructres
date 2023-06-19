@@ -584,7 +584,7 @@ def main():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
 
-    table_size = 512
+    table_size = 512000
     runs = []
     print("table size: ", table_size)
 
@@ -592,7 +592,7 @@ def main():
     config['indexes'] = table_size
     config['num_clients'] = 8
     config['bucket_size'] = 8
-    config['num_steps'] = 250000
+    config['num_steps'] = 100000000
     config['read_threshold_bytes'] = 256
     config["buckets_per_lock"] = 1
     config["locks_per_message"] = 64
@@ -605,8 +605,8 @@ def main():
     # config["state_machine"]=cuckoo.PyRCuckoo
     config["state_machine"]=cuckoo.rcuckoo
     config['workload']='ycsb-w'
-    log.set_debug()
-    # log.set_off()
+    # log.set_debug()
+    log.set_off()
     try:
         runs.append(run_trials(config))
     except Exception as e:

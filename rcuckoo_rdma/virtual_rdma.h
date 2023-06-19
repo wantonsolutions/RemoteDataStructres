@@ -7,6 +7,7 @@
 #include <vector>
 #include <any>
 #include "assert.h"
+#include "hash.h"
 
 using namespace std;
 
@@ -90,6 +91,10 @@ namespace cuckoo_virtual_rdma {
     vector<Entry> decode_entries_from_string(string str_entries);
     string encode_entries_to_string(vector<Entry> &entries);
     int keys_contained_in_read_response(const Key &key, const vector<Entry> &entries);
+
+    unsigned int single_read_size_bytes(hash_locations buckets, unsigned int row_size_bytes);
+
+    vector<VRMessage> read_threshold_message(hash_locations (*location_function)(string, unsigned int), Key current_read_key, unsigned int read_threshold_bytes,unsigned int table_size,unsigned int row_size_bytes);
 
 }
 

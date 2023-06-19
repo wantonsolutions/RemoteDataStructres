@@ -9,6 +9,23 @@ using namespace std;
 typedef struct hash_locations{
     unsigned int primary;
     unsigned int secondary;
+    unsigned int distance() {
+        return max_bucket() - min_bucket();
+    }
+    unsigned int min_bucket() {
+        if (primary < secondary){
+            return primary;
+        } else {
+            return secondary;
+        }
+    }
+    unsigned int max_bucket() {
+        if (primary > secondary){
+            return primary;
+        } else {
+            return secondary;
+        }
+    }
 } hash_locations;
 
 

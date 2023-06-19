@@ -250,7 +250,8 @@ class client_workload_driver():
         if self.deterministic:
             self.random_factor = 1
         else:
-            self.random_factor = int(random.random() * 100) + 1
+            # self.random_factor = int(random.random() * 100) + 1
+            self.random_factor = 1 
         #todo add a line for having a workload passed in as a file
         self.completed_requests=0
         self.completed_puts=0

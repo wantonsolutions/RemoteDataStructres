@@ -162,7 +162,9 @@ namespace cuckoo_virtual_rdma {
         bool success = false;
         Entry new_entry;
 
-        printf("Cas compairision table %lu == guess %lu = %d\n", ret_val, old, ret_val == old);
+        #ifdef DEBUG
+        printf("cas compairision table %08llx == guess %08llx (success=%d -- row %06d, col %06d)\n", ret_val, old, ret_val == old, bucket_id, bucket_offset);
+        #endif
 
         if (ret_val == old) {
             new_entry.set_as_uint64_t(new_value);
@@ -241,4 +243,51 @@ namespace cuckoo_virtual_rdma {
         }
         return count;
     }
+
+    unsigned int single_read_size_bytes(hash_locations buckets, unsigned int row_size_bytes) {
+        return (buckets.distance() + 1) * row_size_bytes;
+    }
+
+    VRMessage read_request_message(unsigned int start_bucket, unsigned int offset, unsigned int size) {
+        VRMessage message;
+        message.function = message_type_to_function_string(READ_REQUEST);
+        message.function_args["bucket_id"] = to_string(start_bucket);
+        message.function_args["bucket_offset"] = to_string(offset);
+        message.function_args["size"] = to_string(size);
+        return message;
+    }\
+
+    vector<VRMessage> multi_bucket_read_message(hash_locations buckets, unsigned int row_size_bytes) {
+        vector<VRMessage> messages;
+        unsigned int min_bucket = buckets.min_bucket();
+        unsigned int size = single_read_size_bytes(buckets, row_size_bytes);
+        VRMessage message = read_request_message(min_bucket, 0, size);
+        messages.push_back(message);
+        return messages;
+    }
+
+    VRMessage single_bucket_read_message(unsigned int bucket, unsigned int row_size_bytes){
+        return read_request_message(bucket, 0, row_size_bytes);
+    }
+
+    vector<VRMessage> single_bucket_read_messages(hash_locations buckets, unsigned int row_size_bytes){
+        vector<VRMessage> messages;
+        messages.push_back(single_bucket_read_message(buckets.primary, row_size_bytes));
+        messages.push_back(single_bucket_read_message(buckets.secondary, row_size_bytes));
+        return messages;
+
+    }
+
+    vector<VRMessage> read_threshold_message(hash_locations (*location_function)(string, unsigned int), Key key, unsigned int read_threshold_bytes,unsigned int table_size,unsigned int row_size_bytes) {
+        hash_locations buckets = location_function(key.to_string(), table_size);
+        vector<VRMessage> messages;
+        if (single_read_size_bytes(buckets, row_size_bytes) <= read_threshold_bytes) {
+            messages = multi_bucket_read_message(buckets, row_size_bytes);
+        } else {
+            messages = single_bucket_read_messages(buckets, row_size_bytes);
+        }
+        return messages;
+    }
+
+    
 }

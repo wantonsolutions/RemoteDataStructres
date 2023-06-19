@@ -574,8 +574,8 @@ namespace cuckoo_state_machines {
             unsigned int memory_size = stoi(config["memory_size"]);
             unsigned int bucket_size = stoi(config["bucket_size"]);
             unsigned int buckets_per_lock = stoi(config["buckets_per_lock"]);
+            printf("Creating Table : Table_size: %d, bucket_size %d, buckets_per_lock %d\n", memory_size, bucket_size, buckets_per_lock);
             _table = Table(memory_size, bucket_size, buckets_per_lock);
-            _table.print_table();
             _max_fill = stoi(config["max_fill"]);
         } catch (exception& e) {
             printf("ERROR: Memory_State_Machine config missing required field\n");
@@ -623,7 +623,7 @@ namespace cuckoo_state_machines {
     }
 
     uint64_t bin_string_to_uint64_t(string s){
-        printf("converting %s to uint64_t\n", s.c_str());
+        // printf("converting %s to uint64_t\n", s.c_str());
         uint64_t num = 0;
         for (int i = 0; i < 64; i++){
             num = num << 1;
@@ -631,7 +631,7 @@ namespace cuckoo_state_machines {
                 num = num | 1;
             }
         }
-        printf("converted to %llx\n", num);
+        // printf("converted to %llx\n", num);
         return num;
     }
 
@@ -643,7 +643,7 @@ namespace cuckoo_state_machines {
 
         if (_table.get_fill_percentage() * 100 > _max_fill) {
             printf("table full to %d percent, not processing any more requests\n", _max_fill);
-            _table.print_table();
+            // _table.print_table();
             throw TableFullException();
         }
 
@@ -677,7 +677,6 @@ namespace cuckoo_state_machines {
                     uint64_t old = stoull(message.function_args["old"], nullptr, 10);
                     uint64_t new_val = stoull(message.function_args["new"], nullptr, 10);
                     CasOperationReturn cas_ret = cas_table_entry(_table, bucket_id, offset, old, new_val);
-                    _table.print_table();
                     vector<VRMessage> response;
                     VRMessage r;
                     r.function = message_type_to_function_string(CAS_RESPONSE);

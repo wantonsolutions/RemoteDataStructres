@@ -155,10 +155,10 @@ namespace cuckoo_state_machines {
             string get_state_machine_name();
             vector<VRMessage> general_idle_fsm(vector<VRMessage> *messages);
             unordered_map<string, string> get_stats();
-            vector<VRMessage> put();
-            vector<VRMessage> get();
+            virtual vector<VRMessage> put();
+            virtual vector<VRMessage> get();
 
-        private:
+        protected:
             uint32_t _total_inserts;
             uint32_t _id;
             client_state _state;
