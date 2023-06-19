@@ -4,7 +4,20 @@
 #include <string>
 #include <iostream>
 #include <vector>
+#include <memory>
+#include <stdexcept>
 // #include "spdlog/spdlog.h" //sudo apt install libspdlog-dev
+
+template<typename ... Args>
+std::string string_format( const std::string& format, Args ... args )
+{
+    int size_s = std::snprintf( nullptr, 0, format.c_str(), args ... ) + 1; // Extra space for '\0'
+    if( size_s <= 0 ){ throw std::runtime_error( "Error during formatting." ); }
+    auto size = static_cast<size_t>( size_s );
+    std::unique_ptr<char[]> buf( new char[ size ] );
+    std::snprintf( buf.get(), size, format.c_str(), args ... );
+    return std::string( buf.get(), buf.get() + size - 1 ); // We don't want the '\0' inside
+}
 
 namespace cuckoo_tables {
 
@@ -14,7 +27,7 @@ namespace cuckoo_tables {
     string Key::to_string(){
         string s = "";
         for (int i = 0; i < KEY_SIZE; i++){
-            s += std::to_string(bytes[i]);
+            s += string_format("%02x", bytes[i]);
         }
         return s;
     }
@@ -82,20 +95,23 @@ namespace cuckoo_tables {
     CasOperationReturn Lock_Table::masked_cas(unsigned int index, uint64_t old, uint64_t new_value, uint64_t mask){
         assert(index <= _total_lock_entries + 4);
         // cout << "indexing into lock table: " << index << endl;
-        uint64_t *va = (uint64_t *) &_locks[index];
+        uint64_t *va = (uint64_t *) &(_locks[index]);
+
         CasOperationReturn atomic_response;
         atomic_response.original_value = *va;
         atomic_response.success = false;
-        // cout << "original value pre operation " << atomic_response.original_value << endl;
-        // cout << "pointer value pre operation " << *va << endl;
+        cout << to_string() << endl;
+        cout << "original value pre operation " << std::hex << atomic_response.original_value << endl;
+        cout << "pointer value pre operation  " << std::hex << *va << endl;
 
         if (!((old ^ *va) & mask)) {
             *va = (*va & ~(mask)) | (new_value & mask);
             atomic_response.success = true;
         }
 
-        // cout << "original value post operation " << atomic_response.original_value << endl;
-        // cout << "pointer value post operation " << *va << endl;
+        cout << "original value post operation " << std::hex << atomic_response.original_value << endl;
+        cout << "pointer value post operation  " << std::hex << *va << endl;
+        cout << to_string() << endl;
         return atomic_response;
     }
 
@@ -111,7 +127,7 @@ namespace cuckoo_tables {
     string Lock_Table::to_string(){
         string output_string = "";
         for (unsigned int i = 0; i < _total_lock_entries; i++){
-            output_string += std::to_string(i) + ": " + std::to_string(_locks[i]) + "\n";
+            output_string += std::to_string(i*8) + ": " + string_format("%02x", _locks[i])+ "\n";
         }
         return output_string;
     }

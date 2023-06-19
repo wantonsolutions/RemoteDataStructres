@@ -16,7 +16,7 @@ extensions = [
     Extension('rcuckoo_wrap', ["rcuckoo_wrapper.pyx", 'hash.cpp', 'tables.cpp', 'search.cpp', 'virtual_rdma.cpp', "state_machines.cpp", "cuckoo.cpp"],
               include_dirs=[xx_hash_abs_dir],
               libraries=['xxhash'],
-              extra_compile_args=['-std=c++11'],
+              extra_compile_args=['-std=c++2a'],
               language='c++'
               ),
 ]

@@ -68,9 +68,9 @@ def fill_table_with_read(table, bucket_id, bucket_offset, size, read):
 
 def fill_local_table_with_cas_response(table, args):
     args_copy = args.copy()
-    args_copy["read"]=[args["value"]]
+    args_copy["read"]=[args["old"]]
     args_copy["size"]=TABLE_ENTRY_SIZE
-    del(args_copy["value"])
+    del(args_copy["old"])
     del(args_copy["success"])
     fill_table_with_read(table, **args_copy)
 
@@ -146,7 +146,7 @@ def cas_table_entry_message(bucket_index, bucket_offset, old, new):
 def unpack_cas_response(message):
     assert message.payload["function"] == fill_table_with_cas, "client is in inserting state but message is not a cas " + str(message)
     args = message.payload["function_args"]
-    logger.debug("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["value"])) if __debug__ else None
+    logger.debug("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["old"])) if __debug__ else None
     return args
 
 def unpack_read_response(message):
@@ -173,7 +173,7 @@ def masked_cas_lock_table_messages(lock_messages):
 def unpack_masked_cas_response(message):
         assert message.payload["function"] == fill_lock_table_masked_cas, "client is in inserting state but message is not a cas " + str(message)
         args = message.payload["function_args"]
-        logger.debug("Insert Response: " +  "Success: " + str(args["success"]) + " Value: " + str(args["value"]) + str(args["mask"]))  if __debug__ else None
+        logger.debug("Insert Response: " +  "Success: " + str(args["success"]) + " Old: " + str(args["old"]) + str(args["mask"]))  if __debug__ else None
         return args
 
 def get_lock_index(buckets, buckets_per_lock):

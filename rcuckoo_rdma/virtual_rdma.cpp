@@ -122,7 +122,6 @@ namespace cuckoo_virtual_rdma {
 
     unordered_map<string,string> unpack_read_read_response(VRMessage &msg) {
         assert (msg.get_message_type() == READ_RESPONSE);
-        printf("unpacking read response %s\n", msg.to_string().c_str());
         return msg.function_args;
     }
 
@@ -163,8 +162,11 @@ namespace cuckoo_virtual_rdma {
         bool success = false;
         Entry new_entry;
 
+        printf("Cas compairision table %lu == guess %lu = %d\n", ret_val, old, ret_val == old);
+
         if (ret_val == old) {
             new_entry.set_as_uint64_t(new_value);
+            table.set_entry(bucket_id, bucket_offset, new_entry);
             success = true;
         } 
         return CasOperationReturn(success, ret_val);

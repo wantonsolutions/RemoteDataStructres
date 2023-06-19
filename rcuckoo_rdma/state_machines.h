@@ -174,6 +174,14 @@ namespace cuckoo_state_machines {
             Client_Workload_Driver _workload_driver;
     };
 
+
+    class TableFullException : public std::exception {
+    public:
+    char * what () {
+            return "Table is full to the max fill rate -- :) this is the only good exception";
+        }
+    };
+
     class Memory_State_Machine : public State_Machine {
         public:
             Memory_State_Machine();

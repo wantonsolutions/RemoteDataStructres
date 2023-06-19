@@ -584,15 +584,15 @@ def main():
     logger = log.setup_custom_logger('root')
     logger.info("Starting simulator")
 
-    table_size = 128
+    table_size = 512
     runs = []
     print("table size: ", table_size)
 
     config = default_config()
     config['indexes'] = table_size
-    config['num_clients'] = 1
+    config['num_clients'] = 8
     config['bucket_size'] = 8
-    config['num_steps'] = 25
+    config['num_steps'] = 250000
     config['read_threshold_bytes'] = 256
     config["buckets_per_lock"] = 1
     config["locks_per_message"] = 64
@@ -600,14 +600,20 @@ def main():
     # import rcuckoo_wrap as cuckoo
     
     config['max_fill']= 90
-    config['deterministic']=True
+    config['deterministic']=False
     # config["state_machine"]=race.race
     # config["state_machine"]=cuckoo.PyRCuckoo
     config["state_machine"]=cuckoo.rcuckoo
     config['workload']='ycsb-w'
     log.set_debug()
     # log.set_off()
-    runs.append(run_trials(config))
+    try:
+        runs.append(run_trials(config))
+    except Exception as e:
+        print(e)
+        print(traceback.format_exc())
+        # raise e
+
 
 if __name__ == "__main__":
     main()

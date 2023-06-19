@@ -522,7 +522,7 @@ class basic_memory_state_machine(state_machine):
         if message.payload["function"] == vrdma.cas_table_entry:
             self.info("CAS: " + "Bucket: " + str(args["bucket_id"]) + " Offset: " + str(args["bucket_offset"]) + " Old: " + str(args["old"]) + " New: " + str(args["new"])) if __debug__ else None
             success, value = vrdma.cas_table_entry(self.table, **args)
-            response = vrdma.Message({"function":vrdma.fill_table_with_cas, "function_args":{"bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "value":value, "success":success}})
+            response = vrdma.Message({"function":vrdma.fill_table_with_cas, "function_args":{"bucket_id":args["bucket_id"], "bucket_offset":args["bucket_offset"], "old":value, "success":success}})
 
             # self.table.print_table()  if __debug__ else None
 
@@ -533,7 +533,7 @@ class basic_memory_state_machine(state_machine):
         if message.payload["function"] == vrdma.masked_cas_lock_table:
             #self.info("Masked CAS in Memory: "+ str(args["lock_index"]) + " Old: " + str(args["old"]) + " New: " + str(args["new"]) + " Mask: " + str(args["mask"]))
             success, value = vrdma.masked_cas_lock_table(self.table, **args)
-            response = vrdma.Message({"function": vrdma.fill_lock_table_masked_cas, "function_args":{"lock_index":args["lock_index"], "success":success, "value": value, "mask":args["mask"]}})
+            response = vrdma.Message({"function": vrdma.fill_lock_table_masked_cas, "function_args":{"lock_index":args["lock_index"], "success":success, "old": value, "mask":args["mask"]}})
             # self.table.print_table() if __debug__ else None
             return response
             

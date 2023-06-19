@@ -104,7 +104,10 @@ class rcuckoo(state_machines.client_state_machine):
         self.outstanding_read_requests += 1
         return [lock_message, read_message]
 
-    def receieve_successful_locking_message(self, message):
+    def get_prior_locking_message(self):
+        return self.current_locking_messages[self.locking_message_index-1]
+
+    def receive_successful_locking_message(self, message):
         lock_indexes = vrdma.lock_message_to_lock_indexes(message)
         self.info("aquired locks: " + str(lock_indexes)) if __debug__ else None
         self.locks_held.extend(lock_indexes)
@@ -130,6 +133,17 @@ class rcuckoo(state_machines.client_state_machine):
         self.current_locking_messages = vrdma.masked_cas_lock_table_messages(lock_messages)
         return self.get_current_locking_message_with_covering_read()
 
+    def last_masked_cas_was_successful(self, masked_cas_response_message):
+        issued_masked_cas = self.get_prior_locking_message()
+        tested_value = issued_masked_cas.payload['function_args']['old']
+        returned_value = masked_cas_response_message.payload['function_args']['old']
+
+        for o, r in zip(tested_value, returned_value):
+            if o != r:
+                return False
+
+        return True
+
     def release_locks_batched(self):
         self.locking_message_index = 0
         buckets = vrdma.lock_indexes_to_buckets(self.locks_held, self.buckets_per_lock)
@@ -144,9 +158,12 @@ class rcuckoo(state_machines.client_state_machine):
             self.debug("aquire_locks_with_reads_fsm") if __debug__ else None
             self.debug("message in aquire_locks_with_reads_fsm" + str(message)) if __debug__ else None
             self.debug("success " + str(message.payload["function_args"]["success"])) if __debug__ else None
+
+            # if self.last_masked_cas_was_successful(message):
             if message.payload["function_args"]["success"] == True:
                 self.debug("Recieved successful locking message") if __debug__ else None
-                self.receieve_successful_locking_message(message)
+                issued_locking_message = self.get_prior_locking_message()
+                self.receive_successful_locking_message(issued_locking_message)
             #1) retransmit if we did not make process
             #2) or just select the next message
             if not self.all_locks_aquired():
@@ -204,6 +221,8 @@ class rcuckoo(state_machines.client_state_machine):
             self.complete=True
             self.state = "idle"
             return None
+
+        # self.table.print_table()
         self.info("Current insert value " + str(self.current_insert_value)) if __debug__ else None
         self.info("Successful local search for [key: " + str(self.current_insert_value) + "] [path: " +self.search_module.path_to_string(self.search_path) + "]") if __debug__ else None
         # self.info("Printing table in function search() Table:") if __debug__ else None
@@ -254,6 +273,7 @@ class rcuckoo(state_machines.client_state_machine):
 
     def insert_cas_fsm(self, message):
         args = vrdma.unpack_cas_response(message)
+        #todo we don't get any value back with CAS, we need to set it from the value we tried to write
         vrdma.fill_local_table_with_cas_response(self.table, args)
 
         #If CAS failed, try the insert a second time.

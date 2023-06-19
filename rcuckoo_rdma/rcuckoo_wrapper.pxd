@@ -194,4 +194,4 @@ cdef extern from "state_machines.h" namespace "cuckoo_state_machines":
         bool contains(Key key)
         float get_fill_percentage()
         void print_table()
-        vector[VRMessage] fsm(VRMessage message)
+        vector[VRMessage] fsm(VRMessage message) except +
