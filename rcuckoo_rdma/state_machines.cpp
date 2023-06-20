@@ -187,6 +187,12 @@ namespace cuckoo_state_machines {
     void State_Machine::update_message_stats(vector<VRMessage> messages){
 
         for (auto message : messages) {
+            printf("Message: %s\n", message.to_string().c_str());
+            printf("updating states on message %d function = %s\n", message.get_message_type(), message_type_to_function_string(message.get_message_type()).c_str());
+            if (message.get_message_type() == NO_OP_MESSAGE) {
+                printf("no_op update, continue\n");
+                continue;
+            }
             uint32_t message_size_bytes = message.get_message_size_bytes();
             if (_inserting) {
                 _current_insert_messages++;
@@ -235,15 +241,18 @@ namespace cuckoo_state_machines {
                 throw logic_error("ERROR: unknown message type");
             }
         }
+        printf("completed updating states\n");
 
     }
 
     vector<VRMessage> State_Machine::fsm(VRMessage message) {
+        printf("State_Machine::fsm entry point\n");
         vector<VRMessage> messages;
         messages.push_back(message);
         update_message_stats(messages);
         vector<VRMessage> output_messages = fsm_logic(message);
         update_message_stats(output_messages);
+        printf("State_Machine::fsm exit point\n");
         return output_messages;
     }
 
@@ -282,7 +291,7 @@ namespace cuckoo_state_machines {
             _total_requests = stoi(config["total_requests"]);
             _client_id = stoi(config["id"]);
             _num_clients = stoi(config["num_clients"]);
-            _deterministic = config["deterministic"] == "true";
+            _deterministic = config["deterministic"] == "True";
             set_workload(config["workload"]);
         } catch (exception& e) {
             printf("ERROR: Client_Workload_Driver config missing required field :%s \n", e.what());
@@ -342,8 +351,10 @@ namespace cuckoo_state_machines {
     }
 
     Key Client_Workload_Driver::unique_insert(int insert_index, int client_id, int total_clients, int factor) {
+        printf("Calculating unique insert insert_index: %d client_id: %d total_clients: %d factor: %d\n", insert_index, client_id, total_clients, factor);
         uint64_t key_int = ((insert_index + 1) * total_clients * factor) + client_id;
         Key key;
+        printf("unique_insert key_int: %lu\n", key_int);
         key.set(key_int);
         return key;
     }
@@ -605,31 +616,6 @@ namespace cuckoo_state_machines {
         _table.print_table();
     }
 
-    string uint64t_to_bin_string(uint64_t num){
-        string s = "";
-        for (int i = 0; i < 64; i++){
-            if (num & 1){
-                s = "1" + s;
-            } else {
-                s = "0" + s;
-            }
-            num = num >> 1;
-        }
-        return s;
-    }
-
-    uint64_t bin_string_to_uint64_t(string s){
-        // printf("converting %s to uint64_t\n", s.c_str());
-        uint64_t num = 0;
-        for (int i = 0; i < 64; i++){
-            num = num << 1;
-            if (s[i] == '1'){
-                num = num | 1;
-            }
-        }
-        // printf("converted to %llx\n", num);
-        return num;
-    }
 
     vector<VRMessage> Memory_State_Machine::fsm_logic(VRMessage message) {
         // if (!messages){
@@ -645,7 +631,7 @@ namespace cuckoo_state_machines {
 
         switch (message.get_message_type()) {
             case READ_REQUEST:
-                // printf("unpacking read request %s\n", message.to_string().c_str());
+                printf("unpacking read request %s\n", message.to_string().c_str());
                 try{
                     uint32_t bucket_id = stoi(message.function_args["bucket_id"]);
                     uint32_t offset = stoi(message.function_args["bucket_offset"]);

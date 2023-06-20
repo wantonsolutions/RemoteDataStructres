@@ -32,7 +32,7 @@ typedef struct hash_locations{
 
 void set_factor(float factor);
 float get_factor();
-unsigned int get_table_id_from_index(unsigned int index);
+// unsigned int get_table_id_from_index(unsigned int index);
 unsigned int distance_to_bytes(unsigned int a, unsigned int b, unsigned int bucket_size, unsigned int entry_size);
 XXH64_hash_t h1(string key);
 XXH64_hash_t h2(string key);

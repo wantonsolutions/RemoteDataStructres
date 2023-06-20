@@ -3,12 +3,15 @@
 #include <unordered_map>
 #include <iostream>
 #include <sstream>
+#include <iterator>
 #include <vector>
 #include <set>
 #include "cuckoo.h"
 #include "tables.h"
 #include "search.h"
 #include "hash.h"
+
+#define DEBUG
 
 using namespace std;
 using namespace cuckoo_search;
@@ -44,6 +47,11 @@ namespace cuckoo_rcuckoo {
             printf("ERROR: RCuckoo config missing required field\n");
             throw logic_error("ERROR: RCuckoo config missing required field");
         }
+        assert(_read_threshold_bytes > 0);
+        assert(_read_threshold_bytes > _table.row_size_bytes());
+
+        set_search_function(config);
+        set_location_function(config);
     }
 
     string RCuckoo::get_state_machine_name() {
@@ -64,6 +72,7 @@ namespace cuckoo_rcuckoo {
 
     void RCuckoo::set_search_function(unordered_map<string, string> config) {
         string search_function_name = config["search_function"];
+        printf("setting search function: %s\n",search_function_name);
         if (search_function_name == "a_star") {
             _table_search_function = &RCuckoo::a_star_insert_self;
         } else if (search_function_name == "random") {
@@ -126,6 +135,7 @@ namespace cuckoo_rcuckoo {
     }
 
     vector<VRMessage> RCuckoo::search() {
+        printf("RCuckoo Enter Search\n");
         vector<unsigned int> searchable_buckets;
         _search_path = (this->*_table_search_function)(searchable_buckets);
         //Search failed
@@ -137,7 +147,7 @@ namespace cuckoo_rcuckoo {
         }
 
         #ifdef DEBUG
-        printf("Current insert Value %s\n", _current_insert_key.to_string());
+        printf("Current insert Value %s\n", _current_insert_key.to_string().c_str());
         printf("Successful local search for [key %s] -> [path %s]\n", _current_insert_key.to_string().c_str(), path_to_string(_search_path).c_str());
         #endif
 
@@ -151,8 +161,9 @@ namespace cuckoo_rcuckoo {
     }
 
     vector<VRMessage> RCuckoo::idle_fsm(VRMessage message) {
-        if (message.get_message_type() != NO_OP) {
-            printf("ERROR: Client %d in idle state received message of type %s\n", _id, message.function);
+        printf("RCuckoo::idle_fsm\n");
+        if (message.get_message_type() != NO_OP_MESSAGE) {
+            printf("Message: %s\n", message.to_string().c_str());
             throw logic_error("ERROR: Client in idle state received message of type");
         }
         return Client_State_Machine::general_idle_fsm();
@@ -231,8 +242,8 @@ namespace cuckoo_rcuckoo {
     vector<VRMessage> RCuckoo::aquire_locks_with_reads_fsm(VRMessage message) {
         if (message.get_message_type() == MASKED_CAS_RESPONSE) {
             try {
-                assert(message.function_args["success"] == "true" || message.function_args["success"] == "false");
-                bool success = message.function_args["success"] == "true";
+                assert(message.function_args["success"] == "True" || message.function_args["success"] == "false");
+                bool success = message.function_args["success"] == "True";
                 if (success) {
                     printf("Client %d successfully aquired lock %s\n", _id, message.function_args["lock_id"].c_str());
                     printf("message received %s\n", message.to_string().c_str());

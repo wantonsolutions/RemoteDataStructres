@@ -170,7 +170,7 @@ namespace cuckoo_state_machines {
 
             //Read State Machine
             Key _current_read_key;
-            Key _current_insert_key;
+            // Key _current_insert_key;
             uint32_t _outstanding_read_requests;
             uint32_t _read_values_found;
             vector<Key> _read_values;
@@ -182,7 +182,9 @@ namespace cuckoo_state_machines {
     class TableFullException : public std::exception {
     public:
     char * what () {
-            return "Table is full to the max fill rate -- :) this is the only good exception";
+            char * message = new char[100];
+            sprintf(message, "Table is full to the max fill rate -- :) this is the only good exception");
+            return message;
         }
     };
 

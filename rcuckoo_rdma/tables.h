@@ -40,12 +40,12 @@ namespace cuckoo_tables {
         }
 
         Key(string key) {
-            for (int i = 0; i < KEY_SIZE && i < key.size(); i++){
+            for (long unsigned int i = 0; i < KEY_SIZE && i < key.size(); i++){
                 bytes[i] = key[i];
             }
         }
         Key(){
-            for (int i = 0; i < KEY_SIZE; i++){
+            for (auto i = 0; i < KEY_SIZE; i++){
                 bytes[i] = 0;
             }
         }
@@ -79,7 +79,7 @@ namespace cuckoo_tables {
             }
         }
         Value(string value){
-            for (int i = 0; i < VALUE_SIZE && i < value.size(); i++){
+            for (long unsigned int i = 0; i < VALUE_SIZE && i < value.size(); i++){
                 bytes[i] = value[i];
             }
         }

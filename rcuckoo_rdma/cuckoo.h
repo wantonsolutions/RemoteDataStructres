@@ -49,7 +49,7 @@ namespace cuckoo_rcuckoo {
 
 
             Table _table;
-            Key _current_insert_key;
+            // Key _current_insert_key;
             vector<path_element> _search_path;
             int _search_path_index;
             vector<unsigned int> _locks_held;

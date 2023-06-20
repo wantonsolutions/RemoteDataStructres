@@ -406,6 +406,7 @@ cdef class PyRCuckoo:
 
     def __init__(self, config=None):
         cdef unordered_map[string,string] c_config
+        print("---------------INIT PyRCuckoo---------")
         if config is not None:
             print(config)
             for k in config:
@@ -413,6 +414,7 @@ cdef class PyRCuckoo:
                 s_conf = str(config[k])
                 c_config[k.encode('utf8')] = s_conf.encode('utf8')
         self.c_rcuckoo = new rw.RCuckoo(c_config)
+        print("-----------END INIT PyRCuckoo---------")
 
     def get_state_machine_name(self):
         return self.c_rcuckoo.get_state_machine_name()
@@ -444,14 +446,14 @@ cdef class PyRCuckoo:
 
     def fsm(self, message=None):
         cdef rw.VRMessage c_message
-        print("todo translate messages input messages to fsm")
         if not message is None:
-            print("gotta translate:", message)
+            c_message = encode_py_message_to_cpp_message(message.payload)
+        print("entering c_rcuckoo.fsm")
         output_messages = self.c_rcuckoo.fsm(c_message)
+        ret_messages = []
         if len(output_messages) > 0:
             for m in output_messages:
-                print("gotta translate output messages: ", m)
-        ret_messages = []
+                ret_messages.append(decode_cpp_message_to_python(m))
         return ret_messages
 
 def lock_array_to_binary_string(lock_array):
@@ -486,15 +488,6 @@ def decode_entry_from_binary_string(e):
         e=e[1:]
         base_int += int(base_str,2) << shift
         shift+=1
-        # byte_str = e[-8:]
-        # e=e[:-8]
-        # byte_str = byte_str[::-1]
-        # while len(byte_str) > 0:
-        #     base_int += int(byte_str,2) << shift
-        #     shift+=1
-        #     print("entry: ",e)
-        #     print("byte_str: ",byte_str)
-        #     print("base_int : ", base_int)
     return base_int
 
 
@@ -505,10 +498,14 @@ def decode_entries_from_string(entries_string):
 
     return entries
 
+# def encode_entries_to_string(entries):
+
+
 def encode_py_message_to_cpp_message(message):
     cdef rw.VRMessage c_message
     function_name = message["function"].__name__
     # print("function_name: ", function_name)
+    print("encoding messages INPUT: ", message)
     c_message.function = function_name.encode('utf8')
     for k in message["function_args"]:
         if k == "lock_index" or k == "bucket_id" or k == "bucket_offset" or k == "size":
@@ -517,14 +514,25 @@ def encode_py_message_to_cpp_message(message):
             c_message.function_args[k.encode('utf8')] = (lock_array_to_binary_string(message["function_args"][k])).encode('utf8')
         elif (k == "old" or k == "new" or k == "mask" ) and function_name == "cas_table_entry":
             c_message.function_args[k.encode('utf8')] = str(message['function_args'][k]).encode('utf8')
+        elif (k == "success"):
+            if message['function_args'][k]:
+                c_message.function_args[k.encode('utf8')] = "1".encode('utf8')
+            else:
+                c_message.function_args[k.encode('utf8')] = "0".encode('utf8')
+        elif (k == "old" or k == "mask") and function_name == "fill_lock_table_masked_cas":
+            c_message.function_args[k.encode('utf8')] = (lock_array_to_binary_string(message["function_args"][k])).encode('utf8')
+
+        # elif (k == "read" and function_name == "fill_table_with_read"):
+        #     c_message.function_args[k.encode('utf8')] = 
         else:
             print("encode error : Unknown key: ", k, " in function_args for function: ", function_name)
             exit(0)
+    print("encoding messages OUTPUT: ", c_message)
     return c_message
 
 def decode_cpp_message_to_python(rw.VRMessage c_message):
 
-    # print("decoding messages INPUT: ", c_message)
+    print("decoding messages INPUT: ", c_message)
     message = vrdma.Message({})
     function_name = c_message.function.decode('utf8')
     message.payload['function'] = vrdma.function_name_to_function_pointer_map[function_name]
@@ -538,6 +546,10 @@ def decode_cpp_message_to_python(rw.VRMessage c_message):
             message.payload["function_args"][k] = binary_string_to_lock_array(v.decode('utf8'))
         elif function_name == "fill_table_with_cas" and k == "old":
             message.payload["function_args"][k] = decode_entry_from_binary_string(v.decode('utf8'))
+        elif function_name == "masked_cas_lock_table" and (k == "old" or k == "new" or k == "mask"):
+            message.payload["function_args"][k] = binary_string_to_lock_array(v.decode('utf8'))
+        elif function_name == "cas_table_entry" and (k == "old" or k == "new" or k == "mask"):
+            message.payload["function_args"][k] = decode_entry_from_binary_string(v.decode('utf8'))
         elif k == "read":
             message.payload["function_args"][k] = decode_entries_from_string(v.decode('utf8'))
         elif k == "success":
@@ -545,7 +557,7 @@ def decode_cpp_message_to_python(rw.VRMessage c_message):
         else:
             print("decode error : Unknown key: ", k, "function_name: ", function_name)
             exit(0)
-    # print ("decoding messages OUTPUT: ", message)
+    print ("decoding messages OUTPUT: ", message)
     return message
             
 

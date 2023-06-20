@@ -19,7 +19,8 @@ namespace cuckoo_virtual_rdma {
     }
 
     string Request::to_string(){
-        string s = "";
+        string s = "Request: {";
+        s += "Op: ";
         switch (op) {
             case GET:
                 s += "GET";
@@ -31,7 +32,9 @@ namespace cuckoo_virtual_rdma {
                 s += "DELETE";
                 break;
         }
-        s += " " + key.to_string() + " " + value.to_string();
+        s += " Key: " + key.to_string();
+        s += " Value: " + value.to_string();
+        s += "}";
         return s;
     }
 
@@ -94,11 +97,41 @@ namespace cuckoo_virtual_rdma {
 
     string VRMessage::to_string(){
         string s = "";
-        s += function + " ";
+        s += "Message Type:";
+        s += message_type_to_function_string(get_message_type());
+        s += " Function Arguments {";
         for (auto const& x : function_args) {
             s += x.first + ":" + x.second + " ";
         }
+        s += "}";
         return s;
+    }
+
+
+    string uint64t_to_bin_string(uint64_t num){
+        string s = "";
+        for (int i = 0; i < 64; i++){
+            if (num & 1){
+                s = "1" + s;
+            } else {
+                s = "0" + s;
+            }
+            num = num >> 1;
+        }
+        return s;
+    }
+
+    uint64_t bin_string_to_uint64_t(string s){
+        // printf("converting %s to uint64_t\n", s.c_str());
+        uint64_t num = 0;
+        for (int i = 0; i < 64; i++){
+            num = num << 1;
+            if (s[i] == '1'){
+                num = num | 1;
+            }
+        }
+        // printf("converted to %llx\n", num);
+        return num;
     }
 
 
@@ -121,7 +154,7 @@ namespace cuckoo_virtual_rdma {
             case MASKED_CAS_RESPONSE:
                 return MASKED_CAS_RESPONSE_SIZE;
             default:
-                printf("error unknown enum\n");
+                printf("error unknown enum %d (string attempt %s)\n", message_type_to_function_string(type).c_str());
                 exit(0);
         }
     }
@@ -251,9 +284,23 @@ namespace cuckoo_virtual_rdma {
         vector<unsigned int> lock_indexes;
         try { 
             unsigned int base_index = get_lock_message_lock_index(lock_message);
-            uint64_t mask = stoull(lock_message.function_args["mask"]);
-            for (int i=0; i<64; i++) {
-                if (mask & (1 << i)) {
+            // string mast_str = lock_message.function_args["mask"];
+            // printf("Mask String: %s\n", mast_str.c_str());
+
+            uint64_t mask = bin_string_to_uint64_t(lock_message.function_args["mask"]);
+            mask = reverse_uint64_t(mask);
+            printf("mask %llx\n", mask);
+            printf("lock_message_to_lock_indexes base_index=%d, mask=%lld\n", base_index, mask);
+            uint64_t one = 1;
+            for (uint64_t i=0; i<64; i++) {
+                
+                printf("mask & (1    << i) = %d\n", mask & (one << i));
+                printf("1 << i = %d\n", one << i);
+
+                if (mask & (one << i)) {
+                    printf("lock_message_to_lock_indexes adding %d\n", base_index + i);
+                    printf("lock_message_to_lock_indexes mask=%016llx\n", mask);
+                    printf("i=%d\n",i);
                     lock_indexes.push_back(base_index + i);
                 }
             }
@@ -319,6 +366,22 @@ namespace cuckoo_virtual_rdma {
         return lock_indexes_chunked;
     }
 
+    uint8_t reverse(uint8_t b) {
+        b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+        b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+        b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+        return b;
+    }
+
+    uint64_t reverse_uint64_t(uint64_t n) {
+        uint64_t r = 0;
+        for (int i=0; i<8; i++) {
+            r = (r << 8) | reverse(n & 0xff);
+            n >>= 8;
+        }
+        return r;
+    }
+
     vector<VRMaskedCasData> lock_chunks_to_masked_cas_data(vector<vector<unsigned int>> lock_chunks) {
         vector<VRMaskedCasData> masked_cas_data;
         for (int i=0; i<lock_chunks.size(); i++) {
@@ -337,6 +400,7 @@ namespace cuckoo_virtual_rdma {
                 printf("%u ", normalized_indexes[j]);
                 lock |= (1 << normalized_indexes[j]);
             }
+            lock = reverse_uint64_t(lock);
             mcd.old = 0;
             mcd.new_value = lock;
             mcd.mask = lock;
@@ -419,9 +483,16 @@ namespace cuckoo_virtual_rdma {
         VRMessage message;
         message.function = message_type_to_function_string(MASKED_CAS_REQUEST);
         message.function_args["lock_index"] = to_string(masked_cas_data.min_lock_index);
-        message.function_args["old"] = to_string(masked_cas_data.old);
-        message.function_args["new"] = to_string(masked_cas_data.new_value);
-        message.function_args["mask"] = to_string(masked_cas_data.mask);
+
+
+
+        message.function_args["old"] = uint64t_to_bin_string(masked_cas_data.old);
+        message.function_args["new"] = uint64t_to_bin_string(masked_cas_data.new_value);
+        message.function_args["mask"] = uint64t_to_bin_string(masked_cas_data.mask);
+
+        // message.function_args["old"] = uint64t_to_bin_string(__builtin_bswap64(masked_cas_data.old));
+        // message.function_args["new"] = uint64t_to_bin_string(__builtin_bswap64(masked_cas_data.new_value));
+        // message.function_args["mask"] = uint64t_to_bin_string(__builtin_bswap64(masked_cas_data.mask));
         return message;
     }
 
@@ -435,10 +506,18 @@ namespace cuckoo_virtual_rdma {
 
     VRMessage get_covering_read_from_lock_message(VRMessage lock_message, unsigned int buckets_per_lock, unsigned int row_size_bytes) {
 
+        printf("Getting covering read from lock message\n");
         vector<unsigned int> lock_indexes = lock_message_to_lock_indexes(lock_message);
+
+        //print lock indexes
+        printf("Lock indexes: ");
+        for (int i=0; i<lock_indexes.size(); i++) {
+            printf("%d ", lock_indexes[i]);
+        }
         unsigned int base_index = get_lock_message_lock_index(lock_message);
         unsigned int min_index = *min_element(lock_indexes.begin(), lock_indexes.end());
         unsigned int max_index = *max_element(lock_indexes.begin(), lock_indexes.end());
+        printf("base_index: %d min_index: %d, max_index: %d\n", base_index, min_index, max_index);
 
         hash_locations buckets;
         buckets.primary = (base_index + min_index) * buckets_per_lock;

@@ -204,6 +204,7 @@ namespace cuckoo_search {
 
     #define MAX_SEARCH_ITEMS 5000
     vector<path_element> a_star_search(Table table, hash_locations (*location_func) (string, unsigned int), Key key, std::vector<unsigned int> open_buckets){
+        printf("actually entering a_star search, this is no joke!!\n");
         vector<path_element> path;
         const unsigned int target_count = 1;
         vector<unsigned int> targets = find_closest_target_n_bi_directional(table, location_func, key, target_count);
@@ -212,14 +213,14 @@ namespace cuckoo_search {
         a_star_pe * prior_aspe = NULL;
         a_star_pe search_element;
 
-        //Debugging print the list of targets
-        // cout << "targets: " << endl;
-        // for (auto target : targets){
-        //     cout << target << " " << endl;
-        // }
+        // Debugging print the list of targets
+        cout << "targets: " << endl;
+        for (auto target : targets){
+            cout << target << " " << endl;
+        }
 
         for (auto target : targets){
-            // cout << "target: " << target << endl;
+            cout << "target: " << target << endl;
             path_element starting_pe = path_element(key, -1, -1, -1);
             search_element = a_star_pe(starting_pe, NULL, 0, 0);
 
@@ -230,8 +231,8 @@ namespace cuckoo_search {
             prior_aspe = NULL;
             unsigned int closed_list_addressable_index = 0;
             push_list(open_list, open_list_map, search_element);
-            // cout << "pushed to open list size: " << open_list.size() << endl;
-            // cout << "starting search element " << search_element.pe.to_string() << endl;
+            cout << "pushed to open list size: " << open_list.size() << endl;
+            cout << "starting search element " << search_element.pe.to_string() << endl;
 
             while (open_list.size() > 0){
                 // cout << "top of search -- open list size: " << open_list.size() << endl;

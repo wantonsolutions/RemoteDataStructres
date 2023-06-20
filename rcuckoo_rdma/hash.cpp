@@ -80,9 +80,9 @@ unsigned int rcuckoo_secondary_location_independent(string key, unsigned int tab
     return location;
 }
 
-unsigned int get_table_id_from_index(unsigned int index){
-    return index % 2;
-}
+// unsigned int get_table_id_from_index(unsigned int index){
+//     return index % 2;
+// }
 
 
 unsigned int distance_to_bytes(unsigned int a, unsigned int b, unsigned int bucket_size, unsigned int entry_size){
@@ -111,6 +111,7 @@ void ten_k_hashes(){
     for(int i=0; i<10000; i++){
         key[i%key.size()] = key[i%key.size()] + 1;
         hash_locations hl = rcuckoo_hash_locations(key, 1000000);
+        printf("hash_loactions primary: %d secondary: %d\n", hl.primary, hl.secondary);
         // XXH64_hash_t hash = h1(key);
     }
 }
