@@ -27,11 +27,15 @@ namespace cuckoo_virtual_rdma {
         CAS_REQUEST,
         CAS_RESPONSE,
         MASKED_CAS_REQUEST,
-        MASKED_CAS_RESPONSE
+        MASKED_CAS_RESPONSE,
+        NO_OP_MESSAGE
     };
 
     typedef struct VRMessage {
         string function;
+        VRMessage(){
+            function = "";
+        }
         unordered_map<string,string> function_args;
         message_type get_message_type();
         uint32_t get_message_size_bytes();
@@ -120,6 +124,12 @@ namespace cuckoo_virtual_rdma {
     VRMessage single_bucket_read_message(unsigned int bucket, unsigned int row_size_bytes);
     vector<VRMessage> single_bucket_read_messages(hash_locations buckets, unsigned int row_size_bytes);
     vector<VRMessage> read_threshold_message(hash_locations (*location_function)(string, unsigned int), Key key, unsigned int read_threshold_bytes,unsigned int table_size,unsigned int row_size_bytes);
+
+    vector<unsigned int> lock_message_to_lock_indexes(VRMessage lock_message);
+    VRMessage create_masked_cas_message_from_lock_list(VRMaskedCasData masked_cas_data);
+    vector<VRMessage> create_masked_cas_messages_from_lock_list(vector<VRMaskedCasData> masked_cas_list);
+    VRMessage get_covering_read_from_lock_message(VRMessage lock_message, unsigned int buckets_per_lock, unsigned int row_size_bytes);
+
 }
 
 #endif

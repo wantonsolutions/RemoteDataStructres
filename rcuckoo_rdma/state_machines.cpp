@@ -494,10 +494,10 @@ namespace cuckoo_state_machines {
         }
     }
 
-    read_status Client_State_Machine::wait_for_read_messages_fsm(Table& table, VRMessage* message, const Key& key){
-        if (message && message->get_message_type() == READ_RESPONSE) {
-            printf("unpacking read response %s\n", message->to_string().c_str());
-            unordered_map<string,string> args = unpack_read_read_response(*message);
+    read_status Client_State_Machine::wait_for_read_messages_fsm(Table& table, VRMessage message, const Key& key){
+        if (message.get_message_type() == READ_RESPONSE) {
+            printf("unpacking read response %s\n", message.to_string().c_str());
+            unordered_map<string,string> args = unpack_read_read_response(message);
             fill_local_table_with_read_response(table, args);
 
             vector <Entry> entries = decode_entries_from_string(args["read"]);
@@ -514,11 +514,7 @@ namespace cuckoo_state_machines {
         return rs;
     }
 
-    vector<VRMessage> Client_State_Machine::general_idle_fsm(vector<VRMessage> *messages) {
-        if (!messages){
-            printf("Messages are not set, returning an empty set of messages");
-            return vector<VRMessage>();
-        }
+    vector<VRMessage> Client_State_Machine::general_idle_fsm() {
         Request next_request = _workload_driver.next();
         printf("next request is %s\n", next_request.to_string().c_str());
 

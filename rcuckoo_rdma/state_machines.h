@@ -132,7 +132,10 @@ namespace cuckoo_state_machines {
         IDLE,
         READING,
         AQUIRE_LOCKS,
+        RELEASE_LOCKS_TRY_AGAIN,
+        INSERTING,
     };
+
     static const char *client_state_names[] = {"idle", "reading"};
     const char* get_client_state_name(client_state state);
 
@@ -152,9 +155,9 @@ namespace cuckoo_state_machines {
             vector<VRMessage> begin_read(vector<VRMessage> messages);
             bool read_complete();
             bool read_successful(Key key);
-            read_status wait_for_read_messages_fsm(Table &table, VRMessage *message, const Key &key);
+            read_status wait_for_read_messages_fsm(Table &table, VRMessage message, const Key &key);
             string get_state_machine_name();
-            vector<VRMessage> general_idle_fsm(vector<VRMessage> *messages);
+            vector<VRMessage> general_idle_fsm();
             unordered_map<string, string> get_stats();
             virtual vector<VRMessage> put();
             virtual vector<VRMessage> get();

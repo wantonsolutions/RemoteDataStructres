@@ -4,6 +4,7 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
+#include <set>
 #include "cuckoo.h"
 #include "tables.h"
 #include "search.h"
@@ -54,7 +55,7 @@ namespace cuckoo_rcuckoo {
         _current_insert_key = Key();
         _search_path = vector<path_element>();
         _search_path_index = 0;
-        _locks_held = vector<int>();
+        _locks_held = vector<unsigned int>();
         _current_locking_messages = vector<VRMessage>();
         _current_locking_read_messages = vector<VRMessage>();
         _locking_message_index = 0;
@@ -99,6 +100,15 @@ namespace cuckoo_rcuckoo {
         return Client_State_Machine::begin_read(messages);
     }
 
+    vector<VRMessage> RCuckoo::get_current_locking_message_with_covering_read() {
+        VRMessage lock_message = _current_locking_messages[_locking_message_index];
+        VRMessage read_message = get_covering_read_from_lock_message(lock_message, _buckets_per_lock, _table.row_size_bytes());
+        _outstanding_read_requests++;
+        vector<VRMessage> lock_and_read_messages = {lock_message, read_message};
+        return lock_and_read_messages;
+
+    }
+
     vector<VRMessage> RCuckoo::aquire_locks() {
         _locking_message_index = 0;
         vector<unsigned int> buckets = search_path_to_buckets(_search_path);
@@ -110,7 +120,9 @@ namespace cuckoo_rcuckoo {
         #endif
 
         vector<VRMaskedCasData> lock_list = get_lock_list(buckets, _buckets_per_lock, _locks_per_message);
-        return ;
+        vector<VRMessage> masked_cas_messages = create_masked_cas_messages_from_lock_list(lock_list);
+        _current_locking_messages = masked_cas_messages;
+        return get_current_locking_message_with_covering_read();
     }
 
     vector<VRMessage> RCuckoo::search() {
@@ -136,6 +148,116 @@ namespace cuckoo_rcuckoo {
     vector<VRMessage> RCuckoo::put() {
         _current_insert_rtt++;
         return search();
+    }
+
+    vector<VRMessage> RCuckoo::idle_fsm(VRMessage message) {
+        if (message.get_message_type() != NO_OP) {
+            printf("ERROR: Client %d in idle state received message of type %s\n", _id, message.function);
+            throw logic_error("ERROR: Client in idle state received message of type");
+        }
+        return Client_State_Machine::general_idle_fsm();
+    }
+
+    vector<VRMessage> RCuckoo::read_fsm(VRMessage message) {
+        read_status rs = wait_for_read_messages_fsm(_table, message, _current_read_key);
+        if (rs.complete) {
+            _state = IDLE;
+            State_Machine::complete_read_stats(rs.success, _current_read_key);
+            _reading=false;
+        }
+        return vector<VRMessage>();
+    }
+
+
+    vector<VRMessage> RCuckoo::fsm_logic(VRMessage message){
+
+        //The client is done
+        if (_complete && _state == IDLE) {
+            return vector<VRMessage>();
+        }
+
+        if (_state == IDLE) {
+            return idle_fsm(message);
+        }
+
+        if (_state == READING) {
+            return read_fsm(message);
+        }
+
+        if (_state == AQUIRE_LOCKS) {
+            return aquire_locks_with_reads_fsm(message);
+        }
+
+        // if (_state == RELEASE_LOCKS_TRY_AGAIN) {
+        //     return release_locks_fsm(message);
+        // }
+
+        // if (_state == INSERTING) {
+        //     return insert_and_release_fsm(message);
+        // }
+    }
+
+    void RCuckoo::receive_successful_locking_message(VRMessage message) {
+        vector<unsigned int> lock_indexes = lock_message_to_lock_indexes(message);
+        for (unsigned int i = 0; i < lock_indexes.size(); i++) {
+            _locks_held.push_back(lock_indexes[i]);
+        }
+        //checking that the locks do not have duplicates
+        assert(_locks_held.size() == set<unsigned int>(_locks_held.begin(), _locks_held.end()).size());
+        _locking_message_index++;
+        
+    }
+
+    VRMessage RCuckoo::get_prior_locking_message() {
+        return _current_locking_messages[_locking_message_index - 1];
+    }
+
+    bool RCuckoo::all_locks_aquired() {
+        return (_locking_message_index >= _current_locking_messages.size() && _locks_held.size() > 0);
+    }
+
+    bool RCuckoo::read_complete() {
+        return (_outstanding_read_requests == 0);
+    }
+
+    vector<VRMessage> RCuckoo::begin_insert() {
+        _state = INSERTING;
+        printf("TODO we got here motherfucker!! -- if you get here today congrats");
+        exit(0);
+
+
+    }
+
+    vector<VRMessage> RCuckoo::aquire_locks_with_reads_fsm(VRMessage message) {
+        if (message.get_message_type() == MASKED_CAS_RESPONSE) {
+            try {
+                assert(message.function_args["success"] == "true" || message.function_args["success"] == "false");
+                bool success = message.function_args["success"] == "true";
+                if (success) {
+                    printf("Client %d successfully aquired lock %s\n", _id, message.function_args["lock_id"].c_str());
+                    printf("message received %s\n", message.to_string().c_str());
+                    VRMessage issued_locking_message = get_prior_locking_message();
+                    receive_successful_locking_message(issued_locking_message);
+                }
+                if (!all_locks_aquired()) {
+                    _current_insert_rtt++;
+                    return get_current_locking_message_with_covering_read();
+                }
+            } catch (const std::out_of_range& oor) {
+                printf("ERROR: Client %d received malformed masked cas response %s\n", _id, message.to_string().c_str());
+                throw logic_error("ERROR: Client received malformed masked cas response");
+            }
+        }
+
+        if (message.get_message_type() == READ_RESPONSE) {
+            fill_local_table_with_read_response(_table, message.function_args);
+            _outstanding_read_requests--;
+            if (all_locks_aquired() && read_complete()) {
+                return begin_insert();
+            }
+        }
+
+        return vector<VRMessage>();
     }
 
 

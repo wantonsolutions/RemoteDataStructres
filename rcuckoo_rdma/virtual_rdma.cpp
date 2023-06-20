@@ -1,7 +1,7 @@
 #include "virtual_rdma.h"
 #include <string.h>
 #include <algorithm>
-#include<iostream>
+#include <iostream>
 
 using namespace std;
 namespace cuckoo_virtual_rdma {
@@ -48,6 +48,8 @@ namespace cuckoo_virtual_rdma {
             return READ_REQUEST;
         } else if (function == "fill_table_with_read") {
             return READ_RESPONSE;
+        } else if (function == "no_op" || function == "") {
+            return NO_OP_MESSAGE;
         } else {
             printf("Error unknown function (%s)\n", function.c_str());
             exit(1);
@@ -72,6 +74,8 @@ namespace cuckoo_virtual_rdma {
                 return "masked_cas_lock_table";
             case MASKED_CAS_RESPONSE:
                 return "fill_lock_table_masked_cas";
+            case NO_OP_MESSAGE:
+                return "no_op";
             default:
                 printf("Error unknown message type %d\n", type);
                 exit(1);
@@ -236,6 +240,31 @@ namespace cuckoo_virtual_rdma {
         return;
     }
 
+    unsigned int get_lock_message_lock_index(VRMessage lock_message) {
+            unsigned int base_index = stoi(lock_message.function_args["lock_index"]);
+            base_index = base_index * 8; //convert bit alignment to byte alignment for ease of manipulation
+            return base_index;
+
+    }
+
+    vector<unsigned int> lock_message_to_lock_indexes(VRMessage lock_message) {
+        vector<unsigned int> lock_indexes;
+        try { 
+            unsigned int base_index = get_lock_message_lock_index(lock_message);
+            uint64_t mask = stoull(lock_message.function_args["mask"]);
+            for (int i=0; i<64; i++) {
+                if (mask & (1 << i)) {
+                    lock_indexes.push_back(base_index + i);
+                }
+            }
+        } catch (exception &e) {
+            printf("error in lock_message_to_lock_indexes %s\n", e.what());
+            exit(1);
+        }
+        return lock_indexes;
+
+    }
+
     int keys_contained_in_read_response(const Key &key, const vector<Entry> &entries) {
         int count = 0;
         for (int i=0; i<entries.size(); i++) {
@@ -386,5 +415,36 @@ namespace cuckoo_virtual_rdma {
         return messages;
     }
 
-    
+    VRMessage create_masked_cas_message_from_lock_list(VRMaskedCasData masked_cas_data) {
+        VRMessage message;
+        message.function = message_type_to_function_string(MASKED_CAS_REQUEST);
+        message.function_args["lock_index"] = to_string(masked_cas_data.min_lock_index);
+        message.function_args["old"] = to_string(masked_cas_data.old);
+        message.function_args["new"] = to_string(masked_cas_data.new_value);
+        message.function_args["mask"] = to_string(masked_cas_data.mask);
+        return message;
+    }
+
+    vector<VRMessage> create_masked_cas_messages_from_lock_list(vector<VRMaskedCasData> masked_cas_list) {
+        vector<VRMessage> messages;
+        for (int i=0; i<masked_cas_list.size(); i++) {
+            messages.push_back(create_masked_cas_message_from_lock_list(masked_cas_list[i]));
+        }
+        return messages;
+    }
+
+    VRMessage get_covering_read_from_lock_message(VRMessage lock_message, unsigned int buckets_per_lock, unsigned int row_size_bytes) {
+
+        vector<unsigned int> lock_indexes = lock_message_to_lock_indexes(lock_message);
+        unsigned int base_index = get_lock_message_lock_index(lock_message);
+        unsigned int min_index = *min_element(lock_indexes.begin(), lock_indexes.end());
+        unsigned int max_index = *max_element(lock_indexes.begin(), lock_indexes.end());
+
+        hash_locations buckets;
+        buckets.primary = (base_index + min_index) * buckets_per_lock;
+        buckets.secondary = ((base_index + max_index)) * buckets_per_lock + (buckets_per_lock - 1);
+
+        VRMessage read_message = multi_bucket_read_message(buckets, row_size_bytes)[0];
+        return read_message;
+    }
 }
