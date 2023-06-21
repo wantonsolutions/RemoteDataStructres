@@ -10,6 +10,7 @@
 #include "tables.h"
 #include "search.h"
 #include "hash.h"
+#include "log.h"
 
 #define DEBUG
 
@@ -42,6 +43,7 @@ namespace cuckoo_rcuckoo {
             _read_threshold_bytes = stoi(config["read_threshold_bytes"]);
             _buckets_per_lock = stoi(config["buckets_per_lock"]);
             _locks_per_message = stoi(config["locks_per_message"]);
+            _id = stoi(config["id"]);
 
         } catch (exception& e) {
             printf("ERROR: RCuckoo config missing required field\n");
@@ -182,22 +184,31 @@ namespace cuckoo_rcuckoo {
 
     vector<VRMessage> RCuckoo::fsm_logic(VRMessage message){
 
+        ALERT("Client " + to_string(_id), "Received Message: %s\n", message.to_string().c_str());
+        vector<VRMessage> response;
+
         //The client is done
         if (_complete && _state == IDLE) {
-            return vector<VRMessage>();
+            response = vector<VRMessage>();
         }
 
-        if (_state == IDLE) {
-            return idle_fsm(message);
+        switch(_state) {
+            case IDLE:
+                response = idle_fsm(message);
+                break;
+            case READING:
+                response = read_fsm(message);
+                break;
+            case AQUIRE_LOCKS:
+                response = aquire_locks_with_reads_fsm(message);
+                break;
         }
 
-        if (_state == READING) {
-            return read_fsm(message);
+        for (unsigned int i = 0; i < response.size(); i++) {
+            ALERT(("Client " + to_string(_id)).c_str(), "Sending Message: %s\n", response[i].to_string().c_str());
         }
+        return response;
 
-        if (_state == AQUIRE_LOCKS) {
-            return aquire_locks_with_reads_fsm(message);
-        }
 
         // if (_state == RELEASE_LOCKS_TRY_AGAIN) {
         //     return release_locks_fsm(message);
@@ -223,6 +234,10 @@ namespace cuckoo_rcuckoo {
         return _current_locking_messages[_locking_message_index - 1];
     }
 
+    VRMessage RCuckoo::get_current_locking_message() {
+        return _current_locking_messages[_locking_message_index];
+    }
+
     bool RCuckoo::all_locks_aquired() {
         return (_locking_message_index >= _current_locking_messages.size() && _locks_held.size() > 0);
     }
@@ -239,22 +254,33 @@ namespace cuckoo_rcuckoo {
 
     }
 
+    const char * RCuckoo::log_id() {
+        return("client " + to_string(_id)).c_str();
+    }
+
     vector<VRMessage> RCuckoo::aquire_locks_with_reads_fsm(VRMessage message) {
+        INFO(log_id(), "enter aquire locks");
+        INFO(log_id(), "aquire locks with reads fsm Message %s", message.to_string().c_str());
         if (message.get_message_type() == MASKED_CAS_RESPONSE) {
+            INFO(log_id(), "got cas response message");
             try {
-                assert(message.function_args["success"] == "True" || message.function_args["success"] == "false");
-                bool success = message.function_args["success"] == "True";
+                bool success = (bool)stoi(message.function_args["success"]);
                 if (success) {
-                    printf("Client %d successfully aquired lock %s\n", _id, message.function_args["lock_id"].c_str());
-                    printf("message received %s\n", message.to_string().c_str());
-                    VRMessage issued_locking_message = get_prior_locking_message();
+                    INFO(log_id(), "successfully aquired lock %s\n", _id, message.function_args["lock_id"].c_str());
+                    VRMessage issued_locking_message = get_current_locking_message();
+                    INFO(log_id(), "grabbed issued locking message %s", issued_locking_message.to_string().c_str());
                     receive_successful_locking_message(issued_locking_message);
+                    INFO(log_id(), "completed successful lock parse and receive");
+                } else {
+                    ALERT(log_id(), "failed to aquire lock %s\n", _id, message.function_args["lock_id"].c_str());
                 }
+
                 if (!all_locks_aquired()) {
                     _current_insert_rtt++;
                     return get_current_locking_message_with_covering_read();
                 }
-            } catch (const std::out_of_range& oor) {
+                INFO(log_id(), "Completed parsing masked cas message");
+            } catch (exception e) {
                 printf("ERROR: Client %d received malformed masked cas response %s\n", _id, message.to_string().c_str());
                 throw logic_error("ERROR: Client received malformed masked cas response");
             }

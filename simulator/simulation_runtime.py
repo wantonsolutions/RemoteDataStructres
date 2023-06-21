@@ -18,7 +18,6 @@ if simulator:
     from . import hash
     from . import tables
     from . import search
-    from . import rcuckoo_basic
     from . import state_machines
 else:
     import rcuckoo_wrap as hash
@@ -27,6 +26,7 @@ else:
 
     import rcuckoo_wrap as tables
     tables.Table = tables.PyTable
+
     import rcuckoo_wrap as cuckoo
     cuckoo.rcuckoo = cuckoo.PyRCuckoo
 
@@ -590,7 +590,7 @@ def main():
     config['indexes'] = table_size
     config['num_clients'] = 1
     config['bucket_size'] = 8
-    config['num_steps'] = 1
+    config['num_steps'] = 5
     config['read_threshold_bytes'] = 256
     config["buckets_per_lock"] = 1
     config["locks_per_message"] = 64
@@ -600,7 +600,7 @@ def main():
     config['max_fill']= 90
     config['deterministic']=True
     # config["state_machine"]=race.race
-    config["state_machine"]=cuckoo.PyRCuckoo
+    config["state_machine"]=cuckoo.rcuckoo
     # config["state_machine"]=cuckoo.rcuckoo
     config['workload']='ycsb-w'
     # log.set_debug()

@@ -2,6 +2,7 @@
 #include <string.h>
 #include <algorithm>
 #include <iostream>
+#include "log.h"
 
 using namespace std;
 namespace cuckoo_virtual_rdma {
@@ -201,9 +202,7 @@ namespace cuckoo_virtual_rdma {
         bool success = false;
         Entry new_entry;
 
-        #ifdef DEBUG
-        printf("cas compairision table %08llx == guess %08llx (success=%d -- row %06d, col %06d)\n", ret_val, old, ret_val == old, bucket_id, bucket_offset);
-        #endif
+        WARNING("virtual_rdma", "cas compairision table %08llx == guess %08llx (success=%d -- row %06d, col %06d)\n", ret_val, old, ret_val == old, bucket_id, bucket_offset);
 
         if (ret_val == old) {
             new_entry.set_as_uint64_t(new_value);
@@ -289,18 +288,9 @@ namespace cuckoo_virtual_rdma {
 
             uint64_t mask = bin_string_to_uint64_t(lock_message.function_args["mask"]);
             mask = reverse_uint64_t(mask);
-            printf("mask %llx\n", mask);
-            printf("lock_message_to_lock_indexes base_index=%d, mask=%lld\n", base_index, mask);
             uint64_t one = 1;
             for (uint64_t i=0; i<64; i++) {
-                
-                printf("mask & (1    << i) = %d\n", mask & (one << i));
-                printf("1 << i = %d\n", one << i);
-
                 if (mask & (one << i)) {
-                    printf("lock_message_to_lock_indexes adding %d\n", base_index + i);
-                    printf("lock_message_to_lock_indexes mask=%016llx\n", mask);
-                    printf("i=%d\n",i);
                     lock_indexes.push_back(base_index + i);
                 }
             }

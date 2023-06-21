@@ -448,7 +448,6 @@ cdef class PyRCuckoo:
         cdef rw.VRMessage c_message
         if not message is None:
             c_message = encode_py_message_to_cpp_message(message.payload)
-        print("entering c_rcuckoo.fsm")
         output_messages = self.c_rcuckoo.fsm(c_message)
         ret_messages = []
         if len(output_messages) > 0:
@@ -479,6 +478,25 @@ def decode_entry_from_string(e):
         shift+=8
     return base_int
 
+def reverse_hex_string_in_bytes(hex_string):
+    assert(len(hex_string) == 8)
+    return hex_string[6:8] + hex_string[4:6] + hex_string[2:4] + hex_string[0:2]
+
+def encode_entry_to_string(a):
+    key = '{0:08X}'.format(a)
+    key = reverse_hex_string_in_bytes(key)
+    dummy_value = "0000"
+    return key + ":" + dummy_value
+
+def encode_entries_to_string(entries):
+    str_list = ""
+    for i in range(0, len(entries)):
+        str_list += encode_entry_to_string(entries[i])
+        if i != len(entries) - 1:
+            str_list += ","
+    return str_list.encode('utf8')
+
+
 def decode_entry_from_binary_string(e):
     shift = 0
     base_int = 0
@@ -505,7 +523,7 @@ def encode_py_message_to_cpp_message(message):
     cdef rw.VRMessage c_message
     function_name = message["function"].__name__
     # print("function_name: ", function_name)
-    print("encoding messages INPUT: ", message)
+    # print("encoding messages INPUT: ", message)
     c_message.function = function_name.encode('utf8')
     for k in message["function_args"]:
         if k == "lock_index" or k == "bucket_id" or k == "bucket_offset" or k == "size":
@@ -521,18 +539,17 @@ def encode_py_message_to_cpp_message(message):
                 c_message.function_args[k.encode('utf8')] = "0".encode('utf8')
         elif (k == "old" or k == "mask") and function_name == "fill_lock_table_masked_cas":
             c_message.function_args[k.encode('utf8')] = (lock_array_to_binary_string(message["function_args"][k])).encode('utf8')
-
-        # elif (k == "read" and function_name == "fill_table_with_read"):
-        #     c_message.function_args[k.encode('utf8')] = 
+        elif (k == "read" and function_name == "fill_table_with_read"):
+            c_message.function_args[k.encode('utf8')] = encode_entries_to_string(message["function_args"][k])
         else:
             print("encode error : Unknown key: ", k, " in function_args for function: ", function_name)
             exit(0)
-    print("encoding messages OUTPUT: ", c_message)
+    # print("encoding messages OUTPUT: ", c_message)
     return c_message
 
 def decode_cpp_message_to_python(rw.VRMessage c_message):
 
-    print("decoding messages INPUT: ", c_message)
+    # print("decoding messages INPUT: ", c_message)
     message = vrdma.Message({})
     function_name = c_message.function.decode('utf8')
     message.payload['function'] = vrdma.function_name_to_function_pointer_map[function_name]
@@ -557,7 +574,7 @@ def decode_cpp_message_to_python(rw.VRMessage c_message):
         else:
             print("decode error : Unknown key: ", k, "function_name: ", function_name)
             exit(0)
-    print ("decoding messages OUTPUT: ", message)
+    # print ("decoding messages OUTPUT: ", message)
     return message
             
 
@@ -567,6 +584,7 @@ cdef class PyMemory_State_Machine:
 
     def __init__(self, config=None):
         cdef unordered_map[string,string] c_config
+        print("---------------INIT PyMemory---------")
         if config is not None:
             print(config)
             for k in config:
@@ -574,6 +592,7 @@ cdef class PyMemory_State_Machine:
                 s_conf = str(config[k])
                 c_config[k.encode('utf8')] = s_conf.encode('utf8')
         self.c_memory_state_machine = new rw.Memory_State_Machine(c_config)
+        print("-----------END INIT PyMemory---------")
 
     def set_max_fill(self, int max_fill):
         self.c_memory_state_machine.set_max_fill(max_fill)

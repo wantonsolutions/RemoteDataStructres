@@ -18,6 +18,9 @@ namespace cuckoo_rcuckoo {
             RCuckoo();
             RCuckoo(unordered_map<string, string> config);
             ~RCuckoo() {}
+
+            const char * log_id();
+
             void set_search_function(unordered_map<string, string> config);
             void set_location_function(unordered_map<string, string> config);
 
@@ -68,6 +71,7 @@ namespace cuckoo_rcuckoo {
             bool read_complete();
             bool all_locks_aquired();
             VRMessage get_prior_locking_message();
+            VRMessage get_current_locking_message();
 
     };
 }
