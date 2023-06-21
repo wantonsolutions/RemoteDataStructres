@@ -41,7 +41,7 @@ namespace cuckoo_tables {
 
         Key(string key) {
             for (long unsigned int i = 0; i < KEY_SIZE && i < key.size(); i++){
-                bytes[i] = key[i];
+                bytes[i] = key[i] - '0';
             }
         }
         Key(){
@@ -80,7 +80,7 @@ namespace cuckoo_tables {
         }
         Value(string value){
             for (long unsigned int i = 0; i < VALUE_SIZE && i < value.size(); i++){
-                bytes[i] = value[i];
+                bytes[i] = value[i] - '0';
             }
         }
         Value(){

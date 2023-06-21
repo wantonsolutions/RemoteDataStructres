@@ -18,6 +18,15 @@ using namespace std;
 using namespace cuckoo_search;
 using namespace cuckoo_state_machines;
 namespace cuckoo_rcuckoo {
+
+    string vector_to_string(vector<unsigned int> buckets) {
+
+        stringstream ss;
+        copy(buckets.begin(), buckets.end(), ostream_iterator<unsigned int>(ss, " "));
+        return ss.str();
+        // return "";
+    }
+
     RCuckoo::RCuckoo() : Client_State_Machine() {
         _table = Table();
         printf("RCUCKOO no args, get outta here\n");
@@ -124,11 +133,7 @@ namespace cuckoo_rcuckoo {
         _locking_message_index = 0;
         vector<unsigned int> buckets = search_path_to_buckets(_search_path);
         
-        #ifdef DEBUG
-        stringstream ss;
-        copy(buckets.begin(), buckets.end(), ostream_iterator<unsigned int>(ss, " "));
-        printf("gathering locks for buckets %s\n", ss.str().c_str());
-        #endif
+        INFO(log_id(), "[aquire_locks] gathering locks for buckets %s\n", vector_to_string(buckets).c_str());
 
         vector<VRMaskedCasData> lock_list = get_lock_list(buckets, _buckets_per_lock, _locks_per_message);
         vector<VRMessage> masked_cas_messages = create_masked_cas_messages_from_lock_list(lock_list);
@@ -181,15 +186,41 @@ namespace cuckoo_rcuckoo {
         return vector<VRMessage>();
     }
 
+    void insert_cas_fsm(VRMessage message) {
+
+    }
+
+    void release_cas_fsm(VRMessage message) {
+
+    }
+
+    void insert_and_release_fsm(VRMessage message) {
+        switch(message.get_message_type()){
+            case CAS_RESPONSE:
+                insert_cas_fsm(message);
+                break;
+            case MASKED_CAS_RESPONSE:
+                release_cas_fsm(message);
+                break;
+            case NO_OP_MESSAGE:
+                break;
+            default:
+                throw logic_error("ERROR: Client in insert_and_release_fsm received message of type");
+                break;
+        }
+        return;
+    }
 
     vector<VRMessage> RCuckoo::fsm_logic(VRMessage message){
 
-        ALERT("Client " + to_string(_id), "Received Message: %s\n", message.to_string().c_str());
-        vector<VRMessage> response;
+        ALERT(log_id(), "Received Message: %s\n", message.to_string().c_str());
+        vector<VRMessage> response = vector<VRMessage>();
+
 
         //The client is done
         if (_complete && _state == IDLE) {
             response = vector<VRMessage>();
+            return response;
         }
 
         switch(_state) {
@@ -202,21 +233,20 @@ namespace cuckoo_rcuckoo {
             case AQUIRE_LOCKS:
                 response = aquire_locks_with_reads_fsm(message);
                 break;
+            // case RELEASE_LOCKS_TRY_AGAIN:
+            //     response = release_locks_fsm(message);
+            //     break;
+            case INSERTING:
+                insert_and_release_fsm(message);
+                break;
+            default:
+                throw logic_error("ERROR: Invalid state");
         }
 
         for (unsigned int i = 0; i < response.size(); i++) {
-            ALERT(("Client " + to_string(_id)).c_str(), "Sending Message: %s\n", response[i].to_string().c_str());
+            ALERT(log_id(), "Sending Message: %s\n", response[i].to_string().c_str());
         }
         return response;
-
-
-        // if (_state == RELEASE_LOCKS_TRY_AGAIN) {
-        //     return release_locks_fsm(message);
-        // }
-
-        // if (_state == INSERTING) {
-        //     return insert_and_release_fsm(message);
-        // }
     }
 
     void RCuckoo::receive_successful_locking_message(VRMessage message) {
@@ -246,12 +276,36 @@ namespace cuckoo_rcuckoo {
         return (_outstanding_read_requests == 0);
     }
 
+    vector<VRMessage> RCuckoo::retry_insert() {
+        ALERT("AAAAAHHHH", "retry_insert not yet implemented");
+        exit(0);
+        return vector<VRMessage>();
+    }
+
     vector<VRMessage> RCuckoo::begin_insert() {
         _state = INSERTING;
-        printf("TODO we got here motherfucker!! -- if you get here today congrats");
-        exit(0);
+        INFO(log_id(), "begin_insert");
+        vector<unsigned int> search_buckets = lock_indexes_to_buckets(_locks_held, _buckets_per_lock);
+        //print search buckets
+        for (unsigned int i = 0; i < search_buckets.size(); i++) {
+            INFO(log_id(), "search bucket %d", search_buckets[i]);
+        }
+        _search_path = (this->*_table_search_function)(search_buckets);
+        if (_search_path.size() <=0 ) {
+            ALERT(log_id(), "Second Search Failed for key %s retry time\n", _current_insert_key.to_string().c_str(), _id);
+            _current_insert_rtt++;
+            return retry_insert();
+        }
+        _search_path_index = _search_path.size() -1;
+        vector<VRMessage> insert_messages = gen_cas_messages(_search_path);
+        ALERT(log_id(), "TODO send unlock messages");
+        // vector<VRMessage> unlock_messages = release_locks_batched();
 
-
+        // for ( unsigned int i = 0; i < unlock_messages.size(); i++) {
+        //     insert_messages.push_back(unlock_messages[i]);
+        // }
+        _current_insert_rtt++;
+        return insert_messages;
     }
 
     const char * RCuckoo::log_id() {
@@ -266,13 +320,13 @@ namespace cuckoo_rcuckoo {
             try {
                 bool success = (bool)stoi(message.function_args["success"]);
                 if (success) {
-                    INFO(log_id(), "successfully aquired lock %s\n", _id, message.function_args["lock_id"].c_str());
+                    INFO(log_id(), "successfully aquired lock %s\n", _id, message.function_args["lock_index"].c_str());
                     VRMessage issued_locking_message = get_current_locking_message();
                     INFO(log_id(), "grabbed issued locking message %s", issued_locking_message.to_string().c_str());
                     receive_successful_locking_message(issued_locking_message);
                     INFO(log_id(), "completed successful lock parse and receive");
                 } else {
-                    ALERT(log_id(), "failed to aquire lock %s\n", _id, message.function_args["lock_id"].c_str());
+                    ALERT(log_id(), "failed to aquire lock %s\n", _id, message.function_args["lock_index"].c_str());
                 }
 
                 if (!all_locks_aquired()) {

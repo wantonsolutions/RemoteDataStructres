@@ -3,8 +3,10 @@
 #include <algorithm>
 #include <iostream>
 #include "log.h"
+#include "search.h"
 
 using namespace std;
+using namespace cuckoo_search;
 namespace cuckoo_virtual_rdma {
 
     Request::Request(operation op, Key key, Value value){
@@ -316,6 +318,21 @@ namespace cuckoo_virtual_rdma {
         return (buckets.distance() + 1) * row_size_bytes;
     }
 
+    vector<unsigned int> lock_indexes_to_buckets(vector<unsigned int> lock_indexes, unsigned int buckets_per_lock) {
+        vector<unsigned int> buckets;
+        //Translate locks by multiplying by the buckets per lock
+        for (int i=0; i<lock_indexes.size(); i++) {
+            unsigned int lock_index = lock_indexes[i];
+            unsigned int bucket = lock_index * buckets_per_lock;
+            //fill in buckets that are covered by the lock
+            //This is every bucket which is covered by the buckets per lock
+            for(int j=0; j<buckets_per_lock; j++) {
+                buckets.push_back(bucket + j);
+            }
+        }
+        return buckets;
+    }
+
     vector<unsigned int> get_unique_lock_indexes(vector<unsigned int> buckets, unsigned int buckets_per_lock) {
         vector<unsigned int> buckets_chunked_by_lock;
         for (int i=0; i<buckets.size(); i++) {
@@ -515,5 +532,30 @@ namespace cuckoo_virtual_rdma {
 
         VRMessage read_message = multi_bucket_read_message(buckets, row_size_bytes)[0];
         return read_message;
+    }
+
+    VRMessage cas_table_entry_message(unsigned int bucket_index, unsigned int bucket_offset, Key old, Key new_value) {
+        VRMessage cas_message;
+        cas_message.function = message_type_to_function_string(CAS_REQUEST);
+        cas_message.function_args["bucket_id"] = to_string(bucket_index);
+        cas_message.function_args["bucket_offset"] = to_string(bucket_offset);
+        cas_message.function_args["old"] = old.to_string();
+        cas_message.function_args["new"] = new_value.to_string();
+        return cas_message;
+    }
+
+    VRMessage next_cas_message(vector<path_element> search_path, unsigned int index) {
+        path_element insert_pe = search_path[index];
+        path_element copy_pe = search_path[index+1];
+        return cas_table_entry_message(insert_pe.bucket_index, insert_pe.offset, insert_pe.key, copy_pe.key);
+    }
+
+    vector<VRMessage> gen_cas_messages(vector<path_element> search_path) {
+        vector<VRMessage> cas_messages;
+        ALERT("gen_cas_message", "Generating cas messages is likey incorrect, check the path order!!");
+        for (int i=0; i<search_path.size()-1; i++) {
+            cas_messages.push_back(next_cas_message(search_path,i));
+        }
+        return cas_messages;
     }
 }

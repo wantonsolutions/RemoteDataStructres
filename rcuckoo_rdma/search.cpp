@@ -117,10 +117,13 @@ namespace cuckoo_search {
     //It starts by finding the location we are inserting into, and then steps in both directions though the table looking for openings
     //It returns a vector of open slots
     vector<unsigned int> find_closest_target_n_bi_directional(Table table, hash_locations (*location_func) (string, unsigned int), Key key, unsigned int n){
+        cout << "finding bi directional targets for key " << key.to_string() << endl;
+        table.print_table();
         vector<unsigned int> targets;
         hash_locations locations = location_func(key.to_string(), table.get_row_count());
         unsigned int index_0 = locations.primary;
-        unsigned int index_1 = locations.primary -1;
+        unsigned int index_1 = (locations.primary -1);
+
         unsigned int counter = 0;
         while (targets.size() < n){
             //deal with wrap around for unsigned ints
@@ -130,6 +133,7 @@ namespace cuckoo_search {
             if (index_1 >= table.get_row_count()){
                 index_1 = table.get_row_count() - 1;
             }
+            cout << "index_0 " << index_0 << " index_1 " << index_1 << " n " << n << endl;
             if (counter > table.get_row_count() / 2) {
                 return targets;
             }

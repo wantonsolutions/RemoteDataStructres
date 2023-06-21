@@ -8,8 +8,10 @@
 #include <any>
 #include "assert.h"
 #include "hash.h"
+#include "search.h"
 
 using namespace std;
+using namespace cuckoo_search;
 
 namespace cuckoo_virtual_rdma {
     enum operation {
@@ -110,6 +112,7 @@ namespace cuckoo_virtual_rdma {
 
     unsigned int single_read_size_bytes(hash_locations buckets, unsigned int row_size_bytes);
     vector<VRMessage> read_threshold_message(hash_locations (*location_function)(string, unsigned int), Key current_read_key, unsigned int read_threshold_bytes,unsigned int table_size,unsigned int row_size_bytes);
+    vector<unsigned int> lock_indexes_to_buckets(vector<unsigned int> lock_indexes, unsigned int buckets_per_lock);
 
 
 
@@ -133,6 +136,10 @@ namespace cuckoo_virtual_rdma {
     VRMessage create_masked_cas_message_from_lock_list(VRMaskedCasData masked_cas_data);
     vector<VRMessage> create_masked_cas_messages_from_lock_list(vector<VRMaskedCasData> masked_cas_list);
     VRMessage get_covering_read_from_lock_message(VRMessage lock_message, unsigned int buckets_per_lock, unsigned int row_size_bytes);
+
+    VRMessage cas_table_entry_message(unsigned int bucket_index, unsigned int bucket_offset, Key old, Key new_value);
+    VRMessage next_cas_message(vector<path_element> search_path, unsigned int index);
+    vector<VRMessage> gen_cas_messages(vector<path_element> search_path);
 
 }
 

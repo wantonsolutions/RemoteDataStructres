@@ -30,6 +30,7 @@ namespace cuckoo_rcuckoo {
             vector<VRMessage> put();
             vector<VRMessage> search();
             vector<VRMessage> begin_insert();
+            vector<VRMessage> retry_insert();
 
 
             vector<VRMessage> get_current_locking_message_with_covering_read();

@@ -508,6 +508,13 @@ def decode_entry_from_binary_string(e):
         shift+=1
     return base_int
 
+def encode_entry_from_int(a):
+    key = '{0:08X}'.format(int(str(a), 16))
+    key = reverse_hex_string_in_bytes(key)
+    dummy_value = "0000"
+    e = key + ":" + dummy_value
+    return e.encode('utf8')
+
 
 def decode_entries_from_string(entries_string):
     entries = []
@@ -523,7 +530,7 @@ def encode_py_message_to_cpp_message(message):
     cdef rw.VRMessage c_message
     function_name = message["function"].__name__
     # print("function_name: ", function_name)
-    # print("encoding messages INPUT: ", message)
+    print("encoding messages INPUT: ", message)
     c_message.function = function_name.encode('utf8')
     for k in message["function_args"]:
         if k == "lock_index" or k == "bucket_id" or k == "bucket_offset" or k == "size":
@@ -541,10 +548,13 @@ def encode_py_message_to_cpp_message(message):
             c_message.function_args[k.encode('utf8')] = (lock_array_to_binary_string(message["function_args"][k])).encode('utf8')
         elif (k == "read" and function_name == "fill_table_with_read"):
             c_message.function_args[k.encode('utf8')] = encode_entries_to_string(message["function_args"][k])
+        elif (k == "old" and function_name == "fill_table_with_cas"):
+            c_message.function_args[k.encode('utf8')] = encode_entry_from_int(message["function_args"][k])
+            # message.payload["function_args"][k] = encode_entry_from_binary_string(v.decode('utf8'))
         else:
             print("encode error : Unknown key: ", k, " in function_args for function: ", function_name)
             exit(0)
-    # print("encoding messages OUTPUT: ", c_message)
+    print("encoding messages OUTPUT: ", c_message)
     return c_message
 
 def decode_cpp_message_to_python(rw.VRMessage c_message):
