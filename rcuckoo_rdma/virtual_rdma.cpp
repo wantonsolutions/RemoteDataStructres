@@ -363,15 +363,17 @@ namespace cuckoo_virtual_rdma {
         vector<unsigned int> current_chunk;
         unsigned int min_lock_index;
         unsigned int bits_in_uint64_t = sizeof(uint64_t) * 8;
-        for (int i=0; i<lock_indexes.size(); i+=locks_per_message) {
+        for (int i=0; i<lock_indexes.size(); i++) {
             if(current_chunk.size() == 0) {
                 min_lock_index = byte_aligned_index(lock_indexes[i]);
                 VERBOSE("break_lock_indexes_into_chunks", "Min lock index: %u origingal %u\n", min_lock_index, lock_indexes[i]);
             }
 
-            if((lock_indexes[i] - min_lock_index) < bits_in_uint64_t && current_chunk.size() < locks_per_message) {
+            if(((lock_indexes[i] - min_lock_index) < bits_in_uint64_t) && (current_chunk.size() < locks_per_message)) {
+                VERBOSE("pushing to chunk", "Pushing %u to chunk\n", lock_indexes[i]);
                 current_chunk.push_back(lock_indexes[i]);
             } else {
+                VERBOSE("pushing to new chunk", "Pushing %u to new chunk\n", lock_indexes[i]);
                 lock_indexes_chunked.push_back(current_chunk);
                 current_chunk.clear();
                 min_lock_index = byte_aligned_index(lock_indexes[i]);
@@ -401,11 +403,13 @@ namespace cuckoo_virtual_rdma {
     }
 
     vector<VRMaskedCasData> lock_chunks_to_masked_cas_data(vector<vector<unsigned int>> lock_chunks) {
+        printf("start here today, this function is buggy, the locks are not ligning up");
+        exit(0);
         vector<VRMaskedCasData> masked_cas_data;
         for (int i=0; i<lock_chunks.size(); i++) {
             VRMaskedCasData mcd;
             vector<unsigned int> normalized_indexes;
-            unsigned int min_index = byte_aligned_index(lock_chunks[i][0]);
+            unsigned int min_index = byte_aligned_index(lock_chunks[i][0]) / 8;
             for (int j=0; j<lock_chunks[i].size(); j++) {
                 //print verbose normalized index
                 VERBOSE("lock_chunks_to_masked_cas", "normalized index %u\n", lock_chunks[i][j] - min_index);
@@ -442,7 +446,7 @@ namespace cuckoo_virtual_rdma {
     }
 
     vector<VRMaskedCasData> get_lock_or_unlock_list(vector<unsigned int> buckets, unsigned int buckets_per_lock, unsigned int locks_per_message, bool locking) {
-        assert(locks_per_message < 64);
+        assert(locks_per_message <= 64);
         vector<unsigned int> unique_lock_indexes = get_unique_lock_indexes(buckets, buckets_per_lock);
         vector<vector<unsigned int>> lock_chunks = break_lock_indexes_into_chunks(unique_lock_indexes, locks_per_message);
         if (locking) {

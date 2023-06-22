@@ -12,6 +12,7 @@
 #include "search.h"
 #include "hash.h"
 #include "log.h"
+#include <cassert>
 
 #define DEBUG
 
@@ -53,6 +54,7 @@ namespace cuckoo_rcuckoo {
             _read_threshold_bytes = stoi(config["read_threshold_bytes"]);
             _buckets_per_lock = stoi(config["buckets_per_lock"]);
             _locks_per_message = stoi(config["locks_per_message"]);
+            assert(_locks_per_message == 64);
             _id = stoi(config["id"]);
 
         } catch (exception& e) {

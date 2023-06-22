@@ -17,7 +17,7 @@ extensions = [
               include_dirs=[xx_hash_abs_dir],
               libraries=['xxhash'],
             #   extra_compile_args=['-std=c++2a'],
-              extra_compile_args=['-std=c++2a', '-DDebug'],
+              extra_compile_args=['-std=c++2a', '-DDebug','-g'],
               language='c++'
               ),
 ]
