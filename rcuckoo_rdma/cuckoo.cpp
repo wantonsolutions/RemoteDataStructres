@@ -432,6 +432,9 @@ namespace cuckoo_rcuckoo {
 
         if (message.get_message_type() == READ_RESPONSE) {
             fill_local_table_with_read_response(_table, message.function_args);
+            ALERT(log_id(), "----Local table after read------");
+            _table.print_table();
+            ALERT(log_id(), "----/Local table after read-----");
             _outstanding_read_requests--;
             if (all_locks_aquired() && read_complete()) {
                 return begin_insert();

@@ -590,7 +590,7 @@ def main():
     config['indexes'] = table_size
     config['num_clients'] = 1
     config['bucket_size'] = 8
-    config['num_steps'] = 5
+    config['num_steps'] = 50
     config['read_threshold_bytes'] = 256
     config["buckets_per_lock"] = 1
     config["locks_per_message"] = 64

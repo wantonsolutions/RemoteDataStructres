@@ -14,6 +14,18 @@ namespace cuckoo_tables {
 
     #define KEY_SIZE 4
     #define VALUE_SIZE 4
+
+    // std::vector<char> HexToBytes(const std::string& hex) {
+    //     std::vector<char> bytes;
+    //     for (unsigned int i = 0; i < hex.length(); i += 2) {
+    //         std::string byteString = hex.substr(i, 2);
+    //         char byte = (char) strtol(byteString.c_str(), NULL, 16);
+    //         bytes.push_back(byte);
+    //     }
+    //     return bytes;
+    // }
+
+
     typedef struct Key { 
         uint8_t bytes[KEY_SIZE];
         string to_string();
@@ -40,8 +52,10 @@ namespace cuckoo_tables {
         }
 
         Key(string key) {
-            for (long unsigned int i = 0; i < KEY_SIZE && i < key.size(); i++){
-                bytes[i] = key[i] - '0';
+            for (long unsigned int i = 0; i < KEY_SIZE*2 && i < key.size(); i+=2){
+                std::string byteString = key.substr(i, 2);
+                uint8_t byte = (uint8_t) strtol(byteString.c_str(), NULL, 16);
+                bytes[i/2] = byte;
             }
         }
         Key(){

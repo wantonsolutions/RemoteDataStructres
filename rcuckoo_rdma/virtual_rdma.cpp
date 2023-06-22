@@ -421,6 +421,7 @@ namespace cuckoo_virtual_rdma {
                 lock |= (1 << normalized_indexes[j]);
             }
             lock = reverse_uint64_t(lock);
+            mcd.min_lock_index = min_index;
             mcd.old = 0;
             mcd.new_value = lock;
             mcd.mask = lock;

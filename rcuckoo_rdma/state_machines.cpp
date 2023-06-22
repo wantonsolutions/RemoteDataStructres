@@ -663,6 +663,10 @@ namespace cuckoo_state_machines {
                     uint64_t old = stoull(message.function_args["old"], nullptr, 10);
                     uint64_t new_val = stoull(message.function_args["new"], nullptr, 10);
                     CasOperationReturn cas_ret = cas_table_entry(_table, bucket_id, offset, old, new_val);
+
+                    WARNING("Memory", "----Table written to----");
+                    _table.print_table();
+                    WARNING("Memory", "----//Table written to--");
                     VRMessage r;
                     r.function = message_type_to_function_string(CAS_RESPONSE);
                     r.function_args["success"] = to_string(cas_ret.success);

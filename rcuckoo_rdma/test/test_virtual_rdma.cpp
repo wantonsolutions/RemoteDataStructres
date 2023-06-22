@@ -43,6 +43,15 @@ int main() {
         }
         cout << endl;
     }
+    vector<VRMaskedCasData> masked_cas_data_2  = lock_chunks_to_masked_cas_data(lock_indexes_list);
+
+    for (auto i : masked_cas_data_2){
+        cout << "Masked Cas Data: " << i.to_string() << endl;
+    }
+
+    cout << "done!" << endl;
+
+
 
 
 }
