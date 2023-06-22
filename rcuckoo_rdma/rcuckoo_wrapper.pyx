@@ -467,8 +467,8 @@ def binary_string_to_lock_array(l_string):
         lock_array.append(int(l))
     return lock_array
 
-def decode_entry_from_string(e):
-    k, v = e.split(":")
+
+def decode_key_only_entry_from_string(k):
     shift = 0
     base_int = 0
     while len(k) > 0:
@@ -477,6 +477,10 @@ def decode_entry_from_string(e):
         base_int += int(base_str,16) << shift
         shift+=8
     return base_int
+
+def decode_entry_from_string(e):
+    k, v = e.split(":")
+    return decode_key_only_entry_from_string(k)
 
 def reverse_hex_string_in_bytes(hex_string):
     assert(len(hex_string) == 8)
@@ -559,7 +563,7 @@ def encode_py_message_to_cpp_message(message):
 
 def decode_cpp_message_to_python(rw.VRMessage c_message):
 
-    # print("decoding messages INPUT: ", c_message)
+    print("decoding messages INPUT: ", c_message)
     message = vrdma.Message({})
     function_name = c_message.function.decode('utf8')
     message.payload['function'] = vrdma.function_name_to_function_pointer_map[function_name]
@@ -576,7 +580,7 @@ def decode_cpp_message_to_python(rw.VRMessage c_message):
         elif function_name == "masked_cas_lock_table" and (k == "old" or k == "new" or k == "mask"):
             message.payload["function_args"][k] = binary_string_to_lock_array(v.decode('utf8'))
         elif function_name == "cas_table_entry" and (k == "old" or k == "new" or k == "mask"):
-            message.payload["function_args"][k] = decode_entry_from_binary_string(v.decode('utf8'))
+            message.payload["function_args"][k] = decode_key_only_entry_from_string(v.decode('utf8'))
         elif k == "read":
             message.payload["function_args"][k] = decode_entries_from_string(v.decode('utf8'))
         elif k == "success":
@@ -584,7 +588,7 @@ def decode_cpp_message_to_python(rw.VRMessage c_message):
         else:
             print("decode error : Unknown key: ", k, "function_name: ", function_name)
             exit(0)
-    # print ("decoding messages OUTPUT: ", message)
+    print ("decoding messages OUTPUT: ", message)
     return message
             
 
