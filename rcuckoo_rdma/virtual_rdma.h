@@ -62,6 +62,7 @@ namespace cuckoo_virtual_rdma {
         uint64_t mask;
         uint64_t new_value;
         uint64_t old;
+        string to_string();
     } VRMaskedCasData;
 
     #define ETHERNET_SIZE 18

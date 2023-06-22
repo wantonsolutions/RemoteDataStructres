@@ -1,6 +1,7 @@
 // #include "state_machines.h"
 #include <string>
 #include <unordered_map>
+#include <algorithm>
 #include <iostream>
 #include <sstream>
 #include <iterator>
@@ -186,29 +187,90 @@ namespace cuckoo_rcuckoo {
         return vector<VRMessage>();
     }
 
-    void insert_cas_fsm(VRMessage message) {
+    void RCuckoo::complete_insert_stats(bool success){
+        _insert_path_lengths.push_back(_search_path.size());
+        _index_range_per_insert.push_back(path_index_range(_search_path));
+        Client_State_Machine::complete_insert_stats(success);
+        return;
+    }
+
+    void RCuckoo::complete_insert(){
+        INFO(log_id(), "[complete_insert] key %s\n", _current_insert_key.to_string().c_str());
+        _state = IDLE;
+        _inserting = false;
+        complete_insert_stats(true);
+        return;
+    }
+
+    void RCuckoo::insert_cas_fsm(VRMessage message) {
+        assert(message.get_message_type() == CAS_RESPONSE);
+        //Note: I used to fill the table with my cas response, the issue is that I only get the old value back.
+        // fill_local_table_with_cas_response(_table, message.function_args);
+        assert(message.function_args["success"] == "1" || message.function_args["success"] == "0");
+        bool success = (bool)stoi(message.function_args["success"]);
+        if (!success) [[unlikely]] {
+            ALERT(log_id(), "CAS Failed for key %s\n", _current_insert_key.to_string().c_str());
+            ALERT(log_id(), "failed cas message: %s\n", message.to_string().c_str());
+            throw logic_error("ERROR: CAS Failed");
+        }
+        _search_path_index--;
+        if (_search_path_index == 0) {
+            VERBOSE(log_id(), "Insert Path Complete for key %s all responses collected\n", _current_insert_key.to_string().c_str());
+        } else if (_search_path_index < 0 ) {
+            throw logic_error("Error we have received too many CAS responses");
+        }
+        return;
+    }
+
+
+
+    vector<VRMessage> RCuckoo::release_locks_fsm(VRMessage message) {
+        vector<VRMessage> response;
+        if (message.get_message_type() != MASKED_CAS_RESPONSE) {
+            VERBOSE(log_id(), "Entered release locks fsm with no masked cas message");
+            return response;
+        }
+        assert(message.function_args["success"] == "1" || message.function_args["success"] == "0");
+        bool success = (bool)stoi(message.function_args["success"]);
+
+        if (!success) [[unlikely]] {
+            ALERT(log_id(), "Masked CAS Failed for key %s\n", _current_insert_key.to_string().c_str());
+            ALERT(log_id(), "failed masked cas message: %s\n", message.to_string().c_str());
+            throw logic_error("ERROR: Masked CAS Failed");
+        }
+        receive_successful_unlocking_message(message);
+        if (all_locks_released()){
+            assert(_state == INSERTING || _state == RELEASE_LOCKS_TRY_AGAIN);
+            switch(_state){
+                case INSERTING:
+                    complete_insert();
+                    return response;
+                
+                case RELEASE_LOCKS_TRY_AGAIN:
+                    return search();
+            }
+        }
+        return response;
+
+
 
     }
 
-    void release_cas_fsm(VRMessage message) {
-
-    }
-
-    void insert_and_release_fsm(VRMessage message) {
+    vector<VRMessage> RCuckoo::insert_and_release_fsm(VRMessage message) {
         switch(message.get_message_type()){
             case CAS_RESPONSE:
                 insert_cas_fsm(message);
-                break;
+                //insert_cas_fsm has no response
+                return vector<VRMessage>();
             case MASKED_CAS_RESPONSE:
-                release_cas_fsm(message);
-                break;
+                return release_locks_fsm(message);
             case NO_OP_MESSAGE:
                 break;
             default:
                 throw logic_error("ERROR: Client in insert_and_release_fsm received message of type");
                 break;
         }
-        return;
+        return vector<VRMessage>();
     }
 
     vector<VRMessage> RCuckoo::fsm_logic(VRMessage message){
@@ -233,11 +295,11 @@ namespace cuckoo_rcuckoo {
             case AQUIRE_LOCKS:
                 response = aquire_locks_with_reads_fsm(message);
                 break;
-            // case RELEASE_LOCKS_TRY_AGAIN:
-            //     response = release_locks_fsm(message);
-            //     break;
+            case RELEASE_LOCKS_TRY_AGAIN:
+                response = release_locks_fsm(message);
+                break;
             case INSERTING:
-                insert_and_release_fsm(message);
+                response = insert_and_release_fsm(message);
                 break;
             default:
                 throw logic_error("ERROR: Invalid state");
@@ -257,7 +319,16 @@ namespace cuckoo_rcuckoo {
         //checking that the locks do not have duplicates
         assert(_locks_held.size() == set<unsigned int>(_locks_held.begin(), _locks_held.end()).size());
         _locking_message_index++;
-        
+    }
+
+    void RCuckoo::receive_successful_unlocking_message(VRMessage message) {
+        vector<unsigned int> unlock_indexes = lock_message_to_lock_indexes(message);
+        for (unsigned int i = 0; i < unlock_indexes.size(); i++) {
+            _locks_held.erase(remove(_locks_held.begin(), _locks_held.end(), unlock_indexes[i]), _locks_held.end());
+        }
+        //checking that the locks do not have duplicates
+        assert(_locks_held.size() == set<unsigned int>(_locks_held.begin(), _locks_held.end()).size());
+        _locking_message_index++;
     }
 
     VRMessage RCuckoo::get_prior_locking_message() {
@@ -272,14 +343,33 @@ namespace cuckoo_rcuckoo {
         return (_locking_message_index >= _current_locking_messages.size() && _locks_held.size() > 0);
     }
 
+    bool RCuckoo::all_locks_released() {
+        return (_locks_held.size() == 0);
+    }
+
     bool RCuckoo::read_complete() {
         return (_outstanding_read_requests == 0);
     }
 
     vector<VRMessage> RCuckoo::retry_insert() {
-        ALERT("AAAAAHHHH", "retry_insert not yet implemented");
-        exit(0);
-        return vector<VRMessage>();
+        _state = RELEASE_LOCKS_TRY_AGAIN;
+        return release_locks_batched();
+    }
+
+    vector<VRMessage> RCuckoo::release_locks_batched(){
+        INFO("release_locks_batched", "Enter releasing locks batched");
+        _locking_message_index=0;
+        vector<unsigned int> buckets = lock_indexes_to_buckets(_locks_held, _buckets_per_lock);
+        //log info buckets
+        for (unsigned int i = 0; i < buckets.size(); i++) {
+            INFO(log_id(), "bucket %d", buckets[i]);
+        }
+        assert(is_sorted(buckets.begin(), buckets.end()));
+        vector<VRMaskedCasData> unlock_list = get_unlock_list(buckets, _buckets_per_lock, _locks_per_message);
+        INFO("release_locks_batched", "unlock list size %d", unlock_list.size());
+        _current_locking_messages = create_masked_cas_messages_from_lock_list(unlock_list);
+        INFO("release_locks_batched", "Exit releasing locks batched");
+        return _current_locking_messages;
     }
 
     vector<VRMessage> RCuckoo::begin_insert() {
@@ -298,13 +388,13 @@ namespace cuckoo_rcuckoo {
         }
         _search_path_index = _search_path.size() -1;
         vector<VRMessage> insert_messages = gen_cas_messages(_search_path);
-        ALERT(log_id(), "TODO send unlock messages");
-        // vector<VRMessage> unlock_messages = release_locks_batched();
+        vector<VRMessage> unlock_messages = release_locks_batched();
 
-        // for ( unsigned int i = 0; i < unlock_messages.size(); i++) {
-        //     insert_messages.push_back(unlock_messages[i]);
-        // }
+        for ( unsigned int i = 0; i < unlock_messages.size(); i++) {
+            insert_messages.push_back(unlock_messages[i]);
+        }
         _current_insert_rtt++;
+        INFO(log_id(), "end begin_insert");
         return insert_messages;
     }
 

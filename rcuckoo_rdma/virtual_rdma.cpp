@@ -41,6 +41,16 @@ namespace cuckoo_virtual_rdma {
         return s;
     }
 
+    string VRMaskedCasData::to_string(){
+        string s = "VRMaskedCasData: {";
+        s += "min_lock_index: " + std::to_string(min_lock_index);
+        s += " mask: " + uint64t_to_bin_string(mask);
+        s += " new_value: " + uint64t_to_bin_string(new_value);
+        s += " old: " + uint64t_to_bin_string(old);
+        s += "}";
+        return s;
+    }
+
     message_type VRMessage::get_message_type(){
         if (function == "cas_table_entry") {
             return CAS_REQUEST;
@@ -276,7 +286,7 @@ namespace cuckoo_virtual_rdma {
 
     unsigned int get_lock_message_lock_index(VRMessage lock_message) {
             unsigned int base_index = stoi(lock_message.function_args["lock_index"]);
-            base_index = base_index * 8; //convert bit alignment to byte alignment for ease of manipulation
+            // base_index = base_index * 8; //convert bit alignment to byte alignment for ease of manipulation
             return base_index;
 
     }
@@ -356,6 +366,7 @@ namespace cuckoo_virtual_rdma {
         for (int i=0; i<lock_indexes.size(); i+=locks_per_message) {
             if(current_chunk.size() == 0) {
                 min_lock_index = byte_aligned_index(lock_indexes[i]);
+                VERBOSE("break_lock_indexes_into_chunks", "Min lock index: %u origingal %u\n", min_lock_index, lock_indexes[i]);
             }
 
             if((lock_indexes[i] - min_lock_index) < bits_in_uint64_t && current_chunk.size() < locks_per_message) {
@@ -396,6 +407,8 @@ namespace cuckoo_virtual_rdma {
             vector<unsigned int> normalized_indexes;
             unsigned int min_index = byte_aligned_index(lock_chunks[i][0]);
             for (int j=0; j<lock_chunks[i].size(); j++) {
+                //print verbose normalized index
+                VERBOSE("lock_chunks_to_masked_cas", "normalized index %u\n", lock_chunks[i][j] - min_index);
                 normalized_indexes.push_back(lock_chunks[i][j] - min_index);
             }
 
@@ -403,8 +416,8 @@ namespace cuckoo_virtual_rdma {
             //#todo we can optimize this by setting the bits right away in the prior loop
             //but this is more readable
             // lock |= (1 << (lock_chunks[i][j] - min_index));
+            VERBOSE("lock_chunks_to_masked_cas", "entering normal loop with a total of %d index", normalized_indexes.size());
             for (int j=0; j<normalized_indexes.size(); j++) {
-                printf("%u ", normalized_indexes[j]);
                 lock |= (1 << normalized_indexes[j]);
             }
             lock = reverse_uint64_t(lock);
@@ -413,15 +426,18 @@ namespace cuckoo_virtual_rdma {
             mcd.mask = lock;
             masked_cas_data.push_back(mcd);
         }
+        VERBOSE("lock_chunks_to_masked_cas", "returning %d masked cas data", masked_cas_data.size());
         return masked_cas_data;
     }
 
     vector<VRMaskedCasData> unlock_chunks_to_masked_cas_data(vector<vector<unsigned int>> lock_chunks){ 
+        VERBOSE("unlock_chunks_to_masked_cas_data", "ENTRY");
         vector<VRMaskedCasData> masked_cas_data = lock_chunks_to_masked_cas_data(lock_chunks);
         for (int i=0; i<masked_cas_data.size(); i++) {
             masked_cas_data[i].old = masked_cas_data[i].new_value;
             masked_cas_data[i].new_value = 0;
         }
+        return masked_cas_data;
     }
 
     vector<VRMaskedCasData> get_lock_or_unlock_list(vector<unsigned int> buckets, unsigned int buckets_per_lock, unsigned int locks_per_message, bool locking) {
@@ -496,18 +512,16 @@ namespace cuckoo_virtual_rdma {
         message.function_args["old"] = uint64t_to_bin_string(masked_cas_data.old);
         message.function_args["new"] = uint64t_to_bin_string(masked_cas_data.new_value);
         message.function_args["mask"] = uint64t_to_bin_string(masked_cas_data.mask);
-
-        // message.function_args["old"] = uint64t_to_bin_string(__builtin_bswap64(masked_cas_data.old));
-        // message.function_args["new"] = uint64t_to_bin_string(__builtin_bswap64(masked_cas_data.new_value));
-        // message.function_args["mask"] = uint64t_to_bin_string(__builtin_bswap64(masked_cas_data.mask));
         return message;
     }
 
     vector<VRMessage> create_masked_cas_messages_from_lock_list(vector<VRMaskedCasData> masked_cas_list) {
+        VERBOSE("create_masked_cas_messages_from_lock_list", "ENTRY");
         vector<VRMessage> messages;
         for (int i=0; i<masked_cas_list.size(); i++) {
             messages.push_back(create_masked_cas_message_from_lock_list(masked_cas_list[i]));
         }
+        VERBOSE("create_masked_cas_messages_from_lock_list", "EXIT");
         return messages;
     }
 
@@ -556,6 +570,7 @@ namespace cuckoo_virtual_rdma {
         for (int i=0; i<search_path.size()-1; i++) {
             cas_messages.push_back(next_cas_message(search_path,i));
         }
+        INFO("gen_cas_message", "Generated %d cas messages", cas_messages.size());
         return cas_messages;
     }
 }

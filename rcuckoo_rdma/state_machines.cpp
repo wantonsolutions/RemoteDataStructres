@@ -257,6 +257,7 @@ namespace cuckoo_state_machines {
         throw logic_error("FSM Logic must be implemented by a subclass");
     }
 
+    static const char *ycsb_workload_names[] = {"ycsb-a", "ycsb-b", "ycsb-c", "ycsb-w"};
     const char* get_ycsb_workload_name(ycsb_workload workload) {
         return ycsb_workload_names[workload];
     }
@@ -333,9 +334,12 @@ namespace cuckoo_state_machines {
     }
 
     void Client_Workload_Driver::record_last_request() {
+        printf("recording last request!!\n");
         if (_last_request.op == PUT) {
+            printf("last request was a put!\n");
             _completed_puts++;
         } else if (_last_request.op == GET) {
+            printf("last request was a get!\n");
             _completed_gets++;
         } else if (_last_request.op == DELETE) {
             printf("ERROR: Delete not implemented\n");
@@ -367,6 +371,7 @@ namespace cuckoo_state_machines {
         Key key = unique_insert(_completed_puts, _client_id, _num_clients, _random_factor);
         Value val = Value();
         Request req = Request{PUT, key, val};
+        _last_request = req;
         return req;
 
     }
@@ -374,6 +379,7 @@ namespace cuckoo_state_machines {
     Request Client_Workload_Driver::next_get() {
         uint32_t next_key_index;
         if (_deterministic){
+            printf("Deterministic get\n");
             next_key_index = _completed_puts - 1;
         } else {
             if (_completed_puts <=1 ) {
@@ -419,6 +425,7 @@ namespace cuckoo_state_machines {
         }
     }
 
+    static const char *client_state_names[] = {"idle", "reading"};
     const char* get_client_state_name(client_state state) {
         return client_state_names[state];
     }

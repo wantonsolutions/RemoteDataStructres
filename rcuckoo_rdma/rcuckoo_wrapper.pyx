@@ -392,7 +392,7 @@ def decode_cpp_stats(client_stats):
         else:
             if dec_str_value == "":
                 decoded_stats[dec_key] = []
-            elif dec_str_value.contains(","):
+            elif "," in dec_str_value:
                 decoded_stats[dec_key] = dec_str_value.split(",")
             else:
                 print("ERROR: I don't know how to decode this value: ", value)

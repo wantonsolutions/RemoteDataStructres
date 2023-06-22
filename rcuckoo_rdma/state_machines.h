@@ -93,7 +93,6 @@ namespace cuckoo_state_machines {
         W,
     };
 
-    static const char *ycsb_workload_names[] = {"ycsb-a", "ycsb-b", "ycsb-c", "ycsb-w"};
     const char* get_ycsb_workload_name(ycsb_workload workload);
 
     class Client_Workload_Driver {
@@ -136,7 +135,6 @@ namespace cuckoo_state_machines {
         INSERTING,
     };
 
-    static const char *client_state_names[] = {"idle", "reading"};
     const char* get_client_state_name(client_state state);
 
     typedef struct read_status {

@@ -42,7 +42,7 @@ RDMA_LIBS = -lrdmacm -libverbs -lpthread
 # 	$(CC) $(CFLAGS) $(INCLUDES) -cpp $<  -o $@
 
 # TARGET := test_hash test_tables test_search rdma_server rdma_client
-TARGET := test_hash test_tables test_search test_state_machines
+TARGET := test_hash test_tables test_search test_state_machines test_virtual_rdma
 test_dir := ./test
 
 all: $(TARGET)
@@ -103,6 +103,10 @@ test_search : search.o
 test_state_machines : state_machines.o cuckoo.o
 	g++ $(CFLAGS)  $(test_dir)/test_state_machines.cpp -o test_state_machines state_machines.o tables.o hash.o search.o virtual_rdma.o $(LIBRARIES)
 	mv test_state_machines $(test_dir)/test_state_machines
+
+test_virtual_rdma : virtual_rdma.o
+	g++ $(CFLAGS)  $(test_dir)/test_virtual_rdma.cpp -o test_virtual_rdma tables.o hash.o search.o virtual_rdma.o $(LIBRARIES)
+	mv test_virtual_rdma $(test_dir)/test_virtual_rdma
 
 
 clean:

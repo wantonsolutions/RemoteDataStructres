@@ -31,11 +31,16 @@ namespace cuckoo_rcuckoo {
             vector<VRMessage> search();
             vector<VRMessage> begin_insert();
             vector<VRMessage> retry_insert();
+            vector<VRMessage> release_locks_batched();
+            void insert_cas_fsm(VRMessage message);
+            vector<VRMessage> release_locks_fsm(VRMessage message);
+            vector <VRMessage> insert_and_release_fsm(VRMessage message);
 
 
             vector<VRMessage> get_current_locking_message_with_covering_read();
 
             void receive_successful_locking_message(VRMessage message);
+            void receive_successful_unlocking_message(VRMessage message);
 
             void clear_statistics();
             string get_state_machine_name();
@@ -44,6 +49,10 @@ namespace cuckoo_rcuckoo {
             vector<VRMessage> idle_fsm(VRMessage message);
             vector<VRMessage> read_fsm(VRMessage message);
             vector<VRMessage> aquire_locks_with_reads_fsm(VRMessage message);
+
+
+            void complete_insert_stats(bool success);
+            void complete_insert();
 
         private:
 
@@ -71,6 +80,7 @@ namespace cuckoo_rcuckoo {
 
             bool read_complete();
             bool all_locks_aquired();
+            bool all_locks_released();
             VRMessage get_prior_locking_message();
             VRMessage get_current_locking_message();
 
