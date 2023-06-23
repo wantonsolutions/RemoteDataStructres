@@ -68,7 +68,7 @@ namespace cuckoo_virtual_rdma {
         } else if (function == "no_op" || function == "") {
             return NO_OP_MESSAGE;
         } else {
-            printf("Error unknown function (%s)\n", function.c_str());
+            ALERT("Error", "unknown function (%s)\n", function.c_str());
             exit(1);
         }
     }
@@ -509,15 +509,7 @@ namespace cuckoo_virtual_rdma {
 
     VRMessage get_covering_read_from_lock_message(VRMessage lock_message, unsigned int buckets_per_lock, unsigned int row_size_bytes) {
 
-        printf("Getting covering read from lock message\n");
         vector<unsigned int> lock_indexes = lock_message_to_lock_indexes(lock_message);
-
-        //print lock indexes
-        printf("Lock indexes: ");
-        for (int i=0; i<lock_indexes.size(); i++) {
-            printf("%d ", lock_indexes[i]);
-        }
-        // unsigned int base_index = get_lock_message_lock_index(lock_message);
         unsigned int min_index = *min_element(lock_indexes.begin(), lock_indexes.end());
         unsigned int max_index = *max_element(lock_indexes.begin(), lock_indexes.end());
         // printf("base_index: %d min_index: %d, max_index: %d\n", base_index, min_index, max_index);
@@ -551,7 +543,6 @@ namespace cuckoo_virtual_rdma {
 
     vector<VRMessage> gen_cas_messages(vector<path_element> search_path) {
         vector<VRMessage> cas_messages;
-        ALERT("gen_cas_message", "Generating cas messages is likey incorrect, check the path order!!");
         for (int i=0; i<search_path.size()-1; i++) {
             cas_messages.push_back(next_cas_message(search_path,i));
         }

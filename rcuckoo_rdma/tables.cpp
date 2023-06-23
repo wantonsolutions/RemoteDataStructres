@@ -173,17 +173,21 @@ namespace cuckoo_tables {
         return;
     }
 
-    void Table::print_table(){
-        cout << "Table::print_table" << endl;
+    string Table::to_string(){
+        string output_string = "";
         for (unsigned int i = 0; i < _table_size; i++){
-            cout << i << ") ";
+            output_string += std::to_string(i)  +  ") ";
             for (unsigned int j = 0; j < _bucket_size; j++){
-                cout << "[" << _table[i][j].to_string() << "]";
+                output_string += "[" + _table[i][j].to_string() += "]";
             }
-            cout << endl;
+            output_string += "\n";
         }
-        cout << "Lock Table" << endl;
-        cout << _lock_table.to_string() << endl;
+        output_string += _lock_table.to_string() + "\n";
+        return output_string;
+    }
+
+    void Table::print_table(){
+        cout << to_string() << endl;
         return;
     }
 

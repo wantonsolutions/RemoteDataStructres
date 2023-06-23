@@ -329,33 +329,29 @@ namespace cuckoo_state_machines {
         } else if (workload == "ycsb-w"){
             _workload = W;
         } else {
-            printf("ERROR: unknown workload\n");
+            ALERT("ERROR", "unknown workload\n");
             throw logic_error("ERROR: unknown workload");
         }
     }
 
     void Client_Workload_Driver::record_last_request() {
-        printf("recording last request!!\n");
         if (_last_request.op == PUT) {
-            printf("last request was a put!\n");
             _completed_puts++;
         } else if (_last_request.op == GET) {
-            printf("last request was a get!\n");
             _completed_gets++;
         } else if (_last_request.op == DELETE) {
-            printf("ERROR: Delete not implemented\n");
+            ALERT("ERROR", "Delete not implemented\n");
             throw logic_error("ERROR: not implemented operation DELETE");
         } else {
-            printf("ERROR: unknown operation\n");
+            ALERT("ERROR", "unknown operation\n");
             throw logic_error("ERROR: unknown operation");
         }
     }
 
     Key Client_Workload_Driver::unique_insert(int insert_index, int client_id, int total_clients, int factor) {
-        printf("Calculating unique insert insert_index: %d client_id: %d total_clients: %d factor: %d\n", insert_index, client_id, total_clients, factor);
         uint64_t key_int = ((insert_index + 1) * total_clients * factor) + client_id;
         Key key;
-        printf("unique_insert key_int: %lu\n", key_int);
+        VERBOSE("DEBUG: unique_insert", "Calculated unique insert %lu -- params: insert_index: %d client_id: %d total_clients: %d factor: %d\n", key_int, insert_index, client_id, total_clients, factor);
         key.set(key_int);
         return key;
     }
@@ -380,7 +376,6 @@ namespace cuckoo_state_machines {
     Request Client_Workload_Driver::next_get() {
         uint32_t next_key_index;
         if (_deterministic){
-            printf("Deterministic get\n");
             next_key_index = _completed_puts - 1;
         } else {
             if (_completed_puts <=1 ) {
@@ -405,7 +400,7 @@ namespace cuckoo_state_machines {
         } else if (_workload == W) {
             return PUT;
         } else {
-            printf("ERROR: unknown workload\n");
+            ALERT("ERROR", "unknown workload\n");
             throw logic_error("ERROR: unknown workload");
         }
     }
@@ -432,12 +427,11 @@ namespace cuckoo_state_machines {
     }
 
     Client_State_Machine::Client_State_Machine() : State_Machine() {
-        printf("TODO client state machine constructor with no argument\n");
+        ALERT("TODO","client state machine constructor with no argument\n");
         exit(1);
     }
 
     Client_State_Machine::Client_State_Machine(unordered_map<string,string> config) : State_Machine(config) {
-        printf("Client State Machine Init with config\n");
         _config = config;
         try{
             _total_inserts = stoi(config["total_inserts"]);
@@ -452,10 +446,9 @@ namespace cuckoo_state_machines {
             _duplicates_found = 0;
             _workload_driver = Client_Workload_Driver(config);
         } catch (exception& e) {
-            printf("ERROR: Client_State_Machine config missing required field\n");
+            ALERT("ERROR", "Client_State_Machine config missing required field\n");
             throw logic_error("ERROR: Client_State_Machine config missing required field");
         }
-        printf("Completed Client_State_Machine Init\n");
     }
 
     void Client_State_Machine::set_max_fill(int max_fill) {
@@ -498,20 +491,20 @@ namespace cuckoo_state_machines {
         bool success = false;
         if (_read_values_found == 0) {
             success = false;
-            printf("Read incomplete (key: %s)\n", key.to_string().c_str());
+            VERBOSE("read success", "Read incomplete (key: %s)", key.to_string().c_str());
         } else if (_read_values_found == 1) {
             success = true;
-            printf("Read success (key: %s)\n", key.to_string().c_str());
+            VERBOSE("read success", "Read success (key: %s)", key.to_string().c_str());
         } else {
             success = false;
             _duplicates_found += (_read_values_found -1);
-            printf("Read Success (key: %s) but duplicate found\n", key.to_string().c_str());
+            VERBOSE("read success", "Read Success (key: %s) but duplicate found\n", key.to_string().c_str());
         }
     }
 
     read_status Client_State_Machine::wait_for_read_messages_fsm(Table& table, VRMessage message, const Key& key){
         if (message.get_message_type() == READ_RESPONSE) {
-            printf("unpacking read response %s\n", message.to_string().c_str());
+            VERBOSE("DEBUG wait_for_read_fsm", "unpacking read response %s\n", message.to_string().c_str());
             unordered_map<string,string> args = unpack_read_read_response(message);
             fill_local_table_with_read_response(table, args);
 
@@ -531,7 +524,7 @@ namespace cuckoo_state_machines {
 
     vector<VRMessage> Client_State_Machine::general_idle_fsm() {
         Request next_request = _workload_driver.next();
-        printf("Generated New Request: %s\n", next_request.to_string().c_str());
+        VERBOSE("DEBUG: general idle fsm","Generated New Request: %s\n", next_request.to_string().c_str());
 
         if (next_request.op == NO_OP) {
             return vector<VRMessage>();
@@ -554,13 +547,13 @@ namespace cuckoo_state_machines {
     }
 
     vector<VRMessage> Client_State_Machine::put() {
-        printf("TODO: implement put in subclass\n");
+        ALERT("TODO", "implement put in subclass\n");
         vector<VRMessage> messages;
         return messages;
     }
 
     vector<VRMessage> Client_State_Machine::get() {
-        printf("TODO: implement gut in subclass\n");
+        ALERT("TODO", "implement gut in subclass\n");
         vector<VRMessage> messages;
         return messages;
     }
@@ -582,11 +575,11 @@ namespace cuckoo_state_machines {
             unsigned int memory_size = stoi(config["memory_size"]);
             unsigned int bucket_size = stoi(config["bucket_size"]);
             unsigned int buckets_per_lock = stoi(config["buckets_per_lock"]);
-            printf("Creating Table : Table_size: %d, bucket_size %d, buckets_per_lock %d\n", memory_size, bucket_size, buckets_per_lock);
+            INFO("Creating Table", "Table_size: %d, bucket_size %d, buckets_per_lock %d\n", memory_size, bucket_size, buckets_per_lock);
             _table = Table(memory_size, bucket_size, buckets_per_lock);
             _max_fill = stoi(config["max_fill"]);
         } catch (exception& e) {
-            printf("ERROR: Memory_State_Machine config missing required field\n");
+            ALERT("ERROR memory state machine init", "Memory_State_Machine config missing required field\n");
             throw logic_error("ERROR: Memory_State_Machine config missing required field");
         }
     }
@@ -619,14 +612,8 @@ namespace cuckoo_state_machines {
 
 
     vector<VRMessage> Memory_State_Machine::fsm_logic(VRMessage message) {
-        // if (!messages){
-        //     printf("Messages are not set, returning an empty set of messages");
-        //     return vector<VRMessage>();
-        // }
-
         if (_table.get_fill_percentage() * 100 > _max_fill) {
-            printf("table full to %d percent, not processing any more requests\n", _max_fill);
-            // _table.print_table();
+            ALERT("fsm logic", "table full to %d percent, not processing any more requests\n", _max_fill);
             throw TableFullException();
         }
 
@@ -634,7 +621,6 @@ namespace cuckoo_state_machines {
         WARNING("Memory", "received %s\n", message.to_string().c_str());
         switch (message.get_message_type()) {
             case READ_REQUEST:
-                printf("unpacking read request %s\n", message.to_string().c_str());
                 try{
                     uint32_t bucket_id = stoi(message.function_args["bucket_id"]);
                     uint32_t offset = stoi(message.function_args["bucket_offset"]);
@@ -654,7 +640,6 @@ namespace cuckoo_state_machines {
                 }
                 break;
             case CAS_REQUEST:
-                // printf("unpacking write response %s\n", message.to_string().c_str());
                 try {
                     uint32_t bucket_id = stoi(message.function_args["bucket_id"]);
                     uint32_t offset = stoi(message.function_args["bucket_offset"]);
@@ -662,9 +647,7 @@ namespace cuckoo_state_machines {
                     uint64_t new_val = stoull(message.function_args["new"], nullptr, 10);
                     CasOperationReturn cas_ret = cas_table_entry(_table, bucket_id, offset, old, new_val);
 
-                    WARNING("Memory", "----Table written to----");
-                    _table.print_table();
-                    WARNING("Memory", "----//Table written to--");
+                    VERBOSE("Memory Got CAS", "print table\n %s", _table.to_string().c_str());
                     VRMessage r;
                     r.function = message_type_to_function_string(CAS_RESPONSE);
                     r.function_args["success"] = to_string(cas_ret.success);
@@ -674,12 +657,11 @@ namespace cuckoo_state_machines {
                     r.function_args["bucket_offset"] = to_string(offset);
                     response.push_back(r);
                 } catch (exception& e){
-                    printf("ERROR: cas request missing required field %s\n", e.what());
+                    ALERT("ERROR", "cas request missing required field %s\n", e.what());
                     throw logic_error("ERROR: cas request missing required field");
                 }
                 break;
             case MASKED_CAS_REQUEST:
-                // printf("unpacking masked cas request %s\n", message.to_string().c_str());
                 try {
                     uint32_t lock_index = stoi(message.function_args["lock_index"]);
                     uint64_t old = bin_string_to_uint64_t(message.function_args["old"]);
@@ -697,12 +679,12 @@ namespace cuckoo_state_machines {
                     r.function_args["mask"] = uint64t_to_bin_string(__builtin_bswap64(mask));
                     response.push_back(r);
                 } catch (exception& e){
-                    printf("ERROR: cas request missing required field %s\n", e.what());
+                    ALERT("ERROR", "cas request missing required field %s\n", e.what());
                     throw logic_error("ERROR: cas request missing required field");
                 }
                 break;
             default:
-                printf("ERROR: unknown message type\n");
+                ALERT("ERROR", "unknown message type\n");
                 throw logic_error("ERROR: unknown message type");
         }
 

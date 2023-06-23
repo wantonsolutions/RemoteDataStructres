@@ -4,6 +4,7 @@
 #include <set>
 #include "tables.h"
 #include "hash.h"
+#include "log.h"
 #include <unordered_map>
 #include <iostream>
 #include <assert.h>
@@ -39,21 +40,12 @@ namespace cuckoo_search {
     }
 
     vector<path_element> random_dfs_search(Key key, unsigned int table_size){
-        cout << "random_dfs_search not implemented" << endl;
-        cout <<"key: " << key.to_string() << endl;
-        cout <<"table_size: " << table_size << endl;
+        ALERT("random dfs search", "random_dfs_search not implemented");
         std::vector<path_element> path;
         return path;
     }
     vector<path_element> bucket_cuckoo_insert(Table table, hash_locations (*location_func) (string, unsigned int), Key key, vector<unsigned int>  open_buckets){
-        cout << "bucket_cuckoo_insert not implemented" << endl;
-        table.print_table();
-        cout <<"key: " << key.to_string() << endl;
-        cout <<"open_buckets: " << endl;
-        for (auto b : open_buckets){
-            cout << b << endl;
-        }
-        cout << "location_func" << location_func;
+        ALERT("Bucket Cuckoo Insert", "Bucket Cuckoo Insert not implemented");
         vector<path_element> path;
         return path;
     }
@@ -205,7 +197,6 @@ namespace cuckoo_search {
 
     #define MAX_SEARCH_ITEMS 5000
     vector<path_element> a_star_search(Table table, hash_locations (*location_func) (string, unsigned int), Key key, std::vector<unsigned int> open_buckets){
-        printf("actually entering a_star search, this is no joke!!\n");
         vector<path_element> path;
         const unsigned int target_count = 1;
         vector<unsigned int> targets = find_closest_target_n_bi_directional(table, location_func, key, target_count);
@@ -215,13 +206,12 @@ namespace cuckoo_search {
         a_star_pe search_element;
 
         // Debugging print the list of targets
-        cout << "targets: " << endl;
         for (auto target : targets){
-            cout << target << " " << endl;
+            VERBOSE("DEBUG a_star search", "target in search pool: %d\n", target);
         }
 
         for (auto target : targets){
-            cout << "target: " << target << endl;
+            VERBOSE("DEBUG a_star search", "searching for target: %d\n", target);
             path_element starting_pe = path_element(key, -1, -1, -1);
             search_element = a_star_pe(starting_pe, NULL, 0, 0);
 
@@ -232,8 +222,7 @@ namespace cuckoo_search {
             prior_aspe = NULL;
             unsigned int closed_list_addressable_index = 0;
             push_list(open_list, open_list_map, search_element);
-            cout << "pushed to open list size: " << open_list.size() << endl;
-            cout << "starting search element " << search_element.pe.to_string() << endl;
+            VERBOSE("DEBUG a_star search", "starting search element %s",search_element.pe.to_string());
 
             while (open_list.size() > 0){
                 // cout << "top of search -- open list size: " << open_list.size() << endl;
@@ -255,7 +244,7 @@ namespace cuckoo_search {
                 //somewhat unintuitive no open buckets means that they are all open
                 if (open_buckets.size() > 0) {
                     for (auto open_bucket : open_buckets){
-                        printf("open bucket %d\n", open_bucket);
+                        VERBOSE("DEBUG a_star search", "open bucket: %d", open_bucket);
                     }
                     if (std::find(open_buckets.begin(), open_buckets.end(), index) == open_buckets.end()) {
                         continue;

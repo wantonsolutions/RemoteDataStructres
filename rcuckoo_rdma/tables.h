@@ -187,6 +187,7 @@ namespace cuckoo_tables {
             Table(unsigned int memory_size, unsigned int bucket_size, unsigned int buckets_per_lock);
             // ~Table();
             void unlock_all();
+            string to_string();
             void print_table();
             CasOperationReturn lock_table_masked_cas(unsigned int lock_index, uint64_t old, uint64_t new_value, uint64_t mask);
             void fill_lock_table_masked_cas(unsigned int lock_index, bool success, uint64_t value, uint64_t mask);

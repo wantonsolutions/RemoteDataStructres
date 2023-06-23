@@ -397,8 +397,6 @@ def decode_cpp_stats(client_stats):
             else:
                 print("ERROR: I don't know how to decode this value: ", value)
                 exit(1)
-
-    print("translation_time_over")
     return decoded_stats
 
 cdef class PyRCuckoo:
@@ -534,7 +532,7 @@ def encode_py_message_to_cpp_message(message):
     cdef rw.VRMessage c_message
     function_name = message["function"].__name__
     # print("function_name: ", function_name)
-    print("encoding messages INPUT: ", message)
+    # print("encoding messages INPUT: ", message)
     c_message.function = function_name.encode('utf8')
     for k in message["function_args"]:
         if k == "lock_index" or k == "bucket_id" or k == "bucket_offset" or k == "size":
@@ -558,12 +556,12 @@ def encode_py_message_to_cpp_message(message):
         else:
             print("encode error : Unknown key: ", k, " in function_args for function: ", function_name)
             exit(0)
-    print("encoding messages OUTPUT: ", c_message)
+    # print("encoding messages OUTPUT: ", c_message)
     return c_message
 
 def decode_cpp_message_to_python(rw.VRMessage c_message):
 
-    print("decoding messages INPUT: ", c_message)
+    # print("decoding messages INPUT: ", c_message)
     message = vrdma.Message({})
     function_name = c_message.function.decode('utf8')
     message.payload['function'] = vrdma.function_name_to_function_pointer_map[function_name]
@@ -588,7 +586,7 @@ def decode_cpp_message_to_python(rw.VRMessage c_message):
         else:
             print("decode error : Unknown key: ", k, "function_name: ", function_name)
             exit(0)
-    print ("decoding messages OUTPUT: ", message)
+    # print ("decoding messages OUTPUT: ", message)
     return message
             
 
