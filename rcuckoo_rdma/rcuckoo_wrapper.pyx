@@ -406,9 +406,9 @@ cdef class PyRCuckoo:
         cdef unordered_map[string,string] c_config
         print("---------------INIT PyRCuckoo---------")
         if config is not None:
-            print(config)
+            # print(config)
             for k in config:
-                print("key:", k, "value: ", config[k])
+                print("rcuckoo key:", k, "value: ", config[k])
                 s_conf = str(config[k])
                 c_config[k.encode('utf8')] = s_conf.encode('utf8')
         self.c_rcuckoo = new rw.RCuckoo(c_config)
@@ -598,9 +598,9 @@ cdef class PyMemory_State_Machine:
         cdef unordered_map[string,string] c_config
         print("---------------INIT PyMemory---------")
         if config is not None:
-            print(config)
+            # print(config)
             for k in config:
-                print("key:", k, "value: ", config[k])
+                print("memory: key:", k, "value: ", config[k])
                 s_conf = str(config[k])
                 c_config[k.encode('utf8')] = s_conf.encode('utf8')
         self.c_memory_state_machine = new rw.Memory_State_Machine(c_config)

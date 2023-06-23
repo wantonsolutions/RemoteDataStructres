@@ -6,6 +6,7 @@
 #include <vector>
 #include <memory>
 #include <stdexcept>
+#include <bitset>
 // #include "spdlog/spdlog.h" //sudo apt install libspdlog-dev
 
 template<typename ... Args>
@@ -131,11 +132,26 @@ namespace cuckoo_tables {
         }
     }
 
+    string pad_string(string s, unsigned int length){
+        while (s.length() < length){
+            s = " " + s;
+        }
+        return s;
+    }
+
     string Lock_Table::to_string(){
         string output_string = "";
         for (unsigned int i = 0; i < _total_lock_entries; i++){
-            output_string += std::to_string(i*8) + ": " + string_format("%02x", _locks[i])+ "\n";
+            std::bitset<8> x(_locks[i]);
+            // printf("bitset: %s\n", x.to_string().c_str());
+            string index_string = std::to_string(i*8);
+            index_string = pad_string(index_string, 5);
+            output_string += index_string + ": " + x.to_string().c_str() + " ";
+            if (i % 8 == 7){
+                output_string += "\n";
+            }
         }
+        printf("\n");
         return output_string;
     }
 
@@ -175,13 +191,17 @@ namespace cuckoo_tables {
 
     string Table::to_string(){
         string output_string = "";
+        output_string += "Table\n";
         for (unsigned int i = 0; i < _table_size; i++){
-            output_string += std::to_string(i)  +  ") ";
+            string index_string = std::to_string(i);
+            index_string = pad_string(index_string, 5);
+            output_string += index_string  +  ") ";
             for (unsigned int j = 0; j < _bucket_size; j++){
                 output_string += "[" + _table[i][j].to_string() += "]";
             }
             output_string += "\n";
         }
+        output_string += "\nLock Table\n";
         output_string += _lock_table.to_string() + "\n";
         return output_string;
     }
