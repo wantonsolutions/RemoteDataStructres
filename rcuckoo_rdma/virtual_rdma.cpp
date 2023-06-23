@@ -4,6 +4,7 @@
 #include <iostream>
 #include "log.h"
 #include "search.h"
+#include "util.h"
 
 using namespace std;
 using namespace cuckoo_search;
@@ -121,31 +122,6 @@ namespace cuckoo_virtual_rdma {
     }
 
 
-    string uint64t_to_bin_string(uint64_t num){
-        string s = "";
-        for (int i = 0; i < 64; i++){
-            if (num & 1){
-                s = "1" + s;
-            } else {
-                s = "0" + s;
-            }
-            num = num >> 1;
-        }
-        return s;
-    }
-
-    uint64_t bin_string_to_uint64_t(string s){
-        // printf("converting %s to uint64_t\n", s.c_str());
-        uint64_t num = 0;
-        for (int i = 0; i < 64; i++){
-            num = num << 1;
-            if (s[i] == '1'){
-                num = num | 1;
-            }
-        }
-        // printf("converted to %llx\n", num);
-        return num;
-    }
 
 
     uint32_t header_size(message_type type){
@@ -295,6 +271,7 @@ namespace cuckoo_virtual_rdma {
         vector<unsigned int> lock_indexes;
         try { 
             unsigned int base_index = get_lock_message_lock_index(lock_message);
+            base_index = base_index * 8; //convert bit alignment to byte alignment for ease of manipulation
             // string mast_str = lock_message.function_args["mask"];
             // printf("Mask String: %s\n", mast_str.c_str());
 
@@ -328,8 +305,10 @@ namespace cuckoo_virtual_rdma {
         return (buckets.distance() + 1) * row_size_bytes;
     }
 
+    
     vector<unsigned int> lock_indexes_to_buckets(vector<unsigned int> lock_indexes, unsigned int buckets_per_lock) {
         vector<unsigned int> buckets;
+        // const uint8_t bits_in_byte = 8;
         //Translate locks by multiplying by the buckets per lock
         for (int i=0; i<lock_indexes.size(); i++) {
             unsigned int lock_index = lock_indexes[i];
@@ -356,6 +335,16 @@ namespace cuckoo_virtual_rdma {
 
     unsigned int byte_aligned_index(unsigned int index) {
         return (index / 8) * 8;
+    }
+
+    unsigned int get_min_byte_aligned_index(vector<unsigned int> indexes) {
+        unsigned int min_index = indexes[0];
+        for (int i=1; i<indexes.size(); i++) {
+            if (indexes[i] < min_index) {
+                min_index = indexes[i];
+            }
+        }
+        return byte_aligned_index(min_index);
     }
 
     vector<vector<unsigned int>> break_lock_indexes_into_chunks(vector<unsigned int> lock_indexes, unsigned int locks_per_message) {
@@ -386,30 +375,14 @@ namespace cuckoo_virtual_rdma {
         return lock_indexes_chunked;
     }
 
-    uint8_t reverse(uint8_t b) {
-        b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
-        b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
-        b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
-        return b;
-    }
-
-    uint64_t reverse_uint64_t(uint64_t n) {
-        uint64_t r = 0;
-        for (int i=0; i<8; i++) {
-            r = (r << 8) | reverse(n & 0xff);
-            n >>= 8;
-        }
-        return r;
-    }
 
     vector<VRMaskedCasData> lock_chunks_to_masked_cas_data(vector<vector<unsigned int>> lock_chunks) {
-        printf("start here today, this function is buggy, the locks are not ligning up");
-        exit(0);
         vector<VRMaskedCasData> masked_cas_data;
         for (int i=0; i<lock_chunks.size(); i++) {
             VRMaskedCasData mcd;
             vector<unsigned int> normalized_indexes;
-            unsigned int min_index = byte_aligned_index(lock_chunks[i][0]) / 8;
+            unsigned int min_index = get_min_byte_aligned_index(lock_chunks[i]);
+            // unsigned int min_index = byte_aligned_index(lock_chunks[i][0]) / 8;
             for (int j=0; j<lock_chunks[i].size(); j++) {
                 //print verbose normalized index
                 VERBOSE("lock_chunks_to_masked_cas", "normalized index %u\n", lock_chunks[i][j] - min_index);
@@ -417,18 +390,22 @@ namespace cuckoo_virtual_rdma {
             }
 
             uint64_t lock = 0;
+            uint64_t one = 1;
             //#todo we can optimize this by setting the bits right away in the prior loop
             //but this is more readable
             // lock |= (1 << (lock_chunks[i][j] - min_index));
             VERBOSE("lock_chunks_to_masked_cas", "entering normal loop with a total of %d index", normalized_indexes.size());
             for (int j=0; j<normalized_indexes.size(); j++) {
-                lock |= (1 << normalized_indexes[j]);
+                VERBOSE("lock_chunks_to_masked_cas", "setting bit %u", j);
+                lock |= (uint64_t)(one << normalized_indexes[j]);
             }
+            VERBOSE("lock_chunks_to_masked_cas", "lock is %s", uint64t_to_bin_string(lock).c_str());
             lock = reverse_uint64_t(lock);
-            mcd.min_lock_index = min_index;
+            mcd.min_lock_index = min_index / 8;
             mcd.old = 0;
             mcd.new_value = lock;
             mcd.mask = lock;
+            VERBOSE("lock_chunks_to_masked_cas", "pushing back masked cas data %s", mcd.to_string().c_str());
             masked_cas_data.push_back(mcd);
         }
         VERBOSE("lock_chunks_to_masked_cas", "returning %d masked cas data", masked_cas_data.size());
@@ -540,14 +517,17 @@ namespace cuckoo_virtual_rdma {
         for (int i=0; i<lock_indexes.size(); i++) {
             printf("%d ", lock_indexes[i]);
         }
-        unsigned int base_index = get_lock_message_lock_index(lock_message);
+        // unsigned int base_index = get_lock_message_lock_index(lock_message);
         unsigned int min_index = *min_element(lock_indexes.begin(), lock_indexes.end());
         unsigned int max_index = *max_element(lock_indexes.begin(), lock_indexes.end());
-        printf("base_index: %d min_index: %d, max_index: %d\n", base_index, min_index, max_index);
+        // printf("base_index: %d min_index: %d, max_index: %d\n", base_index, min_index, max_index);
+        VERBOSE("get_covering_read", "min_bucket: %d, max_bucket: %d\n", min_index, max_index);
 
         hash_locations buckets;
-        buckets.primary = (base_index + min_index) * buckets_per_lock;
-        buckets.secondary = ((base_index + max_index)) * buckets_per_lock + (buckets_per_lock - 1);
+        // buckets.primary = (base_index + min_index) * buckets_per_lock;
+        // buckets.secondary = ((base_index + max_index)) * buckets_per_lock + (buckets_per_lock - 1);
+        buckets.primary = (min_index) * buckets_per_lock;
+        buckets.secondary = (max_index) * buckets_per_lock + (buckets_per_lock - 1);
 
         VRMessage read_message = multi_bucket_read_message(buckets, row_size_bytes)[0];
         return read_message;

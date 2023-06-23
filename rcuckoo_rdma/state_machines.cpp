@@ -8,6 +8,7 @@
 #include "state_machines.h"
 #include "tables.h"
 #include "virtual_rdma.h"
+#include "util.h"
 #include "log.h"
 
 
@@ -530,17 +531,14 @@ namespace cuckoo_state_machines {
 
     vector<VRMessage> Client_State_Machine::general_idle_fsm() {
         Request next_request = _workload_driver.next();
-        printf("next request is %s\n", next_request.to_string().c_str());
+        printf("Generated New Request: %s\n", next_request.to_string().c_str());
 
         if (next_request.op == NO_OP) {
-            printf("No more requests to generate\n");
             return vector<VRMessage>();
         } else if (next_request.op == PUT) {
-            printf("Generating put request\n");
             _current_insert_key = next_request.key;
             return put();
         } else if (next_request.op == GET) {
-            printf("Generating get request\n");
             return get();
         } else {
             printf("ERROR: unknown operation\n");

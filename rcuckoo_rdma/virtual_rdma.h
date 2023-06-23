@@ -90,10 +90,6 @@ namespace cuckoo_virtual_rdma {
     #define MASKED_CAS_RESPONSE_SIZE (BASE_ROCE_SIZE + MASKED_CAS_RESPONSE_HEADER)
 
 
-    uint64_t reverse_uint64_t(uint64_t n);
-    string uint64t_to_bin_string(uint64_t num);
-    uint64_t bin_string_to_uint64_t(string s);
-
     string message_type_to_function_string(message_type type);
     uint32_t header_size(message_type type);
     unordered_map<string,string> unpack_read_read_response(VRMessage &msg);

@@ -584,7 +584,10 @@ def main():
 
     # table_size = 16
     # table_size = 32
-    table_size = 128
+    # table_size = 128
+    # table_size = 256
+    # table_size = 512
+    table_size = 1024 << 2
     runs = []
     print("table size: ", table_size)
 
@@ -592,7 +595,7 @@ def main():
     config['indexes'] = table_size
     config['num_clients'] = 1
     config['bucket_size'] = 8
-    config['num_steps'] = 5000
+    config['num_steps'] = 50000
     config['read_threshold_bytes'] = 256
     config["buckets_per_lock"] = 1
     config["locks_per_message"] = 64
