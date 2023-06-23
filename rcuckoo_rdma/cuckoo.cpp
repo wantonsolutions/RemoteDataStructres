@@ -410,15 +410,17 @@ namespace cuckoo_rcuckoo {
         if (message.get_message_type() == MASKED_CAS_RESPONSE) {
             INFO(log_id(), "got cas response message");
             try {
+                INFO(log_id(), "about to cast message to bool");
                 bool success = (bool)stoi(message.function_args["success"]);
+                INFO(log_id(), "successfully cast to bool %d", (int)success);
                 if (success) {
-                    INFO(log_id(), "successfully aquired lock %s\n", _id, message.function_args["lock_index"].c_str());
+                    INFO(log_id(), "successfully aquired lock %s\n", message.function_args["lock_index"].c_str());
                     VRMessage issued_locking_message = get_current_locking_message();
                     INFO(log_id(), "grabbed issued locking message %s", issued_locking_message.to_string().c_str());
                     receive_successful_locking_message(issued_locking_message);
                     INFO(log_id(), "completed successful lock parse and receive");
                 } else {
-                    ALERT(log_id(), "failed to aquire lock %s\n", _id, message.function_args["lock_index"].c_str());
+                    ALERT(log_id(), "failed to aquire lock %s\n", message.function_args["lock_index"].c_str());
                 }
 
                 if (!all_locks_aquired()) {
