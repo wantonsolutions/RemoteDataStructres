@@ -42,7 +42,8 @@ RDMA_LIBS = -lrdmacm -libverbs -lpthread
 # 	$(CC) $(CFLAGS) $(INCLUDES) -cpp $<  -o $@
 
 # TARGET := test_hash test_tables test_search rdma_server rdma_client
-TARGET := test_hash test_tables test_search test_state_machines test_virtual_rdma
+# TARGET := test_hash test_tables test_search test_state_machines test_virtual_rdma
+TARGET := rdma_server rdma_client
 test_dir := ./test
 
 all: $(TARGET)

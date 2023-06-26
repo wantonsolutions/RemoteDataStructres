@@ -366,6 +366,7 @@ namespace cuckoo_rcuckoo {
         _search_path = (this->*_table_search_function)(search_buckets);
         if (_search_path.size() <=0 ) {
             INFO(log_id(), "Second Search Failed for key %s retry time\n", _current_insert_key.to_string().c_str(), _id);
+            INFO(log_id(), "Hi Stew, I\'m hoping you have a great day", _current_insert_key.to_string().c_str(), _id);
             _current_insert_rtt++;
             return retry_insert();
         }
