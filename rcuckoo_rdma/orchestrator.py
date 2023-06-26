@@ -35,6 +35,19 @@ class rcuckoo_ssh_wrapper:
             result = stderr.read()
             print(result.decode("utf-8"))
 
+    def get_mlx5_ip(self):
+        stdin, stdout, stderr = self.ssh.exec_command(
+            "ifconfig -a | grep enp -A 1 | tail -1 | awk '{print $2}'"
+        )
+        return stdout.read().decode("utf-8").strip()
+
+    def sanity_check_mlx5(self):
+        ip = self.get_mlx5_ip()
+        if ip == "":
+            print("ERROR: mlx5 ip is empty")
+            exit()
+        print("Sanity Check: mlx5 ip is", ip)
+
     def __del__(self):
         self.ssh.close()
 
@@ -43,8 +56,8 @@ class rcuckoo_ssh_wrapper:
 
 class orchestrator:
     def __init__(self):
-        self.client = rcuckoo_ssh_wrapper('ssgrant', 'yak-00.sysnet.ucsd.edu')
-        self.server = rcuckoo_ssh_wrapper('ssgrant', 'yak-01.sysnet.ucsd.edu')
+        self.server = rcuckoo_ssh_wrapper('ssgrant', 'yak-00.sysnet.ucsd.edu')
+        self.client = rcuckoo_ssh_wrapper('ssgrant', 'yak-01.sysnet.ucsd.edu')
 
         #pointer to all of the nodes
         self.all_nodes = [self.client, self.server]
@@ -52,6 +65,8 @@ class orchestrator:
         self.build_location = self.client
         self.project_directory = '/usr/local/home/ssgrant/RemoteDataStructres/rcuckoo_rdma'
         self.sync_dependents = [self.server]
+
+        self.queue_pairs = 24
 
     def set_verbose(self, verbose):
         for node in self.all_nodes:
@@ -87,8 +102,30 @@ class orchestrator:
                 'cd rcuckoo_rdma;'
                 'rsync -r ' + self.build_location.hostname + ':' + self.project_directory + '/*;')
 
+    def sanity_check(self):
+        for node in self.all_nodes:
+            node.sanity_check_mlx5()
+
+
+    def run_rdma_benchmark(self):
+        print("Starting RDMA Benchmark")
+        self.server.run_cmd(
+            'cd rcuckoo_rdma;'
+            './rdma_server -q ' + str(self.queue_pairs) + ' &')
+
+        print("Server is started with queue pairs", self.queue_pairs)
+
+        server_ip = self.server.get_mlx5_ip()
+        self.client.run_cmd(
+            'cd rcuckoo_rdma;'
+            './rdma_client -a ' + server_ip + ' -p 20886 -q '+str(self.queue_pairs)+ ' -x;'
+        )
+
+
 
 
 orch = orchestrator()
+orch.sanity_check()
 orch.build(clean=True)
 orch.sync()
+orch.run_rdma_benchmark()
