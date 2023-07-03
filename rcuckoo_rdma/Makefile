@@ -1,50 +1,21 @@
-# NAME = tables hash
 
-CC = g++ # define the C/C++ compiler to use
-# CFLAGS = -O3 -Wall -Wall -Wextra -pedantic -fPIC
-# # define any directories containing header files other than /usr/include
-XXHASH_INC = /usr/local/home/ssgrant/RemoteDataStructres/rcuckoo_rdma/xxHash
-MLX5_INC = /usr/include/infiniband
-INCLUDES = -I$(XXHASH_INC) -I$(MLX5_INC)
-LIBRARIES = -L$(XXHASH_INC) -lxxhash
+CC := g++ # define the C/C++ compiler to use
+XXHASH_INC := /usr/local/home/ssgrant/RemoteDataStructres/rcuckoo_rdma/xxHash
+MLX5_INC := /usr/include/infiniband
+INCLUDES := -I$(XXHASH_INC) -I$(MLX5_INC)
+LIBRARIES := -L$(XXHASH_INC) -lxxhash
 
 
-CFLAGS = -std=c++2a -g -O3 -Wall -Wall -Wextra -pedantic -fPIC
-# CFLAGS = -std=c++2a -g  -Wall -Wall -Wextra -pedantic -fPIC
-# CFLAGS =  -Wall -Wall -Wextra -pedantic -fPIC
-RDMA_LIBS = -lrdmacm -libverbs -lpthread
-# # define the C++ source files
-# SRCS = $(NAME).cpp 
-# # define the C/C++ object files 
-# # This uses Suffix Replacement within a macro:
-# #   $(name:string1=string2)
-# #         For each word in 'name' replace 'string1' with 'string2'
-# OBJS = $(SRCS:.c=.o)
-# # define the shared library name
-# TARGET = $(NAME).so
-
-# .PHONY: clean
-    
-# all:    $(TARGET)
-# 	@echo  Successfully compiled a .so library.
-
-# # compile object file to .so shared library
-# $(TARGET): $(OBJS) 
-# 	$(CC) $(CFLAGS) $(INCLUDES) -shared -o $(TARGET) $(OBJS) 
-
-# # compile source files to object files
-
-# # this is a suffix replacement rule for building .o's from .c's
-# # it uses automatic variables $<: the name of the prerequisite of
-# # the rule(a .c file) and $@: the name of the target of the rule (a .o file) 
-# # (see the gnu make manual section about automatic variables)
-# .c.o:
-# 	$(CC) $(CFLAGS) $(INCLUDES) -cpp $<  -o $@
+CFLAGS := -std=c++2a -g -O3 -Wall -Wall -Wextra -pedantic -fPIC
+RDMA_LIBS := -lrdmacm -libverbs -lpthread
 
 # TARGET := test_hash test_tables test_search rdma_server rdma_client
-TARGET := test_hash test_tables test_search test_state_machines test_virtual_rdma test_cuckoo
-# TARGET := rdma_server rdma_client
+
+
+# TARGET := test/test_hash test_tables test_search test_state_machines test_virtual_rdma  test_cuckoo
 test_dir := ./test
+TARGET := $(test_dir)/test_hash $(test_dir)/test_tables $(test_dir)/test_search $(test_dir)/test_state_machines $(test_dir)/test_virtual_rdma $(test_dir)/test_cuckoo
+# TARGET := rdma_server rdma_client
 
 all: $(TARGET)
 
@@ -69,7 +40,7 @@ state_machines.o: state_machines.cpp state_machines.h tables.o hash.o search.o v
 cuckoo.o: cuckoo.cpp cuckoo.h state_machines.o tables.o hash.o search.o virtual_rdma.o rdma_engine.o
 	g++ -c $(CFLAGS) $(INCLUDES) -fPIC cuckoo.cpp -o cuckoo.o state_machines.o tables.o hash.o search.o virtual_rdma.o rdma_engine.o
 
-rdma_engine.o: rdma_engine.cpp rdma_engine.h state_machines.o virtual_rdma.object
+rdma_engine.o: rdma_engine.cpp rdma_engine.h state_machines.o virtual_rdma.o
 	g++ -c $(CFLAGS) $(INCLUDES) -fPIC rdma_engine.cpp -o rdma_engine.o state_machines.o virtual_rdma.o
 
 rdma_common.o:
@@ -94,29 +65,29 @@ rdma_server: rdma_server.o
 	$(CC) $(CFLAGS) $(INCLUDES) -fPIC -o rdma_server rdma_server.o rdma_common.o $(RDMA_LIBS)
 
 
-test_hash : hash.o
+$(test_dir)/test_hash : hash.o
 #g++ $(CFLAGS) $(LIBRARIES) -lhash $(test_dir)/test_hash.cpp -o test_hash
 	g++ $(CFLAGS)  $(test_dir)/test_hash.cpp -o test_hash hash.o $(LIBRARIES)
 	mv test_hash $(test_dir)/test_hash
 
-test_tables : tables.o
+$(test_dir)/test_tables : tables.o
 	g++ $(CFLAGS)  $(test_dir)/test_tables.cpp -o test_tables tables.o
 	mv test_tables $(test_dir)/test_tables
 
-test_search : search.o
+$(test_dir)/test_search : search.o
 	g++ $(CFLAGS)  $(test_dir)/test_search.cpp -o test_search search.o tables.o hash.o $(LIBRARIES)
 	mv test_search $(test_dir)/test_search
 
-test_state_machines : state_machines.o cuckoo.o
+$(test_dir)/test_state_machines : state_machines.o cuckoo.o
 	g++ $(CFLAGS)  $(test_dir)/test_state_machines.cpp -o test_state_machines state_machines.o tables.o hash.o search.o virtual_rdma.o util.o $(LIBRARIES)
 	mv test_state_machines $(test_dir)/test_state_machines
 
-test_virtual_rdma : virtual_rdma.o util.o
+$(test_dir)/test_virtual_rdma : virtual_rdma.o util.o
 	g++ $(CFLAGS)  $(test_dir)/test_virtual_rdma.cpp -o test_virtual_rdma tables.o hash.o search.o virtual_rdma.o util.o $(LIBRARIES)
 	mv test_virtual_rdma $(test_dir)/test_virtual_rdma
 
-test_cuckoo: cuckoo.o util.o state_machines.o rdma_engine.o
-	g++ $(CFLAGS)  $(test_dir)/test_cuckoo.cpp -o test_cuckoo cuckoo.o rdma_engine.o tables.o hash.o search.o virtual_rdma.o util.o $(LIBRARIES)
+$(test_dir)/test_cuckoo: cuckoo.o util.o state_machines.o rdma_engine.o
+	g++ $(CFLAGS)  $(test_dir)/test_cuckoo.cpp -o test_cuckoo cuckoo.o rdma_engine.o tables.o hash.o search.o virtual_rdma.o util.o state_machines.o $(LIBRARIES)
 
 
 clean:
@@ -124,3 +95,6 @@ clean:
 	rm -rf *.o *.so
 	rm -rf build
 	rm -rf rcuckoo_wrapper.cpp
+
+
+.PHONY: all clean

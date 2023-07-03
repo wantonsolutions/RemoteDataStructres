@@ -9,6 +9,7 @@
 #include <unordered_map>
 
 using namespace cuckoo_state_machines;
+using namespace cuckoo_rdma_engine;
 using namespace cuckoo_search;
 
 namespace cuckoo_rcuckoo {
