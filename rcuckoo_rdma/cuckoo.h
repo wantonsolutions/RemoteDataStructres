@@ -5,6 +5,7 @@
 #include "state_machines.h"
 #include "tables.h"
 #include "search.h"
+#include "rdma_engine.h"
 #include <unordered_map>
 
 using namespace cuckoo_state_machines;
@@ -62,6 +63,7 @@ namespace cuckoo_rcuckoo {
 
 
             Table _table;
+            RDMA_Engine _rdma_engine;
             // Key _current_insert_key;
             vector<path_element> _search_path;
             int _search_path_index;

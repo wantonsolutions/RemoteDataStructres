@@ -42,8 +42,8 @@ RDMA_LIBS = -lrdmacm -libverbs -lpthread
 # 	$(CC) $(CFLAGS) $(INCLUDES) -cpp $<  -o $@
 
 # TARGET := test_hash test_tables test_search rdma_server rdma_client
-# TARGET := test_hash test_tables test_search test_state_machines test_virtual_rdma
-TARGET := rdma_server rdma_client
+TARGET := test_hash test_tables test_search test_state_machines test_virtual_rdma test_cuckoo
+# TARGET := rdma_server rdma_client
 test_dir := ./test
 
 all: $(TARGET)
@@ -66,8 +66,11 @@ virtual_rdma.o: virtual_rdma.cpp virtual_rdma.h util.o
 state_machines.o: state_machines.cpp state_machines.h tables.o hash.o search.o virtual_rdma.o util.o
 	g++ -c $(CFLAGS) $(INCLUDES) -fPIC state_machines.cpp -o state_machines.o virtual_rdma.o util.o
 
-cuckoo.o: cuckoo.cpp cuckoo.h state_machines.o tables.o hash.o search.o virtual_rdma.o
-	g++ -c $(CFLAGS) $(INCLUDES) -fPIC cuckoo.cpp -o cuckoo.o state_machines.o tables.o hash.o search.o virtual_rdma.o
+cuckoo.o: cuckoo.cpp cuckoo.h state_machines.o tables.o hash.o search.o virtual_rdma.o rdma_engine.o
+	g++ -c $(CFLAGS) $(INCLUDES) -fPIC cuckoo.cpp -o cuckoo.o state_machines.o tables.o hash.o search.o virtual_rdma.o rdma_engine.o
+
+rdma_engine.o: rdma_engine.cpp rdma_engine.h state_machines.o virtual_rdma.object
+	g++ -c $(CFLAGS) $(INCLUDES) -fPIC rdma_engine.cpp -o rdma_engine.o state_machines.o virtual_rdma.o
 
 rdma_common.o:
 	$(CC) -c $(CFLAGS) $(INCLUDES) -fPIC rdma_common.cpp -o rdma_common.o
@@ -111,6 +114,9 @@ test_state_machines : state_machines.o cuckoo.o
 test_virtual_rdma : virtual_rdma.o util.o
 	g++ $(CFLAGS)  $(test_dir)/test_virtual_rdma.cpp -o test_virtual_rdma tables.o hash.o search.o virtual_rdma.o util.o $(LIBRARIES)
 	mv test_virtual_rdma $(test_dir)/test_virtual_rdma
+
+test_cuckoo: cuckoo.o util.o state_machines.o rdma_engine.o
+	g++ $(CFLAGS)  $(test_dir)/test_cuckoo.cpp -o test_cuckoo cuckoo.o rdma_engine.o tables.o hash.o search.o virtual_rdma.o util.o $(LIBRARIES)
 
 
 clean:

@@ -12,6 +12,7 @@
 #include "search.h"
 #include "hash.h"
 #include "log.h"
+#include "rdma_engine.h"
 #include <cassert>
 
 #define DEBUG
@@ -19,6 +20,7 @@
 using namespace std;
 using namespace cuckoo_search;
 using namespace cuckoo_state_machines;
+using namespace cuckoo_rdma_engine;
 namespace cuckoo_rcuckoo {
 
     string vector_to_string(vector<unsigned int> buckets) {
@@ -66,6 +68,8 @@ namespace cuckoo_rcuckoo {
 
         set_search_function(config);
         set_location_function(config);
+
+        RDMA_Engine _rdma_engine = RDMA_Engine(config, this);
     }
 
     string RCuckoo::get_state_machine_name() {
