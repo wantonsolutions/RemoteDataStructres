@@ -197,6 +197,10 @@ namespace cuckoo_state_machines {
             bool contains(Key key);
             float get_fill_percentage();
             void print_table();
+
+            void fill_table_with_incremental_values();
+            unsigned int get_table_size();
+            Entry ** get_table_pointer();
             vector<VRMessage> fsm_logic(VRMessage messages);
 
         private:

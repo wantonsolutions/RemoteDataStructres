@@ -21,12 +21,28 @@ using namespace cuckoo_search;
 using namespace cuckoo_state_machines;
 namespace cuckoo_rcuckoo {
 
+    Entry ** RCuckoo::get_table_pointer() {
+        return _table.get_underlying_table();
+    }
+
+    void RCuckoo::print_table() {
+        _table.print_table();
+    }
+
     string vector_to_string(vector<unsigned int> buckets) {
 
         stringstream ss;
         copy(buckets.begin(), buckets.end(), ostream_iterator<unsigned int>(ss, " "));
         return ss.str();
         // return "";
+    }
+
+    unsigned int RCuckoo::get_table_size_bytes() {
+        return _table.get_table_size_bytes();
+    }
+
+    Entry * RCuckoo::get_entry_pointer(unsigned int bucket_id, unsigned int offset){
+        return _table.get_entry_pointer(bucket_id, offset);
     }
 
     RCuckoo::RCuckoo() : Client_State_Machine() {

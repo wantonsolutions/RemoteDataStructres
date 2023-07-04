@@ -118,6 +118,10 @@ namespace cuckoo_tables {
             this->key = Key(str_key);
             this->value = Value(str_value);
         }
+        Entry(Key key, Value value) {
+            this->key = key;
+            this->value = value;
+        }
         uint64_t get_as_uint64_t() {
             assert(sizeof(Entry) == 8);
             uint64_t entry64 = 0;
@@ -189,8 +193,10 @@ namespace cuckoo_tables {
             void unlock_all();
             string to_string();
             void print_table();
+            Entry ** get_underlying_table();
             CasOperationReturn lock_table_masked_cas(unsigned int lock_index, uint64_t old, uint64_t new_value, uint64_t mask);
             void fill_lock_table_masked_cas(unsigned int lock_index, bool success, uint64_t value, uint64_t mask);
+            unsigned int get_table_size_bytes();
             unsigned int get_buckets_per_row();
             unsigned int get_row_count();
             unsigned int get_bucket_size();
@@ -198,6 +204,7 @@ namespace cuckoo_tables {
             unsigned int n_buckets_size(unsigned int n_buckets);
             Entry get_entry(unsigned int bucket_index, unsigned int offset);
             void set_entry(unsigned int bucket_index, unsigned int offset, Entry entry);
+            Entry * get_entry_pointer(unsigned int bucket_index, unsigned int offset);
             bool bucket_has_empty(unsigned int bucket_index);
             unsigned int get_first_empty_index(unsigned int bucket_index);
 

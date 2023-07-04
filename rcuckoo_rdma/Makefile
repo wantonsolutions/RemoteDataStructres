@@ -7,6 +7,7 @@ LIBRARIES := -L$(XXHASH_INC) -lxxhash
 
 
 CFLAGS := -std=c++2a -g -O3 -Wall -Wall -Wextra -pedantic -fPIC
+# CFLAGS := -std=c++2a -g  -Wall -Wall -Wextra -pedantic -fPIC
 RDMA_LIBS := -lrdmacm -libverbs -lpthread
 
 # TARGET := test_hash test_tables test_search rdma_server rdma_client
@@ -14,7 +15,9 @@ RDMA_LIBS := -lrdmacm -libverbs -lpthread
 
 # TARGET := test/test_hash test_tables test_search test_state_machines test_virtual_rdma  test_cuckoo
 test_dir := ./test
-TARGET := $(test_dir)/test_hash $(test_dir)/test_tables $(test_dir)/test_search $(test_dir)/test_state_machines $(test_dir)/test_virtual_rdma $(test_dir)/test_cuckoo
+TARGET := $(test_dir)/test_hash $(test_dir)/test_tables $(test_dir)/test_search $(test_dir)/test_state_machines $(test_dir)/test_virtual_rdma $(test_dir)/test_cuckoo rdma_memory_server
+# TARGET := rdma_memory_server
+# TARGET := rdma_server
 # TARGET := rdma_server rdma_client
 
 all: $(TARGET)
@@ -61,8 +64,17 @@ rdma_client: rdma_client.o rdma_client_lib.o
 rdma_server.o: rdma_common.o
 	$(CC) -c $(CFLAGS) $(INCLUDES) -fPIC rdma_server.cpp -o rdma_server.o rdma_common.o
 
+
 rdma_server: rdma_server.o
 	$(CC) $(CFLAGS) $(INCLUDES) -fPIC -o rdma_server rdma_server.o rdma_common.o $(RDMA_LIBS)
+
+rdma_memory_server.o: rdma_memory_server.cpp rdma_common.o state_machines.o virtual_rdma.o search.o tables.o hash.o util.o
+	$(CC) -c $(CFLAGS) $(INCLUDES) -fPIC rdma_memory_server.cpp -o rdma_memory_server.o rdma_common.o state_machines.o virtual_rdma.o search.o tables.o hash.o util.o
+ 
+rdma_memory_server: rdma_memory_server.cpp rdma_memory_server.o rdma_common.o state_machines.o virtual_rdma.o search.o tables.o hash.o util.o
+	$(CC) $(CFLAGS) $(INCLUDES) -fPIC -o rdma_memory_server rdma_memory_server.o rdma_common.o state_machines.o virtual_rdma.o search.o tables.o hash.o util.o $(RDMA_LIBS) $(LIBRARIES)
+	
+#rdma_common.o state_machines.o rdma_common.o state_machines.o tables.o hash.o search.o virtual_rdma.o util.o $(RDMA_LIBS)
 
 
 $(test_dir)/test_hash : $(test_dir)/test_hash.cpp hash.o

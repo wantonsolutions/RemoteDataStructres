@@ -594,6 +594,21 @@ namespace cuckoo_state_machines {
         return;
     }
 
+    void Memory_State_Machine::fill_table_with_incremental_values() {
+        for (int i = 0; i < _table.get_row_count(); i++) {
+            for(int j=0; j < _table.get_buckets_per_row(); j++) {
+                int index = i * _table.get_buckets_per_row() + j;
+                Key key;
+                key.set(index);
+                Value value;
+                value.set(index);
+                Entry entry = Entry(key, value);
+                _table.set_entry(i, j, entry);
+            }
+        }
+        return;
+    }
+
 
     bool Memory_State_Machine::contains_duplicates(){
         return _table.contains_duplicates();
@@ -613,6 +628,14 @@ namespace cuckoo_state_machines {
 
     void Memory_State_Machine::print_table(){
         _table.print_table();
+    }
+
+    unsigned int Memory_State_Machine::get_table_size(){
+        return _table.get_table_size_bytes();
+    }
+
+    Entry ** Memory_State_Machine::get_table_pointer(){
+        return _table.get_underlying_table();
     }
 
 

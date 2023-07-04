@@ -38,6 +38,11 @@
 // #include <infiniband/verbs_exp.h>
 // #include <infiniband/kern-abi.h>
 
+#include <string>
+#include <unordered_map>
+
+using namespace std;
+
 
 /* Error Macro*/
 #define rdma_error(msg, ...) fprintf(stderr, "%s : %d : ERROR : "#msg, __FILE__, __LINE__, ## __VA_ARGS__);
@@ -197,6 +202,10 @@ void show_rdma_cmid(struct rdma_cm_id *id);
 
 
 int stick_this_thread_to_core(int core_id);
+
+
+struct sockaddr_in server_address_to_socket_addr(string server_address);
+unordered_map<string, string> gen_config();
 
 
 #endif /* RDMA_COMMON_H */

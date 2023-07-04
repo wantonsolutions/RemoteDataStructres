@@ -69,6 +69,7 @@ class RDMAConnectionManager {
         void CheckAdvancedTransport(struct ibv_context *ctx);
 
     private:
+        bool _connections_initialized = false;
         int _num_qps;
         int _base_port;
         struct sockaddr_in * _server_sockaddr;

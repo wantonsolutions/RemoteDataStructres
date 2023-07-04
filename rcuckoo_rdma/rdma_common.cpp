@@ -9,6 +9,71 @@
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 
+#include <string>
+#include <unordered_map>
+
+using namespace std;
+
+
+struct sockaddr_in server_address_to_socket_addr(string server_address) {
+	struct sockaddr_in server_sockaddr;
+	bzero(&server_sockaddr, sizeof server_sockaddr);
+	server_sockaddr.sin_family = AF_INET;
+	server_sockaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+	char * address = new char[server_address.length() + 1];
+	strcpy(address, server_address.c_str());
+	int ret = get_addr(address, (struct sockaddr*) &server_sockaddr);
+	if (ret != 0) {
+		printf("Error: get_addr failed\n");
+		exit(1);
+	} else {
+		printf("get_addr succeeded\n");
+		printf("connecting to %s\n", inet_ntoa(server_sockaddr.sin_addr));
+	}
+	return server_sockaddr;
+}
+
+unordered_map<string, string> gen_config() {
+    unordered_map<string, string> config;
+    int table_size = 32;
+    int entry_size = 8;
+    int bucket_size = 8;
+    int memory_size = entry_size * table_size;
+    int buckets_per_lock = 1;
+    int locks_per_message = 64;
+    int read_threshold_bytes = 256;
+
+
+    config["bucket_size"] = to_string(bucket_size);
+    config["entry_size"] = to_string(entry_size);
+    config["indexes"] = to_string(table_size);
+    config["read_threshold_bytes"] = to_string(read_threshold_bytes);
+    config["buckets_per_lock"] = to_string(buckets_per_lock);
+    config["locks_per_message"] = to_string(locks_per_message);
+    config["memory_size"] = to_string(memory_size);
+    config["deterministic"]="True";
+    config["workload"]="ycsb-c";
+    config["id"]="0";
+    config["search_function"]="a_star";
+    config["location_function"]="dependent";
+
+    // Client State Machine Arguements
+    int total_inserts = 1;
+    int max_fill = 90;
+    int num_clients = 1;
+    config["total_inserts"]=to_string(total_inserts);
+    config["total_requests"]=to_string(total_inserts);
+    config["max_fill"]=to_string(max_fill);
+    config["num_clients"]=to_string(num_clients);
+
+    // RDMA Engine Arguments
+    config["num_qps"]="1";
+    config["server_address"]="192.168.1.12";
+    config["base_port"] = "20886";
+    return config;
+}
+
+
 
 void show_rdma_cmid(struct rdma_cm_id *id)
 {

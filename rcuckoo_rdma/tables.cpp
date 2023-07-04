@@ -184,6 +184,10 @@ namespace cuckoo_tables {
 
     }
 
+    Entry ** Table::get_underlying_table(){
+        return _table;
+    }
+
     void Table::unlock_all(){
         _lock_table.unlock_all();
         return;
@@ -219,6 +223,11 @@ namespace cuckoo_tables {
         
         _lock_table.fill_masked_cas(lock_index, success, value, mask);
     }
+
+    unsigned int Table::get_table_size_bytes(){
+        return _memory_size;
+    }
+
     unsigned int Table::get_row_count(){
         return _table_size;
     }
@@ -241,6 +250,10 @@ namespace cuckoo_tables {
 
     Entry Table::get_entry(unsigned int bucket_index, unsigned int offset){
         return _table[bucket_index][offset];
+    }
+
+    Entry * Table::get_entry_pointer(unsigned int bucket_index, unsigned int offset){
+        return &_table[bucket_index][offset];
     }
 
     void Table::set_entry(unsigned int bucket_index, unsigned int offset, Entry entry){

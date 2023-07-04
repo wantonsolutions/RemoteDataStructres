@@ -279,12 +279,18 @@ RDMAConnectionManager::RDMAConnectionManager(RDMAConnectionManagerArguments args
 
         // Give server some time to prepare for the next QP
         usleep(100 * 1000);     // 100ms
+        _connections_initialized = true;
     }
 }
 
 RDMAConnectionManager::~RDMAConnectionManager() {
+
+    printf("TODO actually make constructior this one is really bad and fails because of the disconeect call\n");
+    return;
+
     int ret;
     for (int i = 0; i < _num_qps; i++) {
+        printf("RDMA CONNECTION MANAGER DESTRUCTOR disconnecting qp %d \n", i);
         ret = client_disconnect_and_clean(i);
         if (ret)
             rdma_error("Failed to cleanly disconnect qp %d \n", i);
@@ -604,7 +610,7 @@ int RDMAConnectionManager::client_xchange_metadata_with_server(int qp_num, char*
                 ) :
             rdma_buffer_register(pd,
                 buffer,
-                strlen(buffer),
+                buffer_size,
                 MEMORY_PERMISSION);;
     if(!client_qp_src_mr[qp_num]){
         rdma_error("Failed to register the first buffer, ret = %d \n", ret);
@@ -656,6 +662,7 @@ int RDMAConnectionManager::client_xchange_metadata_with_server(int qp_num, char*
     }
     debug("Server sent us buffer location and credentials for QP %d, showing \n", qp_num);
     show_rdma_buffer_attr(&server_qp_metadata_attr[qp_num]);
+
     return 0;
 }
 
