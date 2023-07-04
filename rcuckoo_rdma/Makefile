@@ -40,8 +40,8 @@ state_machines.o: state_machines.cpp state_machines.h tables.o hash.o search.o v
 cuckoo.o: cuckoo.cpp cuckoo.h state_machines.o tables.o hash.o search.o virtual_rdma.o rdma_engine.o
 	g++ -c $(CFLAGS) $(INCLUDES) -fPIC cuckoo.cpp -o cuckoo.o state_machines.o tables.o hash.o search.o virtual_rdma.o rdma_engine.o
 
-rdma_engine.o: rdma_engine.cpp rdma_engine.h state_machines.o virtual_rdma.o
-	g++ -c $(CFLAGS) $(INCLUDES) -fPIC rdma_engine.cpp -o rdma_engine.o state_machines.o virtual_rdma.o
+rdma_engine.o: rdma_engine.cpp rdma_engine.h state_machines.o virtual_rdma.o rdma_client_lib.o rdma_common.o
+	g++ -c $(CFLAGS) $(INCLUDES) -fPIC rdma_engine.cpp -o rdma_engine.o state_machines.o virtual_rdma.o rdma_common.o rdma_client_lib.o $(RDMA_LIBS)
 
 rdma_common.o:
 	$(CC) -c $(CFLAGS) $(INCLUDES) -fPIC rdma_common.cpp -o rdma_common.o
@@ -65,29 +65,30 @@ rdma_server: rdma_server.o
 	$(CC) $(CFLAGS) $(INCLUDES) -fPIC -o rdma_server rdma_server.o rdma_common.o $(RDMA_LIBS)
 
 
-$(test_dir)/test_hash : hash.o
+$(test_dir)/test_hash : $(test_dir)/test_hash.cpp hash.o
 #g++ $(CFLAGS) $(LIBRARIES) -lhash $(test_dir)/test_hash.cpp -o test_hash
 	g++ $(CFLAGS)  $(test_dir)/test_hash.cpp -o test_hash hash.o $(LIBRARIES)
 	mv test_hash $(test_dir)/test_hash
 
-$(test_dir)/test_tables : tables.o
+$(test_dir)/test_tables : $(test_dir)/test_tables.cpp tables.o
 	g++ $(CFLAGS)  $(test_dir)/test_tables.cpp -o test_tables tables.o
 	mv test_tables $(test_dir)/test_tables
 
-$(test_dir)/test_search : search.o
+$(test_dir)/test_search : $(test_dir)/test_search.cpp search.o
 	g++ $(CFLAGS)  $(test_dir)/test_search.cpp -o test_search search.o tables.o hash.o $(LIBRARIES)
 	mv test_search $(test_dir)/test_search
 
-$(test_dir)/test_state_machines : state_machines.o cuckoo.o
+$(test_dir)/test_state_machines : $(test_dir)/test_state_machines.cpp state_machines.o cuckoo.o
 	g++ $(CFLAGS)  $(test_dir)/test_state_machines.cpp -o test_state_machines state_machines.o tables.o hash.o search.o virtual_rdma.o util.o $(LIBRARIES)
 	mv test_state_machines $(test_dir)/test_state_machines
 
-$(test_dir)/test_virtual_rdma : virtual_rdma.o util.o
+$(test_dir)/test_virtual_rdma : $(test_dir)/test_virtual_rdma.cpp virtual_rdma.o util.o
 	g++ $(CFLAGS)  $(test_dir)/test_virtual_rdma.cpp -o test_virtual_rdma tables.o hash.o search.o virtual_rdma.o util.o $(LIBRARIES)
 	mv test_virtual_rdma $(test_dir)/test_virtual_rdma
 
-$(test_dir)/test_cuckoo: cuckoo.o util.o state_machines.o rdma_engine.o
-	g++ $(CFLAGS)  $(test_dir)/test_cuckoo.cpp -o test_cuckoo cuckoo.o rdma_engine.o tables.o hash.o search.o virtual_rdma.o util.o state_machines.o $(LIBRARIES)
+$(test_dir)/test_cuckoo: $(test_dir)/test_cuckoo.cpp cuckoo.o util.o state_machines.o rdma_engine.o rdma_common.o rdma_client_lib.o
+	g++ $(CFLAGS)  $(test_dir)/test_cuckoo.cpp -o test_cuckoo cuckoo.o rdma_engine.o tables.o hash.o search.o virtual_rdma.o util.o state_machines.o rdma_common.o rdma_client_lib.o  $(LIBRARIES) $(RDMA_LIBS)
+	mv test_cuckoo $(test_dir)/test_cuckoo
 
 
 clean:

@@ -5,11 +5,9 @@
 #include "state_machines.h"
 #include "tables.h"
 #include "search.h"
-#include "rdma_engine.h"
 #include <unordered_map>
 
 using namespace cuckoo_state_machines;
-using namespace cuckoo_rdma_engine;
 using namespace cuckoo_search;
 
 namespace cuckoo_rcuckoo {
@@ -56,6 +54,7 @@ namespace cuckoo_rcuckoo {
             void complete_insert_stats(bool success);
             void complete_insert();
 
+
         private:
 
             unsigned int _read_threshold_bytes;
@@ -64,7 +63,6 @@ namespace cuckoo_rcuckoo {
 
 
             Table _table;
-            RDMA_Engine _rdma_engine;
             // Key _current_insert_key;
             vector<path_element> _search_path;
             int _search_path_index;

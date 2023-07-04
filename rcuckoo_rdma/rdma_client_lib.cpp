@@ -261,13 +261,13 @@ RDMAConnectionManager::RDMAConnectionManager(RDMAConnectionManagerArguments args
         /* Each QP will try to connect to port numbers starting from base port */
         ret = client_prepare_connection(_server_sockaddr, i, _base_port + i);
         if (ret) { 
-            rdma_error("Failed to setup client connection , ret = %d \n", ret);
+            rdma_error("Failed to prepare client connection , ret = %d \n", ret);
             throw std::runtime_error("Failed to setup client connection");
         }
 
         ret = client_pre_post_recv_buffer(i); 
         if (ret) { 
-            rdma_error("Failed to setup client connection , ret = %d \n", ret);
+            rdma_error("Failed to post receive buffers client connection , ret = %d \n", ret);
             throw std::runtime_error("Failed to setup client connection");
         }
         

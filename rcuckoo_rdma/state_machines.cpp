@@ -11,6 +11,8 @@
 #include "util.h"
 #include "log.h"
 
+#include <iostream>
+
 
 
 using namespace std;
@@ -253,10 +255,10 @@ namespace cuckoo_state_machines {
         return output_messages;
     }
 
-    vector<VRMessage> State_Machine::fsm_logic(VRMessage messages) {
-        printf("FSM Logic must be implemented by a subclass\n");
-        throw logic_error("FSM Logic must be implemented by a subclass");
-    }
+    // vector<VRMessage> State_Machine::fsm_logic(VRMessage messages) {
+    //     printf("FSM Logic must be implemented by a subclass\n");
+    //     throw logic_error("FSM Logic must be implemented by a subclass");
+    // }
 
     static const char *ycsb_workload_names[] = {"ycsb-a", "ycsb-b", "ycsb-c", "ycsb-w"};
     const char* get_ycsb_workload_name(ycsb_workload workload) {
@@ -434,6 +436,9 @@ namespace cuckoo_state_machines {
     Client_State_Machine::Client_State_Machine(unordered_map<string,string> config) : State_Machine(config) {
         _config = config;
         try{
+            cout << "Client_State_Machine config:" << endl;
+            for (auto i : config)
+                    cout << i.first << " \t\t\t " << i.second << endl;
             _total_inserts = stoi(config["total_inserts"]);
             _id = stoi(config["id"]);
             _max_fill = stoi(config["max_fill"]);

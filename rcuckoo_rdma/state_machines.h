@@ -32,7 +32,7 @@ namespace cuckoo_state_machines {
             unordered_map<string, string> get_stats();
 
             vector<VRMessage> fsm(VRMessage messages);
-            virtual vector<VRMessage> fsm_logic(VRMessage messages);
+            virtual vector<VRMessage> fsm_logic(VRMessage messages) { printf("fsm_logic not implemented\n"); return vector<VRMessage>(); };
 
 
         protected:
@@ -104,6 +104,7 @@ namespace cuckoo_state_machines {
             void set_workload(ycsb_workload workload);
             void set_workload(string workload);
             Request next();
+            virtual vector<VRMessage> fsm_logic(VRMessage messages) { printf("fsm_logic not implemented CLIENT STATE MACHINE\n"); return vector<VRMessage>(); };
 
         private:
             int _total_requests;

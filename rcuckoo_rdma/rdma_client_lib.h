@@ -1,7 +1,7 @@
 #ifndef RDMA_CLIENT_LIB_H
 #define RDMA_CLIENT_LIB_H
 
-#define MAX_THREADS 32
+#define MAX_THREADS 1
 #define MULTI_CQ
 
 #include "rdma_common.h"
@@ -24,6 +24,10 @@ typedef struct RDMAConnectionManagerArguments {
 
 class RDMAConnectionManager {
     public:
+        /* Source and Destination buffers, where RDMA operations source and sink */
+        RDMAConnectionManager();
+        ~RDMAConnectionManager();
+        RDMAConnectionManager(RDMAConnectionManagerArguments arg);
         /* These are basic RDMA resources */
         /* These are RDMA connection related resources */
         struct ibv_context **devices;
@@ -55,10 +59,6 @@ class RDMAConnectionManager {
         struct ibv_sge client_send_sge, server_recv_sge;
 
 
-        /* Source and Destination buffers, where RDMA operations source and sink */
-        RDMAConnectionManager();
-        ~RDMAConnectionManager();
-        RDMAConnectionManager(RDMAConnectionManagerArguments arg);
         //TODO move to an indivdidual connection
         int client_xchange_metadata_with_server(int qp_num, char* buffer, uint32_t buffer_size);
 

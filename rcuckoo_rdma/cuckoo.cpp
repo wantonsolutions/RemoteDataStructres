@@ -12,7 +12,6 @@
 #include "search.h"
 #include "hash.h"
 #include "log.h"
-#include "rdma_engine.h"
 #include <cassert>
 
 #define DEBUG
@@ -20,7 +19,6 @@
 using namespace std;
 using namespace cuckoo_search;
 using namespace cuckoo_state_machines;
-using namespace cuckoo_rdma_engine;
 namespace cuckoo_rcuckoo {
 
     string vector_to_string(vector<unsigned int> buckets) {
@@ -69,12 +67,17 @@ namespace cuckoo_rcuckoo {
         set_search_function(config);
         set_location_function(config);
 
-        RDMA_Engine _rdma_engine = RDMA_Engine(config, this);
+        // RDMA_Engine _rdma_engine = RDMA_Engine(config, this);
+        // _rdma_engine.set_rcuckoo_state_machine(this);
     }
 
     string RCuckoo::get_state_machine_name() {
         return "RCuckoo";
     }
+
+    // bool RCuckoo::start_rdma_engine() {
+    //     return _rdma_engine.start();
+    // }
 
     void RCuckoo::clear_statistics(){
         Client_State_Machine::clear_statistics();
@@ -90,7 +93,7 @@ namespace cuckoo_rcuckoo {
 
     void RCuckoo::set_search_function(unordered_map<string, string> config) {
         string search_function_name = config["search_function"];
-        printf("setting search function: %s\n",search_function_name);
+        // printf("setting search function: %s\n",search_function_name);
         if (search_function_name == "a_star") {
             _table_search_function = &RCuckoo::a_star_insert_self;
         } else if (search_function_name == "random") {
