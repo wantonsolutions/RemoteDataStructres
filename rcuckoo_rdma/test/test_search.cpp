@@ -91,30 +91,11 @@ void run_basic_table_tests() {
 }
 
 void insert_cuckoo_path(Table &table, vector<path_element> path) {
-    // cout << "inserting cuckoo path" << endl;
-    // print_path(path);
     assert(path.size() >= 2);
-    // for (int i=path.size()-2; i >=0; i--){
     for (int i=path.size()-2; i >=0; i--){
-        // cout << "i: " << i << " i+1 " << i+1 << endl;
-        //we actually need to swap the values here
         Entry e;
         e.key = path[i+1].key;
-        e.value.bytes[0] = 9;
-        e.value.bytes[1] = 0;
-        e.value.bytes[1] = 0;
-        e.value.bytes[1] = 0;
-
-        // for (auto pe : path) {
-        //     cout << "pe: " << pe.bucket_index << " " << pe.offset << endl;
-        // }
-
-        // cout << "writing to index:" << path[i].bucket_index << " offset:" << path[i].offset << "key: " << e.key.to_string() << endl;
-        
-        // cout << "setting entry" << endl;
         table.set_entry(path[i].bucket_index, path[i].offset, e);
-        // cout << "post setting entry" << endl;
-        // table.print_table();
     }
 }
 

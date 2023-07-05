@@ -196,6 +196,10 @@ namespace cuckoo_tables {
         return _table;
     }
 
+    void Table::set_underlying_table(Entry ** table){
+        _table = table;
+    }
+
 
     void * Table::get_underlying_lock_table_address() {
         return _lock_table.get_lock_table_address();
@@ -218,7 +222,6 @@ namespace cuckoo_tables {
             index_string = pad_string(index_string, 5);
             output_string += index_string  +  ") ";
             for (unsigned int j = 0; j < _bucket_size; j++){
-                printf("printing table entry %d %d\n", i, j);
                 output_string += "[" + _table[i][j].to_string() += "]";
             }
             output_string += "\n";

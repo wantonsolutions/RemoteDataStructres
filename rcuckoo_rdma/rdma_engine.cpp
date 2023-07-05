@@ -87,6 +87,8 @@ namespace cuckoo_rdma_engine {
     RDMA_Engine::RDMA_Engine(unordered_map<string, string> config, RCuckoo * rcuckoo) {
         _state_machine = rcuckoo;
         _rcuckoo = rcuckoo;
+        _memory_state_machine = new Memory_State_Machine(config);
+        _memory_state_machine->set_table_pointer(_rcuckoo->get_table_pointer());
 
         try {
             RDMAConnectionManagerArguments args;
@@ -123,25 +125,11 @@ namespace cuckoo_rdma_engine {
             assert(_table_config != NULL);
             assert(_table_config->table_size_bytes == table_size);
             printf("got a table config from the memcached server and it seems to line up\n");
-
-
-            // int ret = cm.client_xchange_metadata_with_server(qp_num, NULL, 256);      // 1 MB
-            // int ret = _connection_manager->client_xchange_metadata_with_server(qp_num, table_pointer, table_size);      // 1 MB
-            // if (ret != 0) {
-            //     printf("Error: client_xchange_metadata_with_server failed\n");
-            //     exit(1);
-            // } else {
-            //     printf("client_xchange_metadata_with_server succeeded\n");
-            // }
-            // _table_mr = _connection_manager->client_qp_src_mr[qp_num];
-            // assert(_table_mr != NULL);
-
             rcuckoo->print_table();
 
             //register the memory
             printf("registering table memory");
             _table_mr = rdma_buffer_register(_connection_manager->pd, table_pointer, table_size, MEMORY_PERMISSION);
-
 
             //Request a completion queue
             printf("requesting completion queue\n");
@@ -150,18 +138,8 @@ namespace cuckoo_rdma_engine {
             if(_completion_queue == NULL){
                 printf("completion queue is null\n");
             }
+
             assert(_completion_queue != NULL);
-            // int ret = ibv_get_cq_event(_connection_manager->io_completion_channel_threads[0], &_completion_queue, &context);
-            // result_t result;
-            // if (ret) {
-            //     printf("Failed to get next CQ event due to %d \n", -errno);
-            //     exit(0);
-            // }
-            // ret = ibv_req_notify_cq(_completion_queue, 0);
-            // if (ret) {
-            //     printf("Failed to request further notifications %d \n", -errno);
-            //     exit(0);
-            // }
 
         } catch (exception& e) {
             printf("RDMAConnectionManager failed to create\n");
@@ -183,39 +161,59 @@ namespace cuckoo_rdma_engine {
 
     
     bool RDMA_Engine::start(){
+        vector<VRMessage> ingress_messages;
         VRMessage init;
+        ingress_messages.push_back(init);
 
-        vector<VRMessage> messages = _state_machine->fsm(init);
+
+        // vector<VRMessage> messages = _state_machine->fsm(init);
 
         uint32_t remote_key = _table_config->remote_key;
         int num_concur = 1;
         struct ibv_wc *wc = (struct ibv_wc *) calloc (num_concur, sizeof(struct ibv_wc));
 
+        uint64_t wr_id_counter = 0;
+        unordered_map<uint64_t, VRMessage> wr_id_to_message;
+
         while(true){
             //send messages
+
+            //Pop off an ingress message
+            printf("popping off first ingress message\n");
+
+            VRMessage current_ingress_message;
+            
+            if (ingress_messages.size() > 0){
+                current_ingress_message = ingress_messages[0];
+                ingress_messages.erase(ingress_messages.begin());
+            }
+            vector<VRMessage> messages = _state_machine->fsm(current_ingress_message);
+
+
+            int sent_messages = 0;
             for (int i = 0; i < messages.size(); i++){
                 printf("Sending message: %s\n", messages[i].to_string().c_str());
                 VRMessage message = messages[i];
                 if (message.get_message_type() == READ_REQUEST) {
-                    printf("starting rdma read\n");
-                    ibv_qp *qp = _connection_manager->client_qp[0];
 
+                    printf("storing message to map\n");
+                    wr_id_to_message[wr_id_counter] = message;
+                    printf("starting rdma read\n");
+
+                    ibv_qp *qp = _connection_manager->client_qp[0];
                     //translate address locally for bucket id
                     unsigned int bucket_offset = stoi(message.function_args["bucket_offset"]);
                     unsigned int bucket_id = stoi(message.function_args["bucket_id"]);
                     unsigned int size = stoi(message.function_args["size"]);
 
-                    bucket_id = 1;
-                    bucket_offset = 0;
-                    size = 64;
 
                     uint64_t local_address = (uint64_t) _rcuckoo->get_entry_pointer(bucket_id, bucket_offset);
                     uint64_t remote_server_address = local_to_remote_table_address(local_address);
-                    printf("local address: %lu\n", local_address);
-                    printf("remote server address: %p\n", (void*) remote_server_address);
-                    printf("size: %d\n", size);
-                    printf("local key: %d\n", _table_mr->lkey);
-                    printf("remote key: %d\n", remote_key);
+                    // printf("local address: %lu\n", local_address);
+                    // printf("remote server address: %p\n", (void*) remote_server_address);
+                    // printf("size: %d\n", size);
+                    // printf("local key: %d\n", _table_mr->lkey);
+                    // printf("remote key: %d\n", remote_key);
 
                     // printf("quick sleep\n");
                     // sleep(2);
@@ -229,27 +227,53 @@ namespace cuckoo_rdma_engine {
                         _table_mr->lkey,
                         remote_key,
                         true,
-                        1337
+                        wr_id_counter
                     );
+                    sent_messages++;
+                    wr_id_counter++;
                     if (!success) {
                         printf("rdma read failed\n");
                         exit(1);
                     }
-                    // printf("quick sleep 2\n");
-                    // sleep(2);
-                    // printf("done sleep polling for response\n");
-                    int n = bulk_poll(_completion_queue, num_concur, wc);
-                    printf("done polling!!\n");
-                    _rcuckoo->print_table();
                 }
             }
 
+            if (sent_messages > 0 ) {
+                //Now we deal with the message recipt
+                int n = bulk_poll(_completion_queue, num_concur, wc);
+                if (n < 0) {
+                    printf("polling failed\n");
+                    exit(1);
+                }
+                for (int j=0;j<n;j++) {
+                    if (wc[j].status != IBV_WC_SUCCESS) {
+                        printf("RDMA read failed with status %s\n", ibv_wc_status_str(wc[j].status));
+                        exit(1);
+                    } else {
+                        printf("RDMA read succeeded\n");
 
-            //receive messages
-            printf("polling for messagge\n");
-            // messages = _state_machine->fsm(init);
-            printf("exiting because I don't actually have the logic.");
-            exit(0);
+                        //The result of the operation is in the local buffer
+                        //Perform a faux delivery to our own state machine
+                        VRMessage outgoing = wr_id_to_message[wc[j].wr_id];
+                        vector<VRMessage> incomming = _memory_state_machine->fsm(outgoing);
+                        wr_id_to_message.erase(wc[j].wr_id);
+                        printf("memory state machine table\n");
+                        _memory_state_machine->print_table();
+
+                        for (int i = 0; i < incomming.size(); i++){
+                            printf("memory state machine incomming message: %s\n", incomming[i].to_string().c_str());
+                            ingress_messages.push_back(incomming[i]);
+                        }
+                    }
+                }
+                _rcuckoo->print_table();
+            }
+
+            // //receive messages
+            // printf("polling for messagge\n");
+            // // messages = _state_machine->fsm(init);
+            // printf("exiting because I don't actually have the logic.");
+            // exit(0);
 
         }
 

@@ -196,6 +196,7 @@ namespace cuckoo_tables {
             string to_string();
             void print_table();
             Entry ** get_underlying_table();
+            void set_underlying_table(Entry ** table);
             CasOperationReturn lock_table_masked_cas(unsigned int lock_index, uint64_t old, uint64_t new_value, uint64_t mask);
             void fill_lock_table_masked_cas(unsigned int lock_index, bool success, uint64_t value, uint64_t mask);
             unsigned int get_table_size_bytes();

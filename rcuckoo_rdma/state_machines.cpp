@@ -374,11 +374,12 @@ namespace cuckoo_state_machines {
         return req;
 
     }
+    const uint32_t BASE_KEY=1;
 
     Request Client_Workload_Driver::next_get() {
         uint32_t next_key_index;
         if (_deterministic){
-            next_key_index = _completed_puts - 1;
+            next_key_index =  BASE_KEY + (_completed_puts - 1);
         } else {
             if (_completed_puts <=1 ) {
                 next_key_index = 0;
@@ -505,9 +506,11 @@ namespace cuckoo_state_machines {
             _duplicates_found += (_read_values_found -1);
             VERBOSE("read success", "Read Success (key: %s) but duplicate found\n", key.to_string().c_str());
         }
+        return success;
     }
 
     read_status Client_State_Machine::wait_for_read_messages_fsm(Table& table, VRMessage message, const Key& key){
+        VERBOSE("DEBUG wait_for_read_fsm", "message type: %d\n", message.get_message_type());
         if (message.get_message_type() == READ_RESPONSE) {
             VERBOSE("DEBUG wait_for_read_fsm", "unpacking read response %s\n", message.to_string().c_str());
             unordered_map<string,string> args = unpack_read_read_response(message);
@@ -537,6 +540,7 @@ namespace cuckoo_state_machines {
             _current_insert_key = next_request.key;
             return put();
         } else if (next_request.op == GET) {
+            _current_read_key = next_request.key;
             return get();
         } else {
             printf("ERROR: unknown operation\n");
@@ -594,18 +598,40 @@ namespace cuckoo_state_machines {
         return;
     }
 
-    void Memory_State_Machine::fill_table_with_incremental_values() {
-        for (int i = 0; i < _table.get_row_count(); i++) {
-            for(int j=0; j < _table.get_buckets_per_row(); j++) {
-                int index = i * _table.get_buckets_per_row() + j;
-                Key key;
-                key.set(index);
-                Value value;
-                value.set(index);
-                Entry entry = Entry(key, value);
-                _table.set_entry(i, j, entry);
-            }
+
+    void insert_cuckoo_path(Table &table, vector<path_element> path) {
+        assert(path.size() >= 2);
+        for (int i=path.size()-2; i >=0; i--){
+            Entry e;
+            e.key = path[i+1].key;
+            table.set_entry(path[i].bucket_index, path[i].offset, e);
         }
+    }
+
+    void fill_key(Key &key, int value) {
+        uint8_t *vp = (uint8_t*)&value;
+        key.bytes[0] = vp[0];
+        key.bytes[1] = vp[1];
+        key.bytes[2] = vp[2];
+        key.bytes[3] = vp[3];
+    } 
+
+
+    void Memory_State_Machine::fill_table_with_incremental_values() {
+        Key key;
+        vector<unsigned int> open_buckets; //empty open buckets
+        for (int i=0; i< (_table.get_row_count() * _table.get_buckets_per_row());i++){
+            fill_key(key, i);
+            vector<path_element> path = bucket_cuckoo_a_star_insert(_table, rcuckoo_hash_locations, key, open_buckets);
+            // print_path(path);
+            if (path.size() == 0){
+                cout << "failed to insert key: " << key.to_string() << endl;
+                break;
+            }
+            insert_cuckoo_path(_table, path);
+        }
+
+        cout << "final fill: " << _table.get_fill_percentage() << endl;
         return;
     }
 
@@ -636,6 +662,10 @@ namespace cuckoo_state_machines {
 
     Entry ** Memory_State_Machine::get_table_pointer(){
         return _table.get_underlying_table();
+    }
+
+    void Memory_State_Machine::set_table_pointer(Entry ** table){
+        _table.set_underlying_table(table);
     }
 
     Table * Memory_State_Machine::get_table(){

@@ -26,6 +26,13 @@ typedef struct hash_locations{
             return secondary;
         }
     }
+    string to_string() {
+        return "primary: " + std::to_string(primary) + "\n" +
+            "secondary: " + std::to_string(secondary) + "\n" +
+            "distance: " + std::to_string(distance()) + "\n" +
+            "min_bucket: " + std::to_string(min_bucket()) + "\n" +
+            "max_bucket: " + std::to_string(max_bucket()) + "\n";
+    }
 } hash_locations;
 
 
