@@ -6,6 +6,7 @@
 #include "state_machines.h"
 #include "cuckoo.h"
 #include "rdma_client_lib.h"
+#include "config.h"
 
 using namespace cuckoo_state_machines;
 using namespace cuckoo_rcuckoo;
@@ -26,6 +27,7 @@ namespace cuckoo_rdma_engine {
             State_Machine * _state_machine;
             RCuckoo * _rcuckoo;
             ibv_mr * _table_mr;
+            table_config * _table_config;
             struct ibv_cq *_completion_queue;
             RDMAConnectionManager  *_connection_manager;
     };

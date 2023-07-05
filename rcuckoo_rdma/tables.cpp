@@ -67,6 +67,14 @@ namespace cuckoo_tables {
         return key.is_empty() && value.is_empty();
     }
 
+    void * Lock_Table::get_lock_table_address() {
+        return (void*) _locks;
+    }
+
+    unsigned int Lock_Table::get_lock_table_size_bytes(){
+        return _total_lock_entries;
+    }
+
     /*lock table functions*/
     Lock_Table::Lock_Table(){
         _total_locks = 0;
@@ -188,6 +196,15 @@ namespace cuckoo_tables {
         return _table;
     }
 
+
+    void * Table::get_underlying_lock_table_address() {
+        return _lock_table.get_lock_table_address();
+    }
+    
+    unsigned int Table::get_underlying_lock_table_size_bytes() {
+        return _lock_table.get_lock_table_size_bytes();
+    }
+
     void Table::unlock_all(){
         _lock_table.unlock_all();
         return;
@@ -201,6 +218,7 @@ namespace cuckoo_tables {
             index_string = pad_string(index_string, 5);
             output_string += index_string  +  ") ";
             for (unsigned int j = 0; j < _bucket_size; j++){
+                printf("printing table entry %d %d\n", i, j);
                 output_string += "[" + _table[i][j].to_string() += "]";
             }
             output_string += "\n";
@@ -248,12 +266,26 @@ namespace cuckoo_tables {
         return sizeof(Entry) * n_buckets;
     }
 
+    unsigned int Table::get_entry_size_bytes(){
+        return sizeof(Entry);
+    }
+
     Entry Table::get_entry(unsigned int bucket_index, unsigned int offset){
         return _table[bucket_index][offset];
     }
 
     Entry * Table::get_entry_pointer(unsigned int bucket_index, unsigned int offset){
-        return &_table[bucket_index][offset];
+        // printf("Entry at %d, %d is %s\n", bucket_index, offset, _table[bucket_index][offset].to_string().c_str());
+        // printf("table base is  %p\n", _table);
+        // printf("table row is   %p\n", _table[bucket_index]);
+        // printf("table entry is %p\n", &(_table[bucket_index][offset]));
+
+        // uint64_t entry_pointer = (uint64_t) _table;
+        // printf("entry_pointer is %p\n", (void* )entry_pointer);
+        // entry_pointer += (bucket_index * row_size_bytes()) + (offset * sizeof(Entry));
+        // printf("entry_pointer post math is %p\n", (void* )entry_pointer);
+        // return (Entry *) entry_pointer;
+        return &(_table[bucket_index][offset]);
     }
 
     void Table::set_entry(unsigned int bucket_index, unsigned int offset, Entry entry){
@@ -352,6 +384,7 @@ namespace cuckoo_tables {
             pool = new Entry[nrows * ncols]{Entry()};
 
             for (unsigned i = 0; i < nrows; ++i, pool += ncols ){
+                printf("pool [%d] is %p\n", i, pool);
                 ptr[i] = pool;
             }
             return ptr;

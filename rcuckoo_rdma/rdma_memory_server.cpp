@@ -10,6 +10,8 @@
 #include "rdma_common.h"
 #include "state_machines.h"
 #include <unordered_map>
+#include "memcached.h"
+#include "config.h"
 
 using namespace std;
 using namespace cuckoo_state_machines;
@@ -307,6 +309,48 @@ static int accept_client_connection(int qp_num)
     return ret;
 }
 
+static void send_table_config_to_memcached_server(Memory_State_Machine& msm)
+{
+    //Regiserting the memory for the table
+    //Send the info for the table
+    void * table_ptr = msm.get_table_pointer()[0];
+    server_qp_buffer_mr[0] = rdma_buffer_register(pd /* which protection domain */, 
+            table_ptr,
+            msm.get_table_size(),
+            (MEMORY_PERMISSION
+            ) /* access permissions */);
+
+    //TODO map the lock table to device memory
+    // printf("allocing device memory for lock table\n");
+    // server_qp_buffer_mr[qp_num] = rdma_buffer_alloc_dm(pd /* which protection domain */, 
+    //         client_qp_metadata_attr[qp_num].length /* what size to allocate */, 
+    //         (MEMORY_PERMISSION) /* access permissions */);
+
+    if(!server_qp_buffer_mr[0]){
+        rdma_error("Server failed to create a buffer \n");
+        /* we assume that it is due to out of memory error */
+        exit(0);
+        // return -ENOMEM;
+    }
+
+    printf("Table Address %p registered address %p\n", table_ptr, server_qp_buffer_mr[0]->addr);
+    printf("Sending Table Configuration to Memcached Server\n");
+    table_config config;
+    Table * table = msm.get_table();
+
+    // config.table_address = (uint64_t) msm.get_table_pointer();
+    config.table_address = (uint64_t) server_qp_buffer_mr[0]->addr;
+    config.remote_key = (uint32_t) server_qp_buffer_mr[0]->lkey;
+    printf("todo when you get back set up the remote key!!");
+    config.table_size_bytes = table->get_table_size_bytes();
+    config.num_rows = table->get_row_count();
+    config.buckets_per_row = table->get_buckets_per_row();
+    config.entry_size_bytes = table->get_entry_size_bytes();
+    config.lock_table_address = (uint64_t) table->get_underlying_lock_table_address();
+    config.lock_table_size_bytes = table->get_underlying_lock_table_size_bytes();
+    memcached_pubish_table_config(&config);
+}
+
 
 
 
@@ -353,6 +397,7 @@ static int send_server_metadata_to_client(int qp_num, Memory_State_Machine& msm)
     // server_qp_buffer_mr[qp_num] = rdma_buffer_alloc_dm(pd /* which protection domain */, 
     //         client_qp_metadata_attr[qp_num].length /* what size to allocate */, 
     //         (MEMORY_PERMISSION) /* access permissions */);
+
 
     if(!server_qp_buffer_mr[qp_num]){
         rdma_error("Server failed to create a buffer \n");
@@ -567,15 +612,17 @@ int main(int argc, char **argv)
             return ret;
         }
     }
-    
-    /* Exchange metadata */
-    for (i = 0; i < num_qps; i++) {    
-        ret = send_server_metadata_to_client(i, msm);
-        if (ret) {
-            rdma_error("Failed to send server metadata to the client, ret = %d \n", ret);
-            return ret;
-        }
-    }
+    send_table_config_to_memcached_server(msm);
+
+
+    // /* Exchange metadata */
+    // for (i = 0; i < num_qps; i++) {    
+    //     ret = send_server_metadata_to_client(i, msm);
+    //     if (ret) {
+    //         rdma_error("Failed to send server metadata to the client, ret = %d \n", ret);
+    //         return ret;
+    //     }
+    // }
     printf("All server setup complete, now serving memory requests\n");
 
     print_periodically(num_qps, 1 /* sec */, msm);

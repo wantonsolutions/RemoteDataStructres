@@ -8,6 +8,8 @@
 
 #include "rdma_common.h"
 #include "rdma_client_lib.h"
+#include "config.h"
+#include "memcached.h"
 
 
 using namespace std;
@@ -117,37 +119,49 @@ namespace cuckoo_rdma_engine {
             char * table_pointer = (char *) rcuckoo->get_table_pointer();
             uint32_t table_size = rcuckoo->get_table_size_bytes();
 
-            printf("setting up table of size %d\n", table_size);
+            _table_config = memcached_get_table_config();
+            assert(_table_config != NULL);
+            assert(_table_config->table_size_bytes == table_size);
+            printf("got a table config from the memcached server and it seems to line up\n");
+
+
             // int ret = cm.client_xchange_metadata_with_server(qp_num, NULL, 256);      // 1 MB
-            int ret = _connection_manager->client_xchange_metadata_with_server(qp_num, table_pointer, table_size);      // 1 MB
-            if (ret != 0) {
-                printf("Error: client_xchange_metadata_with_server failed\n");
-                exit(1);
-            } else {
-                printf("client_xchange_metadata_with_server succeeded\n");
-            }
-            _table_mr = _connection_manager->client_qp_src_mr[qp_num];
+            // int ret = _connection_manager->client_xchange_metadata_with_server(qp_num, table_pointer, table_size);      // 1 MB
+            // if (ret != 0) {
+            //     printf("Error: client_xchange_metadata_with_server failed\n");
+            //     exit(1);
+            // } else {
+            //     printf("client_xchange_metadata_with_server succeeded\n");
+            // }
+            // _table_mr = _connection_manager->client_qp_src_mr[qp_num];
+            // assert(_table_mr != NULL);
+
             rcuckoo->print_table();
 
             //register the memory
-            // printf("registering table memory");
-            // _table_mr = rdma_buffer_register(_connection_manager.pd, table_pointer, table_size, MEMORY_PERMISSION);
+            printf("registering table memory");
+            _table_mr = rdma_buffer_register(_connection_manager->pd, table_pointer, table_size, MEMORY_PERMISSION);
 
 
             //Request a completion queue
             printf("requesting completion queue\n");
             void * context = NULL;
-            ret = ibv_get_cq_event(_connection_manager->io_completion_channel_threads[0], &_completion_queue, &context);
-            result_t result;
-            if (ret) {
-                printf("Failed to get next CQ event due to %d \n", -errno);
-                exit(0);
+            _completion_queue = _connection_manager->client_cq_threads[qp_num];
+            if(_completion_queue == NULL){
+                printf("completion queue is null\n");
             }
-            ret = ibv_req_notify_cq(_completion_queue, 0);
-            if (ret) {
-                printf("Failed to request further notifications %d \n", -errno);
-                exit(0);
-            }
+            assert(_completion_queue != NULL);
+            // int ret = ibv_get_cq_event(_connection_manager->io_completion_channel_threads[0], &_completion_queue, &context);
+            // result_t result;
+            // if (ret) {
+            //     printf("Failed to get next CQ event due to %d \n", -errno);
+            //     exit(0);
+            // }
+            // ret = ibv_req_notify_cq(_completion_queue, 0);
+            // if (ret) {
+            //     printf("Failed to request further notifications %d \n", -errno);
+            //     exit(0);
+            // }
 
         } catch (exception& e) {
             printf("RDMAConnectionManager failed to create\n");
@@ -160,10 +174,10 @@ namespace cuckoo_rdma_engine {
     }
 
     uint64_t RDMA_Engine::local_to_remote_table_address(uint64_t local_address){
-        uint64_t base_address = (uint64_t) _rcuckoo->get_table_pointer();
+        uint64_t base_address = (uint64_t) _rcuckoo->get_table_pointer()[0];
         uint64_t address_offset = local_address - base_address;
-        uint64_t remote_address = (uint64_t) _connection_manager->server_qp_metadata_attr[0].address + address_offset;
-        remote_address += 64 + (sizeof(Entry) * 2);
+        uint64_t remote_address = (uint64_t) _table_config->table_address + address_offset;
+        // remote_address += 64 + (sizeof(Entry) * 2);
         return remote_address;
     }
 
@@ -171,11 +185,9 @@ namespace cuckoo_rdma_engine {
     bool RDMA_Engine::start(){
         VRMessage init;
 
-
-
         vector<VRMessage> messages = _state_machine->fsm(init);
 
-        uint32_t remote_key = _connection_manager->server_qp_metadata_attr[0].stag.remote_stag;
+        uint32_t remote_key = _table_config->remote_key;
         int num_concur = 1;
         struct ibv_wc *wc = (struct ibv_wc *) calloc (num_concur, sizeof(struct ibv_wc));
 
@@ -193,13 +205,14 @@ namespace cuckoo_rdma_engine {
                     unsigned int bucket_id = stoi(message.function_args["bucket_id"]);
                     unsigned int size = stoi(message.function_args["size"]);
 
-                    bucket_id = 2;
+                    bucket_id = 1;
+                    bucket_offset = 0;
                     size = 64;
 
                     uint64_t local_address = (uint64_t) _rcuckoo->get_entry_pointer(bucket_id, bucket_offset);
                     uint64_t remote_server_address = local_to_remote_table_address(local_address);
                     printf("local address: %lu\n", local_address);
-                    printf("remote server address: %lu\n", remote_server_address);
+                    printf("remote server address: %p\n", (void*) remote_server_address);
                     printf("size: %d\n", size);
                     printf("local key: %d\n", _table_mr->lkey);
                     printf("remote key: %d\n", remote_key);

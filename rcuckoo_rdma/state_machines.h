@@ -201,6 +201,7 @@ namespace cuckoo_state_machines {
             void fill_table_with_incremental_values();
             unsigned int get_table_size();
             Entry ** get_table_pointer();
+            Table * get_table();
             vector<VRMessage> fsm_logic(VRMessage messages);
 
         private:

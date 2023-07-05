@@ -638,6 +638,10 @@ namespace cuckoo_state_machines {
         return _table.get_underlying_table();
     }
 
+    Table * Memory_State_Machine::get_table(){
+        return &_table;
+    }
+
 
     vector<VRMessage> Memory_State_Machine::fsm_logic(VRMessage message) {
         if (_table.get_fill_percentage() * 100 > _max_fill) {
