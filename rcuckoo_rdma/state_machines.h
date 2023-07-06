@@ -205,6 +205,11 @@ namespace cuckoo_state_machines {
             Table * get_table();
             vector<VRMessage> fsm_logic(VRMessage messages);
 
+
+            void * get_underlying_lock_table_address();
+            unsigned int get_underlying_lock_table_size_bytes();
+            void set_underlying_lock_table_address(void * address);
+
         private:
             Table _table;
             uint32_t _max_fill;

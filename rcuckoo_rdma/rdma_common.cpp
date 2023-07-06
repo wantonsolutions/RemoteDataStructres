@@ -157,169 +157,60 @@ void print_dev_attributes(struct ibv_device_attr_ex * attr) {
 	// printf("CAS %X\n",attr->pci_atomic_caps.compare_swap);
 }
 
-struct ibv_mr* rdma_buffer_alloc_dm(struct ibv_pd *pd, uint32_t size, enum ibv_access_flags permission) {
-	
-	// struct ibv_exp_alloc_dm_attr dm_attr = {0};
-	struct ibv_dm             *dm = {0};
-	struct ibv_mr			  *mr ={0};
 
-	struct ibv_device_attr_ex attrx;
+// /** Stolen from sherman
+on_chip_memory_attr createMemoryRegionOnChip(uint64_t mm, uint64_t mmSize,
+                                 ibv_pd *pd, ibv_context *ctx) {
 
-	/////////////////////////////////////////////////////  
-	/////////////////////////////////////////////////////  
-	/////////////////////////////////////////////////////  
-	/////////////////////////////////////////////////////  
-	//https://docs.nvidia.com/networking/display/MLNXOFEDv494170/Programming
-// struct ibv_exp_dm             *dm;
-// struct ibv_mr                 *mr;
-// struct ibv_exp_alloc_dm_attr dm_attr = {0};
-// struct ibv_exp_memcpy_dm_attr cpy_attr = {0};
-// struct ibv_exp_reg_mr_in mr_in = { .pd = my_pd,
-//                                .addr = 0,
-//                                .length = packet_size,
-//                                .exp_access = IBV_EXP_ACCESS_LOCAL_WRITE,
-//                                .create_flags = 0};
- 
-//  /* Device memory allocation request */
-//  dm_attr.length = packet_size;
-//  dm = ibv_exp_alloc_dm(context, &dm_attr);
- 
-//  /* Device memory registration as memory region */
-//  mr_in.dm = dm;
-//  mr_in.comp_mask = IBV_EXP_REG_MR_DM;
-//  mr = ibv_exp_reg_mr(&mr_in);
- 
-//  cpy_attr.memcpy_dir = IBV_EXP_DM_CPY_TO_DEVICE;
-//  cpy_attr.host_addr = (void *)my_packet_buffer;
-//  cpy_attr.length = packet_size;
-//  cpy_attr.dm_offset = 0;
-//  ibv_exp_memcpy_dm(dm, &cpy_attr);
- 
-// struct ibv_sge list = {
-//          .addr      = 0,
-//          .length    = packet_size,
-//          .lkey      = mr->lkey memory region */
-// };
-// struct ibv_send_wr wr = {
-//           .wr_id      = my_wrid,
-//           .sg_list    = &list,
-//           .num_sge    = 1,
-//           .opcode     = IBV_WR_SEND,
-//           .send_flags = IBV_SEND_SIGNALED,
-// };
-// struct ibv_send_wr *bad_wr;
- 
-// ibv_post_send(my_qp, &wr, &bad_wr);
-	/////////////////////////////////////////////////////
-	/////////////////////////////////////////////////////
-	/////////////////////////////////////////////////////
-	/////////////////////////////////////////////////////
+	struct ibv_exp_alloc_dm_attr dm_attr;
+	memset(&dm_attr, 0, sizeof(dm_attr));
+	dm_attr.length = mmSize;
+	struct ibv_exp_dm *dm = ibv_exp_alloc_dm(ctx, &dm_attr);
+	if (!dm) {
+		rdma_error("Allocate on-chip memory failed\n");
+		exit(0);
+	}
 
+	struct ibv_exp_reg_mr_in mr_in;
+	memset(&mr_in, 0, sizeof(mr_in));
+	mr_in.pd = pd;
+	mr_in.addr = (void *)mm;
+	mr_in.length = mmSize;
+	mr_in.exp_access = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ |
+						IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_ATOMIC;
+	mr_in.create_flags = 0;
+	mr_in.dm = dm;
+	mr_in.comp_mask = IBV_EXP_REG_MR_DM;
+	struct ibv_mr *mr = ibv_exp_reg_mr(&mr_in);
+	if (!mr) {
+		rdma_error("Register on-chip memory failed\n");
+		exit(0);
+	}
 
+	// init zero
+	char *buffer = (char *)malloc(mmSize);
+	memset(buffer, 0, mmSize);
 
-//This is what used to work not using device memory for now.
-	// if (ibv_query_device_ex(pd->context, NULL, &attrx)) {
-	// 	printf("unable to query device for device memory alloc\n");
-	// 	return NULL;
-	// }
+	struct ibv_exp_memcpy_dm_attr cpy_attr;
+	memset(&cpy_attr, 0, sizeof(cpy_attr));
+	cpy_attr.memcpy_dir = IBV_EXP_DM_CPY_TO_DEVICE;
+	cpy_attr.host_addr = (void *)buffer;
+	cpy_attr.length = mmSize;
+	cpy_attr.dm_offset = 0;
+	ibv_exp_memcpy_dm(dm, &cpy_attr);
 
-	// printf("max alloc size %ld\n",attrx.orig_attr.);
-	// if (!attrx.max_dm_size) {
-	// 	printf("Device doesn't support dm allocation\n");
-	// 	return NULL;
-	// }
+	free(buffer);
 
-	// if (attrx.max_dm_size < size) {
-	// 	rdma_error("Size of %u larger than max alloc %ld",size,attrx.max_dm_size);
-	// 	return NULL;
-	// }
+	on_chip_memory_attr attr;
+	attr.addr = (void *)mm;
+	attr.length = mmSize;
+	attr.mr = mr;
+	attr.dm = dm;
 
-	// if (attrx.max_dm_size != DEVICE_MEMORY_KB) {
-	// 	printf("Defined value for max device memory not the same real: %ld static %d, are you running on CX5?\n",attrx.max_dm_size,DEVICE_MEMORY_KB);
-	// }
-
-	// print_dev_attributes(&attrx);
-
-	// dm_attr.length = size;
-	// dm = ibv_alloc_dm(pd->context, &dm_attr);
-
-
-	// if (!dm) {
-	// 	printf("Unable to allocate device memory\n");
-	// 	return NULL;
-	// }
-
-	// // a bit of a c++ switcheroo for bullshit reasons
-	// unsigned int p_sub = (unsigned int)permission;
-	// p_sub = p_sub | IBV_ACCESS_ZERO_BASED;
-	// permission = (enum ibv_access_flags)p_sub;
-
-	// mr = ibv_reg_dm_mr(pd,dm,0,size,permission);
-
-	// if (!mr) {
-	// 	//rdma_error("Unable to register device memory\n");
-	// 	printf("Unable to register device memory\n");
-	// 	return NULL;
-	// }
-
-	// return mr;
-
-
-		/** Stolen from sherman
-		 * https://github.com/thustorage/Sherman/blob/main/src/rdma/Resource.cpp
-		 ibv_mr *createMemoryRegionOnChip(uint64_t mm, uint64_t mmSize,
-                                 RdmaContext *ctx) {
-
-		// struct ibv_exp_alloc_dm_attr dm_attr;
-		// memset(&dm_attr, 0, sizeof(dm_attr));
-		// dm_attr.length = mmSize;
-		// struct ibv_exp_dm *dm = ibv_exp_alloc_dm(ctx->ctx, &dm_attr);
-		// if (!dm) {
-		// 	Debug::notifyError("Allocate on-chip memory failed");
-		// 	return nullptr;
-		// }
-
-		// struct ibv_exp_reg_mr_in mr_in;
-		// memset(&mr_in, 0, sizeof(mr_in));
-		// mr_in.pd = ctx->pd, mr_in.addr = (void *)mm, mr_in.length = mmSize,
-		// mr_in.exp_access = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ |
-		// 					IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_ATOMIC,
-		// mr_in.create_flags = 0;
-		// mr_in.dm = dm;
-		// mr_in.comp_mask = IBV_EXP_REG_MR_DM;
-		// struct ibv_mr *mr = ibv_exp_reg_mr(&mr_in);
-		// if (!mr) {
-		// 	Debug::notifyError("Memory registration failed");
-		// 	return nullptr;
-		// }
-
-		// // init zero
-		// char *buffer = (char *)malloc(mmSize);
-		// memset(buffer, 0, mmSize);
-
-		// struct ibv_exp_memcpy_dm_attr cpy_attr;
-		// memset(&cpy_attr, 0, sizeof(cpy_attr));
-		// cpy_attr.memcpy_dir = IBV_EXP_DM_CPY_TO_DEVICE;
-		// cpy_attr.host_addr = (void *)buffer;
-		// cpy_attr.length = mmSize;
-		// cpy_attr.dm_offset = 0;
-		// ibv_exp_memcpy_dm(dm, &cpy_attr);
-
-		// free(buffer);
-
-		// return mr;
-		// }
-		**/ //End stolen from sherman
-
-
+	return attr;
 }
+		// **/ //End stolen from sherman
 
-// struct ibv_mr *rdma_buffer_register_dm(struct ibv_pd *pd, 
-// 		void *addr, uint32_t length, 
-// 		enum ibv_access_flags permission)
-// {
-
-// }
 
 void rdma_buffer_free(struct ibv_mr *mr) 
 {

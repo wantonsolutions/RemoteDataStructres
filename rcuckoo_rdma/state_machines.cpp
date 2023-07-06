@@ -673,6 +673,20 @@ namespace cuckoo_state_machines {
     }
 
 
+
+    void * Memory_State_Machine::get_underlying_lock_table_address(){
+        return _table.get_underlying_lock_table_address();
+
+    }
+    unsigned int Memory_State_Machine::get_underlying_lock_table_size_bytes(){
+        return _table.get_underlying_lock_table_size_bytes();
+
+    }
+    void Memory_State_Machine::set_underlying_lock_table_address(void * address){
+        _table.set_underlying_lock_table_address(address);
+    }
+
+
     vector<VRMessage> Memory_State_Machine::fsm_logic(VRMessage message) {
         if (_table.get_fill_percentage() * 100 > _max_fill) {
             ALERT("fsm logic", "table full to %d percent, not processing any more requests\n", _max_fill);

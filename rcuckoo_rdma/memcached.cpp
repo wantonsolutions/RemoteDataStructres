@@ -58,8 +58,10 @@ void memcached_pubish_table_config(table_config *config) {
     assert(config->table_size_bytes > 0);
     assert(config->buckets_per_row > 0);
     assert(config->entry_size_bytes > 0);
-    assert(config->lock_table_address > 0);
     assert(config->lock_table_size_bytes > 0);
+    assert(config->lock_table_key > 0);
+    //the lock table address is going to be 0 most of the time.
+    //We do not want to assert any value to it so it's flexible
 
     memcached_publish(SERVER_TABLE_CONFIG_KEY.c_str(), (void *)config, sizeof(table_config));
 }

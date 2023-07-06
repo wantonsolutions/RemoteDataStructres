@@ -104,6 +104,14 @@ union work_req_id {
     uint64_t val;
 };
 
+/* used for tracking on chip memory */
+typedef struct on_chip_memory_attr {
+	void *addr;
+	uint64_t length;
+	struct ibv_mr *mr;
+	struct ibv_exp_dm *dm;
+} on_chip_memory_attr;
+
 inline ibv_access_flags operator|(ibv_access_flags a, ibv_access_flags b)
 {
     return static_cast<ibv_access_flags>(static_cast<int>(a) | static_cast<int>(b));
@@ -163,6 +171,12 @@ struct ibv_mr* rdma_buffer_alloc_dm(struct ibv_pd *pd, uint32_t size,
 struct ibv_mr *rdma_buffer_register_dm(struct ibv_pd *pd, 
 		void *addr, uint32_t length, 
 		enum ibv_access_flags permission);
+
+
+//stolen from sherman
+
+
+on_chip_memory_attr createMemoryRegionOnChip(uint64_t mm, uint64_t mmSize, ibv_pd *pd, ibv_context *ctx);
 
 
 /* Frees a previously allocated RDMA buffer. The buffer must be allocated by 

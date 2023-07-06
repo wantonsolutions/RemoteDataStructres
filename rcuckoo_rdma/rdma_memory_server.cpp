@@ -16,6 +16,10 @@
 using namespace std;
 using namespace cuckoo_state_machines;
 
+#define TABLE_MR_INDEX 0
+#define LOCK_TABLE_MR_INDEX 1
+#define LOCK_TABLE_STARTING_ADDRESS 0
+
 /* These are the RDMA resources needed to setup an RDMA connection */
 /* Event channel, where connection management (cm) related events are relayed */
 static struct ibv_context **devices;
@@ -32,6 +36,8 @@ static struct rdma_buffer_attr client_qp_metadata_attr[MAX_QPS], server_qp_metad
 static struct ibv_recv_wr client_recv_wr, *bad_client_recv_wr = NULL;
 static struct ibv_send_wr server_send_wr, *bad_server_send_wr = NULL;
 static struct ibv_sge client_recv_sge, server_send_sge;
+
+static on_chip_memory_attr device_memory;
 
 
 
@@ -309,45 +315,75 @@ static int accept_client_connection(int qp_num)
     return ret;
 }
 
+void copy_device_memory_to_host_lock_table(Memory_State_Machine &msm) {
+    //Make sure that the device has been initalized
+    assert(device_memory.dm != NULL);
+    struct ibv_exp_memcpy_dm_attr cpy_attr;
+    memset(&cpy_attr, 0, sizeof(cpy_attr));
+    cpy_attr.memcpy_dir = IBV_EXP_DM_CPY_TO_HOST;
+    cpy_attr.host_addr = (void *)msm.get_underlying_lock_table_address();
+    cpy_attr.length = msm.get_underlying_lock_table_size_bytes();
+    cpy_attr.dm_offset = 0;
+    ibv_exp_memcpy_dm(device_memory.dm, &cpy_attr);
+}
+
 static void send_table_config_to_memcached_server(Memory_State_Machine& msm)
 {
+
     //Regiserting the memory for the table
     //Send the info for the table
     void * table_ptr = msm.get_table_pointer()[0];
-    server_qp_buffer_mr[0] = rdma_buffer_register(pd /* which protection domain */, 
+    server_qp_buffer_mr[TABLE_MR_INDEX] = rdma_buffer_register(pd /* which protection domain */, 
             table_ptr,
             msm.get_table_size(),
             (MEMORY_PERMISSION
             ) /* access permissions */);
 
-    //TODO map the lock table to device memory
-    // printf("allocing device memory for lock table\n");
-    // server_qp_buffer_mr[qp_num] = rdma_buffer_alloc_dm(pd /* which protection domain */, 
-    //         client_qp_metadata_attr[qp_num].length /* what size to allocate */, 
-    //         (MEMORY_PERMISSION) /* access permissions */);
-
-    if(!server_qp_buffer_mr[0]){
-        rdma_error("Server failed to create a buffer \n");
+    if(!server_qp_buffer_mr[TABLE_MR_INDEX]){
+        rdma_error("Server failed to create a buffer ro the table\n");
         /* we assume that it is due to out of memory error */
         exit(0);
         // return -ENOMEM;
     }
 
-    printf("Table Address %p registered address %p\n", table_ptr, server_qp_buffer_mr[0]->addr);
+    //TODO map the lock table to device memory
+    printf("allocing device memory for lock table\n");
+    device_memory = createMemoryRegionOnChip(
+        LOCK_TABLE_STARTING_ADDRESS, 
+        (uint64_t) msm.get_underlying_lock_table_size_bytes(),
+         pd, 
+         devices[0]);
+    
+    
+
+    if(!device_memory.mr){
+        rdma_error("Server failed to create a buffer for the lock table\n");
+        /* we assume that it is due to out of memory error */
+        exit(0);
+        // return -ENOMEM;
+    }
+    // msm.set_underlying_lock_table_address(server_qp_buffer_mr[LOCK_TABLE_MR_INDEX]->addr);
+
+
+
+
+    printf("Table Address %p registered address %p\n", table_ptr, server_qp_buffer_mr[TABLE_MR_INDEX]->addr);
+    printf("Lock Table Address %p registered address %p\n", msm.get_underlying_lock_table_address(), device_memory.mr->addr);
     printf("Sending Table Configuration to Memcached Server\n");
     table_config config;
     Table * table = msm.get_table();
 
     // config.table_address = (uint64_t) msm.get_table_pointer();
-    config.table_address = (uint64_t) server_qp_buffer_mr[0]->addr;
-    config.remote_key = (uint32_t) server_qp_buffer_mr[0]->lkey;
+    config.table_address = (uint64_t) server_qp_buffer_mr[TABLE_MR_INDEX]->addr;
+    config.remote_key = (uint32_t) server_qp_buffer_mr[TABLE_MR_INDEX]->lkey;
     printf("todo when you get back set up the remote key!!");
     config.table_size_bytes = table->get_table_size_bytes();
     config.num_rows = table->get_row_count();
     config.buckets_per_row = table->get_buckets_per_row();
     config.entry_size_bytes = table->get_entry_size_bytes();
-    config.lock_table_address = (uint64_t) table->get_underlying_lock_table_address();
+    config.lock_table_address = (uint64_t) LOCK_TABLE_STARTING_ADDRESS;
     config.lock_table_size_bytes = table->get_underlying_lock_table_size_bytes();
+    config.lock_table_key = (uint32_t) device_memory.mr->lkey;
     memcached_pubish_table_config(&config);
 }
 
@@ -551,7 +587,7 @@ void print_periodically(int num_qps, int time_seconds, Memory_State_Machine &msm
         sleep(time_seconds);
         printf("Printing table after %d seconds\n", print_step * time_seconds);
         print_step++;
-
+        copy_device_memory_to_host_lock_table(msm);
         msm.print_table();
 
         // for(int i = 0; i < num_qps; i++) {
@@ -570,7 +606,7 @@ int main(int argc, char **argv)
 
     unordered_map<string, string> config = gen_config();
     Memory_State_Machine msm = Memory_State_Machine(config);
-    msm.fill_table_with_incremental_values();
+    // msm.fill_table_with_incremental_values();
 
 
     //resolve the address from the config

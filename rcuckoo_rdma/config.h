@@ -16,7 +16,8 @@ typedef struct table_config {
             "buckets_per_row: " + std::to_string(buckets_per_row) + "\n" +
             "entry_size_bytes: " + std::to_string(entry_size_bytes) + "\n" +
             "lock_table_address: " + std::to_string(lock_table_address) + "\n" +
-            "lock_table_size_bytes: " + std::to_string(lock_table_size_bytes) + "\n";
+            "lock_table_size_bytes: " + std::to_string(lock_table_size_bytes) + "\n" +
+            "lock_table_key: " + std::to_string(lock_table_key) + "\n";
     }
     uint64_t table_address;
     int table_size_bytes;
@@ -25,6 +26,7 @@ typedef struct table_config {
     int buckets_per_row;
     int entry_size_bytes;
     uint64_t lock_table_address;
+    int lock_table_key;
     int lock_table_size_bytes;
 } table_config;
 

@@ -179,6 +179,7 @@ namespace cuckoo_tables {
             void fill_masked_cas(unsigned int index, bool success, uint64_t new_value, uint64_t mask);
             void * get_lock_table_address();
             unsigned int get_lock_table_size_bytes();
+            void set_lock_table_address(void * address);
             string to_string();
 
         private:
@@ -226,6 +227,7 @@ namespace cuckoo_tables {
 
             void * get_underlying_lock_table_address();
             unsigned int get_underlying_lock_table_size_bytes();
+            void set_underlying_lock_table_address(void * address);
 
 
         private:

@@ -104,7 +104,7 @@ $(test_dir)/test_state_machines : $(test_dir)/test_state_machines.cpp state_mach
 	g++ $(CFLAGS)  $(test_dir)/test_state_machines.cpp -o test_state_machines state_machines.o tables.o hash.o search.o virtual_rdma.o util.o $(LIBRARIES)
 	mv test_state_machines $(test_dir)/test_state_machines
 
-$(test_dir)/test_virtual_rdma : $(test_dir)/test_virtual_rdma.cpp virtual_rdma.o util.o
+$(test_dir)/test_virtual_rdma : $(test_dir)/test_virtual_rdma.cpp virtual_rdma.o util.o search.o
 	g++ $(CFLAGS)  $(test_dir)/test_virtual_rdma.cpp -o test_virtual_rdma tables.o hash.o search.o virtual_rdma.o util.o $(LIBRARIES)
 	mv test_virtual_rdma $(test_dir)/test_virtual_rdma
 

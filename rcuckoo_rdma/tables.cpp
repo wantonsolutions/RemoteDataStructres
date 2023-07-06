@@ -71,8 +71,15 @@ namespace cuckoo_tables {
         return (void*) _locks;
     }
 
+
+
     unsigned int Lock_Table::get_lock_table_size_bytes(){
         return _total_lock_entries;
+    }
+
+
+    void Lock_Table::set_lock_table_address(void * address) {
+        _locks = (uint8_t*) address;
     }
 
     /*lock table functions*/
@@ -203,6 +210,10 @@ namespace cuckoo_tables {
 
     void * Table::get_underlying_lock_table_address() {
         return _lock_table.get_lock_table_address();
+    }
+
+    void Table::set_underlying_lock_table_address(void * address) {
+        _lock_table.set_lock_table_address(address);
     }
     
     unsigned int Table::get_underlying_lock_table_size_bytes() {
