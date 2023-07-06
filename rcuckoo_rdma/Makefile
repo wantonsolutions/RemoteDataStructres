@@ -108,7 +108,7 @@ $(test_dir)/test_virtual_rdma : $(test_dir)/test_virtual_rdma.cpp virtual_rdma.o
 	g++ $(CFLAGS)  $(test_dir)/test_virtual_rdma.cpp -o test_virtual_rdma tables.o hash.o search.o virtual_rdma.o util.o $(LIBRARIES)
 	mv test_virtual_rdma $(test_dir)/test_virtual_rdma
 
-$(test_dir)/test_cuckoo: $(test_dir)/test_cuckoo.cpp cuckoo.o util.o state_machines.o rdma_engine.o rdma_common.o rdma_client_lib.o memcached.o config.h
+$(test_dir)/test_cuckoo: $(test_dir)/test_cuckoo.cpp cuckoo.o util.o state_machines.o rdma_engine.o rdma_common.o rdma_client_lib.o memcached.o config.h rdma_common.cpp
 	g++ $(CFLAGS)  $(test_dir)/test_cuckoo.cpp -o test_cuckoo cuckoo.o rdma_engine.o tables.o hash.o search.o virtual_rdma.o util.o state_machines.o rdma_common.o rdma_client_lib.o memcached.o $(LIBRARIES) $(RDMA_LIBS)
 	mv test_cuckoo $(test_dir)/test_cuckoo
 

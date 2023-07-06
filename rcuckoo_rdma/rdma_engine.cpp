@@ -159,6 +159,40 @@ namespace cuckoo_rdma_engine {
         return remote_address;
     }
 
+    void RDMA_Engine::send_virtual_read_message(VRMessage message, uint64_t wr_id){
+        ibv_qp *qp = _connection_manager->client_qp[0];
+        //translate address locally for bucket id
+        unsigned int bucket_offset = stoi(message.function_args["bucket_offset"]);
+        unsigned int bucket_id = stoi(message.function_args["bucket_id"]);
+        unsigned int size = stoi(message.function_args["size"]);
+
+        uint64_t local_address = (uint64_t) _rcuckoo->get_entry_pointer(bucket_id, bucket_offset);
+        uint64_t remote_server_address = local_to_remote_table_address(local_address);
+
+        bool success = rdmaRead(
+            qp,
+            local_address,
+            remote_server_address,
+            size,
+            _table_mr->lkey,
+            _table_config->remote_key,
+            true,
+            wr_id
+        );
+        if (!success) {
+            printf("rdma read failed\n");
+            exit(1);
+        }
+    }
+    void RDMA_Engine::send_virtual_cas_message(VRMessage message, uint64_t wr_id){
+        printf("virtual cas we have not made it here yet\n");
+        exit(0);
+    }
+
+    void RDMA_Engine::send_virtual_masked_cas_message(VRMessage message, uint64_t wr_id) {
+        printf("virtual masked cas, we have not made it here yet\n");
+        exit(0);
+    }
     
     bool RDMA_Engine::start(){
         vector<VRMessage> ingress_messages;
@@ -168,7 +202,6 @@ namespace cuckoo_rdma_engine {
 
         // vector<VRMessage> messages = _state_machine->fsm(init);
 
-        uint32_t remote_key = _table_config->remote_key;
         int num_concur = 1;
         struct ibv_wc *wc = (struct ibv_wc *) calloc (num_concur, sizeof(struct ibv_wc));
 
@@ -176,65 +209,41 @@ namespace cuckoo_rdma_engine {
         unordered_map<uint64_t, VRMessage> wr_id_to_message;
 
         while(true){
-            //send messages
-
             //Pop off an ingress message
             printf("popping off first ingress message\n");
-
             VRMessage current_ingress_message;
-            
             if (ingress_messages.size() > 0){
                 current_ingress_message = ingress_messages[0];
                 ingress_messages.erase(ingress_messages.begin());
             }
+
             vector<VRMessage> messages = _state_machine->fsm(current_ingress_message);
-
-
             int sent_messages = 0;
             for (int i = 0; i < messages.size(); i++){
                 printf("Sending message: %s\n", messages[i].to_string().c_str());
                 VRMessage message = messages[i];
-                if (message.get_message_type() == READ_REQUEST) {
-
-                    printf("storing message to map\n");
+                bool sent = false;
+                switch(message.get_message_type()) {
+                    case READ_REQUEST:
+                        send_virtual_read_message(message, wr_id_counter);
+                        sent = true;
+                        break;
+                    case CAS_REQUEST:
+                        send_virtual_cas_message(message, wr_id_counter);
+                        sent = true;
+                        break;
+                    case MASKED_CAS_REQUEST:
+                        send_virtual_masked_cas_message(message, wr_id_counter);
+                        sent = true;
+                        break;
+                    default:
+                        printf("message type not supported\n");
+                        exit(1);
+                }
+                if (sent) {
                     wr_id_to_message[wr_id_counter] = message;
-                    printf("starting rdma read\n");
-
-                    ibv_qp *qp = _connection_manager->client_qp[0];
-                    //translate address locally for bucket id
-                    unsigned int bucket_offset = stoi(message.function_args["bucket_offset"]);
-                    unsigned int bucket_id = stoi(message.function_args["bucket_id"]);
-                    unsigned int size = stoi(message.function_args["size"]);
-
-
-                    uint64_t local_address = (uint64_t) _rcuckoo->get_entry_pointer(bucket_id, bucket_offset);
-                    uint64_t remote_server_address = local_to_remote_table_address(local_address);
-                    // printf("local address: %lu\n", local_address);
-                    // printf("remote server address: %p\n", (void*) remote_server_address);
-                    // printf("size: %d\n", size);
-                    // printf("local key: %d\n", _table_mr->lkey);
-                    // printf("remote key: %d\n", remote_key);
-
-                    // printf("quick sleep\n");
-                    // sleep(2);
-                    // printf("done sleep sending read\n");
-
-                    bool success = rdmaRead(
-                        _connection_manager->client_qp[0],
-                        local_address,
-                        remote_server_address,
-                        size,
-                        _table_mr->lkey,
-                        remote_key,
-                        true,
-                        wr_id_counter
-                    );
                     sent_messages++;
                     wr_id_counter++;
-                    if (!success) {
-                        printf("rdma read failed\n");
-                        exit(1);
-                    }
                 }
             }
 

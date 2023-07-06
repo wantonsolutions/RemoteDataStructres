@@ -52,7 +52,7 @@ unordered_map<string, string> gen_config() {
     config["locks_per_message"] = to_string(locks_per_message);
     config["memory_size"] = to_string(memory_size);
     config["deterministic"]="True";
-    config["workload"]="ycsb-c";
+    config["workload"]="ycsb-w";
     config["id"]="0";
     config["search_function"]="a_star";
     config["location_function"]="dependent";

@@ -21,6 +21,9 @@ namespace cuckoo_rdma_engine {
             // using namespace cuckoo_rcuckoo;
             // set_rcuckoo_state_machine(cuckoo_rcuckoo::RCuckoo * rcuckoo);
             uint64_t local_to_remote_table_address(uint64_t local_address);
+            void send_virtual_read_message(VRMessage message, uint64_t wr_id);
+            void send_virtual_cas_message(VRMessage message, uint64_t wr_id);
+            void send_virtual_masked_cas_message(VRMessage message, uint64_t wr_id);
             bool start();
 
         private:
