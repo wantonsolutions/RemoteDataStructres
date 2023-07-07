@@ -52,6 +52,8 @@ namespace cuckoo_virtual_rdma {
         return s;
     }
 
+
+
     message_type VRMessage::get_message_type(){
         if (function == "cas_table_entry") {
             return CAS_REQUEST;
@@ -69,8 +71,15 @@ namespace cuckoo_virtual_rdma {
             return NO_OP_MESSAGE;
         } else {
             ALERT("Error", "unknown function (%s)\n", function.c_str());
-            exit(1);
+            return NO_OP_MESSAGE;
+            // exit(1);
         }
+    }
+
+    VRMessage& VRMessage::operator=(const VRMessage& other){
+        this->function = other.function;
+        this->function_args = other.function_args;
+        return *this;
     }
 
     string message_type_to_function_string(message_type type){
@@ -94,8 +103,9 @@ namespace cuckoo_virtual_rdma {
             case NO_OP_MESSAGE:
                 return "no_op";
             default:
-                printf("Error unknown message type %d\n", type);
-                exit(1);
+                return "broken int type";
+                // printf("Error unknown message type %d\n", type);
+                // exit(1);
         }
     }
 
@@ -113,6 +123,7 @@ namespace cuckoo_virtual_rdma {
         string s = "";
         s += "Message Type:";
         s += message_type_to_function_string(get_message_type());
+        s += "(int type)" + message_type_to_function_string(type);
         s += " Function Arguments {";
         for (auto const& x : function_args) {
             s += x.first + ":" + x.second + " ";

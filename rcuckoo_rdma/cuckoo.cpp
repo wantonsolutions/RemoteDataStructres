@@ -305,7 +305,9 @@ namespace cuckoo_rcuckoo {
 
     vector<VRMessage> RCuckoo::fsm_logic(VRMessage message){
 
-        VERBOSE(log_id(), "Received Message: %s\n", message.to_string().c_str());
+        if (message.get_message_type() != NO_OP_MESSAGE) {
+            VERBOSE(log_id(), "Received Message: %s\n", message.to_string().c_str());
+        }
         vector<VRMessage> response = vector<VRMessage>();
 
 

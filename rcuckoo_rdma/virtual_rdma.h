@@ -35,13 +35,16 @@ namespace cuckoo_virtual_rdma {
 
     typedef struct VRMessage {
         string function;
-        VRMessage(){
-            function = "";
-        }
+        message_type type; // same as function but not the string
+        // VRMessage(){
+        //     function = "";
+        // }
         unordered_map<string,string> function_args;
         message_type get_message_type();
         uint32_t get_message_size_bytes();
         string to_string();
+        VRMessage& operator=(const VRMessage& other);
+
     } VRMessage;
 
     typedef struct Request {

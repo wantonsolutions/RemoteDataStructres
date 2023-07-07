@@ -9,6 +9,7 @@
 #include "rdma_common.h"
 #include "rdma_client_lib.h"
 #include "config.h"
+#include "log.h"
 #include "memcached.h"
 
 
@@ -87,6 +88,36 @@ namespace cuckoo_rdma_engine {
 
         if (ibv_post_send(qp, &wr, &wrBad)) {
             printf("send with rdma read failed");
+        }
+        return true;
+    }
+
+    // for RC & UC
+    bool rdmaCompareAndSwap(ibv_qp *qp, uint64_t source, uint64_t dest,
+                            uint64_t compare, uint64_t swap, uint32_t lkey,
+                            uint32_t remoteRKey, bool signal, uint64_t wrID) {
+        struct ibv_sge sg;
+        struct ibv_send_wr wr;
+        struct ibv_send_wr *wrBad;
+
+        fillSgeWr(sg, wr, source, 8, lkey);
+
+        wr.opcode = IBV_WR_ATOMIC_CMP_AND_SWP;
+
+        if (signal) {
+            wr.send_flags = IBV_SEND_SIGNALED;
+        }
+
+        wr.wr.atomic.remote_addr = dest;
+        wr.wr.atomic.rkey = remoteRKey;
+        wr.wr.atomic.compare_add = compare;
+        wr.wr.atomic.swap = swap;
+        wr.wr_id = wrID;
+
+        if (ibv_post_send(qp, &wr, &wrBad)) {
+            printf("send with rdma compare and swap failed\n");
+            sleep(5);
+            return false;
         }
         return true;
     }
@@ -238,10 +269,40 @@ namespace cuckoo_rdma_engine {
             printf("rdma read failed\n");
             exit(1);
         }
+        VERBOSE("RDMA ENGINE", "sent virtual read message\n");
     }
     void RDMA_Engine::send_virtual_cas_message(VRMessage message, uint64_t wr_id){
-        printf("virtual cas we have not made it here yet\n");
-        exit(0);
+        ibv_qp * qp = _connection_manager->client_qp[0];
+        uint32_t bucket_id = stoi(message.function_args["bucket_id"]);
+        uint32_t bucket_offset = stoi(message.function_args["bucket_offset"]);
+        uint32_t old = stoul(message.function_args["old"], nullptr, 16);
+        old = __builtin_bswap64(old);
+        old = old << 32;
+        uint32_t new_val = stoul(message.function_args["new"], nullptr, 16);
+        new_val = __builtin_bswap64(new_val);
+        new_val = new_val <<32;
+
+        uint64_t local_address = (uint64_t) _rcuckoo->get_entry_pointer(bucket_id, bucket_offset);
+        uint64_t remote_server_address = local_to_remote_table_address(local_address);
+
+
+
+        bool success = rdmaCompareAndSwap(
+            qp, 
+            local_address, 
+            remote_server_address,
+            old, 
+            new_val, 
+            _table_mr->lkey,
+            _table_config->remote_key, 
+            true, 
+            wr_id);
+
+        if (!success) {
+            printf("rdma cas failed\n");
+            exit(1);
+        }
+
     }
 
     void RDMA_Engine::send_virtual_masked_cas_message(VRMessage message, uint64_t wr_id) {
@@ -287,11 +348,13 @@ namespace cuckoo_rdma_engine {
             printf("rdma masked cas failed failed\n");
             exit(1);
         }
-        printf("completed masked cas request");
+        printf("completed masked cas request\n");
 
 
     }
     
+    #define MAX_CONCURRENT_MESSAGES 4
+    VRMessage message_tracker[MAX_CONCURRENT_MESSAGES];
     bool RDMA_Engine::start(){
         vector<VRMessage> ingress_messages;
         VRMessage init;
@@ -305,33 +368,36 @@ namespace cuckoo_rdma_engine {
 
         uint64_t wr_id_counter = 0;
         unordered_map<uint64_t, VRMessage> wr_id_to_message;
+        vector<VRMessage> messages;
 
         while(true){
             //Pop off an ingress message
-            printf("popping off first ingress message\n");
             VRMessage current_ingress_message;
             if (ingress_messages.size() > 0){
+                printf("popping off first ingress message\n");
                 current_ingress_message = ingress_messages[0];
                 ingress_messages.erase(ingress_messages.begin());
+            } else {
+                // printf("nothing to supply to the state machine, sending in blank message\n");
             }
 
-            vector<VRMessage> messages = _state_machine->fsm(current_ingress_message);
+            messages = _state_machine->fsm(current_ingress_message);
             int sent_messages = 0;
             for (int i = 0; i < messages.size(); i++){
                 printf("Sending message: %s\n", messages[i].to_string().c_str());
-                VRMessage message = messages[i];
+                messages[i].type = messages[i].get_message_type();
                 bool sent = false;
-                switch(message.get_message_type()) {
+                switch(messages[i].get_message_type()) {
                     case READ_REQUEST:
-                        send_virtual_read_message(message, wr_id_counter);
+                        send_virtual_read_message(messages[i], wr_id_counter);
                         sent = true;
                         break;
                     case CAS_REQUEST:
-                        send_virtual_cas_message(message, wr_id_counter);
+                        send_virtual_cas_message(messages[i], wr_id_counter);
                         sent = true;
                         break;
                     case MASKED_CAS_REQUEST:
-                        send_virtual_masked_cas_message(message, wr_id_counter);
+                        send_virtual_masked_cas_message(messages[i], wr_id_counter);
                         sent = true;
                         break;
                     default:
@@ -339,38 +405,81 @@ namespace cuckoo_rdma_engine {
                         exit(1);
                 }
                 if (sent) {
-                    wr_id_to_message[wr_id_counter] = message;
+                    printf("writing to wr_id_to_message with %s\n", messages[i].to_string().c_str());
+                    message_tracker[wr_id_counter % MAX_CONCURRENT_MESSAGES] = messages[i];
+                    // wr_id_to_message[wr_id_counter] = messages[i];
+                    printf("setting wrid message %d\n", wr_id_counter);
                     sent_messages++;
                     wr_id_counter++;
                 }
             }
 
+            for (int k=0;k<MAX_CONCURRENT_MESSAGES;k++) {
+                printf("message_tracker[%d] = %s\n", k, message_tracker[k].to_string().c_str());
+            }
+
             if (sent_messages > 0 ) {
                 //Now we deal with the message recipt
                 printf("pooling\n");
-                int n = bulk_poll(_completion_queue, num_concur, wc);
+                int n = bulk_poll(_completion_queue, sent_messages, wc);
                 if (n < 0) {
                     printf("polling failed\n");
                     exit(1);
+                }
+                for (int k=0;k<MAX_CONCURRENT_MESSAGES;k++) {
+                    printf("message_tracker sub 1[%d] = %s\n", k, message_tracker[k].to_string().c_str());
                 }
                 for (int j=0;j<n;j++) {
                     if (wc[j].status != IBV_WC_SUCCESS) {
                         printf("RDMA read failed with status %s\n", ibv_wc_status_str(wc[j].status));
                         exit(1);
                     } else {
-                        printf("RDMA read succeeded\n");
+                        printf("Message Received with work request %d\n", wc[j].wr_id);
 
+                        for (int k=0;k<MAX_CONCURRENT_MESSAGES;k++) {
+                            printf("message_tracker[%d] = %s\n", k, message_tracker[k].to_string().c_str());
+                        }
                         //The result of the operation is in the local buffer
                         //Perform a faux delivery to our own state machine
-                        VRMessage outgoing = wr_id_to_message[wc[j].wr_id];
-                        vector<VRMessage> incomming = _memory_state_machine->fsm(outgoing);
-                        wr_id_to_message.erase(wc[j].wr_id);
-                        printf("memory state machine table\n");
-                        _memory_state_machine->print_table();
 
-                        for (int i = 0; i < incomming.size(); i++){
-                            printf("memory state machine incomming message: %s\n", incomming[i].to_string().c_str());
-                            ingress_messages.push_back(incomming[i]);
+                        // if (wr_id_to_message.find(wc[j].wr_id) == wr_id_to_message.end()) {
+                        //     printf("wr_id not found in wr_id_to_message\n");
+                        //     exit(1);
+                        // }
+                        VRMessage outgoing = message_tracker[wc[j].wr_id % MAX_CONCURRENT_MESSAGES];
+                        printf("about to deliver wr_id %d :: %s\n", wc[j].wr_id, message_tracker[wc[j].wr_id % MAX_CONCURRENT_MESSAGES].to_string().c_str());
+                        // printf("oputging message type %s\n", outgoing.function.c_str());
+                        // for (int k=0;k<outgoing.function.size();k++){
+                        //     printf("%c", outgoing.function[k]);
+                        // }
+                        // if (outgoing.function[0] == 'm' &&  outgoing.function[1] == 'a' && outgoing.function[2] == 's' && outgoing.function[3] == 'k'){
+                        //     printf("assigning mask function\n");
+                        //     outgoing.function="masked_cas_lock_table";
+                        // }
+                        printf("outgoing message type %d\n", outgoing.get_message_type());
+
+                        if (outgoing.get_message_type() == READ_REQUEST){
+                            printf("delivering message to state machine: %s\n", outgoing.to_string().c_str());
+                            vector<VRMessage> incomming = _memory_state_machine->fsm(outgoing);
+                            printf("eraing message from wr_id_to_message %d\n", wc[j].wr_id);
+                            wr_id_to_message.erase(wc[j].wr_id);
+                            printf("memory state machine table\n");
+                            _memory_state_machine->print_table();
+                            for (int i = 0; i < incomming.size(); i++){
+                                printf("memory state machine incomming message: %s\n", incomming[i].to_string().c_str());
+                                ingress_messages.push_back(incomming[i]);
+                            }
+                        } else if (outgoing.get_message_type() == MASKED_CAS_REQUEST) {
+                            printf("received a masked cas response\n");
+                            printf("gottac check if it is the same as reality\n");
+                            exit(0);
+                        } else if (outgoing.get_message_type() == CAS_REQUEST) {
+                            printf("received a cas response\n");
+                            exit(0);
+
+                        } else {
+                            printf("unknown message type %s", outgoing.to_string().c_str());
+                            exit(1);
                         }
                     }
                 }

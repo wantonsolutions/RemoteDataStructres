@@ -24,9 +24,9 @@ string uint64t_to_bin_string(uint64_t num){
     string s = "";
     for (int i = 0; i < 64; i++){
         if (num & 1){
-            s = "1" + s;
+            s.insert(0, "1");
         } else {
-            s = "0" + s;
+            s.insert(0, "0");
         }
         num = num >> 1;
     }
