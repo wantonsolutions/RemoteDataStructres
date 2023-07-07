@@ -339,6 +339,7 @@ static void send_table_config_to_memcached_server(Memory_State_Machine& msm)
             (MEMORY_PERMISSION
             ) /* access permissions */);
 
+
     if(!server_qp_buffer_mr[TABLE_MR_INDEX]){
         rdma_error("Server failed to create a buffer ro the table\n");
         /* we assume that it is due to out of memory error */
@@ -348,6 +349,7 @@ static void send_table_config_to_memcached_server(Memory_State_Machine& msm)
 
     //TODO map the lock table to device memory
     printf("allocing device memory for lock table\n");
+    printf("asking for a table of size %d\n", (uint64_t) msm.get_underlying_lock_table_size_bytes());
     device_memory = createMemoryRegionOnChip(
         LOCK_TABLE_STARTING_ADDRESS, 
         (uint64_t) msm.get_underlying_lock_table_size_bytes(),
@@ -363,6 +365,10 @@ static void send_table_config_to_memcached_server(Memory_State_Machine& msm)
         // return -ENOMEM;
     }
     // msm.set_underlying_lock_table_address(server_qp_buffer_mr[LOCK_TABLE_MR_INDEX]->addr);
+    printf("allocated a device memory buffer for the lock table\n");
+    printf("Device Memory lkey %d\n", device_memory.mr->lkey);
+    printf("Device Memory lkey %d\n", device_memory.mr->rkey);
+    
 
 
 
@@ -449,6 +455,8 @@ static int send_server_metadata_to_client(int qp_num, Memory_State_Machine& msm)
     */
 
     printf("Registering metadata buffer local key for server %d\n", server_qp_buffer_mr[qp_num]->lkey);
+    printf("Registering metadata buffer remote key for server %d\n", server_qp_buffer_mr[qp_num]->rkey);
+
     server_qp_metadata_attr[qp_num].address = (uint64_t) server_qp_buffer_mr[qp_num]->addr;
     server_qp_metadata_attr[qp_num].length = (uint32_t) server_qp_buffer_mr[qp_num]->length;
     server_qp_metadata_attr[qp_num].stag.local_stag = (uint32_t) server_qp_buffer_mr[qp_num]->lkey;

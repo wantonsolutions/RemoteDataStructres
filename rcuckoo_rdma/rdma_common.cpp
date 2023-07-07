@@ -176,8 +176,14 @@ on_chip_memory_attr createMemoryRegionOnChip(uint64_t mm, uint64_t mmSize,
 	mr_in.pd = pd;
 	mr_in.addr = (void *)mm;
 	mr_in.length = mmSize;
-	mr_in.exp_access = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ |
-						IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_ATOMIC;
+	// mr_in.exp_access = MEMORY_PERMISSION | IBV_ACCESS_ZERO_BASED;
+	// mr_in.exp_access = IBV_ACCESS_ZERO_BASED;
+	mr_in.exp_access = IBV_EXP_ACCESS_LOCAL_WRITE | IBV_EXP_ACCESS_REMOTE_READ | IBV_EXP_ACCESS_REMOTE_WRITE | IBV_EXP_ACCESS_REMOTE_ATOMIC; // | IBV_EXP_ACCESS_MW_BIND | IBV_EXP_ACCESS_ZERO_BASED;
+	
+	//IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_ATOMIC | IBV_EXP_ACCESS_MW_ZERO_BASED; // | IBV_ACCESS_MW_BIND | IBV_ACCESS_ZERO_BASED;
+
+	
+	
 	mr_in.create_flags = 0;
 	mr_in.dm = dm;
 	mr_in.comp_mask = IBV_EXP_REG_MR_DM;
@@ -207,7 +213,26 @@ on_chip_memory_attr createMemoryRegionOnChip(uint64_t mm, uint64_t mmSize,
 	attr.mr = mr;
 	attr.dm = dm;
 
+	printf("allocated on chip memory %s\n", attr.to_string().c_str());
 	return attr;
+}
+
+string on_chip_memory_attr::to_string(){
+	string output = "";
+	output += "addr: " + std::to_string((uint64_t) addr);
+	output += "\nlength: " + std::to_string((uint64_t)length);
+	output += "\nmr: addr " + std::to_string((uint64_t) mr->addr);
+	output += "\nmr: handel " + std::to_string(mr->handle);
+	output += "\nmr: length " + std::to_string((uint64_t)mr->length);
+	output += "\nmr: lkey " + std::to_string(mr->lkey);
+	output += "\nmr: rkey " + std::to_string(mr->rkey);
+	output += "\ndm: context " + std::to_string((uint64_t) dm->context);
+	output += "\ndm: handle " + std::to_string(dm->handle);
+	output += "\ndm: length " + std::to_string(dm->comp_mask);
+
+
+	return output;
+
 }
 		// **/ //End stolen from sherman
 

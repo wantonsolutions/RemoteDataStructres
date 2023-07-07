@@ -25,6 +25,19 @@ namespace cuckoo_rcuckoo {
         return _table.get_underlying_table();
     }
 
+
+    void * RCuckoo::get_lock_table_pointer(){
+        return _table.get_underlying_lock_table_address();
+    }
+
+    void * RCuckoo::get_lock_pointer(unsigned int lock_index){
+        return _table.get_lock_pointer(lock_index);
+    }
+
+    unsigned int RCuckoo::get_lock_table_size_bytes(){
+        return _table.get_underlying_lock_table_size_bytes();
+    }
+
     void RCuckoo::print_table() {
         _table.print_table();
     }

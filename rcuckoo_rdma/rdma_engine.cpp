@@ -53,6 +53,19 @@ namespace cuckoo_rdma_engine {
         wr.num_sge = 1;
     }
 
+    static inline void fillSgeWr(ibv_sge &sg, ibv_exp_send_wr &wr, uint64_t source,
+                                uint64_t size, uint32_t lkey) {
+        memset(&sg, 0, sizeof(sg));
+        sg.addr = (uint64_t)source;
+        sg.length = size;
+        sg.lkey = lkey;
+
+        memset(&wr, 0, sizeof(wr));
+        wr.wr_id = 0;
+        wr.sg_list = &sg;
+        wr.num_sge = 1;
+    }
+
     // for RC & UC
     bool rdmaRead(ibv_qp *qp, uint64_t source, uint64_t dest, uint64_t size,
                 uint32_t lkey, uint32_t remoteRKey, bool signal, uint64_t wrID) {
@@ -74,6 +87,41 @@ namespace cuckoo_rdma_engine {
 
         if (ibv_post_send(qp, &wr, &wrBad)) {
             printf("send with rdma read failed");
+        }
+        return true;
+    }
+
+    bool rdmaCompareAndSwapMask(ibv_qp *qp, uint64_t source, uint64_t dest,
+                                uint64_t compare, uint64_t swap, uint32_t lkey,
+                                uint32_t remoteRKey, uint64_t mask, bool singal) {
+        struct ibv_sge sg;
+        struct ibv_exp_send_wr wr;
+        struct ibv_exp_send_wr *wrBad;
+        fillSgeWr(sg, wr, source, 8, lkey);
+
+        wr.next = NULL;
+        wr.exp_opcode = IBV_EXP_WR_EXT_MASKED_ATOMIC_CMP_AND_SWP;
+        wr.exp_send_flags = IBV_EXP_SEND_EXT_ATOMIC_INLINE;
+
+        if (singal) {
+            wr.exp_send_flags |= IBV_EXP_SEND_SIGNALED;
+        }
+
+        wr.ext_op.masked_atomics.log_arg_sz = 3;
+        wr.ext_op.masked_atomics.remote_addr = dest;
+        wr.ext_op.masked_atomics.rkey = remoteRKey;
+
+        auto &op = wr.ext_op.masked_atomics.wr_data.inline_data.op.cmp_swap;
+        op.compare_val = compare;
+        op.swap_val = swap;
+
+        op.compare_mask = mask;
+        op.swap_mask = mask;
+
+        int ret = ibv_exp_post_send(qp, &wr, &wrBad);
+        if (ret) {
+            printf("MSKCAS FAILED : Return code %d\n", ret);
+            return false;
         }
         return true;
     }
@@ -121,6 +169,9 @@ namespace cuckoo_rdma_engine {
             char * table_pointer = (char *) rcuckoo->get_table_pointer();
             uint32_t table_size = rcuckoo->get_table_size_bytes();
 
+            char * lock_table_pointer = (char *) rcuckoo->get_lock_table_pointer();
+            uint32_t lock_table_size = rcuckoo->get_lock_table_size_bytes();
+
             _table_config = memcached_get_table_config();
             assert(_table_config != NULL);
             assert(_table_config->table_size_bytes == table_size);
@@ -128,8 +179,11 @@ namespace cuckoo_rdma_engine {
             rcuckoo->print_table();
 
             //register the memory
-            printf("registering table memory");
+            printf("registering table memory\n");
             _table_mr = rdma_buffer_register(_connection_manager->pd, table_pointer, table_size, MEMORY_PERMISSION);
+
+            printf("register lock table memory\n");
+            _lock_table_mr = rdma_buffer_register(_connection_manager->pd, lock_table_pointer, lock_table_size, MEMORY_PERMISSION);
 
             //Request a completion queue
             printf("requesting completion queue\n");
@@ -190,8 +244,48 @@ namespace cuckoo_rdma_engine {
     }
 
     void RDMA_Engine::send_virtual_masked_cas_message(VRMessage message, uint64_t wr_id) {
-        printf("virtual masked cas, we have not made it here yet\n");
-        exit(0);
+        ibv_qp * qp = _connection_manager->client_qp[0];
+        int lock_index = stoi(message.function_args["lock_index"]);
+        uint64_t local_lock_address = (uint64_t) _rcuckoo->get_lock_pointer(lock_index);
+        // uint64_t remote_lock_address = local_to_remote_lock_table_address(local_lock_address);
+        uint64_t remote_lock_address = (uint64_t) _table_config->lock_table_address + lock_index;
+
+        uint64_t compare = stoull(message.function_args["old"], 0, 2);
+        printf("compare %lu\n", compare);
+        uint64_t swap = stoull(message.function_args["new"], 0, 2);
+        printf("swap %lu\n", swap);
+        uint64_t mask = stoull(message.function_args["mask"], 0, 2);
+        printf("mask %lu\n", mask);
+
+        printf("sending masked cas message\n");
+
+
+        printf("local_lock_address %lu\n", local_lock_address);
+        printf("remote_lock_address %lu\n", remote_lock_address);
+        printf("compare %lu\n", compare);
+        printf("swap %lu\n", swap);
+        printf("mask %lu\n", mask);
+        printf("_lock_table_mr->lkey %u\n", _lock_table_mr->lkey);
+        printf("_table_config->lock_table_key %u\n", _table_config->lock_table_key);
+
+        bool success = rdmaCompareAndSwapMask(
+            qp,
+            local_lock_address,
+            remote_lock_address,
+            compare,
+            swap,
+            _lock_table_mr->lkey,
+            _table_config->lock_table_key,
+            mask,
+            true);
+
+        if (!success) {
+            printf("rdma masked cas failed failed\n");
+            exit(1);
+        }
+        printf("completed masked cas request");
+
+
     }
     
     bool RDMA_Engine::start(){
@@ -249,6 +343,7 @@ namespace cuckoo_rdma_engine {
 
             if (sent_messages > 0 ) {
                 //Now we deal with the message recipt
+                printf("pooling\n");
                 int n = bulk_poll(_completion_queue, num_concur, wc);
                 if (n < 0) {
                     printf("polling failed\n");

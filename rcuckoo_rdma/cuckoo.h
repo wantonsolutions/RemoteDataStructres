@@ -24,10 +24,6 @@ namespace cuckoo_rcuckoo {
             void set_search_function(unordered_map<string, string> config);
             void set_location_function(unordered_map<string, string> config);
 
-            Entry ** get_table_pointer();
-            unsigned int get_table_size_bytes();
-            void print_table();
-            Entry * get_entry_pointer(unsigned int bucket_id, unsigned int offset);
 
             vector<VRMessage> fsm_logic(VRMessage messages);
             vector<VRMessage> get();
@@ -58,6 +54,15 @@ namespace cuckoo_rcuckoo {
 
             void complete_insert_stats(bool success);
             void complete_insert();
+
+            //Table and lock table functions
+            Entry ** get_table_pointer();
+            unsigned int get_table_size_bytes();
+            void print_table();
+            Entry * get_entry_pointer(unsigned int bucket_id, unsigned int offset);
+            void * get_lock_table_pointer();
+            unsigned int get_lock_table_size_bytes();
+            void * get_lock_pointer(unsigned int lock_index);
 
 
         private:

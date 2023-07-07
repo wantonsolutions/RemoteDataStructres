@@ -30,6 +30,7 @@ namespace cuckoo_rdma_engine {
             State_Machine * _state_machine;
             RCuckoo * _rcuckoo;
             ibv_mr * _table_mr;
+            ibv_mr * _lock_table_mr;
             Memory_State_Machine * _memory_state_machine;
             table_config * _table_config;
             struct ibv_cq *_completion_queue;

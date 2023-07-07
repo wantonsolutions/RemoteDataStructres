@@ -110,6 +110,7 @@ typedef struct on_chip_memory_attr {
 	uint64_t length;
 	struct ibv_mr *mr;
 	struct ibv_exp_dm *dm;
+	string to_string();
 } on_chip_memory_attr;
 
 inline ibv_access_flags operator|(ibv_access_flags a, ibv_access_flags b)

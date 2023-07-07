@@ -77,10 +77,15 @@ namespace cuckoo_tables {
         return _total_lock_entries;
     }
 
+    void * Lock_Table::get_lock_pointer(unsigned int lock_index) {
+        return (void*) (_locks + lock_index);
+    }
+
 
     void Lock_Table::set_lock_table_address(void * address) {
         _locks = (uint8_t*) address;
     }
+
 
     /*lock table functions*/
     Lock_Table::Lock_Table(){
@@ -90,13 +95,21 @@ namespace cuckoo_tables {
 
     }
     Lock_Table::Lock_Table(unsigned int memory_size, unsigned int bucket_size, unsigned int buckets_per_lock){
+
+        printf("memory_size: %d\n", memory_size);
         assert(memory_size % sizeof(Entry) == 0 );
-        unsigned int row_size = memory_size / sizeof(Entry);
-        assert(row_size % bucket_size == 0);
-        unsigned int table_rows = row_size / bucket_size;
+        unsigned int total_entries = memory_size / sizeof(Entry);
+        printf("total_entries: %d\n", total_entries);
+        assert(total_entries % bucket_size == 0);
+        unsigned int table_rows = total_entries / bucket_size;
+        printf("table_rows: %d\n", table_rows);
         assert(table_rows % buckets_per_lock == 0);
         _total_locks = table_rows / buckets_per_lock;
-        _total_lock_entries = (_total_locks / 8) + 4;
+        printf("_total_locks: %d\n", _total_locks);
+        const int cas_size = 8;
+        const int bits_per_byte=8;
+        _total_lock_entries = (_total_locks / bits_per_byte) + cas_size;
+        printf("_total_lock_entries: %d\n", _total_lock_entries);
         _locks = new uint8_t[_total_lock_entries];
         this->unlock_all();
 
@@ -197,6 +210,11 @@ namespace cuckoo_tables {
         _table = this->generate_bucket_cuckoo_hash_index(memory_size, bucket_size);
         _lock_table = Lock_Table(memory_size, bucket_size, buckets_per_lock);
 
+    }
+
+
+    void * Table::get_lock_pointer(unsigned int lock_index) {
+        return _lock_table.get_lock_pointer(lock_index);
     }
 
     Entry ** Table::get_underlying_table(){
