@@ -137,6 +137,7 @@ namespace cuckoo_rdma_engine {
         _rcuckoo = rcuckoo;
         _memory_state_machine = new Memory_State_Machine(config);
         _memory_state_machine->set_table_pointer(_rcuckoo->get_table_pointer());
+        _memory_state_machine->set_underlying_lock_table_address(_rcuckoo->get_lock_table_pointer());
 
         try {
             RDMAConnectionManagerArguments args;
@@ -252,10 +253,13 @@ namespace cuckoo_rdma_engine {
 
         uint64_t compare = stoull(message.function_args["old"], 0, 2);
         printf("compare %lu\n", compare);
+        compare = __builtin_bswap64(compare);
         uint64_t swap = stoull(message.function_args["new"], 0, 2);
         printf("swap %lu\n", swap);
+        swap = __builtin_bswap64(swap);
         uint64_t mask = stoull(message.function_args["mask"], 0, 2);
         printf("mask %lu\n", mask);
+        mask = __builtin_bswap64(mask);
 
         printf("sending masked cas message\n");
 
@@ -370,7 +374,11 @@ namespace cuckoo_rdma_engine {
                         }
                     }
                 }
+                printf("memory state machine table after operations\n");
+                _memory_state_machine->print_table();
+                printf("rcuckoo table after operations\n");
                 _rcuckoo->print_table();
+                assert(_memory_state_machine->get_table_pointer() == _rcuckoo->get_table_pointer());
             }
 
             // //receive messages
