@@ -35,7 +35,9 @@ struct sockaddr_in server_address_to_socket_addr(string server_address) {
 
 unordered_map<string, string> gen_config() {
     unordered_map<string, string> config;
-    int table_size = 32;
+    // int table_size = 512;
+    // int table_size = 256;
+    int table_size = 128;
     int entry_size = 8;
     int bucket_size = 8;
     int memory_size = entry_size * table_size;
@@ -178,7 +180,9 @@ on_chip_memory_attr createMemoryRegionOnChip(uint64_t mm, uint64_t mmSize,
 	mr_in.length = mmSize;
 	// mr_in.exp_access = MEMORY_PERMISSION | IBV_ACCESS_ZERO_BASED;
 	// mr_in.exp_access = IBV_ACCESS_ZERO_BASED;
+	// mr_in.exp_access = IBV_ACCESS_ZERO_BASED | IBV_ACCESS_LOCAL_WRITE;
 	mr_in.exp_access = IBV_EXP_ACCESS_LOCAL_WRITE | IBV_EXP_ACCESS_REMOTE_READ | IBV_EXP_ACCESS_REMOTE_WRITE | IBV_EXP_ACCESS_REMOTE_ATOMIC; // | IBV_EXP_ACCESS_MW_BIND | IBV_EXP_ACCESS_ZERO_BASED;
+	// mr_in.exp_access |= IBV_EXP_ACCESS_MW_ZERO_BASED;
 	
 	//IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_ATOMIC | IBV_EXP_ACCESS_MW_ZERO_BASED; // | IBV_ACCESS_MW_BIND | IBV_ACCESS_ZERO_BASED;
 

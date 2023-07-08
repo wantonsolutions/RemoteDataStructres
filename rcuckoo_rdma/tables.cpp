@@ -78,7 +78,7 @@ namespace cuckoo_tables {
     }
 
     void * Lock_Table::get_lock_pointer(unsigned int lock_index) {
-        return (void*) (_locks + lock_index);
+        return (void*) &(_locks[lock_index]);
     }
 
 
@@ -109,6 +109,12 @@ namespace cuckoo_tables {
         const int cas_size = 8;
         const int bits_per_byte=8;
         _total_lock_entries = (_total_locks / bits_per_byte) + cas_size;
+        //round lock entries to the nearest value divisible by 8 so everything is cache line alligned
+        // const int cache_line_size = 64;
+        // if (_total_lock_entries % cache_line_size != 0){
+        //     _total_lock_entries += cache_line_size - (_total_lock_entries % cache_line_size);
+        // }
+
         printf("_total_lock_entries: %d\n", _total_lock_entries);
         _locks = new uint8_t[_total_lock_entries];
         this->unlock_all();

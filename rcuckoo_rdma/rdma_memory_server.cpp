@@ -352,7 +352,7 @@ static void send_table_config_to_memcached_server(Memory_State_Machine& msm)
     printf("asking for a table of size %d\n", (uint64_t) msm.get_underlying_lock_table_size_bytes());
     device_memory = createMemoryRegionOnChip(
         LOCK_TABLE_STARTING_ADDRESS, 
-        (uint64_t) msm.get_underlying_lock_table_size_bytes(),
+        (uint64_t) msm.get_underlying_lock_table_size_bytes() + 256,
          pd, 
          devices[0]);
     

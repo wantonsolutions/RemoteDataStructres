@@ -24,6 +24,7 @@ namespace cuckoo_rdma_engine {
             void send_virtual_read_message(VRMessage message, uint64_t wr_id);
             void send_virtual_cas_message(VRMessage message, uint64_t wr_id);
             void send_virtual_masked_cas_message(VRMessage message, uint64_t wr_id);
+            void debug_masked_cas();
             bool start();
 
         private:

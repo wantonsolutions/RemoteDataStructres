@@ -65,6 +65,7 @@ namespace cuckoo_rdma_engine {
         wr.wr_id = 0;
         wr.sg_list = &sg;
         wr.num_sge = 1;
+
     }
 
     // for RC & UC
@@ -213,7 +214,8 @@ namespace cuckoo_rdma_engine {
 
             //register the memory
             printf("registering table memory\n");
-            _table_mr = rdma_buffer_register(_connection_manager->pd, table_pointer, table_size+128, MEMORY_PERMISSION);
+            const int extra_table_memory = 256; //I get out of range errros unless i make the table a bit bigger
+            _table_mr = rdma_buffer_register(_connection_manager->pd, table_pointer, table_size+extra_table_memory, MEMORY_PERMISSION);
 
             printf("register lock table memory\n");
             _lock_table_mr = rdma_buffer_register(_connection_manager->pd, lock_table_pointer, lock_table_size, MEMORY_PERMISSION);
@@ -306,6 +308,124 @@ namespace cuckoo_rdma_engine {
         }
 
     }
+/* this example assumed that the variables my_port, my_psn, my_mtu, my_sl, remote_qpn, remote_psn, remote_lid are declared and initialized with valid values */
+void reset_qp(struct ibv_qp *qp)
+{
+    printf("resetting qp\n");
+    struct ibv_qp_attr attr;
+    int my_port = 20886;
+
+    memset(&attr, 0, sizeof(attr));
+
+    attr.qp_state        = IBV_QPS_INIT;
+    attr.pkey_index      = 0;
+    attr.port_num        = my_port;
+    attr.qp_access_flags = 0;
+
+    if (ibv_modify_qp(qp, &attr,
+            IBV_QP_STATE      |
+            IBV_QP_PKEY_INDEX |
+            IBV_QP_PORT       |
+            IBV_QP_ACCESS_FLAGS)) {
+        fprintf(stderr, "Failed to modify QP to INIT\n");
+        return;
+    }
+
+    memset(&attr, 0, sizeof(attr));
+
+    attr.qp_state		= IBV_QPS_RTR;
+    // attr.path_mtu		= my_mtu;
+    // attr.dest_qp_num	= remote_qpn;
+    // attr.rq_psn		= remote_psn;
+    attr.max_dest_rd_atomic	= 1;
+    attr.min_rnr_timer	= 12;
+    attr.ah_attr.is_global	   = 0;
+    // attr.ah_attr.dlid	   = remote_lid;
+    // attr.ah_attr.sl		   = my_sl;
+    // attr.ah_attr.src_path_bits = 0;
+    // attr.ah_attr.port_num	   = my_port;
+
+    if (ibv_modify_qp(qp, &attr,
+            IBV_QP_STATE              |
+            IBV_QP_AV                 |
+            IBV_QP_PATH_MTU           |
+            IBV_QP_DEST_QPN           |
+            IBV_QP_RQ_PSN             |
+            IBV_QP_MAX_DEST_RD_ATOMIC |
+            IBV_QP_MIN_RNR_TIMER)) {
+        fprintf(stderr, "Failed to modify QP to RTR\n");
+        return;
+    }
+
+    memset(&attr, 0, sizeof(attr));
+
+    attr.qp_state	    = IBV_QPS_RTS;
+    // attr.sq_psn	    = my_psn;
+    attr.timeout	    = 14;
+    attr.retry_cnt	    = 7;
+    attr.rnr_retry	    = 7; /* infinite */
+    attr.max_rd_atomic  = 1;
+
+    if (ibv_modify_qp(qp, &attr,
+            IBV_QP_STATE              |
+            IBV_QP_TIMEOUT            |
+            IBV_QP_RETRY_CNT          |
+            IBV_QP_RNR_RETRY          |
+            IBV_QP_SQ_PSN             |
+            IBV_QP_MAX_QP_RD_ATOMIC)) {
+        fprintf(stderr, "Failed to modify QP to RTS\n");
+        return;
+    }
+}
+
+
+    void RDMA_Engine::debug_masked_cas(){
+        struct ibv_wc *wc = (struct ibv_wc *) calloc (64, sizeof(struct ibv_wc));
+        for (int i=55; i <= 64; i++) {
+            uint64_t local_lock_address = (uint64_t) _rcuckoo->get_lock_pointer(i);
+            uint64_t remote_lock_address = ((uint64_t)1) << i;
+            uint64_t compare = 0;
+            uint64_t swap = 1;
+            printf("remote address %d = %lx\n", i, remote_lock_address);
+            bool success = rdmaCompareAndSwap(
+                _connection_manager->client_qp[0], 
+                local_lock_address, 
+                remote_lock_address,
+                compare, 
+                swap, 
+                _lock_table_mr->lkey,
+                _table_config->remote_key, 
+                true, 
+                i);
+            if (!success) {
+                printf("rdma cas failed\n");
+                exit(1);
+            }
+            int n = bulk_poll(_completion_queue, 1, wc);
+            if (n < 0) {
+                printf("polling failed\n");
+                exit(1);
+            }
+            // for (int k=0;k<MAX_CONCURRENT_MESSAGES;k++) {
+            //     printf("message_tracker sub 1[%d] = %s\n", k, message_tracker[k].to_string().c_str());
+            // }
+            printf("-------------------------------------Sending-------------------------------------\n");
+            for (int j=0;j<n;j++) {
+                if (wc[j].status != IBV_WC_SUCCESS) {
+                    printf("RDMA masked cas failed with status %s on request %d\n", ibv_wc_status_str(wc[j].status), wc[j].wr_id);
+                    // reset_qp(_connection_manager->client_qp[0]);
+                    exit(0);
+                } else {
+                    printf("Message Received with work request %d\n", wc[j].wr_id);
+                }
+            }
+
+
+
+        }
+        printf("completed masked cas debug\n");
+        exit(0);
+    }
 
     void RDMA_Engine::send_virtual_masked_cas_message(VRMessage message, uint64_t wr_id) {
         ibv_qp * qp = _connection_manager->client_qp[0];
@@ -313,6 +433,7 @@ namespace cuckoo_rdma_engine {
         uint64_t local_lock_address = (uint64_t) _rcuckoo->get_lock_pointer(lock_index);
         // uint64_t remote_lock_address = local_to_remote_lock_table_address(local_lock_address);
         uint64_t remote_lock_address = (uint64_t) _table_config->lock_table_address + lock_index;
+        // remote_lock_address = 0;
 
         uint64_t compare = stoull(message.function_args["old"], 0, 2);
         printf("compare %lu\n", compare);
@@ -325,6 +446,8 @@ namespace cuckoo_rdma_engine {
         mask = __builtin_bswap64(mask);
 
         printf("sending masked cas message\n");
+
+        // remote_lock_address = __builtin_bswap64(remote_lock_address);
 
 
         printf("local_lock_address %lu\n", local_lock_address);
@@ -351,7 +474,6 @@ namespace cuckoo_rdma_engine {
             printf("rdma masked cas failed failed\n");
             exit(1);
         }
-        printf("completed masked cas request\n");
 
 
     }
@@ -359,6 +481,11 @@ namespace cuckoo_rdma_engine {
     #define MAX_CONCURRENT_MESSAGES 32
     VRMessage message_tracker[MAX_CONCURRENT_MESSAGES];
     bool RDMA_Engine::start(){
+
+
+
+        debug_masked_cas();
+
         vector<VRMessage> ingress_messages;
         VRMessage init;
         ingress_messages.push_back(init);
@@ -447,7 +574,7 @@ namespace cuckoo_rdma_engine {
                 printf("-------------------------------------Sending-------------------------------------\n");
                 for (int j=0;j<n;j++) {
                     if (wc[j].status != IBV_WC_SUCCESS) {
-                        printf("RDMA read failed with status %s\n", ibv_wc_status_str(wc[j].status));
+                        printf("RDMA read failed with status %s on request %d\n", ibv_wc_status_str(wc[j].status), wc[j].wr_id);
                         exit(1);
                     } else {
                         printf("Message Received with work request %d\n", wc[j].wr_id);
