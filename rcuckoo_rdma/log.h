@@ -14,8 +14,8 @@
 #define __LOG_COLOR_WHITE "0;37"
 
 //This one makes all the printing happen
-// #define _LOG_ALERT
-#define _LOG_VERBOSE
+#define _LOG_ALERT
+// #define _LOG_VERBOSE
 // #define _LOG_ALERT
 // #define _LOG_SUCCESS
 

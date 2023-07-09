@@ -210,7 +210,7 @@ namespace cuckoo_rdma_engine {
             assert(_table_config != NULL);
             assert(_table_config->table_size_bytes == table_size);
             printf("got a table config from the memcached server and it seems to line up\n");
-            rcuckoo->print_table();
+            // rcuckoo->print_table();
 
             //register the memory
             printf("registering table memory\n");
@@ -284,7 +284,6 @@ namespace cuckoo_rdma_engine {
         uint64_t new_val = stoull(message.function_args["new"], nullptr, 16);
         new_val = __builtin_bswap64(new_val);
         new_val = new_val >> 32;
-        printf("newwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww %lx\n", new_val);
 
         uint64_t local_address = (uint64_t) _rcuckoo->get_entry_pointer(bucket_id, bucket_offset);
         uint64_t remote_server_address = local_to_remote_table_address(local_address);
@@ -385,27 +384,23 @@ namespace cuckoo_rdma_engine {
         // remote_lock_address = 0;
 
         uint64_t compare = stoull(message.function_args["old"], 0, 2);
-        printf("compare %lu\n", compare);
         compare = __builtin_bswap64(compare);
         uint64_t swap = stoull(message.function_args["new"], 0, 2);
-        printf("swap %lu\n", swap);
         swap = __builtin_bswap64(swap);
         uint64_t mask = stoull(message.function_args["mask"], 0, 2);
-        printf("mask %lu\n", mask);
         mask = __builtin_bswap64(mask);
 
-        printf("sending masked cas message\n");
 
         // remote_lock_address = __builtin_bswap64(remote_lock_address);
 
 
-        printf("local_lock_address %lu\n", local_lock_address);
-        printf("remote_lock_address %lu\n", remote_lock_address);
-        printf("compare %lu\n", compare);
-        printf("swap %lu\n", swap);
-        printf("mask %lu\n", mask);
-        printf("_lock_table_mr->lkey %u\n", _lock_table_mr->lkey);
-        printf("_table_config->lock_table_key %u\n", _table_config->lock_table_key);
+        VERBOSE("RDMA engine", "local_lock_address %lu\n", local_lock_address);
+        VERBOSE("RDMA engine", "remote_lock_address %lu\n", remote_lock_address);
+        VERBOSE("RDMA engine", "compare %lu\n", compare);
+        VERBOSE("RDMA engine", "swap %lu\n", swap);
+        VERBOSE("RDMA engine", "mask %lu\n", mask);
+        VERBOSE("RDMA engine", "_lock_table_mr->lkey %u\n", _lock_table_mr->lkey);
+        VERBOSE("RDMA engine", "_table_config->lock_table_key %u\n", _table_config->lock_table_key);
 
         bool success = rdmaCompareAndSwapMask(
             qp,
@@ -440,8 +435,6 @@ namespace cuckoo_rdma_engine {
         ingress_messages.push_back(init);
 
 
-        // vector<VRMessage> messages = _state_machine->fsm(init);
-
         struct ibv_wc *wc = (struct ibv_wc *) calloc (MAX_CONCURRENT_MESSAGES, sizeof(struct ibv_wc));
 
         uint64_t wr_id_counter = 0;
@@ -453,8 +446,6 @@ namespace cuckoo_rdma_engine {
             //Pop off an ingress message
             VRMessage current_ingress_message;
             if (ingress_messages.size() > 0){
-                printf("popping off first ingress message\n");
-                // current_ingress_message = ingress_messages[0];
                 current_ingress_message = *ingress_messages.begin();
                 ingress_messages.erase(ingress_messages.begin());
             } else {
@@ -463,7 +454,7 @@ namespace cuckoo_rdma_engine {
 
             messages = _state_machine->fsm(current_ingress_message);
             for (int i = 0; i < messages.size(); i++){
-                printf("Sending message: %s\n", messages[i].to_string().c_str());
+                VERBOSE("RDMA Engine", "Sending message: %s\n", messages[i].to_string().c_str());
                 messages[i].type = messages[i].get_message_type();
                 bool sent = false;
                 switch(messages[i].get_message_type()) {
@@ -480,11 +471,11 @@ namespace cuckoo_rdma_engine {
                         sent = true;
                         break;
                     default:
-                        printf("message type not supported\n");
+                        ALERT("RDMA Engine", "message type not supported\n");
                         exit(1);
                 }
                 if (sent) {
-                    printf("writing to wr_id_to_message with %s\n", messages[i].to_string().c_str());
+                    VERBOSE("RDMA Engine", "writing to wr_id_to_message for id (%d) %s\n", wr_id_counter, messages[i].to_string().c_str());
                     uint64_t modulo_id = wr_id_counter % MAX_CONCURRENT_MESSAGES;
                     message_tracker[modulo_id] = messages[i];
                     message_tracker[modulo_id].type = messages[i].type;
@@ -494,12 +485,7 @@ namespace cuckoo_rdma_engine {
                     {
                         message_tracker[modulo_id].function_args[x.first] = x.second;
                     }
-                    // message_tracker[modulo_id].function_args = messages[i].function_args;
 
-
-                    // message_tracker[wr_id_counter % MAX_CONCURRENT_MESSAGES] = messages[i];
-                    // wr_id_to_message[wr_id_counter] = messages[i];
-                    printf("setting wrid message %d\n", wr_id_counter);
                     outstanding_messages++;
                     wr_id_counter++;
                 }
@@ -513,22 +499,21 @@ namespace cuckoo_rdma_engine {
 
             if (outstanding_messages > 0 ) {
                 //Now we deal with the message recipt
-                printf("pooling\n");
                 int n = bulk_poll(_completion_queue, outstanding_messages, wc);
                 if (n < 0) {
-                    printf("polling failed\n");
+                    ALERT("RDMA Engine", "polling failed\n");
                     exit(1);
                 }
                 // for (int k=0;k<MAX_CONCURRENT_MESSAGES;k++) {
                 //     printf("message_tracker sub 1[%d] = %s\n", k, message_tracker[k].to_string().c_str());
                 // }
-                printf("-------------------------------------Sending-------------------------------------\n");
+                // printf("-------------------------------------Sending-------------------------------------\n");
                 for (int j=0;j<n;j++) {
                     if (wc[j].status != IBV_WC_SUCCESS) {
-                        printf("RDMA read failed with status %s on request %d\n", ibv_wc_status_str(wc[j].status), wc[j].wr_id);
+                        ALERT("RDMA Engine", "RDMA read failed with status %s on request %d\n", ibv_wc_status_str(wc[j].status), wc[j].wr_id);
                         exit(1);
                     } else {
-                        printf("Message Received with work request %d\n", wc[j].wr_id);
+                        VERBOSE("RDMA engine", "Message Received wih work request %d\n", wc[j].wr_id);
 
                         // for (int k=0;k<MAX_CONCURRENT_MESSAGES;k++) {
                         //     printf("message_tracker[%d] = %s\n", k, message_tracker[k].to_string().c_str());
@@ -557,14 +542,13 @@ namespace cuckoo_rdma_engine {
                         // printf("outgoing message type %d\n", outgoing.get_message_type());
 
                         if (outgoing.get_message_type() == READ_REQUEST){
-                            printf("delivering message to state machine: %s\n", outgoing.to_string().c_str());
+                            // printf("delivering message to state machine: %s\n", outgoing.to_string().c_str());
                             vector<VRMessage> incomming = _memory_state_machine->fsm(outgoing);
-                            printf("eraing message from wr_id_to_message %d\n", wc[j].wr_id);
-                            // wr_id_to_message.erase(wc[j].wr_id);
-                            printf("memory state machine table\n");
-                            _memory_state_machine->print_table();
+
+                            // printf("memory state machine table\n");
+                            // _memory_state_machine->print_table();
                             for (int i = 0; i < incomming.size(); i++){
-                                printf("memory state machine incomming message: %s\n", incomming[i].to_string().c_str());
+                                VERBOSE("RDMA engine", "memory state machine incomming message: %s\n", incomming[i].to_string().c_str());
                                 ingress_messages.push_back(incomming[i]);
                                 // for (auto const& x : incomming[i].function_args)
                                 // {
@@ -572,33 +556,33 @@ namespace cuckoo_rdma_engine {
                                 // }
                             }
                         } else if (outgoing.get_message_type() == MASKED_CAS_REQUEST) {
-                            printf("received a masked cas response\n");
+                            // printf("received a masked cas response\n");
                             vector<VRMessage> incomming = _memory_state_machine->fsm(outgoing);
                             for (int i = 0; i < incomming.size(); i++){
-                                printf("memory state machine incomming message: %s\n", incomming[i].to_string().c_str());
+                                VERBOSE("RDMA engine", "memory state machine incomming message: %s\n", incomming[i].to_string().c_str());
                                 incomming[i].function_args["success"] = "1";
                                 ingress_messages.push_back(incomming[i]);
                             }
                             
                         } else if (outgoing.get_message_type() == CAS_REQUEST) {
-                            printf("received a cas response\n");
+                            // printf("received a cas response\n");
                             vector<VRMessage> incomming = _memory_state_machine->fsm(outgoing);
                             for (int i = 0; i < incomming.size(); i++){
-                                printf("memory state machine incomming message: %s\n", incomming[i].to_string().c_str());
+                                VERBOSE("RDMA engine", "memory state machine incomming message: %s\n", incomming[i].to_string().c_str());
                                 incomming[i].function_args["success"] = "1";
                                 ingress_messages.push_back(incomming[i]);
                             }
 
                         } else {
-                            printf("unknown message type %s", outgoing.to_string().c_str());
+                            ALERT("RDMA engine", "unknown message type %s", outgoing.to_string().c_str());
                             exit(1);
                         }
                     }
                 }
-                printf("memory state machine table after operations\n");
-                _memory_state_machine->print_table();
-                printf("rcuckoo table after operations\n");
-                _rcuckoo->print_table();
+                // printf("memory state machine table after operations\n");
+                // _memory_state_machine->print_table();
+                // printf("rcuckoo table after operations\n");
+                // _rcuckoo->print_table();
                 assert(_memory_state_machine->get_table_pointer() == _rcuckoo->get_table_pointer());
             }
 
