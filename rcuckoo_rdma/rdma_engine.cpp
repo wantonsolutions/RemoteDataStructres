@@ -200,7 +200,8 @@ namespace cuckoo_rdma_engine {
 
             //Exchange the connection information on the QP
             int qp_num = 0;
-            char * table_pointer = (char *) rcuckoo->get_table_pointer();
+            //the first index of the Entry** is the beginning of the table
+            char * table_pointer = (char *) rcuckoo->get_table_pointer()[0];
             uint32_t table_size = rcuckoo->get_table_size_bytes();
 
             char * lock_table_pointer = (char *) rcuckoo->get_lock_table_pointer();
@@ -214,8 +215,8 @@ namespace cuckoo_rdma_engine {
 
             //register the memory
             printf("registering table memory\n");
-            const int extra_table_memory = 256; //I get out of range errros unless i make the table a bit bigger
-            _table_mr = rdma_buffer_register(_connection_manager->pd, table_pointer, table_size*8, MEMORY_PERMISSION);
+            // const int extra_table_memory = 256; //I get out of range errros unless i make the table a bit bigger
+            _table_mr = rdma_buffer_register(_connection_manager->pd, table_pointer, table_size, MEMORY_PERMISSION);
 
             printf("register lock table memory\n");
             _lock_table_mr = rdma_buffer_register(_connection_manager->pd, lock_table_pointer, lock_table_size, MEMORY_PERMISSION);
@@ -257,6 +258,11 @@ namespace cuckoo_rdma_engine {
 
         uint64_t local_address = (uint64_t) _rcuckoo->get_entry_pointer(bucket_id, bucket_offset);
         uint64_t remote_server_address = local_to_remote_table_address(local_address);
+
+        // printf("table size       %d\n", _table_config->table_size_bytes);
+        // printf("table address =  %p\n", _rcuckoo->get_table_pointer());
+        // printf("offset pointer = %p\n", _rcuckoo->get_entry_pointer(bucket_id, bucket_offset));
+        // printf("offset =         %p\n", (void *) (local_address - (uint64_t) _rcuckoo->get_table_pointer()));
 
         bool success = rdmaRead(
             qp,
@@ -309,71 +315,71 @@ namespace cuckoo_rdma_engine {
     }
 
 
-    void RDMA_Engine::debug_masked_cas(){
-        struct ibv_wc *wc = (struct ibv_wc *) calloc (64, sizeof(struct ibv_wc));
-        // uint64_t remote_lock_address = 0;
-        uint64_t remote_lock_address = 16;
-        // remote_lock_address = 1 << 8; // wtf this seems to work....
+    // void RDMA_Engine::debug_masked_cas(){
+    //     struct ibv_wc *wc = (struct ibv_wc *) calloc (64, sizeof(struct ibv_wc));
+    //     // uint64_t remote_lock_address = 0;
+    //     uint64_t remote_lock_address = 16;
+    //     // remote_lock_address = 1 << 8; // wtf this seems to work....
 
-        // remote_lock_address = __builtin_bswap64(remote_lock_address);
-        // uint64_t remote_lock_address = ((uint64_t)1) << 0;
-        uint64_t local_lock_address = (uint64_t) _rcuckoo->get_lock_pointer(0);
-        uint64_t mask = 1;
-        uint64_t swap = 1;
-        uint64_t compare=0;
-        uint64_t wr_id =0;
-
-
-        printf("local_lock_address %lu\n", local_lock_address);
-        printf("remote_lock_address %lu\n", remote_lock_address);
-        printf("compare %lu\n", compare);
-        printf("swap %lu\n", swap);
-        printf("mask %lu\n", mask);
-        printf("_lock_table_mr->lkey %u\n", _lock_table_mr->lkey);
-        printf("_table_config->lock_table_key %u\n", _table_config->lock_table_key);
-
-        printf("remote address %lx\n", remote_lock_address);
-
-        bool success = rdmaCompareAndSwapMask(
-            _connection_manager->client_qp[0],
-            local_lock_address,
-            remote_lock_address,
-            compare,
-            swap,
-            _lock_table_mr->lkey,
-            _table_config->lock_table_key,
-            mask,
-            true,
-            wr_id);
+    //     // remote_lock_address = __builtin_bswap64(remote_lock_address);
+    //     // uint64_t remote_lock_address = ((uint64_t)1) << 0;
+    //     uint64_t local_lock_address = (uint64_t) _rcuckoo->get_lock_pointer(0);
+    //     uint64_t mask = 1;
+    //     uint64_t swap = 1;
+    //     uint64_t compare=0;
+    //     uint64_t wr_id =0;
 
 
-        if (!success) {
-            printf("rdma cas failed\n");
-            exit(1);
-        }
-        int n = bulk_poll(_completion_queue, 1, wc);
-        if (n < 0) {
-            printf("polling failed\n");
-            exit(1);
-        }
-        // for (int k=0;k<MAX_CONCURRENT_MESSAGES;k++) {
-        //     printf("message_tracker sub 1[%d] = %s\n", k, message_tracker[k].to_string().c_str());
-        // }
-        printf("-------------------------------------Sending-------------------------------------\n");
-        for (int j=0;j<n;j++) {
-            if (wc[j].status != IBV_WC_SUCCESS) {
+    //     printf("local_lock_address %lu\n", local_lock_address);
+    //     printf("remote_lock_address %lu\n", remote_lock_address);
+    //     printf("compare %lu\n", compare);
+    //     printf("swap %lu\n", swap);
+    //     printf("mask %lu\n", mask);
+    //     printf("_lock_table_mr->lkey %u\n", _lock_table_mr->lkey);
+    //     printf("_table_config->lock_table_key %u\n", _table_config->lock_table_key);
 
-                printf("RDMA masked cas failed with status %s (%d)on request %d\n", ibv_wc_status_str(wc[j].status),wc[j].status, wc[j].wr_id);
-                // reset_qp(_connection_manager->client_qp[0]);
-                exit(0);
-            } else {
-                printf("Message Received with work request %d\n", wc[j].wr_id);
-            }
+    //     printf("remote address %lx\n", remote_lock_address);
 
-        }
-        printf("completed masked cas debug\n");
-        exit(0);
-    }
+    //     bool success = rdmaCompareAndSwapMask(
+    //         _connection_manager->client_qp[0],
+    //         local_lock_address,
+    //         remote_lock_address,
+    //         compare,
+    //         swap,
+    //         _lock_table_mr->lkey,
+    //         _table_config->lock_table_key,
+    //         mask,
+    //         true,
+    //         wr_id);
+
+
+    //     if (!success) {
+    //         printf("rdma cas failed\n");
+    //         exit(1);
+    //     }
+    //     int n = bulk_poll(_completion_queue, 1, wc);
+    //     if (n < 0) {
+    //         printf("polling failed\n");
+    //         exit(1);
+    //     }
+    //     // for (int k=0;k<MAX_CONCURRENT_MESSAGES;k++) {
+    //     //     printf("message_tracker sub 1[%d] = %s\n", k, message_tracker[k].to_string().c_str());
+    //     // }
+    //     printf("-------------------------------------Sending-------------------------------------\n");
+    //     for (int j=0;j<n;j++) {
+    //         if (wc[j].status != IBV_WC_SUCCESS) {
+
+    //             printf("RDMA masked cas failed with status %s (%d)on request %d\n", ibv_wc_status_str(wc[j].status),wc[j].status, wc[j].wr_id);
+    //             // reset_qp(_connection_manager->client_qp[0]);
+    //             exit(0);
+    //         } else {
+    //             printf("Message Received with work request %d\n", wc[j].wr_id);
+    //         }
+
+    //     }
+    //     printf("completed masked cas debug\n");
+    //     exit(0);
+    // }
 
     void RDMA_Engine::send_virtual_masked_cas_message(VRMessage message, uint64_t wr_id) {
         ibv_qp * qp = _connection_manager->client_qp[0];

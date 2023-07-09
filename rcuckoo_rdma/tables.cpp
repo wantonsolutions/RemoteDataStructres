@@ -265,6 +265,7 @@ namespace cuckoo_tables {
         }
         output_string += "\nLock Table\n";
         output_string += _lock_table.to_string() + "\n";
+        output_string += std::to_string(get_fill_percentage()) + "% full\n";
         return output_string;
     }
 
@@ -325,7 +326,8 @@ namespace cuckoo_tables {
         // entry_pointer += (bucket_index * row_size_bytes()) + (offset * sizeof(Entry));
         // printf("entry_pointer post math is %p\n", (void* )entry_pointer);
         // return (Entry *) entry_pointer;
-        return &(_table[bucket_index][offset]);
+        return _table[bucket_index] + offset;
+        // return &(_table[bucket_index][offset]);
     }
 
     void Table::set_entry(unsigned int bucket_index, unsigned int offset, Entry entry){
@@ -383,16 +385,16 @@ namespace cuckoo_tables {
 
     float Table::get_fill_percentage(){
         unsigned int max_fill = _table_size * _bucket_size;
-        // unsigned int current_fill = 0;
-        // for (unsigned int i = 0; i < _table_size; i++){
-        //     for (unsigned int j = 0; j < _bucket_size; j++){
-        //         if (!_table[i][j].is_empty()){
-        //             current_fill++;
-        //         }
-        //     }
-        // } 
-        // return float(current_fill) / float(max_fill);
-        return float(_fill) / float(max_fill);
+        unsigned int current_fill = 0;
+        for (unsigned int i = 0; i < _table_size; i++){
+            for (unsigned int j = 0; j < _bucket_size; j++){
+                if (!_table[i][j].is_empty()){
+                    current_fill++;
+                }
+            }
+        } 
+        return float(current_fill) / float(max_fill);
+        // return float(_fill) / float(max_fill);
     }
 
     bool Table::full(){

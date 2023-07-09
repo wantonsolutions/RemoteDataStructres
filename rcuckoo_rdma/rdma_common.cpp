@@ -35,7 +35,8 @@ struct sockaddr_in server_address_to_socket_addr(string server_address) {
 
 unordered_map<string, string> gen_config() {
     unordered_map<string, string> config;
-    int table_size = 1024;
+    // int table_size = 1024;
+    int table_size = 4096 * 16;
     // int table_size = 256;
     // int table_size = 128;
     int entry_size = 8;
@@ -141,6 +142,7 @@ struct ibv_mr *rdma_buffer_register(struct ibv_pd *pd,
 	mr = ibv_reg_mr(pd, addr, length, permission);
 	if (!mr) {
 		rdma_error("Failed to create mr on buffer, errno: %d \n", -errno);
+		rdma_error("addr: %p , len: %u , perm: %d \n", addr, length, permission);
 		return NULL;
 	}
 	debug("Registered: %p , len: %u , stag: 0x%x \n", 
