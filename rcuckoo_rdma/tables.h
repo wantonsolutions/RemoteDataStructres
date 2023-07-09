@@ -216,6 +216,8 @@ namespace cuckoo_tables {
 
             bool contains(Key key);
             bool bucket_contains(unsigned int bucket_index, Key key);
+
+            float get_fill_percentage_fast();
             float get_fill_percentage();
             bool full();
             Entry ** generate_bucket_cuckoo_hash_index(unsigned int memory_size, unsigned int bucket_size);

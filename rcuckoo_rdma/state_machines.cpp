@@ -688,7 +688,7 @@ namespace cuckoo_state_machines {
 
 
     vector<VRMessage> Memory_State_Machine::fsm_logic(VRMessage message) {
-        if (_table.get_fill_percentage() * 100 > _max_fill) {
+        if (_table.get_fill_percentage_fast() * 100 > _max_fill) {
             ALERT("fsm logic", "table full to %d percent, not processing any more requests\n", _max_fill);
             throw TableFullException();
         }

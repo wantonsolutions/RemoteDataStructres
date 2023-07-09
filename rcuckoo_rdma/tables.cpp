@@ -397,6 +397,11 @@ namespace cuckoo_tables {
         // return float(_fill) / float(max_fill);
     }
 
+    float Table::get_fill_percentage_fast() {
+        unsigned int max_fill = _table_size * _bucket_size;
+        return float(_fill) / float(max_fill);
+    }
+
     bool Table::full(){
         return _fill == _table_size * _bucket_size;
     }
