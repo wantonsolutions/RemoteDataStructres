@@ -15,7 +15,7 @@ string s(const char * c) {
 }
 
 bool test_0() {
-    printf("basic test, can we lock the first index\n");
+    string test_name = "basic test, can we lock the first index";
     vector<unsigned int> buckets = {0};
     vector<VRMaskedCasData> masked_cas_data = get_lock_list(buckets, buckets_per_lock, locks_per_message);
 
@@ -34,7 +34,7 @@ bool test_0() {
 }
 
 bool test_1() {
-    printf("basic test, can we lock the first two indexes\n");
+    string test_name = "basic test, can we lock the first two indexes";
     vector<unsigned int> buckets = {0,1};
     vector<VRMaskedCasData> masked_cas_data = get_lock_list(buckets, buckets_per_lock, locks_per_message);
 
@@ -53,7 +53,7 @@ bool test_1() {
 }
 
 bool test_2 () {
-    printf("basic test, get a mask with an index of 1 shifted\n");
+    string test_name ="basic test, get a mask with an index of 1 shifted";
     vector<unsigned int> buckets = {8};
     vector<VRMaskedCasData> masked_cas_data = get_lock_list(buckets, buckets_per_lock, locks_per_message);
 
@@ -61,8 +61,8 @@ bool test_2 () {
     VRMaskedCasData mcd = masked_cas_data[0];
     printf("Masked Cas Data: %s\n", mcd.to_string().c_str());
 
-    string outcome  = s("10000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000");
-    int min_index = 1;
+    string outcome  = s("00000000") + s("10000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000");
+    int min_index = 0;
     if (uint64t_to_bin_string(mcd.mask) == outcome && mcd.min_lock_index == min_index) {
         printf("success\n");
         return true;
@@ -73,16 +73,16 @@ bool test_2 () {
 }
 
 bool test_3 () {
-    printf("basic test, get a mask with an index of 1 shifted\n");
-    vector<unsigned int> buckets = {47, 30, 19};
+    string test_name = "basic test, get a mask with an index of 8 shifted";
+    vector<unsigned int> buckets = {64};
     vector<VRMaskedCasData> masked_cas_data = get_lock_list(buckets, buckets_per_lock, locks_per_message);
 
     assert(masked_cas_data.size() == 1);
     VRMaskedCasData mcd = masked_cas_data[0];
     printf("Masked Cas Data: %s\n", mcd.to_string().c_str());
 
-    string outcome  = s("00010000") + s("00000010") + s("00000000") + s("000000001") + s("00000000") + s("00000000") + s("00000000") + s("00000000");
-    int min_index = 1;
+    string outcome  = s("10000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000");
+    int min_index = 8;
     if (uint64t_to_bin_string(mcd.mask) == outcome && mcd.min_lock_index == min_index) {
         printf("success\n");
         return true;
@@ -92,9 +92,56 @@ bool test_3 () {
     }
 }
 
-bool test_4() {
-    printf("test to ensure that we get 64 bit aligned CAS ");
+bool test_4(){
+    string test_name = "make sure that we get two masked cas when the buckets are 64 apart";
+    vector<unsigned int> buckets = {0,64};
+    vector<VRMaskedCasData> masked_cas_data = get_lock_list(buckets, buckets_per_lock, locks_per_message);
+
+    assert(masked_cas_data.size() == 2);
+    VRMaskedCasData mcd_0 = masked_cas_data[0];
+    VRMaskedCasData mcd_1 = masked_cas_data[1];
+    printf("Masked Cas Data 0 : %s\n", mcd_0.to_string().c_str());
+    printf("Masked Cas Data 1 : %s\n", mcd_1.to_string().c_str());
+
+    string outcome_0  = s("10000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000");
+    int min_index_0 = 0;
+
+    string outcome_1  = s("10000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000");
+    int min_index_1 = 8;
+    if (
+        uint64t_to_bin_string(mcd_0.mask) == outcome_0 && mcd_0.min_lock_index == min_index_0 &&
+        uint64t_to_bin_string(mcd_1.mask) == outcome_1 && mcd_1.min_lock_index == min_index_1
+        ) {
+        printf("success\n");
+        return true;
+    } else {
+        printf("failure\n");
+        return false;
+    }
 }
+
+// bool test_3 () {
+//     printf("basic test, get a mask with an index of 1 shifted\n");
+//     vector<unsigned int> buckets = {47, 30, 19};
+//     vector<VRMaskedCasData> masked_cas_data = get_lock_list(buckets, buckets_per_lock, locks_per_message);
+
+//     assert(masked_cas_data.size() == 1);
+//     VRMaskedCasData mcd = masked_cas_data[0];
+//     printf("Masked Cas Data: %s\n", mcd.to_string().c_str());
+
+//     string outcome  = s("00010000") + s("00000010") + s("00000000") + s("000000001") + s("00000000") + s("00000000") + s("00000000") + s("00000000");
+//     int min_index = 1;
+//     if (uint64t_to_bin_string(mcd.mask) == outcome && mcd.min_lock_index == min_index) {
+//         printf("success\n");
+//         return true;
+//     } else {
+//         printf("failure\n");
+//         return false;
+//     }
+// }
+
+// bool test_4() {
+//     printf("test to ensure that we get 64 bit aligned CAS ");
 
 int main() {
 
@@ -102,6 +149,8 @@ int main() {
     test_1();
     test_2();
     test_3();
+    test_4();
+    // test_3();
 
     //Translate a single lock
     // vector<unsigned int> lock_indexes = get_unique_lock_indexes(buckets, buckets_per_lock);

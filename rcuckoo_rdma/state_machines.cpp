@@ -719,8 +719,10 @@ namespace cuckoo_state_machines {
                 try {
                     uint32_t bucket_id = stoi(message.function_args["bucket_id"]);
                     uint32_t offset = stoi(message.function_args["bucket_offset"]);
-                    uint64_t old = stoull(message.function_args["old"], nullptr, 10);
-                    uint64_t new_val = stoull(message.function_args["new"], nullptr, 10);
+                    // uint64_t old = stoull(message.function_args["old"], nullptr, 10);
+                    // uint64_t new_val = stoull(message.function_args["new"], nullptr, 10);
+                    uint64_t old = stoull(message.function_args["old"], nullptr, 16);
+                    uint64_t new_val = stoull(message.function_args["new"], nullptr, 16);
                     CasOperationReturn cas_ret = cas_table_entry(_table, bucket_id, offset, old, new_val);
 
                     VERBOSE("Memory Got CAS", "print table\n %s", _table.to_string().c_str());

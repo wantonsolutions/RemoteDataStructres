@@ -348,24 +348,30 @@ namespace cuckoo_virtual_rdma {
         return (index / 8) * 8;
     }
 
-    unsigned int get_min_byte_aligned_index(vector<unsigned int> indexes) {
+    unsigned int sixty_four_aligned_index(unsigned int index) {
+        return (index / 64) * 64;
+    }
+
+    unsigned int get_min_sixty_four_aligned_index(vector<unsigned int> indexes) {
         unsigned int min_index = indexes[0];
         for (int i=1; i<indexes.size(); i++) {
             if (indexes[i] < min_index) {
                 min_index = indexes[i];
             }
         }
-        return byte_aligned_index(min_index);
+        return sixty_four_aligned_index(min_index);
     }
+
+    #define BITS_PER_BYTE 8
 
     vector<vector<unsigned int>> break_lock_indexes_into_chunks(vector<unsigned int> lock_indexes, unsigned int locks_per_message) {
         vector<vector<unsigned int>> lock_indexes_chunked;
         vector<unsigned int> current_chunk;
         unsigned int min_lock_index;
-        unsigned int bits_in_uint64_t = sizeof(uint64_t) * 8;
+        unsigned int bits_in_uint64_t = sizeof(uint64_t) * BITS_PER_BYTE;
         for (int i=0; i<lock_indexes.size(); i++) {
             if(current_chunk.size() == 0) {
-                min_lock_index = byte_aligned_index(lock_indexes[i]);
+                min_lock_index = sixty_four_aligned_index(lock_indexes[i]);
                 VERBOSE("break_lock_indexes_into_chunks", "Min lock index: %u origingal %u\n", min_lock_index, lock_indexes[i]);
             }
 
@@ -376,7 +382,7 @@ namespace cuckoo_virtual_rdma {
                 VERBOSE("pushing to new chunk", "Pushing %u to new chunk\n", lock_indexes[i]);
                 lock_indexes_chunked.push_back(current_chunk);
                 current_chunk.clear();
-                min_lock_index = byte_aligned_index(lock_indexes[i]);
+                min_lock_index = sixty_four_aligned_index(lock_indexes[i]);
                 current_chunk.push_back(lock_indexes[i]);
             }
         }
@@ -392,7 +398,7 @@ namespace cuckoo_virtual_rdma {
         for (int i=0; i<lock_chunks.size(); i++) {
             VRMaskedCasData mcd;
             vector<unsigned int> normalized_indexes;
-            unsigned int min_index = get_min_byte_aligned_index(lock_chunks[i]);
+            unsigned int min_index = get_min_sixty_four_aligned_index(lock_chunks[i]);
             // unsigned int min_index = byte_aligned_index(lock_chunks[i][0]) / 8;
             for (int j=0; j<lock_chunks[i].size(); j++) {
                 //print verbose normalized index

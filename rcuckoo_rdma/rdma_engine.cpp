@@ -215,7 +215,7 @@ namespace cuckoo_rdma_engine {
             //register the memory
             printf("registering table memory\n");
             const int extra_table_memory = 256; //I get out of range errros unless i make the table a bit bigger
-            _table_mr = rdma_buffer_register(_connection_manager->pd, table_pointer, table_size+extra_table_memory, MEMORY_PERMISSION);
+            _table_mr = rdma_buffer_register(_connection_manager->pd, table_pointer, table_size*8, MEMORY_PERMISSION);
 
             printf("register lock table memory\n");
             _lock_table_mr = rdma_buffer_register(_connection_manager->pd, lock_table_pointer, lock_table_size, MEMORY_PERMISSION);
@@ -308,75 +308,6 @@ namespace cuckoo_rdma_engine {
         }
 
     }
-/* this example assumed that the variables my_port, my_psn, my_mtu, my_sl, remote_qpn, remote_psn, remote_lid are declared and initialized with valid values */
-void reset_qp(struct ibv_qp *qp)
-{
-    printf("resetting qp\n");
-    struct ibv_qp_attr attr;
-    int my_port = 20886;
-
-    memset(&attr, 0, sizeof(attr));
-
-    attr.qp_state        = IBV_QPS_INIT;
-    attr.pkey_index      = 0;
-    attr.port_num        = my_port;
-    attr.qp_access_flags = 0;
-
-    if (ibv_modify_qp(qp, &attr,
-            IBV_QP_STATE      |
-            IBV_QP_PKEY_INDEX |
-            IBV_QP_PORT       |
-            IBV_QP_ACCESS_FLAGS)) {
-        fprintf(stderr, "Failed to modify QP to INIT\n");
-        return;
-    }
-
-    memset(&attr, 0, sizeof(attr));
-
-    attr.qp_state		= IBV_QPS_RTR;
-    // attr.path_mtu		= my_mtu;
-    // attr.dest_qp_num	= remote_qpn;
-    // attr.rq_psn		= remote_psn;
-    attr.max_dest_rd_atomic	= 1;
-    attr.min_rnr_timer	= 12;
-    attr.ah_attr.is_global	   = 0;
-    // attr.ah_attr.dlid	   = remote_lid;
-    // attr.ah_attr.sl		   = my_sl;
-    // attr.ah_attr.src_path_bits = 0;
-    // attr.ah_attr.port_num	   = my_port;
-
-    if (ibv_modify_qp(qp, &attr,
-            IBV_QP_STATE              |
-            IBV_QP_AV                 |
-            IBV_QP_PATH_MTU           |
-            IBV_QP_DEST_QPN           |
-            IBV_QP_RQ_PSN             |
-            IBV_QP_MAX_DEST_RD_ATOMIC |
-            IBV_QP_MIN_RNR_TIMER)) {
-        fprintf(stderr, "Failed to modify QP to RTR\n");
-        return;
-    }
-
-    memset(&attr, 0, sizeof(attr));
-
-    attr.qp_state	    = IBV_QPS_RTS;
-    // attr.sq_psn	    = my_psn;
-    attr.timeout	    = 14;
-    attr.retry_cnt	    = 7;
-    attr.rnr_retry	    = 7; /* infinite */
-    attr.max_rd_atomic  = 1;
-
-    if (ibv_modify_qp(qp, &attr,
-            IBV_QP_STATE              |
-            IBV_QP_TIMEOUT            |
-            IBV_QP_RETRY_CNT          |
-            IBV_QP_RNR_RETRY          |
-            IBV_QP_SQ_PSN             |
-            IBV_QP_MAX_QP_RD_ATOMIC)) {
-        fprintf(stderr, "Failed to modify QP to RTS\n");
-        return;
-    }
-}
 
 
     void RDMA_Engine::debug_masked_cas(){
@@ -502,7 +433,7 @@ void reset_qp(struct ibv_qp *qp)
 
 
 
-        debug_masked_cas();
+        // debug_masked_cas();
 
         vector<VRMessage> ingress_messages;
         VRMessage init;

@@ -110,12 +110,12 @@ namespace cuckoo_tables {
         const int bits_per_byte=8;
         _total_lock_entries = (_total_locks / bits_per_byte) + cas_size;
 
-        _total_lock_entries += 4096;
+        // _total_lock_entries += 4096;
         //round lock entries to the nearest value divisible by 8 so everything is cache line alligned
-        // const int cache_line_size = 64;
-        // if (_total_lock_entries % cache_line_size != 0){
-        //     _total_lock_entries += cache_line_size - (_total_lock_entries % cache_line_size);
-        // }
+        const int cas_line_size = 8;
+        if (_total_lock_entries % cas_size != 0){
+            _total_lock_entries += cas_size - (_total_lock_entries % cas_size);
+        }
 
         printf("_total_lock_entries: %d\n", _total_lock_entries);
         _locks = new uint8_t[_total_lock_entries];

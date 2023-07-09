@@ -120,6 +120,8 @@ namespace cuckoo_virtual_rdma {
 
     vector<unsigned int> get_unique_lock_indexes(vector<unsigned int> buckets, unsigned int buckets_per_lock);
     unsigned int byte_aligned_index(unsigned int index);
+    unsigned int sixty_four_aligned_index(unsigned int index);
+    unsigned int get_min_sixty_four_aligned_index(vector<unsigned int> indexes);
     vector<vector<unsigned int>> break_lock_indexes_into_chunks(vector<unsigned int> lock_indexes, unsigned int locks_per_message);
     vector<VRMaskedCasData> lock_chunks_to_masked_cas_data(vector<vector<unsigned int>> lock_chunks);
     vector<VRMaskedCasData> unlock_chunks_to_masked_cas_data(vector<vector<unsigned int>> lock_chunks);
