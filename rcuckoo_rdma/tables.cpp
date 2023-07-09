@@ -109,6 +109,8 @@ namespace cuckoo_tables {
         const int cas_size = 8;
         const int bits_per_byte=8;
         _total_lock_entries = (_total_locks / bits_per_byte) + cas_size;
+
+        _total_lock_entries += 4096;
         //round lock entries to the nearest value divisible by 8 so everything is cache line alligned
         // const int cache_line_size = 64;
         // if (_total_lock_entries % cache_line_size != 0){

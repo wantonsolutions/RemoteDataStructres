@@ -381,46 +381,64 @@ void reset_qp(struct ibv_qp *qp)
 
     void RDMA_Engine::debug_masked_cas(){
         struct ibv_wc *wc = (struct ibv_wc *) calloc (64, sizeof(struct ibv_wc));
-        for (int i=55; i <= 64; i++) {
-            uint64_t local_lock_address = (uint64_t) _rcuckoo->get_lock_pointer(i);
-            uint64_t remote_lock_address = ((uint64_t)1) << i;
-            uint64_t compare = 0;
-            uint64_t swap = 1;
-            printf("remote address %d = %lx\n", i, remote_lock_address);
-            bool success = rdmaCompareAndSwap(
-                _connection_manager->client_qp[0], 
-                local_lock_address, 
-                remote_lock_address,
-                compare, 
-                swap, 
-                _lock_table_mr->lkey,
-                _table_config->remote_key, 
-                true, 
-                i);
-            if (!success) {
-                printf("rdma cas failed\n");
-                exit(1);
-            }
-            int n = bulk_poll(_completion_queue, 1, wc);
-            if (n < 0) {
-                printf("polling failed\n");
-                exit(1);
-            }
-            // for (int k=0;k<MAX_CONCURRENT_MESSAGES;k++) {
-            //     printf("message_tracker sub 1[%d] = %s\n", k, message_tracker[k].to_string().c_str());
-            // }
-            printf("-------------------------------------Sending-------------------------------------\n");
-            for (int j=0;j<n;j++) {
-                if (wc[j].status != IBV_WC_SUCCESS) {
-                    printf("RDMA masked cas failed with status %s on request %d\n", ibv_wc_status_str(wc[j].status), wc[j].wr_id);
-                    // reset_qp(_connection_manager->client_qp[0]);
-                    exit(0);
-                } else {
-                    printf("Message Received with work request %d\n", wc[j].wr_id);
-                }
-            }
+        // uint64_t remote_lock_address = 0;
+        uint64_t remote_lock_address = 16;
+        // remote_lock_address = 1 << 8; // wtf this seems to work....
+
+        // remote_lock_address = __builtin_bswap64(remote_lock_address);
+        // uint64_t remote_lock_address = ((uint64_t)1) << 0;
+        uint64_t local_lock_address = (uint64_t) _rcuckoo->get_lock_pointer(0);
+        uint64_t mask = 1;
+        uint64_t swap = 1;
+        uint64_t compare=0;
+        uint64_t wr_id =0;
 
 
+        printf("local_lock_address %lu\n", local_lock_address);
+        printf("remote_lock_address %lu\n", remote_lock_address);
+        printf("compare %lu\n", compare);
+        printf("swap %lu\n", swap);
+        printf("mask %lu\n", mask);
+        printf("_lock_table_mr->lkey %u\n", _lock_table_mr->lkey);
+        printf("_table_config->lock_table_key %u\n", _table_config->lock_table_key);
+
+        printf("remote address %lx\n", remote_lock_address);
+
+        bool success = rdmaCompareAndSwapMask(
+            _connection_manager->client_qp[0],
+            local_lock_address,
+            remote_lock_address,
+            compare,
+            swap,
+            _lock_table_mr->lkey,
+            _table_config->lock_table_key,
+            mask,
+            true,
+            wr_id);
+
+
+        if (!success) {
+            printf("rdma cas failed\n");
+            exit(1);
+        }
+        int n = bulk_poll(_completion_queue, 1, wc);
+        if (n < 0) {
+            printf("polling failed\n");
+            exit(1);
+        }
+        // for (int k=0;k<MAX_CONCURRENT_MESSAGES;k++) {
+        //     printf("message_tracker sub 1[%d] = %s\n", k, message_tracker[k].to_string().c_str());
+        // }
+        printf("-------------------------------------Sending-------------------------------------\n");
+        for (int j=0;j<n;j++) {
+            if (wc[j].status != IBV_WC_SUCCESS) {
+
+                printf("RDMA masked cas failed with status %s (%d)on request %d\n", ibv_wc_status_str(wc[j].status),wc[j].status, wc[j].wr_id);
+                // reset_qp(_connection_manager->client_qp[0]);
+                exit(0);
+            } else {
+                printf("Message Received with work request %d\n", wc[j].wr_id);
+            }
 
         }
         printf("completed masked cas debug\n");
@@ -559,6 +577,8 @@ void reset_qp(struct ibv_qp *qp)
             // for (int k=0;k<MAX_CONCURRENT_MESSAGES;k++) {
             //     printf("message_tracker[%d] = %s\n", k, message_tracker[k].to_string().c_str());
             // }
+
+            // exit(0);
 
             if (outstanding_messages > 0 ) {
                 //Now we deal with the message recipt

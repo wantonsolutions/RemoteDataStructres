@@ -92,6 +92,10 @@ bool test_3 () {
     }
 }
 
+bool test_4() {
+    printf("test to ensure that we get 64 bit aligned CAS ");
+}
+
 int main() {
 
     test_0();
