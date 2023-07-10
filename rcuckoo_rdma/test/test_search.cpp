@@ -108,7 +108,8 @@ void fill_key(Key &key, int value) {
 } 
 
 void run_single_insert() {
-    unsigned int indexes = 1024 * 1024 * 10;
+    // unsigned int indexes = 1024 * 1024;
+    unsigned int indexes = 32;
     unsigned int buckets = 8;
     unsigned int memory = indexes * sizeof(Entry);
     Table table = Table(memory, buckets, 1);
@@ -128,7 +129,7 @@ void run_single_insert() {
     }
 
     // cout << "final table" << endl;
-    // table.print_table();
+    table.print_table();
     cout << "final fill: " << table.get_fill_percentage() << endl;
 }
 
