@@ -1,7 +1,7 @@
 #ifndef RDMA_CLIENT_LIB_H
 #define RDMA_CLIENT_LIB_H
 
-#define MAX_THREADS 1
+#define MAX_THREADS MAX_QPS
 #define MULTI_CQ
 
 #include "rdma_common.h"

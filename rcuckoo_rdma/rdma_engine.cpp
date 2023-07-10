@@ -190,9 +190,10 @@ namespace cuckoo_rdma_engine {
                 printf("Error: num_qps must be at least 1\n");
                 exit(1);
             }
-            if (args.num_qps > 1) {
-                printf("Error: num_qps must be at most %d, we are only enabling a single QP per process\n", 1);
-                printf("TODO; figure out a proper way to set up threading for QP's this likely only works for one FSM\n");
+            #define MAX_QPS 8
+            if (args.num_qps > MAX_QPS) {
+                printf("Error: num_qps must be at most %d, we are only enabling a few QP per process\n", MAX_QPS);
+                printf("TODO; we probably need a better way to scale clients if we are going more than this.\n");
                 exit(1);
             }
 

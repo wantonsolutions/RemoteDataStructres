@@ -242,6 +242,10 @@ RDMAConnectionManager::RDMAConnectionManager(RDMAConnectionManagerArguments args
     client_send_wr, bad_client_send_wr = NULL;
     server_recv_wr, bad_server_recv_wr = NULL;
 
+    if (_num_qps > MAX_QPS) {
+        rdma_error("Failed to setup shared RDMA resourceds MAX QPS = %d. %d qp's were requested \n", MAX_QPS, _num_qps);
+    }
+
     int ret;
     /* Setup shared resources */
     ret = client_setup_shared_resources();
@@ -485,9 +489,11 @@ int RDMAConnectionManager::client_prepare_connection(struct sockaddr_in *s_addr,
         printf("QP %d created at %p \n", qp_num, (void *)client_qp[qp_num]);
     } else {
         bzero(&qp_init_attr_exp, sizeof(qp_init_attr_exp));
+        // qp_init_attr.qp_context = nullptr;
         qp_init_attr_exp.qp_type = IBV_QPT_RC;                  /* QP type, RC = Reliable connection */
         qp_init_attr_exp.sq_sig_all = 0;
         #ifdef MULTI_CQ
+        assert(client_cq_threads[qp_num] != NULL);
         qp_init_attr_exp.recv_cq = client_cq_threads[qp_num]; /* Where should I notify for receive completion operations */
         qp_init_attr_exp.send_cq = client_cq_threads[qp_num]; /* Where should I notify for send completion operations */
         #else
@@ -513,7 +519,7 @@ int RDMAConnectionManager::client_prepare_connection(struct sockaddr_in *s_addr,
         client_qp[qp_num] = ibv_exp_create_qp(devices[0], &qp_init_attr_exp);
         cm_client_qp_id[qp_num]->qp = client_qp[qp_num];
         if (!client_qp[qp_num]) {
-            rdma_error("Failed to EXP create QP, errno: %d \n", -errno);
+            rdma_error("Failed to EXP create QP, errno#: %d error %s\n", -errno, strerror(errno));
             return -errno;
         }
         // client_qp[qp_num] = cm_client_qp_id[qp_num]->qp;

@@ -63,7 +63,7 @@ unordered_map<string, string> gen_config() {
     // Client State Machine Arguements
     int total_inserts = 1;
     int max_fill = 90;
-    int num_clients = 1;
+    int num_clients = 2;
     config["total_inserts"]=to_string(total_inserts);
     config["total_requests"]=to_string(total_inserts);
     config["max_fill"]=to_string(max_fill);
