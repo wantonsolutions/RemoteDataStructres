@@ -10,6 +10,7 @@
 
 using namespace cuckoo_state_machines;
 using namespace cuckoo_rcuckoo;
+#define ID_SIZE 64
 
 namespace cuckoo_rdma_engine {
 
@@ -17,6 +18,7 @@ namespace cuckoo_rdma_engine {
     //It's point is just to hold a bunch of pointers to associated objects
     class State_Machine_Wrapper {
         public:
+            int _id;
             State_Machine * _state_machine;
             ibv_qp * _qp;
             RCuckoo * _rcuckoo;
@@ -26,11 +28,14 @@ namespace cuckoo_rdma_engine {
             table_config * _table_config;
             struct ibv_cq *_completion_queue;
 
-            bool start();
+            void * start(void* args);
+            const char * log_id();
             uint64_t local_to_remote_table_address(uint64_t local_address);
             void send_virtual_read_message(VRMessage message, uint64_t wr_id);
             void send_virtual_cas_message(VRMessage message, uint64_t wr_id);
             void send_virtual_masked_cas_message(VRMessage message, uint64_t wr_id);
+        private:
+            char _log_identifier[ID_SIZE];
     };
     
     class RDMA_Engine {

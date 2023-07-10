@@ -182,7 +182,7 @@ namespace cuckoo_rcuckoo {
         _search_path = (this->*_table_search_function)(searchable_buckets);
         //Search failed
         if (_search_path.size() <= 0) {
-            printf("Search Failed for key %s unable to continue client %d is done\n", _current_insert_key.to_string().c_str(), _id);
+            ALERT(log_id(), "Search Failed for key %s unable to continue client %d is done\n", _current_insert_key.to_string().c_str(), _id);
             _complete=true;
             _state = IDLE;
             return vector<VRMessage>();
@@ -417,7 +417,7 @@ namespace cuckoo_rcuckoo {
     }
 
     const char * RCuckoo::log_id() {
-        return("client " + to_string(_id)).c_str();
+        return ("client " + to_string(_id)).c_str();
     }
 
     vector<VRMessage> RCuckoo::aquire_locks_with_reads_fsm(VRMessage message) {

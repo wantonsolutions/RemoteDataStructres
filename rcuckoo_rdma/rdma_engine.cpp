@@ -219,6 +219,7 @@ namespace cuckoo_rdma_engine {
 
             for (i=0;i<_num_clients;i++) {
                 config["id"] = to_string(i);
+                _state_machines[i]._id = i;
                 _state_machines[i]._qp = _connection_manager->client_qp[i];
                 _state_machines[i]._rcuckoo = new RCuckoo(config);
                 _state_machines[i]._state_machine = _state_machines[i]._rcuckoo;
@@ -270,12 +271,30 @@ namespace cuckoo_rdma_engine {
         return;
     }
 
+
+    typedef void * (*THREADFUNCPTR)(void *);
     bool RDMA_Engine::start() {
         VERBOSE("RDMA Engine", "starting rdma engine\n");
         VERBOSE("RDMA Engine", "for the moment just start the first of the state machines\n");
-        _state_machines[0].start();
+        pthread_t* thread_ids = (pthread_t*) calloc(_num_clients, sizeof(pthread_t));
+        for (int i=0;i<_num_clients;i++) {
+            printf("Creating Client Thread %d\n", i);
+            pthread_create(&thread_ids[i], NULL, (THREADFUNCPTR)&State_Machine_Wrapper::start, &_state_machines[i]);
+        }
+        for (int i=0;i<_num_clients;i++){
+            printf("Joining Client Thread %d\n", i);
+            pthread_join(thread_ids[i],NULL);
+        }
+        // _state_machines[0].start();
+
+ 
+        free(thread_ids);
         VERBOSE("RDMA Engine", "done running state machine!");
         return true;
+    }
+
+    const char * State_Machine_Wrapper::log_id() {
+        return _log_identifier;
     }
 
     uint64_t State_Machine_Wrapper::local_to_remote_table_address(uint64_t local_address){
@@ -368,13 +387,13 @@ namespace cuckoo_rdma_engine {
         // remote_lock_address = __builtin_bswap64(remote_lock_address);
 
 
-        VERBOSE("RDMA engine", "local_lock_address %lu\n", local_lock_address);
-        VERBOSE("RDMA engine", "remote_lock_address %lu\n", remote_lock_address);
-        VERBOSE("RDMA engine", "compare %lu\n", compare);
-        VERBOSE("RDMA engine", "swap %lu\n", swap);
-        VERBOSE("RDMA engine", "mask %lu\n", mask);
-        VERBOSE("RDMA engine", "_lock_table_mr->lkey %u\n", _lock_table_mr->lkey);
-        VERBOSE("RDMA engine", "_table_config->lock_table_key %u\n", _table_config->lock_table_key);
+        VERBOSE(log_id(), "local_lock_address %lu\n", local_lock_address);
+        VERBOSE(log_id(), "remote_lock_address %lu\n", remote_lock_address);
+        VERBOSE(log_id(), "compare %lu\n", compare);
+        VERBOSE(log_id(), "swap %lu\n", swap);
+        VERBOSE(log_id(), "mask %lu\n", mask);
+        VERBOSE(log_id(), "_lock_table_mr->lkey %u\n", _lock_table_mr->lkey);
+        VERBOSE(log_id(), "_table_config->lock_table_key %u\n", _table_config->lock_table_key);
 
         bool success = rdmaCompareAndSwapMask(
             _qp,
@@ -396,11 +415,12 @@ namespace cuckoo_rdma_engine {
 
     
     #define MAX_CONCURRENT_MESSAGES 32
-    VRMessage message_tracker[MAX_CONCURRENT_MESSAGES];
-    bool State_Machine_Wrapper::start(){
+    void * State_Machine_Wrapper::start(void * args){
+        VRMessage message_tracker[MAX_CONCURRENT_MESSAGES];
 
 
 
+        sprintf(_log_identifier, "SMW: %d", _id);
         // debug_masked_cas();
 
         vector<VRMessage> ingress_messages;
@@ -426,8 +446,13 @@ namespace cuckoo_rdma_engine {
             }
 
             messages = _state_machine->fsm(current_ingress_message);
+
+            if (messages.size() == 0 && _state_machine->is_complete()) {
+                ALERT(log_id(), "State Machine is complete\n");
+                return NULL;
+            }
             for (int i = 0; i < messages.size(); i++){
-                VERBOSE("RDMA Engine", "Sending message: %s\n", messages[i].to_string().c_str());
+                VERBOSE(log_id(), "Sending message: %s\n", messages[i].to_string().c_str());
                 messages[i].type = messages[i].get_message_type();
                 bool sent = false;
                 switch(messages[i].get_message_type()) {
@@ -444,11 +469,11 @@ namespace cuckoo_rdma_engine {
                         sent = true;
                         break;
                     default:
-                        ALERT("RDMA Engine", "message type not supported\n");
+                        ALERT(log_id(), "message type not supported\n");
                         exit(1);
                 }
                 if (sent) {
-                    VERBOSE("RDMA Engine", "writing to wr_id_to_message for id (%d) %s\n", wr_id_counter, messages[i].to_string().c_str());
+                    VERBOSE(log_id(), "writing to wr_id_to_message for id (%d) %s\n", wr_id_counter, messages[i].to_string().c_str());
                     uint64_t modulo_id = wr_id_counter % MAX_CONCURRENT_MESSAGES;
                     message_tracker[modulo_id] = messages[i];
                     message_tracker[modulo_id].type = messages[i].type;
@@ -474,7 +499,7 @@ namespace cuckoo_rdma_engine {
                 //Now we deal with the message recipt
                 int n = bulk_poll(_completion_queue, outstanding_messages, wc);
                 if (n < 0) {
-                    ALERT("RDMA Engine", "polling failed\n");
+                    ALERT(log_id(), "polling failed\n");
                     exit(1);
                 }
                 // for (int k=0;k<MAX_CONCURRENT_MESSAGES;k++) {
@@ -483,10 +508,10 @@ namespace cuckoo_rdma_engine {
                 // printf("-------------------------------------Sending-------------------------------------\n");
                 for (int j=0;j<n;j++) {
                     if (wc[j].status != IBV_WC_SUCCESS) {
-                        ALERT("RDMA Engine", "RDMA read failed with status %s on request %d\n", ibv_wc_status_str(wc[j].status), wc[j].wr_id);
+                        ALERT(log_id(), "RDMA read failed with status %s on request %d\n", ibv_wc_status_str(wc[j].status), wc[j].wr_id);
                         exit(1);
                     } else {
-                        VERBOSE("RDMA engine", "Message Received wih work request %d\n", wc[j].wr_id);
+                        VERBOSE(log_id(), "Message Received wih work request %d\n", wc[j].wr_id);
 
                         // for (int k=0;k<MAX_CONCURRENT_MESSAGES;k++) {
                         //     printf("message_tracker[%d] = %s\n", k, message_tracker[k].to_string().c_str());
@@ -521,7 +546,7 @@ namespace cuckoo_rdma_engine {
                             // printf("memory state machine table\n");
                             // _memory_state_machine->print_table();
                             for (int i = 0; i < incomming.size(); i++){
-                                VERBOSE("RDMA engine", "memory state machine incomming message: %s\n", incomming[i].to_string().c_str());
+                                VERBOSE(log_id(), "memory state machine incomming message: %s\n", incomming[i].to_string().c_str());
                                 ingress_messages.push_back(incomming[i]);
                                 // for (auto const& x : incomming[i].function_args)
                                 // {
@@ -532,8 +557,21 @@ namespace cuckoo_rdma_engine {
                             // printf("received a masked cas response\n");
                             vector<VRMessage> incomming = _memory_state_machine->fsm(outgoing);
                             for (int i = 0; i < incomming.size(); i++){
-                                VERBOSE("RDMA engine", "memory state machine incomming message: %s\n", incomming[i].to_string().c_str());
-                                incomming[i].function_args["success"] = "1";
+                                VERBOSE(log_id(), "memory state machine incomming message: %s\n", incomming[i].to_string().c_str());
+                                //Now I'm going to check if this failed. If it did I'm not going to set the success flag
+                                //At this point the incomming message is filled with the current state of the memory.
+                                //In order for the masked cas to be a success the old value of the outgoing message must be the same as what is currently in memory.
+                                uint64_t old_value = stoull(outgoing.function_args["old"], 0, 2);
+                                uint64_t mask = stoull(outgoing.function_args["mask"], 0, 2);
+                                uint64_t current_value = stoull(incomming[i].function_args["old"], 0, 2);
+                                if (old_value != (current_value & mask)) {
+                                    ALERT(log_id(), "SHOOT WE FAILED GETTING THE LOCK");
+                                    ALERT(log_id(), "old value %lx != current value %lx (mask %lx)", old_value, current_value, mask);
+                                    incomming[i].function_args["success"] = "0";
+                                    // exit(0);
+                                } else {
+                                    incomming[i].function_args["success"] = "1";
+                                }
                                 ingress_messages.push_back(incomming[i]);
                             }
                             
@@ -541,13 +579,13 @@ namespace cuckoo_rdma_engine {
                             // printf("received a cas response\n");
                             vector<VRMessage> incomming = _memory_state_machine->fsm(outgoing);
                             for (int i = 0; i < incomming.size(); i++){
-                                VERBOSE("RDMA engine", "memory state machine incomming message: %s\n", incomming[i].to_string().c_str());
+                                VERBOSE(log_id(), "memory state machine incomming message: %s\n", incomming[i].to_string().c_str());
                                 incomming[i].function_args["success"] = "1";
                                 ingress_messages.push_back(incomming[i]);
                             }
 
                         } else {
-                            ALERT("RDMA engine", "unknown message type %s", outgoing.to_string().c_str());
+                            ALERT(log_id(), "unknown message type %s", outgoing.to_string().c_str());
                             exit(1);
                         }
                     }

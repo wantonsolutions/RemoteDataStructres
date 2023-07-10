@@ -243,9 +243,9 @@ namespace cuckoo_search {
                 //Only check for open buckets if the size of the open buckets is greater than zero
                 //somewhat unintuitive no open buckets means that they are all open
                 if (open_buckets.size() > 0) {
-                    for (auto open_bucket : open_buckets){
-                        VERBOSE("DEBUG a_star search", "open bucket: %d", open_bucket);
-                    }
+                    // for (auto open_bucket : open_buckets){
+                    //     VERBOSE("DEBUG a_star search", "open bucket: %d", open_bucket);
+                    // }
                     if (std::find(open_buckets.begin(), open_buckets.end(), index) == open_buckets.end()) {
                         continue;
                     }
