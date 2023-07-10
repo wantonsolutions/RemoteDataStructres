@@ -190,7 +190,7 @@ namespace cuckoo_rdma_engine {
                 printf("Error: num_qps must be at least 1\n");
                 exit(1);
             }
-            #define MAX_RDMA_ENGINE_QPS 8
+            #define MAX_RDMA_ENGINE_QPS 24
             if (args.num_qps > MAX_RDMA_ENGINE_QPS) {
                 printf("Error: num_qps must be at most %d, we are only enabling a few QP per process\n", MAX_RDMA_ENGINE_QPS);
                 printf("TODO; we probably need a better way to scale clients if we are going more than this.\n");
