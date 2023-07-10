@@ -15,10 +15,7 @@ int main(){
     printf("testing cuckoo!\n");
     unordered_map<string, string> config = gen_config();
 
-    RCuckoo rcuck = RCuckoo(config);
-    printf("done rcuck init\n");
-
-    RDMA_Engine client_1 = RDMA_Engine(config, &rcuck);
+    RDMA_Engine client_1 = RDMA_Engine(config);
 
     printf("starting client 0\n");
     client_1.start();

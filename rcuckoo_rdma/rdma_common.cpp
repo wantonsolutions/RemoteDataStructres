@@ -36,7 +36,7 @@ struct sockaddr_in server_address_to_socket_addr(string server_address) {
 unordered_map<string, string> gen_config() {
     unordered_map<string, string> config;
     // int table_size = 1024;
-    int table_size = 4096 * 1024;
+    int table_size = 128;
     // int table_size = 256;
     // int table_size = 128;
     int entry_size = 8;
@@ -70,7 +70,6 @@ unordered_map<string, string> gen_config() {
     config["num_clients"]=to_string(num_clients);
 
     // RDMA Engine Arguments
-    config["num_qps"]="1";
     config["server_address"]="192.168.1.12";
     config["base_port"] = "20886";
     return config;

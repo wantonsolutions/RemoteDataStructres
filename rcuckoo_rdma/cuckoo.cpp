@@ -95,9 +95,6 @@ namespace cuckoo_rcuckoo {
 
         set_search_function(config);
         set_location_function(config);
-
-        // RDMA_Engine _rdma_engine = RDMA_Engine(config, this);
-        // _rdma_engine.set_rcuckoo_state_machine(this);
     }
 
     string RCuckoo::get_state_machine_name() {

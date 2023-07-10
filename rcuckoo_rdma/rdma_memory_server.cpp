@@ -622,7 +622,7 @@ int main(int argc, char **argv)
 
     printf("assigning base_port %s\n", config["base_port"].c_str());
     int base_port = stoi(config["base_port"]);
-    int num_qps = stoi(config["num_qps"]);
+    int num_qps = stoi(config["num_clients"]);
 
     int i; 
     int ret = setup_shared_resources();

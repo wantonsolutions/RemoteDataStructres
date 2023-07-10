@@ -12,29 +12,47 @@ using namespace cuckoo_state_machines;
 using namespace cuckoo_rcuckoo;
 
 namespace cuckoo_rdma_engine {
-    
-    class RDMA_Engine {
-        public:
-            RDMA_Engine();
-            ~RDMA_Engine() {}
-            RDMA_Engine(unordered_map<string, string> config, RCuckoo * rcuckoo);
-            // using namespace cuckoo_rcuckoo;
-            // set_rcuckoo_state_machine(cuckoo_rcuckoo::RCuckoo * rcuckoo);
-            uint64_t local_to_remote_table_address(uint64_t local_address);
-            void send_virtual_read_message(VRMessage message, uint64_t wr_id);
-            void send_virtual_cas_message(VRMessage message, uint64_t wr_id);
-            void send_virtual_masked_cas_message(VRMessage message, uint64_t wr_id);
-            void debug_masked_cas();
-            bool start();
 
-        private:
+    //This class is basically a struct
+    //It's point is just to hold a bunch of pointers to associated objects
+    class State_Machine_Wrapper {
+        public:
             State_Machine * _state_machine;
+            ibv_qp * _qp;
             RCuckoo * _rcuckoo;
             ibv_mr * _table_mr;
             ibv_mr * _lock_table_mr;
             Memory_State_Machine * _memory_state_machine;
             table_config * _table_config;
             struct ibv_cq *_completion_queue;
+
+            bool start();
+            uint64_t local_to_remote_table_address(uint64_t local_address);
+            void send_virtual_read_message(VRMessage message, uint64_t wr_id);
+            void send_virtual_cas_message(VRMessage message, uint64_t wr_id);
+            void send_virtual_masked_cas_message(VRMessage message, uint64_t wr_id);
+    };
+    
+    class RDMA_Engine {
+        public:
+            RDMA_Engine();
+            ~RDMA_Engine() {}
+            RDMA_Engine(unordered_map<string, string> config);
+            // using namespace cuckoo_rcuckoo;
+            // set_rcuckoo_state_machine(cuckoo_rcuckoo::RCuckoo * rcuckoo);
+            void debug_masked_cas();
+            bool start();
+
+        private:
+            // State_Machine * _state_machine;
+            // RCuckoo * _rcuckoo;
+            // ibv_mr * _table_mr;
+            // ibv_mr * _lock_table_mr;
+            // Memory_State_Machine * _memory_state_machine;
+            // table_config * _table_config;
+            // struct ibv_cq *_completion_queue;
+            State_Machine_Wrapper * _state_machines;
+            int _num_clients;
             RDMAConnectionManager  *_connection_manager;
     };
 }

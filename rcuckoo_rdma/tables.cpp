@@ -431,7 +431,7 @@ namespace cuckoo_tables {
             pool = new Entry[nrows * ncols]{Entry()};
 
             for (unsigned i = 0; i < nrows; ++i, pool += ncols ){
-                printf("pool [%d] is %p\n", i, pool);
+                // printf("pool [%d] is %p\n", i, pool);
                 ptr[i] = pool;
             }
             return ptr;
