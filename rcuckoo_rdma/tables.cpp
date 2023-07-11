@@ -64,7 +64,7 @@ namespace cuckoo_tables {
     }
 
     bool Entry::is_empty(){
-        return key.is_empty() && value.is_empty();
+        return key.is_empty();// && value.is_empty();
     }
 
     void * Lock_Table::get_lock_table_address() {
@@ -364,11 +364,10 @@ namespace cuckoo_tables {
         bool has_empty = false;
         for (unsigned int i = 0; i < _bucket_size; i++){
             if (_table[bucket_index][i].is_empty()){
-                has_empty = true;
-                break;
+                return true;
             }
         }
-        return has_empty;
+        return false;
     }
 
     unsigned int Table::get_first_empty_index(unsigned int bucket_index){
