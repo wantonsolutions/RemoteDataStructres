@@ -50,12 +50,11 @@ namespace cuckoo_search {
         return path;
     }
 
-    unsigned int table_index_to_hash_location(hash_locations locations, unsigned int table_index){
+    inline unsigned int table_index_to_hash_location(hash_locations locations, unsigned int table_index){
         if (table_index == 0){
             return locations.primary;
-        } else {
-            return locations.secondary;
         }
+        return locations.secondary;
     }
 
     unsigned int next_search_index(path_element pe, hash_locations (*location_func) (string, unsigned int), Table table){
@@ -164,12 +163,12 @@ namespace cuckoo_search {
         return aspe;
     }
 
-    fast_a_star_pe fast_pop_list(vector<fast_a_star_pe> &list, unordered_map<Key*, fast_a_star_pe> &list_map){
+    inline fast_a_star_pe fast_pop_list(vector<fast_a_star_pe> &list){
         pop_heap(list.begin(), list.end());
         fast_a_star_pe aspe = list.back();
         list.pop_back();
-        size_t val = list_map.erase(aspe.pe.key);
-        assert (val == 1);
+        // size_t val = list_map.erase(aspe.pe.key);
+        // assert (val == 1);
         return aspe;
     }
 
@@ -183,14 +182,18 @@ namespace cuckoo_search {
         return aspe;
     }
 
-    fast_a_star_pe fast_pop_key_from_list(vector<fast_a_star_pe> &list, unordered_map<Key *, fast_a_star_pe> &list_map, Key * key){
-        fast_a_star_pe aspe = list_map[key];
-        size_t val = list_map.erase(key);
-        assert (val == 1);
-        vector<fast_a_star_pe>::iterator it = find(list.begin(), list.end(), aspe);
-        assert(it != list.end());
-        list.erase(it);
-        return aspe;
+    inline fast_a_star_pe fast_pop_key_from_list(vector<fast_a_star_pe> &list, Key * key){
+        fast_a_star_pe ret_aspe;
+        int i=0;
+        for (auto aspe : list){
+            if (aspe.pe.key == key){
+                ret_aspe = aspe;
+                list.erase(list.begin() + i);
+                return ret_aspe;
+            }
+            i++;
+        }
+        assert(false);
     }
 
     void push_list(vector<a_star_pe> &list, unordered_map<Key, a_star_pe> &list_map, a_star_pe aspe) {
@@ -199,17 +202,17 @@ namespace cuckoo_search {
         list_map[aspe.pe.key] = aspe;
     }
 
-    void fast_push_list(vector<fast_a_star_pe> &list, unordered_map<Key*, fast_a_star_pe> &list_map, fast_a_star_pe aspe) {
+    inline void fast_push_list(vector<fast_a_star_pe> &list, fast_a_star_pe aspe) {
         list.push_back(aspe);
         push_heap(list.begin(), list.end());
-        list_map[aspe.pe.key] = aspe;
+        // list_map[aspe.pe.key] = aspe;
     }
 
     bool list_contains(unordered_map<Key, a_star_pe> &list_map, Key key){
         return list_map.find(key) != list_map.end();
     }
 
-    bool fast_list_contains(unordered_map<Key*, fast_a_star_pe> &list_map, Key *key){
+    inline bool fast_list_contains(unordered_map<Key*, fast_a_star_pe> &list_map, Key *key){
         return list_map.find(key) != list_map.end();
     }
 
@@ -223,7 +226,7 @@ namespace cuckoo_search {
         return false;
     }
 
-    unsigned int next_table_index(unsigned int table_index){
+    inline unsigned int next_table_index(unsigned int table_index){
         return (table_index + 1) % 2;
     }
 
@@ -380,6 +383,20 @@ namespace cuckoo_search {
         return path;
     }
 
+    std::vector<path_element> a_star_path_to_path_element(fast_a_star_pe * start) {
+        std::vector<path_element> path;
+        fast_a_star_pe * back_tracker = start;
+        while (back_tracker != NULL){
+            path_element pe;
+            pe.key = *(back_tracker->pe.key);
+            pe.table_index = back_tracker->pe.table_index;
+            pe.bucket_index = back_tracker->pe.bucket_index;
+            pe.offset = back_tracker->pe.offset;
+            path.push_back(pe);
+            back_tracker = back_tracker->prior;
+        }
+        return path;
+    }
 
     vector<path_element> a_star_search_fast(Table table, hash_locations (*location_func) (Key, unsigned int), Key key, std::vector<unsigned int> open_buckets){
         vector<path_element> path;
@@ -390,12 +407,8 @@ namespace cuckoo_search {
         fast_a_star_pe * prior_aspe = NULL;
         fast_a_star_pe search_element;
 
+        const unsigned int table_rows = table.get_row_count();
         // Debugging print the list of targets
-        for (auto target : targets){
-            VERBOSE("DEBUG a_star search", "target in search pool: %d\n", target);
-        }
-
-        Key local_key = key;
 
         for (auto target : targets){
             VERBOSE("DEBUG a_star search", "searching for target: %d\n", target);
@@ -403,12 +416,12 @@ namespace cuckoo_search {
             search_element = fast_a_star_pe(starting_pe, NULL, 0, 0);
 
             vector<fast_a_star_pe> open_list;
-            unordered_map<Key *, fast_a_star_pe> open_list_map;
+            // unordered_map<Key *, fast_a_star_pe> open_list_map;
             vector<fast_a_star_pe> closed_list;
-            unordered_map<Key *, fast_a_star_pe> closed_list_map;
+            // unordered_map<Key *, fast_a_star_pe> closed_list_map;
             prior_aspe = NULL;
             unsigned int closed_list_addressable_index = 0;
-            fast_push_list(open_list, open_list_map, search_element);
+            fast_push_list(open_list, search_element);
             VERBOSE("DEBUG a_star search", "starting search element %s",search_element.pe.to_string().c_str());
 
 
@@ -418,16 +431,16 @@ namespace cuckoo_search {
                 //     cout << "open list element: " << open_element.pe.to_string() << endl;
                 // }
 
-                search_element = fast_pop_list(open_list, open_list_map);
+                search_element = fast_pop_list(open_list);
                 //I need to store back pointers to the closed list so I can reconstruct the path
                 closed_list_addressable[closed_list_addressable_index] = search_element;
                 closed_list_addressable_index++;
                 prior_aspe = &closed_list_addressable[closed_list_addressable_index - 1];
                 // cout << "set the origin to the beginning of the closed list " << prior_aspe->pe.to_string() << endl;
                 //todo closed list is not actually used, we only need the map remove it for optimizations
-                fast_push_list(closed_list, closed_list_map, search_element);
+                fast_push_list(closed_list, search_element);
 
-                hash_locations locations = location_func(*(search_element.pe.key), table.get_row_count());
+                hash_locations locations = location_func(*(search_element.pe.key), table_rows);
                 //print the locations of the key
                 // cout << "locations for key: " << search_element.pe.key->to_string() << endl;
                 // cout << "L1: " << locations.primary << " L2: " << locations.secondary << endl;
@@ -453,7 +466,7 @@ namespace cuckoo_search {
                     unsigned int offset = table.get_first_empty_index(index);
                     fast_path_element open_pe = fast_path_element(&(table.get_entry_pointer(index,offset)->key), table_index, index, offset);
                     unsigned int distance = search_element.distance + 1;
-                    unsigned int f_score = fast_fscore(search_element, target, table.get_row_count());
+                    unsigned int f_score = fast_fscore(search_element, target, table_rows);
                     fast_a_star_pe open_a_star_pe = fast_a_star_pe(open_pe, prior_aspe, search_element.distance+1, f_score);
                     // cout << "found target: " << open_a_star_pe.pe.to_string() << endl;
                     // cout << "setting prior to " << prior_aspe->pe.to_string() << endl;
@@ -472,7 +485,7 @@ namespace cuckoo_search {
                     fast_path_element child_pe = fast_path_element(&(table.get_entry_pointer(index, i))->key, table_index, index, i);
                     unsigned int distance = search_element.distance + 1;
                     fast_a_star_pe child = fast_a_star_pe(child_pe, prior_aspe, distance, 0);
-                    unsigned int f_score = fast_fscore(child, target, table.get_row_count());
+                    unsigned int f_score = fast_fscore(child, target, table_rows);
                     child.fscore = f_score;
                     child_list.push_back(child);
                 }
@@ -486,15 +499,15 @@ namespace cuckoo_search {
                     if (fast_list_contains_vector(open_list, child.pe.key)){
                         //remote the item from the open list and then reinsert it
                         //todo optimize by not poping from the list if we don't need to
-                        fast_a_star_pe existing_aspe = fast_pop_key_from_list(open_list, open_list_map, child.pe.key);
+                        fast_a_star_pe existing_aspe = fast_pop_key_from_list(open_list, child.pe.key);
                         if (child.distance < existing_aspe.distance){
                             existing_aspe.distance = child.distance;
                             existing_aspe.prior = child.prior;
-                            existing_aspe.fscore = fast_fscore(existing_aspe, target, table.get_row_count());
+                            existing_aspe.fscore = fast_fscore(existing_aspe, target, table_rows);
                         }
-                        fast_push_list(open_list, open_list_map, existing_aspe);
+                        fast_push_list(open_list, existing_aspe);
                     } else {
-                        fast_push_list(open_list, open_list_map, child);
+                        fast_push_list(open_list, child);
                     }
                 }
             }
@@ -504,19 +517,11 @@ namespace cuckoo_search {
         }
 
         if (found) {
-            fast_a_star_pe * back_tracker = &search_element;
-            while (back_tracker != NULL){
-                path_element pe;
-                pe.key = *(back_tracker->pe.key);
-                pe.table_index = back_tracker->pe.table_index;
-                pe.bucket_index = back_tracker->pe.bucket_index;
-                pe.offset = back_tracker->pe.offset;
-                path.push_back(pe);
-                back_tracker = back_tracker->prior;
-            }
+            path = a_star_path_to_path_element(&search_element);
         }
         return path;
     }
+
 
     std::vector<path_element> bucket_cuckoo_a_star_insert_fast(cuckoo_tables::Table table, hash_locations (*location_func) (cuckoo_tables::Key, unsigned int), cuckoo_tables::Key key, std::vector<unsigned int> open_buckets){
         std::vector<path_element> path = a_star_search_fast(table, location_func, key, open_buckets);

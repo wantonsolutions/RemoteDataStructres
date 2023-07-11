@@ -140,7 +140,7 @@ void run_single_insert() {
 
 void time_and_check_search_algorithms() {
 
-    unsigned int indexes = 1024 * 512;
+    unsigned int indexes = 1024 * 1024;
     unsigned int buckets = 8;
     unsigned int memory = indexes * sizeof(Entry);
     int total_inserts = indexes+1;
@@ -196,6 +196,14 @@ void time_and_check_search_algorithms() {
 
     printf("\n");
     cout << "final table" << endl;
+    if (!(table_0.get_fill_percentage() == table_1.get_fill_percentage())){
+        cout << "Tables are not equal" << endl;
+        table_0.print_table();
+        table_1.print_table();
+        exit(1);
+    } else {
+        cout << "Test Passed" << endl;
+    }
     // if (!(table_0 == table_1)){
     //     cout << "Tables are not equal" << endl;
     //     table_0.print_table();
@@ -230,7 +238,7 @@ void time_and_check_search_algorithms() {
 
 int main() {
     // run_basic_table_tests();
-    run_single_insert();
-    // time_and_check_search_algorithms();
+    // run_single_insert();
+    time_and_check_search_algorithms();
     // cout << "Hello Search Test!" << endl;
 }
