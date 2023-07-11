@@ -18,7 +18,8 @@ LIBRARIES := -L$(XXHASH_INC) -lxxhash $(RDMA_LIBS) -lmemcached
 # TARGET := test/test_hash test_tables test_search test_state_machines test_virtual_rdma  test_cuckoo
 test_dir := ./test
 TARGET := $(test_dir)/test_hash \
-	$(test_dir)/test_tables $(test_dir)/test_search \
+	$(test_dir)/test_tables \
+	$(test_dir)/test_search \
 	$(test_dir)/test_state_machines \
 	$(test_dir)/test_virtual_rdma \
 	$(test_dir)/test_cuckoo rdma_memory_server \
@@ -96,7 +97,7 @@ $(test_dir)/test_tables : $(test_dir)/test_tables.cpp tables.o
 	g++ $(CFLAGS)  $(test_dir)/test_tables.cpp -o test_tables tables.o
 	mv test_tables $(test_dir)/test_tables
 
-$(test_dir)/test_search : $(test_dir)/test_search.cpp search.o
+$(test_dir)/test_search : $(test_dir)/test_search.cpp search.cpp search.o
 	g++ $(CFLAGS)  $(test_dir)/test_search.cpp -o test_search search.o tables.o hash.o $(LIBRARIES)
 	mv test_search $(test_dir)/test_search
 

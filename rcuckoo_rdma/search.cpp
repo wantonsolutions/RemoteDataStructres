@@ -153,11 +153,11 @@ namespace cuckoo_search {
         return aspe;
     }
 
-    fast_a_star_pe fast_pop_list(vector<fast_a_star_pe> &list, unordered_map<Key, fast_a_star_pe> &list_map){
+    fast_a_star_pe fast_pop_list(vector<fast_a_star_pe> &list, unordered_map<Key*, fast_a_star_pe> &list_map){
         pop_heap(list.begin(), list.end());
         fast_a_star_pe aspe = list.back();
         list.pop_back();
-        size_t val = list_map.erase(*(aspe.pe.key));
+        size_t val = list_map.erase(aspe.pe.key);
         assert (val == 1);
         return aspe;
     }
@@ -172,7 +172,7 @@ namespace cuckoo_search {
         return aspe;
     }
 
-    fast_a_star_pe fast_pop_key_from_list(vector<fast_a_star_pe> &list, unordered_map<Key, fast_a_star_pe> &list_map, Key key){
+    fast_a_star_pe fast_pop_key_from_list(vector<fast_a_star_pe> &list, unordered_map<Key *, fast_a_star_pe> &list_map, Key * key){
         fast_a_star_pe aspe = list_map[key];
         size_t val = list_map.erase(key);
         assert (val == 1);
@@ -188,18 +188,17 @@ namespace cuckoo_search {
         list_map[aspe.pe.key] = aspe;
     }
 
-    void fast_push_list(vector<fast_a_star_pe> &list, unordered_map<Key, fast_a_star_pe> &list_map, fast_a_star_pe aspe) {
+    void fast_push_list(vector<fast_a_star_pe> &list, unordered_map<Key*, fast_a_star_pe> &list_map, fast_a_star_pe aspe) {
         list.push_back(aspe);
         push_heap(list.begin(), list.end());
-        Key key = *(aspe.pe.key);
-        list_map[key] = aspe;
+        list_map[aspe.pe.key] = aspe;
     }
 
     bool list_contains(unordered_map<Key, a_star_pe> &list_map, Key key){
         return list_map.find(key) != list_map.end();
     }
 
-    bool fast_list_contains(unordered_map<Key, fast_a_star_pe> &list_map, Key key){
+    bool fast_list_contains(unordered_map<Key*, fast_a_star_pe> &list_map, Key *key){
         return list_map.find(key) != list_map.end();
     }
 
@@ -383,9 +382,9 @@ namespace cuckoo_search {
             search_element = fast_a_star_pe(starting_pe, NULL, 0, 0);
 
             vector<fast_a_star_pe> open_list;
-            unordered_map<Key, fast_a_star_pe> open_list_map;
+            unordered_map<Key *, fast_a_star_pe> open_list_map;
             vector<fast_a_star_pe> closed_list;
-            unordered_map<Key, fast_a_star_pe> closed_list_map;
+            unordered_map<Key *, fast_a_star_pe> closed_list_map;
             prior_aspe = NULL;
             unsigned int closed_list_addressable_index = 0;
             fast_push_list(open_list, open_list_map, search_element);
@@ -458,13 +457,13 @@ namespace cuckoo_search {
                 }
 
                 for (auto child : child_list){
-                    if (fast_list_contains(closed_list_map, *(child.pe.key))){
+                    if (fast_list_contains(closed_list_map,child.pe.key)){
                         continue;
                     }
-                    if (fast_list_contains(open_list_map, *(child.pe.key))){
+                    if (fast_list_contains(open_list_map, child.pe.key)){
                         //remote the item from the open list and then reinsert it
                         //todo optimize by not poping from the list if we don't need to
-                        fast_a_star_pe existing_aspe = fast_pop_key_from_list(open_list, open_list_map, *(child.pe.key));
+                        fast_a_star_pe existing_aspe = fast_pop_key_from_list(open_list, open_list_map, child.pe.key);
                         if (child.distance < existing_aspe.distance){
                             existing_aspe.distance = child.distance;
                             existing_aspe.prior = child.prior;

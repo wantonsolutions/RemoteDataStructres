@@ -122,7 +122,7 @@ void run_single_insert() {
     int inserted=0;
     for (i=0; i< total_inserts;i++){
         fill_key(key, i);
-        vector<path_element> path = bucket_cuckoo_a_star_insert(table, rcuckoo_hash_locations, key, open_buckets);
+        vector<path_element> path = bucket_cuckoo_a_star_insert_fast(table, rcuckoo_hash_locations, key, open_buckets);
         if (path.size() == 0){
             continue;
         }
@@ -140,7 +140,7 @@ void run_single_insert() {
 
 void time_and_check_search_algorithms() {
 
-    unsigned int indexes = 1024 * 128;
+    unsigned int indexes = 1024 * 512;
     unsigned int buckets = 8;
     unsigned int memory = indexes * sizeof(Entry);
     int total_inserts = indexes+1;
@@ -158,7 +158,7 @@ void time_and_check_search_algorithms() {
     //The first stable insert
     Table table_0 = Table(memory, buckets, 1);
     auto t1 = high_resolution_clock::now();
-    for (i=0; i< total_inserts;i++){
+    for (i=1; i< total_inserts;i++){
         fill_key(key, i);
         vector<path_element> path = bucket_cuckoo_a_star_insert(table_0, rcuckoo_hash_locations, key, open_buckets);
         if (path.size() == 0){
@@ -173,11 +173,13 @@ void time_and_check_search_algorithms() {
     auto t2 = high_resolution_clock::now();
     auto duration_0 = duration_cast<milliseconds>( t2 - t1 ).count();
 
+
+    printf("---------------------------------\n");
     //The second table
     inserted=0;
     Table table_1 = Table(memory, buckets, 1);
     auto t3 = high_resolution_clock::now();
-    for (i=0; i< total_inserts;i++){
+    for (i=1; i< total_inserts;i++){
         fill_key(key, i);
         vector<path_element> path = bucket_cuckoo_a_star_insert_fast(table_1, rcuckoo_hash_locations, key, open_buckets);
         if (path.size() == 0){
@@ -228,7 +230,7 @@ void time_and_check_search_algorithms() {
 
 int main() {
     // run_basic_table_tests();
-    // run_single_insert();
-    time_and_check_search_algorithms();
+    run_single_insert();
+    // time_and_check_search_algorithms();
     // cout << "Hello Search Test!" << endl;
 }
