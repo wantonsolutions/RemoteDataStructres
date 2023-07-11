@@ -490,7 +490,7 @@ namespace cuckoo_virtual_rdma {
 
     }
 
-    vector<VRMessage> read_threshold_message(hash_locations (*location_function)(string, unsigned int), Key key, unsigned int read_threshold_bytes,unsigned int table_size,unsigned int row_size_bytes) {
+    vector<VRMessage> read_threshold_message(hash_locations (*location_function)(Key, unsigned int), Key key, unsigned int read_threshold_bytes,unsigned int table_size,unsigned int row_size_bytes) {
         hash_locations buckets = location_function(key.to_string(), table_size);
         VERBOSE("read_threshold_message", "buckets are %s", buckets.to_string().c_str());
         vector<VRMessage> messages;

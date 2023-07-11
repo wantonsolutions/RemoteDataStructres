@@ -4,8 +4,8 @@ measuretime=30
 sudo killall test_cuckoo
 
 # page_script="LD_PRELOAD=libhugetlbfs.so HUGETLB_MORECORE=yes"
-# LD_PRELOAD=libhugetlbfs.so HUGETLB_MORECORE=yes ./test/test_cuckoo &
-LD_PRELOAD=libhugetlbfs.so HUGETLB_MORECORE=yes ./test/test_search &
+LD_PRELOAD=libhugetlbfs.so HUGETLB_MORECORE=yes ./test/test_cuckoo &
+# LD_PRELOAD=libhugetlbfs.so HUGETLB_MORECORE=yes ./test/test_search &
 cuckoopid=$!
 
 

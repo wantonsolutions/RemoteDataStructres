@@ -82,7 +82,8 @@ namespace cuckoo_rcuckoo {
             int _locking_message_index;
 
 
-            hash_locations  (*_location_function)(string, unsigned int);
+            // hash_locations  (*_location_function)(string, unsigned int);
+            hash_locations  (*_location_function)(Key, unsigned int);
 
             vector<path_element> (RCuckoo::*_table_search_function)(vector<unsigned int> searchable_buckets);
             vector<path_element> a_star_insert_self(vector<unsigned int> searchable_buckets);

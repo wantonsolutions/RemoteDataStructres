@@ -143,7 +143,7 @@ namespace cuckoo_rcuckoo {
     }
 
     vector<path_element> RCuckoo::a_star_insert_self(vector<unsigned int> searchable_buckets) {
-        return bucket_cuckoo_a_star_insert(_table, _location_function, _current_insert_key, searchable_buckets);
+        return bucket_cuckoo_a_star_insert_fast(_table, _location_function, _current_insert_key, searchable_buckets);
     }
 
     vector<path_element> RCuckoo::random_insert_self(vector<unsigned int> searchable_buckets) {

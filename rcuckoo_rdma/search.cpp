@@ -520,4 +520,10 @@ namespace cuckoo_search {
         return path;
     }
 
+    std::vector<path_element> bucket_cuckoo_random_insert(cuckoo_tables::Table & table, hash_locations (*location_func) (cuckoo_tables::Key, unsigned int), cuckoo_tables::Key key, std::vector<unsigned int> open_buckets){
+        cout << "bucket_cuckoo_random_insert not implemented" << endl;
+        std::vector<path_element> path;
+        return path;
+    }
+
 }

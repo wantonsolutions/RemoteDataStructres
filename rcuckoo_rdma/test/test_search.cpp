@@ -217,6 +217,8 @@ void time_and_check_search_algorithms() {
     cout << "fast fill: " << duration_1 << endl;
     cout << "speedup " << float(duration_0)/float(duration_1) << "x" << endl;
 
+    cout << "fast fill searches per second " << float(inserted)/(float(duration_1 / 1000.0)) << endl;
+
 
     
     
