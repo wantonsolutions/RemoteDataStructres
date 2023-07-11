@@ -26,6 +26,43 @@ namespace cuckoo_search {
         }
     } path_element;
 
+    typedef struct fast_path_element {
+        cuckoo_tables::Key *key;
+        uint8_t table_index;
+        unsigned int bucket_index;
+        uint8_t offset;
+        fast_path_element() {};
+        fast_path_element(cuckoo_tables::Key * _key, uint8_t _table_index, unsigned int _bucket_index, unsigned int _offset) {
+            key = _key;
+            table_index = _table_index;
+            offset = _offset;
+            bucket_index = _bucket_index;
+        };
+        std::string to_string(){
+            return "key: " + key->to_string() + " table_index: " + std::to_string(table_index) + " bucket_index: " + std::to_string(bucket_index) + " offset: " + std::to_string(offset);
+        }
+    } fast_path_element;
+
+    typedef struct fast_a_star_pe {
+        fast_path_element pe;
+        fast_a_star_pe *prior;
+        unsigned int distance;
+        unsigned int fscore;
+        std::string to_string();
+        bool operator<( const fast_a_star_pe & aspe ) const {
+            return fscore < aspe.fscore;
+        }
+        bool operator==( const fast_a_star_pe & aspe ) const {
+            return *(pe.key) == *(aspe.pe.key);
+        }
+        fast_a_star_pe() {};
+        fast_a_star_pe(fast_path_element _pe, fast_a_star_pe * _prior, unsigned int _distance, unsigned int _fscore) {
+            pe = _pe;
+            prior = _prior;
+            distance = _distance;
+            fscore = _fscore;}
+    } fast_a_star_pe;
+
     typedef struct a_star_pe {
         path_element pe;
         a_star_pe *prior;

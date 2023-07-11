@@ -153,6 +153,15 @@ namespace cuckoo_search {
         return aspe;
     }
 
+    fast_a_star_pe fast_pop_list(vector<fast_a_star_pe> &list, unordered_map<Key, fast_a_star_pe> &list_map){
+        pop_heap(list.begin(), list.end());
+        fast_a_star_pe aspe = list.back();
+        list.pop_back();
+        size_t val = list_map.erase(*(aspe.pe.key));
+        assert (val == 1);
+        return aspe;
+    }
+
     a_star_pe pop_key_from_list(vector<a_star_pe> &list, unordered_map<Key, a_star_pe> &list_map, Key key){
         a_star_pe aspe = list_map[key];
         size_t val = list_map.erase(key);
@@ -163,16 +172,39 @@ namespace cuckoo_search {
         return aspe;
     }
 
+    fast_a_star_pe fast_pop_key_from_list(vector<fast_a_star_pe> &list, unordered_map<Key, fast_a_star_pe> &list_map, Key key){
+        fast_a_star_pe aspe = list_map[key];
+        size_t val = list_map.erase(key);
+        assert (val == 1);
+        vector<fast_a_star_pe>::iterator it = find(list.begin(), list.end(), aspe);
+        assert(it != list.end());
+        list.erase(it);
+        return aspe;
+    }
+
     void push_list(vector<a_star_pe> &list, unordered_map<Key, a_star_pe> &list_map, a_star_pe aspe) {
         list.push_back(aspe);
         push_heap(list.begin(), list.end());
         list_map[aspe.pe.key] = aspe;
     }
+
+    void fast_push_list(vector<fast_a_star_pe> &list, unordered_map<Key, fast_a_star_pe> &list_map, fast_a_star_pe aspe) {
+        list.push_back(aspe);
+        push_heap(list.begin(), list.end());
+        Key key = *(aspe.pe.key);
+        list_map[key] = aspe;
+    }
+
     bool list_contains(unordered_map<Key, a_star_pe> &list_map, Key key){
         return list_map.find(key) != list_map.end();
     }
+
+    bool fast_list_contains(unordered_map<Key, fast_a_star_pe> &list_map, Key key){
+        return list_map.find(key) != list_map.end();
+    }
+
     unsigned int next_table_index(unsigned int table_index){
-        return table_index + 1 % 2;
+        return (table_index + 1) % 2;
     }
 
     unsigned int heuristic(unsigned int current_index, unsigned int target_index, unsigned int table_size) {
@@ -190,6 +222,12 @@ namespace cuckoo_search {
     }
 
     unsigned int fscore(a_star_pe pe, unsigned int target_index, unsigned int table_size){
+        unsigned int g = pe.distance;
+        unsigned int h = heuristic(pe.pe.bucket_index, target_index, table_size);
+        return g + h;
+    }
+
+    unsigned int fast_fscore(fast_a_star_pe pe, unsigned int target_index, unsigned int table_size){
         unsigned int g = pe.distance;
         unsigned int h = heuristic(pe.pe.bucket_index, target_index, table_size);
         return g + h;
@@ -222,11 +260,12 @@ namespace cuckoo_search {
             prior_aspe = NULL;
             unsigned int closed_list_addressable_index = 0;
             push_list(open_list, open_list_map, search_element);
-            VERBOSE("DEBUG a_star search", "starting search element %s",search_element.pe.to_string());
+            VERBOSE("DEBUG a_star search", "starting search element %s",search_element.pe.to_string().c_str());
 
             while (open_list.size() > 0){
                 // cout << "top of search -- open list size: " << open_list.size() << endl;
                 search_element = pop_list(open_list, open_list_map);
+                VERBOSE("DEBUG popped a_star search", "starting search element %s",search_element.pe.to_string().c_str());
                 //I need to store back pointers to the closed list so I can reconstruct the path
                 closed_list_addressable[closed_list_addressable_index] = search_element;
                 closed_list_addressable_index++;
@@ -234,10 +273,15 @@ namespace cuckoo_search {
                 // cout << "set the origin to the beginning of the closed list " << prior_aspe->pe.to_string() << endl;
                 //todo closed list is not actually used, we only need the map remove it for optimizations
                 push_list(closed_list, closed_list_map, search_element);
+                VERBOSE("DEBUG pushed a_star search", "starting search element %s",search_element.pe.to_string().c_str());
 
                 hash_locations locations = location_func(search_element.pe.key.to_string(), table.get_row_count());
+                // cout << "locations for key: " << search_element.pe.key.to_string() << endl;
+                // cout << "L1: " << locations.primary << " L2: " << locations.secondary << endl;
                 unsigned int table_index = next_table_index(search_element.pe.table_index);
+                // cout << "table index" << table_index << endl;
                 unsigned int index = table_index_to_hash_location(locations, table_index);
+                // cout << "index: " <<  index << endl;
 
                 //if the index is not in the open buckets continue
                 //Only check for open buckets if the size of the open buckets is greater than zero
@@ -322,43 +366,55 @@ namespace cuckoo_search {
         const unsigned int target_count = 1;
         vector<unsigned int> targets = find_closest_target_n_bi_directional(table, location_func, key, target_count);
         bool found = false;
-        a_star_pe closed_list_addressable[MAX_SEARCH_ITEMS];
-        a_star_pe * prior_aspe = NULL;
-        a_star_pe search_element;
+        fast_a_star_pe closed_list_addressable[MAX_SEARCH_ITEMS];
+        fast_a_star_pe * prior_aspe = NULL;
+        fast_a_star_pe search_element;
 
         // Debugging print the list of targets
         for (auto target : targets){
             VERBOSE("DEBUG a_star search", "target in search pool: %d\n", target);
         }
 
+        Key local_key = key;
+
         for (auto target : targets){
             VERBOSE("DEBUG a_star search", "searching for target: %d\n", target);
-            path_element starting_pe = path_element(key, -1, -1, -1);
-            search_element = a_star_pe(starting_pe, NULL, 0, 0);
+            fast_path_element starting_pe = fast_path_element(&key, -1, -1, -1);
+            search_element = fast_a_star_pe(starting_pe, NULL, 0, 0);
 
-            vector<a_star_pe> open_list;
-            unordered_map<Key, a_star_pe> open_list_map;
-            vector<a_star_pe> closed_list;
-            unordered_map<Key, a_star_pe> closed_list_map;
+            vector<fast_a_star_pe> open_list;
+            unordered_map<Key, fast_a_star_pe> open_list_map;
+            vector<fast_a_star_pe> closed_list;
+            unordered_map<Key, fast_a_star_pe> closed_list_map;
             prior_aspe = NULL;
             unsigned int closed_list_addressable_index = 0;
-            push_list(open_list, open_list_map, search_element);
-            VERBOSE("DEBUG a_star search", "starting search element %s",search_element.pe.to_string());
+            fast_push_list(open_list, open_list_map, search_element);
+            VERBOSE("DEBUG a_star search", "starting search element %s",search_element.pe.to_string().c_str());
+
 
             while (open_list.size() > 0){
                 // cout << "top of search -- open list size: " << open_list.size() << endl;
-                search_element = pop_list(open_list, open_list_map);
+                // for (auto open_element : open_list){
+                //     cout << "open list element: " << open_element.pe.to_string() << endl;
+                // }
+
+                search_element = fast_pop_list(open_list, open_list_map);
                 //I need to store back pointers to the closed list so I can reconstruct the path
                 closed_list_addressable[closed_list_addressable_index] = search_element;
                 closed_list_addressable_index++;
                 prior_aspe = &closed_list_addressable[closed_list_addressable_index - 1];
                 // cout << "set the origin to the beginning of the closed list " << prior_aspe->pe.to_string() << endl;
                 //todo closed list is not actually used, we only need the map remove it for optimizations
-                push_list(closed_list, closed_list_map, search_element);
+                fast_push_list(closed_list, closed_list_map, search_element);
 
-                hash_locations locations = location_func(search_element.pe.key.to_string(), table.get_row_count());
+                hash_locations locations = location_func(search_element.pe.key->to_string(), table.get_row_count());
+                //print the locations of the key
+                // cout << "locations for key: " << search_element.pe.key->to_string() << endl;
+                // cout << "L1: " << locations.primary << " L2: " << locations.secondary << endl;
                 unsigned int table_index = next_table_index(search_element.pe.table_index);
+                // cout << "table index" << table_index << endl;
                 unsigned int index = table_index_to_hash_location(locations, table_index);
+                // cout << "index: " <<  index << endl;
 
                 //if the index is not in the open buckets continue
                 //Only check for open buckets if the size of the open buckets is greater than zero
@@ -375,10 +431,10 @@ namespace cuckoo_search {
                 //We have found the slot if this is true
                 if (table.bucket_has_empty(index)){
                     unsigned int offset = table.get_first_empty_index(index);
-                    path_element open_pe = path_element(table.get_entry(index,offset).key, table_index, index, offset);
+                    fast_path_element open_pe = fast_path_element(&(table.get_entry_pointer(index,offset)->key), table_index, index, offset);
                     unsigned int distance = search_element.distance + 1;
-                    unsigned int f_score = fscore(search_element, target, table.get_row_count());
-                    a_star_pe open_a_star_pe = a_star_pe(open_pe, prior_aspe, search_element.distance+1, f_score);
+                    unsigned int f_score = fast_fscore(search_element, target, table.get_row_count());
+                    fast_a_star_pe open_a_star_pe = fast_a_star_pe(open_pe, prior_aspe, search_element.distance+1, f_score);
                     // cout << "found target: " << open_a_star_pe.pe.to_string() << endl;
                     // cout << "setting prior to " << prior_aspe->pe.to_string() << endl;
                     // cout << "exiting search" << endl;
@@ -391,32 +447,32 @@ namespace cuckoo_search {
                     break;
                 }
 
-                vector<a_star_pe> child_list;
+                vector<fast_a_star_pe> child_list;
                 for (unsigned int i = 0; i < table.get_buckets_per_row(); i++){
-                    path_element child_pe = path_element(table.get_entry(index, i).key, table_index, index, i);
+                    fast_path_element child_pe = fast_path_element(&(table.get_entry_pointer(index, i))->key, table_index, index, i);
                     unsigned int distance = search_element.distance + 1;
-                    a_star_pe child = a_star_pe(child_pe, prior_aspe, distance, 0);
-                    unsigned int f_score = fscore(child, target, table.get_row_count());
+                    fast_a_star_pe child = fast_a_star_pe(child_pe, prior_aspe, distance, 0);
+                    unsigned int f_score = fast_fscore(child, target, table.get_row_count());
                     child.fscore = f_score;
                     child_list.push_back(child);
                 }
 
                 for (auto child : child_list){
-                    if (list_contains(closed_list_map, child.pe.key)){
+                    if (fast_list_contains(closed_list_map, *(child.pe.key))){
                         continue;
                     }
-                    if (list_contains(open_list_map, child.pe.key)){
+                    if (fast_list_contains(open_list_map, *(child.pe.key))){
                         //remote the item from the open list and then reinsert it
                         //todo optimize by not poping from the list if we don't need to
-                        a_star_pe existing_aspe = pop_key_from_list(open_list, open_list_map, child.pe.key);
+                        fast_a_star_pe existing_aspe = fast_pop_key_from_list(open_list, open_list_map, *(child.pe.key));
                         if (child.distance < existing_aspe.distance){
                             existing_aspe.distance = child.distance;
                             existing_aspe.prior = child.prior;
-                            existing_aspe.fscore = fscore(existing_aspe, target, table.get_row_count());
+                            existing_aspe.fscore = fast_fscore(existing_aspe, target, table.get_row_count());
                         }
-                        push_list(open_list, open_list_map, existing_aspe);
+                        fast_push_list(open_list, open_list_map, existing_aspe);
                     } else {
-                        push_list(open_list, open_list_map, child);
+                        fast_push_list(open_list, open_list_map, child);
                     }
                 }
             }
@@ -426,10 +482,13 @@ namespace cuckoo_search {
         }
 
         if (found) {
-            a_star_pe * back_tracker = &search_element;
+            fast_a_star_pe * back_tracker = &search_element;
             while (back_tracker != NULL){
-                // cout << "pushing key to path: " << back_tracker->pe.to_string() << endl;
-                path_element pe = back_tracker->pe;
+                path_element pe;
+                pe.key = *(back_tracker->pe.key);
+                pe.table_index = back_tracker->pe.table_index;
+                pe.bucket_index = back_tracker->pe.bucket_index;
+                pe.offset = back_tracker->pe.offset;
                 path.push_back(pe);
                 back_tracker = back_tracker->prior;
             }
