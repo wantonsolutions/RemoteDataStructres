@@ -11,7 +11,15 @@ test/test_hash
 test/test_tables
 test/test_search
 test/test_state_machines
+test/test_cuckoo
 
 rdma_client
 rdma_server
+rdma_memory_server
+
+flamechart
+perf.data
+perf.data.old
+out.perf-folded
+
 
