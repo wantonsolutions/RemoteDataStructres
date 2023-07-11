@@ -4,6 +4,7 @@
 #include <iostream>
 #include <vector>
 #include <cassert>
+#include <chrono>
 
 using namespace std;
 using namespace cuckoo_search;
@@ -122,9 +123,7 @@ void run_single_insert() {
     for (i=0; i< total_inserts;i++){
         fill_key(key, i);
         vector<path_element> path = bucket_cuckoo_a_star_insert(table, rcuckoo_hash_locations, key, open_buckets);
-        // print_path(path);
         if (path.size() == 0){
-            // cout << "failed to insert key: " << key.to_string() << endl;
             continue;
         }
         if (float(inserted)/float(total_inserts) > 0.9){
@@ -137,6 +136,82 @@ void run_single_insert() {
     // cout << "final table" << endl;
     table.print_table();
     cout << " fill " << i << "/" << total_inserts << " " << i/total_inserts << "\%" << "final fill: " << table.get_fill_percentage() << endl;
+}
+
+void time_and_check_search_algorithms() {
+
+    unsigned int indexes = 1024 * 128;
+    unsigned int buckets = 8;
+    unsigned int memory = indexes * sizeof(Entry);
+    int total_inserts = indexes+1;
+    Key key;
+    vector<unsigned int> open_buckets; //empty open buckets
+    int i;
+    int inserted=0;
+
+    using std::chrono::high_resolution_clock;
+    using std::chrono::duration_cast;
+    using std::chrono::duration;
+    using std::chrono::milliseconds;
+
+
+    //The first stable insert
+    Table table_0 = Table(memory, buckets, 1);
+    auto t1 = high_resolution_clock::now();
+    for (i=0; i< total_inserts;i++){
+        fill_key(key, i);
+        vector<path_element> path = bucket_cuckoo_a_star_insert(table_0, rcuckoo_hash_locations, key, open_buckets);
+        if (path.size() == 0){
+            continue;
+        }
+        if (float(inserted)/float(total_inserts) > 0.9){
+            break;
+        }
+        inserted++;
+        insert_cuckoo_path(table_0, path);
+    }
+    auto t2 = high_resolution_clock::now();
+    auto duration_0 = duration_cast<milliseconds>( t2 - t1 ).count();
+
+    //The second table
+    inserted=0;
+    Table table_1 = Table(memory, buckets, 1);
+    auto t3 = high_resolution_clock::now();
+    for (i=0; i< total_inserts;i++){
+        fill_key(key, i);
+        vector<path_element> path = bucket_cuckoo_a_star_insert_fast(table_1, rcuckoo_hash_locations, key, open_buckets);
+        if (path.size() == 0){
+            continue;
+        }
+        if (float(inserted)/float(total_inserts) > 0.9){
+            break;
+        }
+        inserted++;
+        insert_cuckoo_path(table_1, path);
+    }
+    auto t4 = high_resolution_clock::now();
+    auto duration_1 = duration_cast<milliseconds>( t4 - t3 ).count();
+
+    printf("\n");
+    // cout << "final table" << endl;
+    if (!(table_0 == table_1)){
+        cout << "Tables are not equal" << endl;
+        table_0.print_table();
+        table_1.print_table();
+        exit(1);
+    } else {
+        cout << "Test Passed" << endl;
+    }
+
+    cout << "slow fill: " << duration_0 << endl;
+    cout << "fast fill: " << duration_1 << endl;
+    cout << "speedup " << float(duration_0)/float(duration_1) << "x" << endl;
+
+
+    
+    
+
+
 }
 
 
@@ -153,6 +228,7 @@ void run_single_insert() {
 
 int main() {
     // run_basic_table_tests();
-    run_single_insert();
+    // run_single_insert();
+    time_and_check_search_algorithms();
     // cout << "Hello Search Test!" << endl;
 }

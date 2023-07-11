@@ -221,6 +221,24 @@ namespace cuckoo_tables {
     }
 
 
+    bool Table::operator==(const Table& rhs) const {
+        if (get_table_size_bytes() != rhs.get_table_size_bytes()){
+            return false;
+        }
+        if (this->get_buckets_per_row() != rhs.get_buckets_per_row()){
+            return false;
+        }
+        for (int i=0;i<this->get_row_count();i++) {
+            for (int j=0;j<this->get_buckets_per_row();j++) {
+                if (this->get_entry(i,j) != rhs.get_entry(i,j)){
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+
     void * Table::get_lock_pointer(unsigned int lock_index) {
         return _lock_table.get_lock_pointer(lock_index);
     }
@@ -283,15 +301,15 @@ namespace cuckoo_tables {
         _lock_table.fill_masked_cas(lock_index, success, value, mask);
     }
 
-    unsigned int Table::get_table_size_bytes(){
+    unsigned int Table::get_table_size_bytes() const {
         return _memory_size;
     }
 
-    unsigned int Table::get_row_count(){
+    unsigned int Table::get_row_count() const{
         return _table_size;
     }
 
-    unsigned int Table::get_buckets_per_row(){
+    unsigned int Table::get_buckets_per_row() const{
         return _bucket_size;
     }
 
@@ -311,7 +329,7 @@ namespace cuckoo_tables {
         return sizeof(Entry);
     }
 
-    Entry Table::get_entry(unsigned int bucket_index, unsigned int offset){
+    Entry Table::get_entry(unsigned int bucket_index, unsigned int offset) const{
         return _table[bucket_index][offset];
     }
 

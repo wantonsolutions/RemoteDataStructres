@@ -122,6 +122,14 @@ namespace cuckoo_tables {
             this->key = key;
             this->value = value;
         }
+
+        bool operator==(const Entry& rhs) const {
+            return this->key == rhs.key && this->value == rhs.value;
+        }
+        bool operator!=(const Entry& rhs) const {
+            return !(*this == rhs);
+        }
+
         uint64_t get_as_uint64_t() {
             assert(sizeof(Entry) == 8);
             uint64_t entry64 = 0;
@@ -193,6 +201,9 @@ namespace cuckoo_tables {
         public:
             Table();
             Table(unsigned int memory_size, unsigned int bucket_size, unsigned int buckets_per_lock);
+
+
+            bool operator==(const Table &rhs) const;
             // ~Table();
             void unlock_all();
             string to_string();
@@ -201,14 +212,14 @@ namespace cuckoo_tables {
             void set_underlying_table(Entry ** table);
             CasOperationReturn lock_table_masked_cas(unsigned int lock_index, uint64_t old, uint64_t new_value, uint64_t mask);
             void fill_lock_table_masked_cas(unsigned int lock_index, bool success, uint64_t value, uint64_t mask);
-            unsigned int get_table_size_bytes();
-            unsigned int get_buckets_per_row();
-            unsigned int get_row_count();
+            unsigned int get_table_size_bytes() const;
+            unsigned int get_buckets_per_row() const;
+            unsigned int get_row_count() const;
             unsigned int get_bucket_size();
             unsigned int row_size_bytes();
             unsigned int get_entry_size_bytes();
             unsigned int n_buckets_size(unsigned int n_buckets);
-            Entry get_entry(unsigned int bucket_index, unsigned int offset);
+            Entry get_entry(unsigned int bucket_index, unsigned int offset) const;
             void set_entry(unsigned int bucket_index, unsigned int offset, Entry entry);
             Entry * get_entry_pointer(unsigned int bucket_index, unsigned int offset);
             bool bucket_has_empty(unsigned int bucket_index);
