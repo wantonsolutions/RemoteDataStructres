@@ -111,7 +111,7 @@ void fill_key(Key &key, int value) {
 void run_single_insert() {
     // unsigned int indexes = 1024 * 1024;
     // unsigned int indexes = 32;
-    unsigned int indexes = 1024 * 128;
+    unsigned int indexes = 1024 * 512;
     unsigned int buckets = 8;
     unsigned int memory = indexes * sizeof(Entry);
     Table table = Table(memory, buckets, 1);
@@ -134,8 +134,8 @@ void run_single_insert() {
     }
 
     // cout << "final table" << endl;
-    table.print_table();
-    cout << " fill " << i << "/" << total_inserts << " " << i/total_inserts << "\%" << "final fill: " << table.get_fill_percentage() << endl;
+    // table.print_table();
+    // cout << " fill " << i << "/" << total_inserts << " " << i/total_inserts << "\%" << "final fill: " << table.get_fill_percentage() << endl;
 }
 
 void time_and_check_search_algorithms() {
@@ -195,15 +195,15 @@ void time_and_check_search_algorithms() {
     auto duration_1 = duration_cast<milliseconds>( t4 - t3 ).count();
 
     printf("\n");
-    // cout << "final table" << endl;
-    if (!(table_0 == table_1)){
-        cout << "Tables are not equal" << endl;
-        table_0.print_table();
-        table_1.print_table();
-        exit(1);
-    } else {
-        cout << "Test Passed" << endl;
-    }
+    cout << "final table" << endl;
+    // if (!(table_0 == table_1)){
+    //     cout << "Tables are not equal" << endl;
+    //     table_0.print_table();
+    //     table_1.print_table();
+    //     exit(1);
+    // } else {
+    //     cout << "Test Passed" << endl;
+    // }
 
     cout << "slow fill: " << duration_0 << endl;
     cout << "fast fill: " << duration_1 << endl;

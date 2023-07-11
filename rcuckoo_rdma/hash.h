@@ -2,6 +2,7 @@
 #define HASH_H
 
 #include "xxhash.h"
+#include "tables.h"
 #include <string>
 
 using namespace std;
@@ -45,12 +46,23 @@ XXH64_hash_t h1(string key);
 XXH64_hash_t h2(string key);
 XXH64_hash_t h3(string key);
 
+XXH64_hash_t h1(Key key);
+XXH64_hash_t h2(Key key);
+XXH64_hash_t h3(Key key);
+
 unsigned int rcuckoo_primary_location(string key, unsigned int table_size);
 unsigned int h3_suffix_base_two(string key);
 unsigned int rcuckoo_secondary_location(string key, float factor, unsigned int table_size);
 unsigned int rcuckoo_secondary_location_independent(string key, unsigned int table_size);
 hash_locations rcuckoo_hash_locations(string key, unsigned int table_size);
 hash_locations rcuckoo_hash_locations_independent(string key, unsigned int table_size);
+
+unsigned int rcuckoo_primary_location(Key key, unsigned int table_size);
+unsigned int h3_suffix_base_two(Key key);
+unsigned int rcuckoo_secondary_location(Key key, float factor, unsigned int table_size);
+unsigned int rcuckoo_secondary_location_independent(Key key, unsigned int table_size);
+hash_locations rcuckoo_hash_locations(Key key, unsigned int table_size);
+hash_locations rcuckoo_hash_locations_independent(Key key, unsigned int table_size);
 
 typedef struct race_bucket{
     unsigned int bucket;

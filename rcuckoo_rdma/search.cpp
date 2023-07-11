@@ -105,14 +105,10 @@ namespace cuckoo_search {
         return max - min;
     }
 
-    //A* search requires targets to search for. This function fines them.
-    //It starts by finding the location we are inserting into, and then steps in both directions though the table looking for openings
-    //It returns a vector of open slots
-    vector<unsigned int> find_closest_target_n_bi_directional(Table table, hash_locations (*location_func) (string, unsigned int), Key key, unsigned int n){
-        vector<unsigned int> targets;
-        hash_locations locations = location_func(key.to_string(), table.get_row_count());
+    vector<unsigned int> search_closest_bi_n_locations_from_location(Table table, hash_locations locations, unsigned int n){
         unsigned int index_0 = locations.primary;
         unsigned int index_1 = (locations.primary -1);
+        vector <unsigned int> targets;
 
         unsigned int counter = 0;
         while (targets.size() < n){
@@ -141,7 +137,22 @@ namespace cuckoo_search {
             counter++;
         }
         return targets;
+
     }
+
+    //A* search requires targets to search for. This function fines them.
+    //It starts by finding the location we are inserting into, and then steps in both directions though the table looking for openings
+    //It returns a vector of open slots
+    vector<unsigned int> find_closest_target_n_bi_directional(Table table, hash_locations (*location_func) (string, unsigned int), Key key, unsigned int n){
+        hash_locations locations = location_func(key.to_string(), table.get_row_count());
+        return search_closest_bi_n_locations_from_location(table, locations, n);
+    }
+
+    vector<unsigned int> find_closest_target_n_bi_directional(Table table, hash_locations (*location_func) (Key, unsigned int), Key key, unsigned int n){
+        hash_locations locations = location_func(key, table.get_row_count());
+        return search_closest_bi_n_locations_from_location(table, locations, n);
+    }
+
 
     // list must be a heap
     a_star_pe pop_list(vector<a_star_pe> &list, unordered_map<Key, a_star_pe> &list_map){
@@ -200,6 +211,16 @@ namespace cuckoo_search {
 
     bool fast_list_contains(unordered_map<Key*, fast_a_star_pe> &list_map, Key *key){
         return list_map.find(key) != list_map.end();
+    }
+
+    inline bool fast_list_contains_vector(vector<fast_a_star_pe> &list, Key *key){
+        // printf("fast_list_contains_vector size: %d\n" + list.size());
+        for (auto &aspe : list){
+            if (aspe.pe.key == key){
+                return true;
+            }
+        }
+        return false;
     }
 
     unsigned int next_table_index(unsigned int table_index){
@@ -360,7 +381,7 @@ namespace cuckoo_search {
     }
 
 
-    vector<path_element> a_star_search_fast(Table table, hash_locations (*location_func) (string, unsigned int), Key key, std::vector<unsigned int> open_buckets){
+    vector<path_element> a_star_search_fast(Table table, hash_locations (*location_func) (Key, unsigned int), Key key, std::vector<unsigned int> open_buckets){
         vector<path_element> path;
         const unsigned int target_count = 1;
         vector<unsigned int> targets = find_closest_target_n_bi_directional(table, location_func, key, target_count);
@@ -406,7 +427,7 @@ namespace cuckoo_search {
                 //todo closed list is not actually used, we only need the map remove it for optimizations
                 fast_push_list(closed_list, closed_list_map, search_element);
 
-                hash_locations locations = location_func(search_element.pe.key->to_string(), table.get_row_count());
+                hash_locations locations = location_func(*(search_element.pe.key), table.get_row_count());
                 //print the locations of the key
                 // cout << "locations for key: " << search_element.pe.key->to_string() << endl;
                 // cout << "L1: " << locations.primary << " L2: " << locations.secondary << endl;
@@ -457,10 +478,12 @@ namespace cuckoo_search {
                 }
 
                 for (auto child : child_list){
-                    if (fast_list_contains(closed_list_map,child.pe.key)){
+                    // if (fast_list_contains(closed_list_map,child.pe.key)){
+                    if (fast_list_contains_vector(closed_list,child.pe.key)){
                         continue;
                     }
-                    if (fast_list_contains(open_list_map, child.pe.key)){
+                    // if (fast_list_contains(open_list_map, child.pe.key)){
+                    if (fast_list_contains_vector(open_list, child.pe.key)){
                         //remote the item from the open list and then reinsert it
                         //todo optimize by not poping from the list if we don't need to
                         fast_a_star_pe existing_aspe = fast_pop_key_from_list(open_list, open_list_map, child.pe.key);
@@ -495,7 +518,7 @@ namespace cuckoo_search {
         return path;
     }
 
-    std::vector<path_element> bucket_cuckoo_a_star_insert_fast(cuckoo_tables::Table table, hash_locations (*location_func) (std::string, unsigned int), cuckoo_tables::Key key, std::vector<unsigned int> open_buckets){
+    std::vector<path_element> bucket_cuckoo_a_star_insert_fast(cuckoo_tables::Table table, hash_locations (*location_func) (cuckoo_tables::Key, unsigned int), cuckoo_tables::Key key, std::vector<unsigned int> open_buckets){
         std::vector<path_element> path = a_star_search_fast(table, location_func, key, open_buckets);
         return path;
     }
