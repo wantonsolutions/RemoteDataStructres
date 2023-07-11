@@ -109,28 +109,34 @@ void fill_key(Key &key, int value) {
 
 void run_single_insert() {
     // unsigned int indexes = 1024 * 1024;
-    unsigned int indexes = 32;
+    // unsigned int indexes = 32;
+    unsigned int indexes = 1024 * 128;
     unsigned int buckets = 8;
     unsigned int memory = indexes * sizeof(Entry);
     Table table = Table(memory, buckets, 1);
     Key key;
     int total_inserts = indexes+1;
     vector<unsigned int> open_buckets; //empty open buckets
-    for (int i=0; i< total_inserts;i++){
+    int i;
+    int inserted=0;
+    for (i=0; i< total_inserts;i++){
         fill_key(key, i);
         vector<path_element> path = bucket_cuckoo_a_star_insert(table, rcuckoo_hash_locations, key, open_buckets);
         // print_path(path);
         if (path.size() == 0){
-            cout << "failed to insert key: " << key.to_string() << endl;
+            // cout << "failed to insert key: " << key.to_string() << endl;
+            continue;
+        }
+        if (float(inserted)/float(total_inserts) > 0.9){
             break;
         }
+        inserted++;
         insert_cuckoo_path(table, path);
-        // table.print_table();
     }
 
     // cout << "final table" << endl;
     table.print_table();
-    cout << "final fill: " << table.get_fill_percentage() << endl;
+    cout << " fill " << i << "/" << total_inserts << " " << i/total_inserts << "\%" << "final fill: " << table.get_fill_percentage() << endl;
 }
 
 
@@ -148,5 +154,5 @@ void run_single_insert() {
 int main() {
     // run_basic_table_tests();
     run_single_insert();
-    cout << "Hello Search Test!" << endl;
+    // cout << "Hello Search Test!" << endl;
 }
