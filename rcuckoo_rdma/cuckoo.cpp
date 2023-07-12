@@ -12,6 +12,7 @@
 #include "search.h"
 #include "hash.h"
 #include "log.h"
+#include "rdma_helper.h"
 #include <cassert>
 
 #define DEBUG
@@ -446,6 +447,21 @@ namespace cuckoo_rcuckoo {
     }
 
     /******* DIRECT RDMA CALLS ********/
+
+    void RCuckoo::init_rdma_structures(rcuckoo_rdma_info info){ 
+
+        assert(info.qp != NULL);
+        assert(info.table_mr != NULL);
+        assert(info.lock_table_mr != NULL);
+        assert(info.completion_queue != NULL);
+
+        _qp = info.qp;
+        _table_mr = info.table_mr;
+        _lock_table_mr = info.lock_table_mr;
+        _completion_queue = info.completion_queue;
+
+    }
+
     vector<VRMessage> RCuckoo::rdma_fsm(VRMessage message) {
 
         if (message.get_message_type() != NO_OP_MESSAGE) {

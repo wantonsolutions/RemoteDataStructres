@@ -117,7 +117,15 @@ namespace cuckoo_rdma_engine {
                     printf("completion queue is null\n");
                 }
 
+
                 assert(_state_machines[i]._completion_queue != NULL);
+
+                struct rcuckoo_rdma_info info;
+                info.qp= _state_machines[i]._qp;
+                info.table_mr = _state_machines[i]._table_mr;
+                info.lock_table_mr = _state_machines[i]._lock_table_mr;
+                info.completion_queue = _state_machines[i]._completion_queue;
+                _state_machines[i]._rcuckoo->init_rdma_structures(info);
             }
 
         } catch (exception& e) {
@@ -304,7 +312,8 @@ namespace cuckoo_rdma_engine {
                 // printf("nothing to supply to the state machine, sending in blank message\n");
             }
 
-            messages = _state_machine->fsm(current_ingress_message);
+            // messages = _state_machine->fsm(current_ingress_message);
+            messages = _rcuckoo->rdma_fsm(current_ingress_message);
 
             if (messages.size() == 0 && _state_machine->is_complete()) {
                 ALERT(log_id(), "State Machine is complete\n");

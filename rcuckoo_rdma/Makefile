@@ -67,7 +67,7 @@ state_machines.o: state_machines.cpp state_machines.h tables.o hash.o search.o v
 	g++ -c $(CFLAGS) $(INCLUDES) -fPIC state_machines.cpp -o state_machines.o virtual_rdma.o util.o
 
 cuckoo.o: cuckoo.cpp cuckoo.h state_machines.o tables.o hash.o search.o virtual_rdma.o rdma_engine.o
-	g++ -c $(CFLAGS) $(INCLUDES) -fPIC cuckoo.cpp -o cuckoo.o state_machines.o tables.o hash.o search.o virtual_rdma.o rdma_engine.o
+	g++ -c $(CFLAGS) $(INCLUDES) -fPIC cuckoo.cpp -o cuckoo.o state_machines.o tables.o hash.o search.o virtual_rdma.o rdma_engine.o $(RDMA_LIBS)
 
 rdma_engine.o: rdma_engine.cpp rdma_engine.h state_machines.o virtual_rdma.o rdma_client_lib.o rdma_common.o memcached.o config.h rdma_helper.o
 	g++ -c $(CFLAGS) $(INCLUDES) -fPIC rdma_engine.cpp -o rdma_engine.o state_machines.o virtual_rdma.o rdma_common.o rdma_client_lib.o memcached.o rdma_helper.o $(RDMA_LIBS)

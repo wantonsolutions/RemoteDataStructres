@@ -6,12 +6,20 @@
 #include "tables.h"
 #include "search.h"
 #include <unordered_map>
+#include <infiniband/verbs.h>
 
 using namespace cuckoo_state_machines;
 using namespace cuckoo_search;
 
 namespace cuckoo_rcuckoo {
 
+
+    typedef struct rcuckoo_rdma_info {
+        ibv_qp *qp;
+        ibv_mr *table_mr;
+        ibv_mr *lock_table_mr;
+        struct ibv_cq * completion_queue;
+    } rcuckoo_rdma_info;
 
     class RCuckoo : public Client_State_Machine {
         public:
@@ -62,6 +70,7 @@ namespace cuckoo_rcuckoo {
 
             /* RDMA specific functions */
             vector<VRMessage> rdma_fsm(VRMessage message);
+            void init_rdma_structures(rcuckoo_rdma_info info);
 
 
         private:
@@ -79,6 +88,12 @@ namespace cuckoo_rcuckoo {
             vector<VRMessage> _current_locking_messages;
             vector<VRMessage> _current_locking_read_messages;
             int _locking_message_index;
+
+            /*rdma specific variables*/
+            ibv_qp * _qp;
+            ibv_mr *_table_mr;
+            ibv_mr *_lock_table_mr;
+            struct ibv_cq * _completion_queue;
 
 
             // hash_locations  (*_location_function)(string, unsigned int);
