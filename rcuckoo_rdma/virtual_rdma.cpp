@@ -534,8 +534,6 @@ namespace cuckoo_virtual_rdma {
         VERBOSE("get_covering_read", "min_bucket: %d, max_bucket: %d\n", min_index, max_index);
 
         hash_locations buckets;
-        // buckets.primary = (base_index + min_index) * buckets_per_lock;
-        // buckets.secondary = ((base_index + max_index)) * buckets_per_lock + (buckets_per_lock - 1);
         buckets.primary = (min_index) * buckets_per_lock;
         buckets.secondary = (max_index) * buckets_per_lock + (buckets_per_lock - 1);
 
@@ -567,4 +565,6 @@ namespace cuckoo_virtual_rdma {
         INFO("gen_cas_message", "Generated %d cas messages", cas_messages.size());
         return cas_messages;
     }
+
+    /*------------------------------------ Real RDMA functions ---------------------------- */
 }

@@ -11,160 +11,19 @@
 #include "config.h"
 #include "log.h"
 #include "memcached.h"
+#include "rdma_helper.h"
 
 
 using namespace std;
 using namespace cuckoo_state_machines;
+using namespace rdma_helper;
 
 namespace cuckoo_rdma_engine {
-
-    int bulk_poll(struct ibv_cq *cq, int num_entries, struct ibv_wc *wc) {
-        int n = 0;
-        int ret = 0;
-        do {
-            n = ibv_poll_cq(cq, num_entries, wc);       // get upto num_concur entries
-            if (n < 0) {
-                printf("Failed to poll cq for wc due to %d\n", ret);
-                rdma_error("Failed to poll cq for wc due to %d \n", ret);
-                exit(1);
-            }
-            if (n == 0) {
-                //todo deal with a global variable being used to break the polling here
-                //we should deal with finished running xput elsewhere (hard to tell where though)
-                //todo we can stop polling here if we add a global stop variable and we will need to
-                // if (finished_running_xput) {
-                //     break;
-                // }
-            }     
-        } while (n < 1);
-        return n;
-    }
-
-
-    static inline void fillSgeWr(ibv_sge &sg, ibv_send_wr &wr, uint64_t source,
-                             uint64_t size, uint32_t lkey) {
-        memset(&sg, 0, sizeof(sg));
-        sg.addr = (uintptr_t)source;
-        sg.length = size;
-        sg.lkey = lkey;
-
-        memset(&wr, 0, sizeof(wr));
-        wr.wr_id = 0;
-        wr.sg_list = &sg;
-        wr.num_sge = 1;
-    }
-
-    static inline void fillSgeWr(ibv_sge &sg, ibv_exp_send_wr &wr, uint64_t source,
-                                uint64_t size, uint32_t lkey) {
-        memset(&sg, 0, sizeof(sg));
-        sg.addr = (uint64_t)source;
-        sg.length = size;
-        sg.lkey = lkey;
-
-        memset(&wr, 0, sizeof(wr));
-        wr.wr_id = 0;
-        wr.sg_list = &sg;
-        wr.num_sge = 1;
-
-    }
-
-    // for RC & UC
-    bool rdmaRead(ibv_qp *qp, uint64_t source, uint64_t dest, uint64_t size,
-                uint32_t lkey, uint32_t remoteRKey, bool signal, uint64_t wrID) {
-        struct ibv_sge sg;
-        struct ibv_send_wr wr;
-        struct ibv_send_wr *wrBad;
-
-        fillSgeWr(sg, wr, source, size, lkey);
-
-        wr.opcode = IBV_WR_RDMA_READ;
-
-        if (signal) {
-            wr.send_flags = IBV_SEND_SIGNALED;
-        }
-
-        wr.wr.rdma.remote_addr = dest;
-        wr.wr.rdma.rkey = remoteRKey;
-        wr.wr_id = wrID;
-
-        if (ibv_post_send(qp, &wr, &wrBad)) {
-            printf("send with rdma read failed");
-        }
-        return true;
-    }
-
-    // for RC & UC
-    bool rdmaCompareAndSwap(ibv_qp *qp, uint64_t source, uint64_t dest,
-                            uint64_t compare, uint64_t swap, uint32_t lkey,
-                            uint32_t remoteRKey, bool signal, uint64_t wrID) {
-        struct ibv_sge sg;
-        struct ibv_send_wr wr;
-        struct ibv_send_wr *wrBad;
-
-        fillSgeWr(sg, wr, source, 8, lkey);
-
-        wr.opcode = IBV_WR_ATOMIC_CMP_AND_SWP;
-
-        if (signal) {
-            wr.send_flags = IBV_SEND_SIGNALED;
-        }
-
-        wr.wr.atomic.remote_addr = dest;
-        wr.wr.atomic.rkey = remoteRKey;
-        wr.wr.atomic.compare_add = compare;
-        wr.wr.atomic.swap = swap;
-        wr.wr_id = wrID;
-
-        if (ibv_post_send(qp, &wr, &wrBad)) {
-            printf("send with rdma compare and swap failed\n");
-            sleep(5);
-            return false;
-        }
-        return true;
-    }
-
-    bool rdmaCompareAndSwapMask(ibv_qp *qp, uint64_t source, uint64_t dest,
-                                uint64_t compare, uint64_t swap, uint32_t lkey,
-                                uint32_t remoteRKey, uint64_t mask, bool singal, uint64_t wr_ID) {
-        struct ibv_sge sg;
-        struct ibv_exp_send_wr wr;
-        struct ibv_exp_send_wr *wrBad;
-        fillSgeWr(sg, wr, source, 8, lkey);
-
-        wr.next = NULL;
-        wr.exp_opcode = IBV_EXP_WR_EXT_MASKED_ATOMIC_CMP_AND_SWP;
-        wr.exp_send_flags = IBV_EXP_SEND_EXT_ATOMIC_INLINE;
-        wr.wr_id = wr_ID;
-
-        if (singal) {
-            wr.exp_send_flags |= IBV_EXP_SEND_SIGNALED;
-        }
-
-        wr.ext_op.masked_atomics.log_arg_sz = 3;
-        wr.ext_op.masked_atomics.remote_addr = dest;
-        wr.ext_op.masked_atomics.rkey = remoteRKey;
-
-        auto &op = wr.ext_op.masked_atomics.wr_data.inline_data.op.cmp_swap;
-        op.compare_val = compare;
-        op.swap_val = swap;
-
-        op.compare_mask = mask;
-        op.swap_mask = mask;
-
-        int ret = ibv_exp_post_send(qp, &wr, &wrBad);
-        if (ret) {
-            printf("MSKCAS FAILED : Return code %d\n", ret);
-            return false;
-        }
-        return true;
-    }
-
     
     RDMA_Engine::RDMA_Engine(){
         ALERT("RDMA Engine", "Don't blindly allocate an RDMA state machine");
         exit(1);
     }
-
 
             
     RDMA_Engine::RDMA_Engine(unordered_map<string, string> config) {
@@ -489,11 +348,6 @@ namespace cuckoo_rdma_engine {
                 }
             }
 
-            // for (int k=0;k<MAX_CONCURRENT_MESSAGES;k++) {
-            //     printf("message_tracker[%d] = %s\n", k, message_tracker[k].to_string().c_str());
-            // }
-
-            // exit(0);
 
             if (outstanding_messages > 0 ) {
                 //Now we deal with the message recipt
@@ -502,56 +356,21 @@ namespace cuckoo_rdma_engine {
                     ALERT(log_id(), "polling failed\n");
                     exit(1);
                 }
-                // for (int k=0;k<MAX_CONCURRENT_MESSAGES;k++) {
-                //     printf("message_tracker sub 1[%d] = %s\n", k, message_tracker[k].to_string().c_str());
-                // }
-                // printf("-------------------------------------Sending-------------------------------------\n");
                 for (int j=0;j<n;j++) {
                     if (wc[j].status != IBV_WC_SUCCESS) {
                         ALERT(log_id(), "RDMA read failed with status %s on request %d\n", ibv_wc_status_str(wc[j].status), wc[j].wr_id);
                         exit(1);
                     } else {
                         VERBOSE(log_id(), "Message Received wih work request %d\n", wc[j].wr_id);
-
-                        // for (int k=0;k<MAX_CONCURRENT_MESSAGES;k++) {
-                        //     printf("message_tracker[%d] = %s\n", k, message_tracker[k].to_string().c_str());
-                        // }
-                        //The result of the operation is in the local buffer
-                        //Perform a faux delivery to our own state machine
-
-                        // if (wr_id_to_message.find(wc[j].wr_id) == wr_id_to_message.end()) {
-                        //     printf("wr_id not found in wr_id_to_message\n");
-                        //     exit(1);
-                        // }
                         VRMessage outgoing = message_tracker[wc[j].wr_id % MAX_CONCURRENT_MESSAGES];
                         outstanding_messages--;
-                        // printf("about to deliver wr_id %d :: %s\n", wc[j].wr_id, message_tracker[wc[j].wr_id % MAX_CONCURRENT_MESSAGES].to_string().c_str());
-                        // printf("oputging message type %s\n", outgoing.function.c_str());
-                        // for (int k=0;k<outgoing.function.size();k++){
-                        //     printf("%c", outgoing.function[k]);
-                        // }
-                        // if (outgoing.function[0] == 'm' &&  outgoing.function[1] == 'a' && outgoing.function[2] == 's' && outgoing.function[3] == 'k'){
-                        //     printf("assigning mask function\n");
-                        //     outgoing.function="masked_cas_lock_table";
-                        // }
-
-                        //BUG This line fixes a bug where the function name keeps getting over written
-                        // outgoing.function = message_type_to_function_string(outgoing.type);
-                        // printf("outgoing message type %d\n", outgoing.get_message_type());
 
                         if (outgoing.get_message_type() == READ_REQUEST){
-                            // printf("delivering message to state machine: %s\n", outgoing.to_string().c_str());
                             vector<VRMessage> incomming = _memory_state_machine->fsm(outgoing);
 
-                            // printf("memory state machine table\n");
-                            // _memory_state_machine->print_table();
                             for (int i = 0; i < incomming.size(); i++){
                                 VERBOSE(log_id(), "memory state machine incomming message: %s\n", incomming[i].to_string().c_str());
                                 ingress_messages.push_back(incomming[i]);
-                                // for (auto const& x : incomming[i].function_args)
-                                // {
-                                //     ingress_messages[ingress_messages.size()-1].function_args[x.first] = x.second;
-                                // }
                             }
                         } else if (outgoing.get_message_type() == MASKED_CAS_REQUEST) {
                             // printf("received a masked cas response\n");
@@ -590,19 +409,8 @@ namespace cuckoo_rdma_engine {
                         }
                     }
                 }
-                // printf("memory state machine table after operations\n");
-                // _memory_state_machine->print_table();
-                // printf("rcuckoo table after operations\n");
-                // _rcuckoo->print_table();
                 assert(_memory_state_machine->get_table_pointer() == _rcuckoo->get_table_pointer());
             }
-
-            // //receive messages
-            // printf("polling for messagge\n");
-            // // messages = _state_machine->fsm(init);
-            // printf("exiting because I don't actually have the logic.");
-            // exit(0);
-
         }
 
     }

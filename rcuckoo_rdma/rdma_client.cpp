@@ -460,7 +460,7 @@ bool rdmaCompareAndSwap(ibv_qp *qp, uint64_t source, uint64_t dest,
   wr.wr_id = wrID;
 
   if (ibv_post_send(qp, &wr, &wrBad)) {
-    Debug::notifyError("Send with ATOMIC_CMP_AND_SWP failed.");
+    // Debug::notifyError("Send with ATOMIC_CMP_AND_SWP failed.");
     sleep(5);
     return false;
   }

@@ -101,10 +101,6 @@ namespace cuckoo_rcuckoo {
         return "RCuckoo";
     }
 
-    // bool RCuckoo::start_rdma_engine() {
-    //     return _rdma_engine.start();
-    // }
-
     void RCuckoo::clear_statistics(){
         Client_State_Machine::clear_statistics();
         _current_insert_key = Key();
@@ -250,8 +246,6 @@ namespace cuckoo_rcuckoo {
         return;
     }
 
-
-
     vector<VRMessage> RCuckoo::release_locks_fsm(VRMessage message) {
         vector<VRMessage> response;
         if (message.get_message_type() != MASKED_CAS_RESPONSE) {
@@ -278,9 +272,6 @@ namespace cuckoo_rcuckoo {
             }
         }
         return response;
-
-
-
     }
 
     vector<VRMessage> RCuckoo::insert_and_release_fsm(VRMessage message) {
@@ -454,5 +445,48 @@ namespace cuckoo_rcuckoo {
         return vector<VRMessage>();
     }
 
+    /******* DIRECT RDMA CALLS ********/
+    vector<VRMessage> RCuckoo::rdma_fsm(VRMessage message) {
 
+        if (message.get_message_type() != NO_OP_MESSAGE) {
+            VERBOSE(log_id(), "Received Message: %s\n", message.to_string().c_str());
+        }
+        vector<VRMessage> response = vector<VRMessage>();
+
+
+        //The client is done
+        if (_complete && _state == IDLE) {
+            response = vector<VRMessage>();
+            return response;
+        }
+
+        switch(_state) {
+            case IDLE:
+                response = idle_fsm(message);
+                break;
+            case READING:
+                response = read_fsm(message);
+                break;
+            case AQUIRE_LOCKS:
+                response = aquire_locks_with_reads_fsm(message);
+                break;
+            case RELEASE_LOCKS_TRY_AGAIN:
+                response = release_locks_fsm(message);
+                break;
+            case INSERTING:
+                response = insert_and_release_fsm(message);
+                break;
+            default:
+                throw logic_error("ERROR: Invalid state");
+        }
+
+        for (unsigned int i = 0; i < response.size(); i++) {
+            VERBOSE(log_id(), "Sending Message: %s\n", response[i].to_string().c_str());
+        }
+        return response;
+
+    }
 }
+
+
+
