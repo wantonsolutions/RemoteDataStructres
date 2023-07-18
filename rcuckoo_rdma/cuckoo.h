@@ -71,6 +71,7 @@ namespace cuckoo_rcuckoo {
             /* RDMA specific functions */
             vector<VRMessage> rdma_fsm(VRMessage message);
             void init_rdma_structures(rcuckoo_rdma_info info);
+            vector<VRMessage> put_direct();
 
 
         private:

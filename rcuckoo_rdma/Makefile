@@ -144,4 +144,4 @@ clean:
 	rm -rf rcuckoo_wrapper.cpp
 
 
-.PHONY: all clean
+.PHONY: all cleanclean

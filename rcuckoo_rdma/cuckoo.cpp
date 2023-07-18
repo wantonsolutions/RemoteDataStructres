@@ -462,6 +462,40 @@ namespace cuckoo_rcuckoo {
 
     }
 
+    vector<VRMessage> RCuckoo::put_direct() {
+        _current_insert_rtt++;
+
+        /* copied from the search function */ 
+        vector<unsigned int> searchable_buckets;
+        _search_path = (this->*_table_search_function)(searchable_buckets);
+        //Search failed
+        if (_search_path.size() <= 0) {
+            ALERT(log_id(), "Search Failed for key %s unable to continue client %d is done\n", _current_insert_key.to_string().c_str(), _id);
+            _complete=true;
+            _state = IDLE;
+            return vector<VRMessage>();
+        }
+        VERBOSE("search", "Successful local search for [key %s] -> [path %s]\n", _current_insert_key.to_string().c_str(), path_to_string(_search_path).c_str());
+        _state = AQUIRE_LOCKS;
+
+
+        /* copied from aquire locks function */ 
+        _locking_message_index = 0;
+        vector<unsigned int> buckets = search_path_to_buckets(_search_path);
+        
+        INFO(log_id(), "[aquire_locks] gathering locks for buckets %s\n", vector_to_string(buckets).c_str());
+
+        vector<VRMaskedCasData> lock_list = get_lock_list(buckets, _buckets_per_lock, _locks_per_message);
+        vector<VRMessage> masked_cas_messages = create_masked_cas_messages_from_lock_list(lock_list);
+        _current_locking_messages = masked_cas_messages;
+        return get_current_locking_message_with_covering_read();
+
+
+
+    }
+
+
+
     vector<VRMessage> RCuckoo::rdma_fsm(VRMessage message) {
 
         if (message.get_message_type() != NO_OP_MESSAGE) {
@@ -476,10 +510,28 @@ namespace cuckoo_rcuckoo {
             return response;
         }
 
+        Request next_request;
         switch(_state) {
             case IDLE:
-                response = idle_fsm(message);
+
+                next_request = _workload_driver.next();
+                VERBOSE("DEBUG: general idle fsm","Generated New Request: %s\n", next_request.to_string().c_str());
+
+                if (next_request.op == NO_OP) {
+                     response = vector<VRMessage>();
+                } else if (next_request.op == PUT) {
+                    _current_insert_key = next_request.key;
+                    response=put_direct();
+                } else if (next_request.op == GET) {
+                    _current_read_key = next_request.key;
+                    response=get();
+                } else {
+                    printf("ERROR: unknown operation\n");
+                    throw logic_error("ERROR: unknown operation");
+                }
                 break;
+
+
             case READING:
                 response = read_fsm(message);
                 break;
