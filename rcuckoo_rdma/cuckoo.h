@@ -5,11 +5,15 @@
 #include "state_machines.h"
 #include "tables.h"
 #include "search.h"
+#include "config.h"
 #include <unordered_map>
 #include <infiniband/verbs.h>
 
 using namespace cuckoo_state_machines;
 using namespace cuckoo_search;
+
+#define MAX_CONCURRENT_CUCKOO_MESSAGES 32
+#define ID_SIZE 64
 
 namespace cuckoo_rcuckoo {
 
@@ -19,6 +23,7 @@ namespace cuckoo_rcuckoo {
         ibv_mr *table_mr;
         ibv_mr *lock_table_mr;
         struct ibv_cq * completion_queue;
+        table_config *remote_table_config;
     } rcuckoo_rdma_info;
 
     class RCuckoo : public Client_State_Machine {
@@ -69,6 +74,10 @@ namespace cuckoo_rcuckoo {
 
 
             /* RDMA specific functions */
+            uint64_t local_to_remote_table_address(uint64_t local_address);
+            void send_virtual_read_message(VRMessage message, uint64_t wr_id);
+            void send_virtual_cas_message(VRMessage message, uint64_t wr_id);
+            void send_virtual_masked_cas_message(VRMessage message, uint64_t wr_id);
             vector<VRMessage> rdma_fsm(VRMessage message);
             void init_rdma_structures(rcuckoo_rdma_info info);
             vector<VRMessage> put_direct();
@@ -76,6 +85,7 @@ namespace cuckoo_rcuckoo {
 
         private:
 
+            char _log_identifier[ID_SIZE];
             unsigned int _read_threshold_bytes;
             unsigned int _buckets_per_lock;
             unsigned int _locks_per_message;
@@ -95,6 +105,9 @@ namespace cuckoo_rcuckoo {
             ibv_mr *_table_mr;
             ibv_mr *_lock_table_mr;
             struct ibv_cq * _completion_queue;
+            table_config * _table_config;
+            struct ibv_wc *_wc;
+            uint64_t _wr_id;
 
 
             // hash_locations  (*_location_function)(string, unsigned int);

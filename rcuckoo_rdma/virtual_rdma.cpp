@@ -201,9 +201,10 @@ namespace cuckoo_virtual_rdma {
         bool success = false;
         Entry new_entry;
 
-        WARNING("virtual_rdma", "cas compairision table %08llx == guess %08llx (success=%d -- row %06d, col %06d)\n", ret_val, old, ret_val == old, bucket_id, bucket_offset);
+        SUCCESS("virtual_rdma", "cas compairision table %08llx == guess %08llx (success=%d -- row %06d, col %06d)\n", ret_val, old, ret_val == old, bucket_id, bucket_offset);
 
         if (ret_val == old) {
+            SUCCESS("virtual_rdma", "success cas compairision table %08llx == guess %08llx (success=%d -- row %06d, col %06d)\n", ret_val, old, ret_val == old, bucket_id, bucket_offset);
             new_entry.set_as_uint64_t(new_value);
             table.set_entry(bucket_id, bucket_offset, new_entry);
             success = true;

@@ -20,6 +20,8 @@
 using namespace std;
 using namespace cuckoo_search;
 using namespace cuckoo_state_machines;
+using namespace rdma_helper;
+
 namespace cuckoo_rcuckoo {
 
     Entry ** RCuckoo::get_table_pointer() {
@@ -96,6 +98,8 @@ namespace cuckoo_rcuckoo {
 
         set_search_function(config);
         set_location_function(config);
+
+        sprintf(_log_identifier, "Client: %d", _id);
     }
 
     string RCuckoo::get_state_machine_name() {
@@ -258,6 +262,7 @@ namespace cuckoo_rcuckoo {
         if (!success) [[unlikely]] {
             ALERT(log_id(), "Masked CAS Failed for key %s\n", _current_insert_key.to_string().c_str());
             ALERT(log_id(), "failed masked cas message: %s\n", message.to_string().c_str());
+            exit(1);
             throw logic_error("ERROR: Masked CAS Failed");
         }
         receive_successful_unlocking_message(message);
@@ -269,7 +274,8 @@ namespace cuckoo_rcuckoo {
                     return response;
                 
                 case RELEASE_LOCKS_TRY_AGAIN:
-                    return search();
+                    // return search();
+                    return put_direct();
             }
         }
         return response;
@@ -409,7 +415,7 @@ namespace cuckoo_rcuckoo {
     }
 
     const char * RCuckoo::log_id() {
-        return ("client " + to_string(_id)).c_str();
+        return _log_identifier;
     }
 
     vector<VRMessage> RCuckoo::aquire_locks_with_reads_fsm(VRMessage message) {
@@ -454,12 +460,133 @@ namespace cuckoo_rcuckoo {
         assert(info.table_mr != NULL);
         assert(info.lock_table_mr != NULL);
         assert(info.completion_queue != NULL);
+        assert(info.remote_table_config != NULL);
 
         _qp = info.qp;
         _table_mr = info.table_mr;
         _lock_table_mr = info.lock_table_mr;
         _completion_queue = info.completion_queue;
+        _table_config = info.remote_table_config;
+        _wr_id = 10000000;
 
+        _wc = (struct ibv_wc *) calloc (MAX_CONCURRENT_CUCKOO_MESSAGES, sizeof(struct ibv_wc));
+
+    }
+
+
+    uint64_t RCuckoo::local_to_remote_table_address(uint64_t local_address){
+        uint64_t base_address = (uint64_t) get_table_pointer()[0];
+        uint64_t address_offset = local_address - base_address;
+        uint64_t remote_address = (uint64_t) _table_config->table_address + address_offset;
+        // remote_address += 64 + (sizeof(Entry) * 2);
+        return remote_address;
+    }
+
+    void RCuckoo::send_virtual_read_message(VRMessage message, uint64_t wr_id){
+        //translate address locally for bucket id
+        unsigned int bucket_offset = stoi(message.function_args["bucket_offset"]);
+        unsigned int bucket_id = stoi(message.function_args["bucket_id"]);
+        unsigned int size = stoi(message.function_args["size"]);
+
+        uint64_t local_address = (uint64_t) get_entry_pointer(bucket_id, bucket_offset);
+        uint64_t remote_server_address = local_to_remote_table_address(local_address);
+
+        // printf("table size       %d\n", _table_config->table_size_bytes);
+        // printf("table address =  %p\n", _rcuckoo->get_table_pointer());
+        // printf("offset pointer = %p\n", _rcuckoo->get_entry_pointer(bucket_id, bucket_offset));
+        // printf("offset =         %p\n", (void *) (local_address - (uint64_t) _rcuckoo->get_table_pointer()));
+
+        bool success = rdmaRead(
+            _qp,
+            local_address,
+            remote_server_address,
+            size,
+            _table_mr->lkey,
+            _table_config->remote_key,
+            true,
+            wr_id
+        );
+        if (!success) {
+            printf("rdma read failed\n");
+            exit(1);
+        }
+        VERBOSE("State Machine Wrapper", "sent virtual read message\n");
+    }
+    void RCuckoo::send_virtual_cas_message(VRMessage message, uint64_t wr_id){
+        uint32_t bucket_id = stoi(message.function_args["bucket_id"]);
+        uint32_t bucket_offset = stoi(message.function_args["bucket_offset"]);
+        uint64_t old = stoull(message.function_args["old"], nullptr, 16);
+        old = __builtin_bswap64(old);
+        old = old >> 32;
+        uint64_t new_val = stoull(message.function_args["new"], nullptr, 16);
+        new_val = __builtin_bswap64(new_val);
+        new_val = new_val >> 32;
+
+        uint64_t local_address = (uint64_t) get_entry_pointer(bucket_id, bucket_offset);
+        uint64_t remote_server_address = local_to_remote_table_address(local_address);
+
+
+
+        bool success = rdmaCompareAndSwap(
+            _qp, 
+            local_address, 
+            remote_server_address,
+            old, 
+            new_val, 
+            _table_mr->lkey,
+            _table_config->remote_key, 
+            true, 
+            wr_id);
+
+        if (!success) {
+            printf("rdma cas failed\n");
+            exit(1);
+        }
+
+    }
+
+    void RCuckoo::send_virtual_masked_cas_message(VRMessage message, uint64_t wr_id) {
+        int lock_index = stoi(message.function_args["lock_index"]);
+        uint64_t local_lock_address = (uint64_t) get_lock_pointer(lock_index);
+        // uint64_t remote_lock_address = local_to_remote_lock_table_address(local_lock_address);
+        uint64_t remote_lock_address = (uint64_t) _table_config->lock_table_address + lock_index;
+        // remote_lock_address = 0;
+
+        uint64_t compare = stoull(message.function_args["old"], 0, 2);
+        compare = __builtin_bswap64(compare);
+        uint64_t swap = stoull(message.function_args["new"], 0, 2);
+        swap = __builtin_bswap64(swap);
+        uint64_t mask = stoull(message.function_args["mask"], 0, 2);
+        mask = __builtin_bswap64(mask);
+
+
+        // remote_lock_address = __builtin_bswap64(remote_lock_address);
+
+
+        VERBOSE(log_id(), "local_lock_address %lu\n", local_lock_address);
+        VERBOSE(log_id(), "remote_lock_address %lu\n", remote_lock_address);
+        VERBOSE(log_id(), "compare %lu\n", compare);
+        VERBOSE(log_id(), "swap %lu\n", swap);
+        VERBOSE(log_id(), "mask %lu\n", mask);
+        VERBOSE(log_id(), "_lock_table_mr->lkey %u\n", _lock_table_mr->lkey);
+        VERBOSE(log_id(), "_table_config->lock_table_key %u\n", _table_config->lock_table_key);
+
+        bool success = rdmaCompareAndSwapMask(
+            _qp,
+            local_lock_address,
+            remote_lock_address,
+            compare,
+            swap,
+            _lock_table_mr->lkey,
+            _table_config->lock_table_key,
+            mask,
+            true,
+            wr_id);
+
+        if (!success) {
+            printf("rdma masked cas failed failed\n");
+            exit(1);
+        }
     }
 
     vector<VRMessage> RCuckoo::put_direct() {
@@ -488,12 +615,95 @@ namespace cuckoo_rcuckoo {
         vector<VRMaskedCasData> lock_list = get_lock_list(buckets, _buckets_per_lock, _locks_per_message);
         vector<VRMessage> masked_cas_messages = create_masked_cas_messages_from_lock_list(lock_list);
         _current_locking_messages = masked_cas_messages;
-        return get_current_locking_message_with_covering_read();
+        
+        
 
 
+        bool locking_complete = false;
+        bool failed_last_request = false;
 
+        //Inital send TODO probably put this in a while loop
+        while (!locking_complete) {
+            vector<VRMessage> lock_and_read =  get_current_locking_message_with_covering_read();
+            VRMessage lock_message = lock_and_read[0];
+            VRMessage read_message = lock_and_read[1];
+
+            _wr_id++;
+            int outstanding_cas_wr_id = _wr_id;
+            //TODO obviously combine these two functions into a single one
+            send_virtual_masked_cas_message(lock_message, outstanding_cas_wr_id);
+            _wr_id++;
+            int outstanding_read_wr_id = _wr_id;
+            send_virtual_read_message(read_message, outstanding_read_wr_id);
+
+            int outstanding_messages = 2; //It's two because we send the read and CAS
+            assert(_completion_queue != NULL);
+            int n = bulk_poll(_completion_queue, outstanding_messages, _wc);
+
+            if (n == 1) {
+                VERBOSE(log_id(), "first poll missed the read, polling again\n");
+                n += bulk_poll(_completion_queue, outstanding_messages - n, _wc + n);
+            }
+
+            _outstanding_read_requests--;
+            assert(n == outstanding_messages); //This is just a safty for now.
+            if (_wc[0].status != IBV_WC_SUCCESS) {
+                ALERT("lock aquire", " masked cas failed somehow\n");
+                exit(1);
+            }
+
+            if (_wc[1].status != IBV_WC_SUCCESS) {
+                ALERT("lock aquire", " spanning read failed somehow\n");
+                exit(1);
+            }
+
+            //TODO check for duplicate messages
+            //TODO check that we actually got the lock we wanted.
+            // ALERT(log_id(), "checking if we actually got the lock!\n");
+            uint64_t old_value = stoull(lock_message.function_args["old"], 0, 2);
+            uint64_t mask = stoull(lock_message.function_args["mask"], 0, 2);
+
+
+            int lock_index = stoi(lock_message.function_args["lock_index"]);
+            uint64_t received_locks = *((uint64_t*) get_lock_pointer(lock_index));
+
+
+            //?? bswap the DMA'd value?
+            received_locks = __builtin_bswap64(received_locks);
+            *((uint64_t*) get_lock_pointer(lock_index)) = received_locks;
+
+
+            if ((received_locks & mask) == old_value) {
+                VERBOSE(log_id(), "we got the lock!\n");
+                receive_successful_locking_message(lock_message);
+                if (failed_last_request) {
+                    failed_last_request = false;
+                    // ALERT("put direct", "grabbed some locks after failing!\n");
+                    // ALERT(log_id(), "received_locks %016lx\n", received_locks);
+                    // ALERT(log_id(), "old_value      %016lx\n", old_value);
+                    // ALERT(log_id(), "mask           %016lx\n", mask);
+                }
+            } else {
+                // ALERT("put direct", "we did not get the lock reissuing request!\n");
+                // ALERT(log_id(), "received_locks %016lx\n", received_locks);
+                // ALERT(log_id(), "old_value      %016lx\n", old_value);
+                // ALERT(log_id(), "mask           %016lx\n", mask);
+                failed_last_request = true;
+            }
+
+            if (all_locks_aquired()) {
+                locking_complete = true;
+                break;
+            }
+            _current_insert_rtt++;
+
+            // lock_and_read = get_current_locking_message_with_covering_read();
+            // lock_message = lock_and_read[0];
+            // read_message = lock_and_read[1];
+        }
+
+        return begin_insert();
     }
-
 
 
     vector<VRMessage> RCuckoo::rdma_fsm(VRMessage message) {

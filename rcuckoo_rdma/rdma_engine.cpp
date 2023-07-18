@@ -125,6 +125,7 @@ namespace cuckoo_rdma_engine {
                 info.table_mr = _state_machines[i]._table_mr;
                 info.lock_table_mr = _state_machines[i]._lock_table_mr;
                 info.completion_queue = _state_machines[i]._completion_queue;
+                info.remote_table_config = _state_machines[i]._table_config;
                 _state_machines[i]._rcuckoo->init_rdma_structures(info);
             }
 
@@ -382,6 +383,8 @@ namespace cuckoo_rdma_engine {
                                 ingress_messages.push_back(incomming[i]);
                             }
                         } else if (outgoing.get_message_type() == MASKED_CAS_REQUEST) {
+
+                            /* at this point in time we should not fail here because only unlock messages are being issued */
                             // printf("received a masked cas response\n");
                             vector<VRMessage> incomming = _memory_state_machine->fsm(outgoing);
                             for (int i = 0; i < incomming.size(); i++){
@@ -392,12 +395,14 @@ namespace cuckoo_rdma_engine {
                                 uint64_t old_value = stoull(outgoing.function_args["old"], 0, 2);
                                 uint64_t mask = stoull(outgoing.function_args["mask"], 0, 2);
                                 uint64_t current_value = stoull(incomming[i].function_args["old"], 0, 2);
-                                if (old_value != (current_value & mask)) {
-                                    ALERT(log_id(), "SHOOT WE FAILED GETTING THE LOCK");
+                                if ((old_value != mask) || old_value != (current_value & mask)) {
+                                    ALERT(log_id(), "WARNING it seems we failed during unlock (succeding anyways) ");
                                     ALERT(log_id(), "old value %lx != current value %lx (mask %lx)", old_value, current_value, mask);
-                                    incomming[i].function_args["success"] = "0";
-                                    // exit(0);
+                                    // incomming[i].function_args["success"] = "0";
+                                    incomming[i].function_args["success"] = "1";
+                                    throw std::runtime_error("failed to unlock");
                                 } else {
+                                    // ALERT(log_id(), "SUCCESS unlock old value %lx == current value %lx (mask %lx)", old_value, current_value, mask);
                                     incomming[i].function_args["success"] = "1";
                                 }
                                 ingress_messages.push_back(incomming[i]);
