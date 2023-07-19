@@ -35,7 +35,8 @@ struct sockaddr_in server_address_to_socket_addr(string server_address) {
 
 unordered_map<string, string> gen_config() {
     unordered_map<string, string> config;
-    int table_size = 1024 * 1024;
+    // int table_size = 1024 * 1024 * 10;
+    int table_size = 1024 * 1024 ;
     // int table_size = 256;
     // int table_size = 1024;
     // int table_size = 256;
@@ -64,7 +65,7 @@ unordered_map<string, string> gen_config() {
     // Client State Machine Arguements
     int total_inserts = 1;
     int max_fill = 90;
-    int num_clients = 4;
+    int num_clients = 24;
 	// int num_clinets = 1;
     config["total_inserts"]=to_string(total_inserts);
     config["total_requests"]=to_string(total_inserts);

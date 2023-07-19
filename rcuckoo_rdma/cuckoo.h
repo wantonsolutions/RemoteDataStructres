@@ -61,6 +61,7 @@ namespace cuckoo_rcuckoo {
 
 
             void receive_successful_locking_message(VRMaskedCasData message);
+            void receive_successful_unlocking_message(VRMaskedCasData message);
 
 
             void complete_insert_stats(bool success);
@@ -87,6 +88,9 @@ namespace cuckoo_rcuckoo {
             void init_rdma_structures(rcuckoo_rdma_info info);
             vector<VRMessage> put_direct();
             vector<VRMessage> insert_direct();
+
+
+            vector<VRMaskedCasData> get_current_unlock_list();
 
 
         private:
