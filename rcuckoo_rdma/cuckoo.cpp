@@ -744,7 +744,7 @@ namespace cuckoo_rcuckoo {
             return vector<VRMessage>();
         } else if (_state == RELEASE_LOCKS_TRY_AGAIN) {
             _current_insert_rtt++;
-            return put_direct();
+            return vector<VRMessage>();
         } else {
             printf("invalid state\n");
             exit(1);
@@ -936,7 +936,7 @@ namespace cuckoo_rcuckoo {
                 response = aquire_locks_with_reads_fsm(message);
                 break;
             case RELEASE_LOCKS_TRY_AGAIN:
-                response = release_locks_fsm(message);
+                response = put_direct();
                 break;
             case INSERTING:
                 response = insert_and_release_fsm(message);
