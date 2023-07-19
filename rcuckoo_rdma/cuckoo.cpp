@@ -274,8 +274,8 @@ namespace cuckoo_rcuckoo {
                     return response;
                 
                 case RELEASE_LOCKS_TRY_AGAIN:
-                    // return search();
-                    return put_direct();
+                    return search();
+                    // return put_direct();
             }
         }
         return response;
@@ -595,22 +595,27 @@ namespace cuckoo_rcuckoo {
         _state = INSERTING;
         vector<unsigned int> search_buckets = lock_indexes_to_buckets(_locks_held, _buckets_per_lock);
         _search_path = (this->*_table_search_function)(search_buckets);
+        _search_path_index = _search_path.size() -1;
         if (_search_path.size() <=0 ) {
             INFO(log_id(), "Second Search Failed for key %s retry time\n", _current_insert_key.to_string().c_str(), _id);
             INFO(log_id(), "Hi Stew, I\'m hoping you have a great day", _current_insert_key.to_string().c_str(), _id);
-            _current_insert_rtt++;
-            return retry_insert();
+            _state = RELEASE_LOCKS_TRY_AGAIN;
         }
-        _search_path_index = _search_path.size() -1;
-        vector<VRMessage> insert_messages = gen_cas_messages(_search_path);
+
+
+        vector<VRMessage> insert_messages;
         vector<VRMessage> unlock_messages = release_locks_batched();
 
-        unsigned int total_messages = insert_messages.size() + unlock_messages.size();
 
-        for ( unsigned int i=0; i < insert_messages.size(); i++) {
-            // ALERT("State Machine Wrapper", "sending virtual cas message %d\n", i);
-            _wr_id++;
-            send_virtual_cas_message(insert_messages[i], _wr_id);
+        unsigned int total_messages = unlock_messages.size();
+        if (_state == INSERTING) {
+            insert_messages = gen_cas_messages(_search_path);
+            total_messages += insert_messages.size();
+            for ( unsigned int i=0; i < insert_messages.size(); i++) {
+                // ALERT("State Machine Wrapper", "sending virtual cas message %d\n", i);
+                _wr_id++;
+                send_virtual_cas_message(insert_messages[i], _wr_id);
+            }
         }
 
         for ( unsigned int i = 0; i < unlock_messages.size(); i++) {
@@ -619,30 +624,41 @@ namespace cuckoo_rcuckoo {
             send_virtual_masked_cas_message(unlock_messages[i], _wr_id);
         }
 
+        //Bulk poll to receive all messages
         int n=0;
-
         while(n < total_messages) {
             n += bulk_poll(_completion_queue, total_messages - n, _wc + n);
         }
 
-        for (unsigned int i = 0; i < insert_messages.size(); i++) {
-            if (_wc[i].status != IBV_WC_SUCCESS) {
-                printf("insert failed\n");
-                exit(1);
+        if (_state == INSERTING) {
+            for (unsigned int i = 0; i < insert_messages.size(); i++) {
+                if (_wc[i].status != IBV_WC_SUCCESS) {
+                    printf("insert failed\n");
+                    exit(1);
+                }
             }
         }
 
-        for (unsigned int i = insert_messages.size(); i < total_messages; i++) {
+        for (unsigned int i = total_messages - unlock_messages.size() ; i < total_messages; i++) {
             if (_wc[i].status != IBV_WC_SUCCESS) {
                 printf("unlock failed\n");
                 exit(1);
             }
-
+            //TODO check if pthe unlock failed
             receive_successful_unlocking_message(unlock_messages[i-insert_messages.size()]);
         }
 
-        complete_insert();
-        return vector<VRMessage>();
+        if (_state == INSERTING) {
+            complete_insert();
+            return vector<VRMessage>();
+        } else if (_state == RELEASE_LOCKS_TRY_AGAIN) {
+            _current_insert_rtt++;
+            return put_direct();
+        } else {
+            printf("invalid state\n");
+            exit(1);
+        }
+
 
 
         //Continously poll for completion
