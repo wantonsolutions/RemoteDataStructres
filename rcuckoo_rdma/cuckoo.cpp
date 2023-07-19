@@ -605,6 +605,41 @@ namespace cuckoo_rcuckoo {
 
     }
 
+    void RCuckoo::send_virtual_cas_message(VRCasData message, uint64_t wr_id){
+
+        // ALERT("sending cas data", "data %s\n", message.to_string().c_str());
+        uint32_t bucket_id = message.row;
+        uint32_t bucket_offset = message.offset;
+        uint64_t old = message.old;
+        old = __builtin_bswap64(old);
+        old = old >> 32;
+        uint64_t new_val = message.new_value;
+        new_val = __builtin_bswap64(new_val);
+        new_val = new_val >> 32;
+
+        uint64_t local_address = (uint64_t) get_entry_pointer(bucket_id, bucket_offset);
+        uint64_t remote_server_address = local_to_remote_table_address(local_address);
+
+
+
+        bool success = rdmaCompareAndSwap(
+            _qp, 
+            local_address, 
+            remote_server_address,
+            old, 
+            new_val, 
+            _table_mr->lkey,
+            _table_config->remote_key, 
+            true, 
+            wr_id);
+
+        if (!success) {
+            printf("rdma cas failed\n");
+            exit(1);
+        }
+
+    }
+
     void RCuckoo::send_virtual_masked_cas_message(VRMessage message, uint64_t wr_id) {
         int lock_index = stoi(message.function_args["lock_index"]);
         uint64_t local_lock_address = (uint64_t) get_lock_pointer(lock_index);
@@ -715,7 +750,7 @@ namespace cuckoo_rcuckoo {
         }
 
 
-        vector<VRMessage> insert_messages;
+        vector<VRCasData> insert_messages;
         // vector<VRMessage> unlock_messages = release_locks_batched();
         _locking_message_index = 0;
         vector<VRMaskedCasData> unlock_messages = get_current_unlock_list();
@@ -725,7 +760,7 @@ namespace cuckoo_rcuckoo {
 
         unsigned int total_messages = unlock_messages.size();
         if (_state == INSERTING) {
-            insert_messages = gen_cas_messages(_search_path);
+            insert_messages = gen_cas_data(_search_path);
             total_messages += insert_messages.size();
             for ( unsigned int i=0; i < insert_messages.size(); i++) {
                 // ALERT("State Machine Wrapper", "sending virtual cas message %d\n", i);

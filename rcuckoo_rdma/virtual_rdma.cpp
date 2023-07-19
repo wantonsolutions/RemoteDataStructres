@@ -60,6 +60,15 @@ namespace cuckoo_virtual_rdma {
         return s;
     }
 
+    string VRCasData::to_string() {
+        string s = "VRCasData: {";
+        s += "row " + std::to_string(row);
+        s += " offset" + std::to_string(offset);
+        s += " old_value: " + uint64t_to_bin_string(old);
+        s += " new_value: " + uint64t_to_bin_string(new_value);
+        return s;
+    }
+
 
     message_type VRMessage::get_message_type(){
         if (function == "cas_table_entry") {
@@ -623,16 +632,40 @@ namespace cuckoo_virtual_rdma {
         return cas_message;
     }
 
+    VRCasData cas_table_entry_cas_data(unsigned int bucket_index, unsigned int bucket_offset, Key old, Key new_value) {
+        VRCasData cas_message;
+        cas_message.row = bucket_index;
+        cas_message.offset = bucket_offset;
+        cas_message.old = stoull(old.to_string(),nullptr,16);
+        cas_message.new_value = stoull(new_value.to_string(),nullptr,16);
+        return cas_message;
+    }
+
     VRMessage next_cas_message(vector<path_element> search_path, unsigned int index) {
         path_element insert_pe = search_path[index];
         path_element copy_pe = search_path[index+1];
         return cas_table_entry_message(insert_pe.bucket_index, insert_pe.offset, insert_pe.key, copy_pe.key);
     }
 
+    VRCasData next_cas_data(vector<path_element> search_path, unsigned int index) {
+        path_element insert_pe = search_path[index];
+        path_element copy_pe = search_path[index+1];
+        return cas_table_entry_cas_data(insert_pe.bucket_index, insert_pe.offset, insert_pe.key, copy_pe.key);
+    }
+
     vector<VRMessage> gen_cas_messages(vector<path_element> search_path) {
         vector<VRMessage> cas_messages;
         for (int i=0; i<search_path.size()-1; i++) {
             cas_messages.push_back(next_cas_message(search_path,i));
+        }
+        INFO("gen_cas_message", "Generated %d cas messages", cas_messages.size());
+        return cas_messages;
+    }
+
+    vector<VRCasData> gen_cas_data(vector<path_element> search_path) {
+        vector<VRCasData> cas_messages;
+        for (int i=0; i<search_path.size()-1; i++) {
+            cas_messages.push_back(next_cas_data(search_path,i));
         }
         INFO("gen_cas_message", "Generated %d cas messages", cas_messages.size());
         return cas_messages;
