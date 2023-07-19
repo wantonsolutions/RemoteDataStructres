@@ -368,16 +368,6 @@ namespace cuckoo_rcuckoo {
         _locking_message_index++;
     }
 
-    void RCuckoo::receive_successful_unlocking_message(VRMaskedCasData message) {
-        vector<unsigned int> unlock_indexes = lock_message_to_lock_indexes(message);
-        for (unsigned int i = 0; i < unlock_indexes.size(); i++) {
-            _locks_held.erase(remove(_locks_held.begin(), _locks_held.end(), unlock_indexes[i]), _locks_held.end());
-        }
-        //checking that the locks do not have duplicates
-        assert(_locks_held.size() == set<unsigned int>(_locks_held.begin(), _locks_held.end()).size());
-        _locking_message_index++;
-    }
-
     VRMessage RCuckoo::get_prior_locking_message() {
         return _current_locking_messages[_locking_message_index - 1];
     }
@@ -403,18 +393,13 @@ namespace cuckoo_rcuckoo {
         return release_locks_batched();
     }
 
-
-    vector<VRMaskedCasData> RCuckoo::get_unlock_masked_cas() {
-        _locking_message_index=0;
-        vector<unsigned int> buckets = lock_indexes_to_buckets(_locks_held, _buckets_per_lock);
-        sort(buckets.begin(), buckets.end());
-        assert(is_sorted(buckets.begin(), buckets.end()));
-        return get_unlock_list(buckets, _buckets_per_lock, _locks_per_message);
-    }
-
     vector<VRMessage> RCuckoo::release_locks_batched(){
         _locking_message_index=0;
-        vector<VRMaskedCasData> unlock_list = get_unlock_masked_cas();
+        vector<unsigned int> buckets = lock_indexes_to_buckets(_locks_held, _buckets_per_lock);
+        //log info buckets
+        sort(buckets.begin(), buckets.end());
+        assert(is_sorted(buckets.begin(), buckets.end()));
+        vector<VRMaskedCasData> unlock_list = get_unlock_list(buckets, _buckets_per_lock, _locks_per_message);
         _current_locking_messages = create_masked_cas_messages_from_lock_list(unlock_list);
         return _current_locking_messages;
     }
@@ -536,7 +521,7 @@ namespace cuckoo_rcuckoo {
             printf("rdma read failed\n");
             exit(1);
         }
-        VERBOSE("State Machine Wrapper", "sent virtual read message\n");
+        VERBOSE("State Machine Wrapper", "sent virtual read message (do do do)\n");
     }
 
     void RCuckoo::send_virtual_read_message(VRReadData message, uint64_t wr_id) {
@@ -567,7 +552,8 @@ namespace cuckoo_rcuckoo {
             printf("rdma read failed\n");
             exit(1);
         }
-        VERBOSE("State Machine Wrapper", "sent virtual read message\n");
+        VERBOSE("State Machine Wrapper", "sent virtual read message (do do do 2)\n");
+        // VERBOSE("State Machine Wrapper", "sent virtual read message\n");
 
     }
 
@@ -622,13 +608,13 @@ namespace cuckoo_rcuckoo {
         // remote_lock_address = __builtin_bswap64(remote_lock_address);
 
 
-        VERBOSE(log_id(), "local_lock_address %lu\n", local_lock_address);
-        VERBOSE(log_id(), "remote_lock_address %lu\n", remote_lock_address);
-        VERBOSE(log_id(), "compare %lu\n", compare);
-        VERBOSE(log_id(), "swap %lu\n", swap);
-        VERBOSE(log_id(), "mask %lu\n", mask);
-        VERBOSE(log_id(), "_lock_table_mr->lkey %u\n", _lock_table_mr->lkey);
-        VERBOSE(log_id(), "_table_config->lock_table_key %u\n", _table_config->lock_table_key);
+        // VERBOSE(log_id(), "local_lock_address %lu\n", local_lock_address);
+        // VERBOSE(log_id(), "remote_lock_address %lu\n", remote_lock_address);
+        // VERBOSE(log_id(), "compare %lu\n", compare);
+        // VERBOSE(log_id(), "swap %lu\n", swap);
+        // VERBOSE(log_id(), "mask %lu\n", mask);
+        // VERBOSE(log_id(), "_lock_table_mr->lkey %u\n", _lock_table_mr->lkey);
+        // VERBOSE(log_id(), "_table_config->lock_table_key %u\n", _table_config->lock_table_key);
 
         bool success = rdmaCompareAndSwapMask(
             _qp,
@@ -669,13 +655,13 @@ namespace cuckoo_rcuckoo {
         // remote_lock_address = __builtin_bswap64(remote_lock_address);
 
 
-        VERBOSE(log_id(), "local_lock_address %lu\n", local_lock_address);
-        VERBOSE(log_id(), "remote_lock_address %lu\n", remote_lock_address);
-        VERBOSE(log_id(), "compare %lu\n", compare);
-        VERBOSE(log_id(), "swap %lu\n", swap);
-        VERBOSE(log_id(), "mask %lu\n", mask);
-        VERBOSE(log_id(), "_lock_table_mr->lkey %u\n", _lock_table_mr->lkey);
-        VERBOSE(log_id(), "_table_config->lock_table_key %u\n", _table_config->lock_table_key);
+        // VERBOSE(log_id(), "local_lock_address %lu\n", local_lock_address);
+        // VERBOSE(log_id(), "remote_lock_address %lu\n", remote_lock_address);
+        // VERBOSE(log_id(), "compare %lu\n", compare);
+        // VERBOSE(log_id(), "swap %lu\n", swap);
+        // VERBOSE(log_id(), "mask %lu\n", mask);
+        // VERBOSE(log_id(), "_lock_table_mr->lkey %u\n", _lock_table_mr->lkey);
+        // VERBOSE(log_id(), "_table_config->lock_table_key %u\n", _table_config->lock_table_key);
 
         bool success = rdmaCompareAndSwapMask(
             _qp,
@@ -699,6 +685,11 @@ namespace cuckoo_rcuckoo {
     vector<VRMessage> RCuckoo::insert_direct() {
 
         _state = INSERTING;
+
+        VERBOSE("pre search", "searching in buckets..\n");
+        for (int i=0; i< _locks_held.size();i++) {
+            VERBOSE("pre search", "lock %d\n", _locks_held[i]);
+        }
         vector<unsigned int> search_buckets = lock_indexes_to_buckets(_locks_held, _buckets_per_lock);
         _search_path = (this->*_table_search_function)(search_buckets);
         _search_path_index = _search_path.size() -1;
@@ -710,7 +701,7 @@ namespace cuckoo_rcuckoo {
 
 
         vector<VRMessage> insert_messages;
-        vector<VRMaskedCasData> unlock_messages = get_unlock_masked_cas();
+        vector<VRMessage> unlock_messages = release_locks_batched();
 
 
         unsigned int total_messages = unlock_messages.size();
@@ -800,12 +791,11 @@ namespace cuckoo_rcuckoo {
 
         vector<VRMaskedCasData> lock_list = get_lock_list(buckets, _buckets_per_lock, _locks_per_message);
         vector<VRReadData> covering_reads = get_covering_reads_from_lock_list(lock_list, _buckets_per_lock, _table.row_size_bytes());
-        vector<VRMessage> masked_cas_messages = create_masked_cas_messages_from_lock_list(lock_list);
+        // vector<VRMessage> masked_cas_messages = create_masked_cas_messages_from_lock_list(lock_list);
         // _current_locking_messages = masked_cas_messages;
 
         for (unsigned int i = 0; i < lock_list.size(); i++) {
             INFO(log_id(), "[aquire_locks] lock %d -> [lock %s] [read %s]\n", i, lock_list[i].to_string().c_str(), covering_reads[i].to_string().c_str());
-            INFO(log_id(), "[aquire_locks] old masked cas message %d -> %s\n", i, masked_cas_messages[i].to_string().c_str());
         }
 
         assert(lock_list.size() == covering_reads.size());
@@ -817,17 +807,17 @@ namespace cuckoo_rcuckoo {
         bool failed_last_request = false;
 
         //Inital send TODO probably put this in a while loop
-        unsigned int lock_index = 0;
+        unsigned int message_index = 0;
         while (!locking_complete) {
 
-            assert(lock_index < lock_list.size());
+            assert(message_index < lock_list.size());
 
             // vector<VRMessage> lock_and_read =  get_current_locking_message_with_covering_read();
             // VRMessage lock_message = lock_and_read[0];
             // VRMessage read_message = lock_and_read[1];
 
-            VRMaskedCasData lock = lock_list[lock_index];
-            VRReadData read = covering_reads[lock_index];
+            VRMaskedCasData lock = lock_list[message_index];
+            VRReadData read = covering_reads[message_index];
 
             _wr_id++;
             int outstanding_cas_wr_id = _wr_id;
@@ -879,6 +869,7 @@ namespace cuckoo_rcuckoo {
             if ((received_locks & mask) == old_value) {
                 // ALERT(log_id(), "we got the lock!\n");
                 receive_successful_locking_message(lock);
+                message_index++;
                 if (failed_last_request) {
                     failed_last_request = false;
                     // ALERT("put direct", "grabbed some locks after failing!\n");
@@ -894,11 +885,14 @@ namespace cuckoo_rcuckoo {
                 failed_last_request = true;
             }
 
-            if (all_locks_aquired()) {
+            if (lock_list.size() == message_index) {
                 locking_complete = true;
+                SUCCESS("put direct", "we got all the locks!\n");
                 break;
             }
             _current_insert_rtt++;
+
+            // lock_index++;
 
             // lock_and_read = get_current_locking_message_with_covering_read();
             // lock_message = lock_and_read[0];

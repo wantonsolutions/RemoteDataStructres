@@ -71,6 +71,9 @@ unsigned int rcuckoo_primary_location(string key, unsigned int table_size){
     #ifdef DEBUG
     cout << "hash: " << hash << " table size " << table_size <<  endl;
     #endif
+    if (hash % 2 == 0) {
+        hash +=1;
+    }
     return hash % table_size;
 }
 
@@ -79,6 +82,9 @@ unsigned int rcuckoo_primary_location(Key key, unsigned int table_size){
     #ifdef DEBUG
     cout << "hash: " << hash << " table size " << table_size <<  endl;
     #endif
+    if (hash % 2 == 0) {
+        hash +=1;
+    }
     return hash % table_size;
 }
 
@@ -165,7 +171,7 @@ hash_locations rcuckoo_hash_locations(Key key, unsigned int table_size){
     hash_locations hl;
     hl.primary = rcuckoo_primary_location(key, table_size);
     hl.secondary = rcuckoo_secondary_location(key, DEFAULT_FACTOR, table_size);
-    // cout << "key " << key << "primary: " << hl.primary << " secondary: " << hl.secondary << endl;
+    // cout << "key " << key.to_string() << "primary: " << hl.primary << " secondary: " << hl.secondary << "table size" << table_size << endl;
     return hl;
 }
 

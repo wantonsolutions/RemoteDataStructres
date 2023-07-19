@@ -435,6 +435,7 @@ namespace cuckoo_search {
                 fast_push_list(closed_list, search_element);
 
                 hash_locations locations = location_func(*(search_element.pe.key), table_rows);
+                // ALERT("DEBUG", "hash locations 1) %d 2) %d  table_size %d\n", locations.primary, locations.secondary, table_rows);
                 unsigned int table_index = next_table_index(search_element.pe.table_index);
                 unsigned int index = table_index_to_hash_location(locations, table_index);
 

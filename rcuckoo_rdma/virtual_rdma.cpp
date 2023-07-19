@@ -297,6 +297,7 @@ namespace cuckoo_virtual_rdma {
                 lock_indexes.push_back(base_index + i);
             }
         }
+        // ALERT("lock_message to indexes","appending a total of %d locks\n", lock_indexes.size());
         return lock_indexes;
 
     }
@@ -575,6 +576,7 @@ namespace cuckoo_virtual_rdma {
     VRReadData get_covering_read_from_lock(VRMaskedCasData masked_cas, unsigned int buckets_per_lock, unsigned int row_size_bytes) {
         VRReadData read_data;
         #define BITS_PER_MASKED_CAS 64
+        #define BITS_PER_BYTE 8
         unsigned int min_index = BITS_PER_MASKED_CAS;
         unsigned int max_index = 0;
         //TODO use something like __builtin_clz for better efficency
@@ -583,23 +585,30 @@ namespace cuckoo_virtual_rdma {
         for (int i=0; i<BITS_PER_MASKED_CAS; i++) {
             // printf("i: %d, mask: %16lx\n", i, masked_cas.mask);
             // printf("i: %d, hit : %16lx\n", i, (one << i));
-            unsigned int index = BITS_PER_MASKED_CAS - i - 1;
+            unsigned int index = (BITS_PER_MASKED_CAS - i) - 1;
             if (masked_cas.mask & (one << i)) {
 
-                max_index = index;
+                if (index > max_index) {
+                    // printf("HIT HIT HIT\n");
+                    // printf("max i: %d, hit : %16lx\n", i, (one << i));
+                    max_index = index;
+                }
                 if (index < min_index ) {
+                    // printf("min i: %d, hit : %16lx\n", i, (one << i));
                     min_index = index;
                 }
             }
         }
         assert(max_index >= min_index);
 
+        // ALERT("cover read", "Min index is %d, max index is %d\n", min_index, max_index);
+
         hash_locations buckets;
         buckets.primary = (min_index) * buckets_per_lock;
         buckets.secondary = (max_index) * buckets_per_lock + (buckets_per_lock - 1);
 
         read_data.size= single_read_size_bytes(buckets, row_size_bytes);
-        read_data.row = min_index;
+        read_data.row = min_index + (BITS_PER_BYTE * masked_cas.min_lock_index);
         read_data.offset = 0;
         return read_data;
     }
