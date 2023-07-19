@@ -61,6 +61,8 @@ namespace cuckoo_rcuckoo {
 
 
             void receive_successful_locking_message(VRMaskedCasData message);
+            void receive_successful_unlocking_message(VRMaskedCasData message);
+            vector<VRMaskedCasData> get_unlock_masked_cas();
 
 
             void complete_insert_stats(bool success);

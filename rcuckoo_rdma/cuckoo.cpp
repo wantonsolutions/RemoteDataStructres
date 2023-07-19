@@ -368,6 +368,16 @@ namespace cuckoo_rcuckoo {
         _locking_message_index++;
     }
 
+    void RCuckoo::receive_successful_unlocking_message(VRMaskedCasData message) {
+        vector<unsigned int> unlock_indexes = lock_message_to_lock_indexes(message);
+        for (unsigned int i = 0; i < unlock_indexes.size(); i++) {
+            _locks_held.erase(remove(_locks_held.begin(), _locks_held.end(), unlock_indexes[i]), _locks_held.end());
+        }
+        //checking that the locks do not have duplicates
+        assert(_locks_held.size() == set<unsigned int>(_locks_held.begin(), _locks_held.end()).size());
+        _locking_message_index++;
+    }
+
     VRMessage RCuckoo::get_prior_locking_message() {
         return _current_locking_messages[_locking_message_index - 1];
     }
@@ -393,13 +403,18 @@ namespace cuckoo_rcuckoo {
         return release_locks_batched();
     }
 
-    vector<VRMessage> RCuckoo::release_locks_batched(){
+
+    vector<VRMaskedCasData> RCuckoo::get_unlock_masked_cas() {
         _locking_message_index=0;
         vector<unsigned int> buckets = lock_indexes_to_buckets(_locks_held, _buckets_per_lock);
-        //log info buckets
         sort(buckets.begin(), buckets.end());
         assert(is_sorted(buckets.begin(), buckets.end()));
-        vector<VRMaskedCasData> unlock_list = get_unlock_list(buckets, _buckets_per_lock, _locks_per_message);
+        return get_unlock_list(buckets, _buckets_per_lock, _locks_per_message);
+    }
+
+    vector<VRMessage> RCuckoo::release_locks_batched(){
+        _locking_message_index=0;
+        vector<VRMaskedCasData> unlock_list = get_unlock_masked_cas();
         _current_locking_messages = create_masked_cas_messages_from_lock_list(unlock_list);
         return _current_locking_messages;
     }
@@ -695,7 +710,7 @@ namespace cuckoo_rcuckoo {
 
 
         vector<VRMessage> insert_messages;
-        vector<VRMessage> unlock_messages = release_locks_batched();
+        vector<VRMaskedCasData> unlock_messages = get_unlock_masked_cas();
 
 
         unsigned int total_messages = unlock_messages.size();
@@ -785,11 +800,12 @@ namespace cuckoo_rcuckoo {
 
         vector<VRMaskedCasData> lock_list = get_lock_list(buckets, _buckets_per_lock, _locks_per_message);
         vector<VRReadData> covering_reads = get_covering_reads_from_lock_list(lock_list, _buckets_per_lock, _table.row_size_bytes());
-        // vector<VRMessage> masked_cas_messages = create_masked_cas_messages_from_lock_list(lock_list);
+        vector<VRMessage> masked_cas_messages = create_masked_cas_messages_from_lock_list(lock_list);
         // _current_locking_messages = masked_cas_messages;
 
         for (unsigned int i = 0; i < lock_list.size(); i++) {
             INFO(log_id(), "[aquire_locks] lock %d -> [lock %s] [read %s]\n", i, lock_list[i].to_string().c_str(), covering_reads[i].to_string().c_str());
+            INFO(log_id(), "[aquire_locks] old masked cas message %d -> %s\n", i, masked_cas_messages[i].to_string().c_str());
         }
 
         assert(lock_list.size() == covering_reads.size());
