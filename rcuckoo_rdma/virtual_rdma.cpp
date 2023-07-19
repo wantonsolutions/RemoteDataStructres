@@ -52,6 +52,13 @@ namespace cuckoo_virtual_rdma {
         return s;
     }
 
+    string VRReadData::to_string() {
+        string s = "VRReadData: {";
+        s += "row: " + std::to_string(row);
+        s += " offset: " + std::to_string(offset);
+        s += " size: " + std::to_string(size);
+        return s;
+    }
 
 
     message_type VRMessage::get_message_type(){
@@ -276,6 +283,21 @@ namespace cuckoo_virtual_rdma {
             unsigned int base_index = stoi(lock_message.function_args["lock_index"]);
             // base_index = base_index * 8; //convert bit alignment to byte alignment for ease of manipulation
             return base_index;
+
+    }
+
+    vector<unsigned int> lock_message_to_lock_indexes(VRMaskedCasData lock_message) {
+        vector<unsigned int> lock_indexes;
+        uint64_t mask = reverse_uint64_t(lock_message.mask);
+        unsigned int base_index = lock_message.min_lock_index * 8;
+
+        uint64_t one = 1;
+        for (uint64_t i=0; i<64; i++) {
+            if (mask & (one << i)) {
+                lock_indexes.push_back(base_index + i);
+            }
+        }
+        return lock_indexes;
 
     }
 
@@ -540,6 +562,46 @@ namespace cuckoo_virtual_rdma {
 
         VRMessage read_message = multi_bucket_read_message(buckets, row_size_bytes)[0];
         return read_message;
+    }
+
+    vector<VRReadData> get_covering_reads_from_lock_list(vector<VRMaskedCasData> masked_cas_list, unsigned int buckets_per_lock, unsigned int row_size_bytes) {
+        vector<VRReadData> read_data_list;
+        for (int i=0; i<masked_cas_list.size(); i++) {
+            read_data_list.push_back(get_covering_read_from_lock(masked_cas_list[i], buckets_per_lock, row_size_bytes));
+        }
+        return read_data_list;
+    }
+
+    VRReadData get_covering_read_from_lock(VRMaskedCasData masked_cas, unsigned int buckets_per_lock, unsigned int row_size_bytes) {
+        VRReadData read_data;
+        #define BITS_PER_MASKED_CAS 64
+        unsigned int min_index = BITS_PER_MASKED_CAS;
+        unsigned int max_index = 0;
+        //TODO use something like __builtin_clz for better efficency
+        // printf("ITTERATING THROUGH MASK %16lx\n", masked_cas.mask);
+        uint64_t one = 1;
+        for (int i=0; i<BITS_PER_MASKED_CAS; i++) {
+            // printf("i: %d, mask: %16lx\n", i, masked_cas.mask);
+            // printf("i: %d, hit : %16lx\n", i, (one << i));
+            unsigned int index = BITS_PER_MASKED_CAS - i - 1;
+            if (masked_cas.mask & (one << i)) {
+
+                max_index = index;
+                if (index < min_index ) {
+                    min_index = index;
+                }
+            }
+        }
+        assert(max_index >= min_index);
+
+        hash_locations buckets;
+        buckets.primary = (min_index) * buckets_per_lock;
+        buckets.secondary = (max_index) * buckets_per_lock + (buckets_per_lock - 1);
+
+        read_data.size= single_read_size_bytes(buckets, row_size_bytes);
+        read_data.row = min_index;
+        read_data.offset = 0;
+        return read_data;
     }
 
     VRMessage cas_table_entry_message(unsigned int bucket_index, unsigned int bucket_offset, Key old, Key new_value) {

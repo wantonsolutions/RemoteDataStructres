@@ -68,6 +68,13 @@ namespace cuckoo_virtual_rdma {
         string to_string();
     } VRMaskedCasData;
 
+    typedef struct VRReadData {
+        unsigned int size;
+        unsigned int row;
+        unsigned int offset;
+        string to_string();
+    } VRReadData;
+
     #define ETHERNET_SIZE 18
     #define IP_SIZE 20
     #define UDP_SIZE 8
@@ -142,6 +149,11 @@ namespace cuckoo_virtual_rdma {
     VRMessage cas_table_entry_message(unsigned int bucket_index, unsigned int bucket_offset, Key old, Key new_value);
     VRMessage next_cas_message(vector<path_element> search_path, unsigned int index);
     vector<VRMessage> gen_cas_messages(vector<path_element> search_path);
+
+    //RDMA specific functions
+    vector<VRReadData> get_covering_reads_from_lock_list(vector<VRMaskedCasData> masked_cas_list, unsigned int buckets_per_lock, unsigned int row_size_bytes);
+    VRReadData get_covering_read_from_lock(VRMaskedCasData masked_cas, unsigned int buckets_per_lock, unsigned int row_size_bytes);
+    vector<unsigned int> lock_message_to_lock_indexes(VRMaskedCasData lock_message);
 
 }
 

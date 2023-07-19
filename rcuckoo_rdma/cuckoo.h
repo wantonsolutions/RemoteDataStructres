@@ -60,6 +60,9 @@ namespace cuckoo_rcuckoo {
             void receive_successful_unlocking_message(VRMessage message);
 
 
+            void receive_successful_locking_message(VRMaskedCasData message);
+
+
             void complete_insert_stats(bool success);
             void complete_insert();
 
@@ -76,8 +79,10 @@ namespace cuckoo_rcuckoo {
             /* RDMA specific functions */
             uint64_t local_to_remote_table_address(uint64_t local_address);
             void send_virtual_read_message(VRMessage message, uint64_t wr_id);
+            void send_virtual_read_message(VRReadData message, uint64_t wr_id);
             void send_virtual_cas_message(VRMessage message, uint64_t wr_id);
             void send_virtual_masked_cas_message(VRMessage message, uint64_t wr_id);
+            void send_virtual_masked_cas_message(VRMaskedCasData message, uint64_t wr_id);
             vector<VRMessage> rdma_fsm(VRMessage message);
             void init_rdma_structures(rcuckoo_rdma_info info);
             vector<VRMessage> put_direct();
@@ -99,6 +104,8 @@ namespace cuckoo_rcuckoo {
             vector<unsigned int> _locks_held;
             vector<VRMessage> _current_locking_messages;
             vector<VRMessage> _current_locking_read_messages;
+
+
             int _locking_message_index;
 
             /*rdma specific variables*/
