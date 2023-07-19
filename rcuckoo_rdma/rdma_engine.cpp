@@ -305,6 +305,8 @@ namespace cuckoo_rdma_engine {
         int outstanding_messages = 0;
         while(true){
             //Pop off an ingress message
+
+
             VRMessage current_ingress_message;
             if (ingress_messages.size() > 0){
                 current_ingress_message = *ingress_messages.begin();
@@ -315,6 +317,10 @@ namespace cuckoo_rdma_engine {
 
             // messages = _state_machine->fsm(current_ingress_message);
             messages = _rcuckoo->rdma_fsm(current_ingress_message);
+            if (messages.size() > 0){
+                ALERT(log_id(), "State Machine returned %d messages\n", messages.size());
+                ALERT(log_id(), "State Machine returned %s\n", messages[0].to_string().c_str());
+            }
 
             if (messages.size() == 0 && _state_machine->is_complete()) {
                 ALERT(log_id(), "State Machine is complete\n");
