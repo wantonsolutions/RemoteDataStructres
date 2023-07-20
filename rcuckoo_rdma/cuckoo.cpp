@@ -608,26 +608,15 @@ namespace cuckoo_rcuckoo {
     void RCuckoo::send_virtual_cas_message(VRCasData message, uint64_t wr_id){
 
         // ALERT("sending cas data", "data %s\n", message.to_string().c_str());
-        uint32_t bucket_id = message.row;
-        uint32_t bucket_offset = message.offset;
-        uint64_t old = message.old;
-        old = __builtin_bswap64(old);
-        old = old >> 32;
-        uint64_t new_val = message.new_value;
-        new_val = __builtin_bswap64(new_val);
-        new_val = new_val >> 32;
-
-        uint64_t local_address = (uint64_t) get_entry_pointer(bucket_id, bucket_offset);
+        uint64_t local_address = (uint64_t) get_entry_pointer(message.row, message.offset);
         uint64_t remote_server_address = local_to_remote_table_address(local_address);
-
-
 
         bool success = rdmaCompareAndSwap(
             _qp, 
             local_address, 
             remote_server_address,
-            old, 
-            new_val, 
+            message.old, 
+            message.new_value, 
             _table_mr->lkey,
             _table_config->remote_key, 
             true, 

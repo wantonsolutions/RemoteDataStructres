@@ -636,8 +636,8 @@ namespace cuckoo_virtual_rdma {
         VRCasData cas_message;
         cas_message.row = bucket_index;
         cas_message.offset = bucket_offset;
-        cas_message.old = stoull(old.to_string(),nullptr,16);
-        cas_message.new_value = stoull(new_value.to_string(),nullptr,16);
+        cas_message.old = old.to_uint64_t();
+        cas_message.new_value = new_value.to_uint64_t();
         return cas_message;
     }
 

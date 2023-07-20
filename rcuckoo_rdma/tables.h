@@ -29,6 +29,7 @@ namespace cuckoo_tables {
     typedef struct Key { 
         uint8_t bytes[KEY_SIZE];
         string to_string();
+        uint64_t to_uint64_t();
         bool is_empty();
         bool operator==(const Key& rhs) const {
             for (int i = 0; i < KEY_SIZE; i++){

@@ -33,6 +33,18 @@ namespace cuckoo_tables {
         return s;
     }
 
+    uint64_t Key::to_uint64_t(){
+        uint64_t val = 0;
+        assert(KEY_SIZE <= 8);
+        for (int i = 0; i < KEY_SIZE; i++){
+            val |= (uint64_t) bytes[i] << (8 * i);
+        }
+        // for (int i = KEY_SIZE; i < 8; i++){
+        //     val |= (uint64_t) 0 << (8 * i);
+        // }
+        return val;
+    }
+
     bool Key::is_empty(){
         for (int i = 0; i < KEY_SIZE; i++){
             if (bytes[i] != 0){
