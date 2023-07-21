@@ -285,17 +285,25 @@ namespace cuckoo_tables {
         string output_string = "";
         output_string += "Table\n";
         for (unsigned int i = 0; i < _table_size; i++){
-            string index_string = std::to_string(i);
-            index_string = pad_string(index_string, 5);
-            output_string += index_string  +  ") ";
-            for (unsigned int j = 0; j < _bucket_size; j++){
-                output_string += "[" + _table[i][j].to_string() += "]";
-            }
+            output_string += row_to_string(i);
             output_string += "\n";
         }
         output_string += "\nLock Table\n";
         output_string += _lock_table.to_string() + "\n";
         output_string += std::to_string(get_fill_percentage()) + "% full\n";
+        return output_string;
+    }
+
+
+    string Table::row_to_string(unsigned int row) {
+        assert(row < _table_size);
+        string output_string = "";
+        string index_string = std::to_string(row);
+        index_string = pad_string(index_string, 5);
+        output_string += index_string  +  ") ";
+        for (unsigned int j = 0; j < _bucket_size; j++){
+            output_string += "[" + _table[row][j].to_string() += "]";
+        }
         return output_string;
     }
 

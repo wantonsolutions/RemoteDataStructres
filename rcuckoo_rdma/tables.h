@@ -208,6 +208,7 @@ namespace cuckoo_tables {
             // ~Table();
             void unlock_all();
             string to_string();
+            string row_to_string(unsigned int row);
             void print_table();
             Entry ** get_underlying_table();
             void set_underlying_table(Entry ** table);

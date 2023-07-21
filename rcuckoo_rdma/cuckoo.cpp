@@ -99,7 +99,7 @@ namespace cuckoo_rcuckoo {
         set_search_function(config);
         set_location_function(config);
 
-        sprintf(_log_identifier, "Client: %d", _id);
+        sprintf(_log_identifier, "Client: %3d", _id);
     }
 
     string RCuckoo::get_state_machine_name() {
@@ -227,7 +227,8 @@ namespace cuckoo_rcuckoo {
         INFO(log_id(), "[complete_insert] key %s\n", _current_insert_key.to_string().c_str());
         _state = IDLE;
         _inserting = false;
-        complete_insert_stats(true);
+
+        // complete_insert_stats(true);
         return;
     }
 
@@ -733,7 +734,15 @@ namespace cuckoo_rcuckoo {
         _search_path = (this->*_table_search_function)(search_buckets);
         _search_path_index = _search_path.size() -1;
         if (_search_path.size() <=0 ) {
-            INFO(log_id(), "Second Search Failed for key %s retry time\n", _current_insert_key.to_string().c_str(), _id);
+            WARNING(log_id(), "Second Search Failed for key %s retry time\n", _current_insert_key.to_string().c_str(), _id);
+            assert(search_buckets.size() == _locks_held.size());
+            for (int i=0; i< search_buckets.size(); i++) {
+                WARNING(log_id(), "search_buckets[%d] = %d\n", i, search_buckets[i]);
+                WARNING(log_id(), "locks_held[%d] = %d\n", i, _locks_held[i]);
+                WARNING(log_id(), "%s\n", _table.row_to_string(search_buckets[i]).c_str());
+
+
+            }
             INFO(log_id(), "Hi Stew, I\'m hoping you have a great day", _current_insert_key.to_string().c_str(), _id);
             _state = RELEASE_LOCKS_TRY_AGAIN;
         }
@@ -930,7 +939,7 @@ namespace cuckoo_rcuckoo {
 
             if (lock_list.size() == message_index) {
                 locking_complete = true;
-                SUCCESS("put direct", "we got all the locks!\n");
+                SUCCESS(log_id(), " [put-direct] we got all the locks!\n");
                 break;
             }
             _current_insert_rtt++;

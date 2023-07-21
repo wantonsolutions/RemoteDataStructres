@@ -108,6 +108,10 @@ namespace cuckoo_virtual_rdma {
     #define MASKED_CAS_RESPONSE_SIZE (BASE_ROCE_SIZE + MASKED_CAS_RESPONSE_HEADER)
 
 
+    #define MAX_LOCKS 512
+    #define BITS_IN_MASKED_CAS 64
+
+
     string message_type_to_function_string(message_type type);
     uint32_t header_size(message_type type);
     unordered_map<string,string> unpack_read_read_response(VRMessage &msg);
@@ -134,6 +138,10 @@ namespace cuckoo_virtual_rdma {
     vector<VRMaskedCasData> get_lock_list(vector<unsigned int> buckets, unsigned int buckets_per_lock, unsigned int locks_per_message);
 
     vector<unsigned int> get_unique_lock_indexes(vector<unsigned int> buckets, unsigned int buckets_per_lock);
+    vector<VRMaskedCasData> get_lock_or_unlock_list_fast(vector<unsigned int> buckets, unsigned int buckets_per_lock, unsigned int locks_per_message, bool locking);
+    unsigned int get_unique_lock_indexes_fast(vector<unsigned int> buckets, unsigned int buckets_per_lock, unsigned int *unique_buckets, unsigned int unique_buckets_size);
+
+
     unsigned int byte_aligned_index(unsigned int index);
     unsigned int sixty_four_aligned_index(unsigned int index);
     unsigned int get_min_sixty_four_aligned_index(vector<unsigned int> indexes);
