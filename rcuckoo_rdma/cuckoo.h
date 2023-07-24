@@ -8,6 +8,7 @@
 #include "config.h"
 #include <unordered_map>
 #include <infiniband/verbs.h>
+#include <atomic>
 
 using namespace cuckoo_state_machines;
 using namespace cuckoo_search;
@@ -90,6 +91,9 @@ namespace cuckoo_rcuckoo {
             vector<VRMessage> put_direct();
             vector<VRMessage> insert_direct();
 
+            void set_global_start_flag(bool * flag);
+            void set_global_end_flag(bool * flag);
+
 
             vector<VRMaskedCasData> get_current_unlock_list();
 
@@ -100,6 +104,9 @@ namespace cuckoo_rcuckoo {
             unsigned int _read_threshold_bytes;
             unsigned int _buckets_per_lock;
             unsigned int _locks_per_message;
+
+            bool * _global_start_flag;
+            bool * _global_end_flag;
 
 
             Table _table;

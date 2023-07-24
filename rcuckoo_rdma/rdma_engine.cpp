@@ -5,6 +5,7 @@
 #include "cuckoo.h"
 #include <vector>
 #include <infiniband/verbs.h>
+#include <atomic>
 
 #include "rdma_common.h"
 #include "rdma_client_lib.h"
@@ -12,6 +13,8 @@
 #include "log.h"
 #include "memcached.h"
 #include "rdma_helper.h"
+
+#include <chrono>
 
 
 using namespace std;
@@ -145,15 +148,60 @@ namespace cuckoo_rdma_engine {
         VERBOSE("RDMA Engine", "starting rdma engine\n");
         VERBOSE("RDMA Engine", "for the moment just start the first of the state machines\n");
         pthread_t* thread_ids = (pthread_t*) calloc(_num_clients, sizeof(pthread_t));
+
+        bool global_start_flag = false;
+        bool global_end_flag = false;
+
+
+        // bool *global_start_flag = (bool *) calloc(_num_clients, sizeof(bool));
+        // bool *global_end_flag = (bool *) calloc(_num_clients, sizeof(bool));
+
+        for(int i=0;i<_num_clients;i++){
+            _state_machines[i]._rcuckoo->set_global_start_flag(&global_start_flag);
+            _state_machines[i]._rcuckoo->set_global_end_flag(&global_end_flag);
+        }
         for (int i=0;i<_num_clients;i++) {
             printf("Creating Client Thread %d\n", i);
             pthread_create(&thread_ids[i], NULL, (THREADFUNCPTR)&State_Machine_Wrapper::start, &_state_machines[i]);
         }
+
+        using std::chrono::high_resolution_clock;
+        using std::chrono::duration_cast;
+        using std::chrono::duration;
+        using std::chrono::milliseconds;
+
+        //Start the treads
+        auto t1 = high_resolution_clock::now();
+        global_start_flag = true;
+        sleep(10);
+        global_end_flag = true;
+        auto t2 = high_resolution_clock::now();
+        auto ms_int = duration_cast<milliseconds>(t2 - t1);
+
+        //Get all of the threads to join
         for (int i=0;i<_num_clients;i++){
             printf("Joining Client Thread %d\n", i);
             pthread_join(thread_ids[i],NULL);
         }
-        // _state_machines[0].start();
+
+
+        //Collect statistics from each of the threads
+        vector<unordered_map<string,string>> statistics;
+        for (int i=0;i<_num_clients;i++) {
+            printf("Grabbing Statistics Off of Client Thread %d\n", i);
+            statistics.push_back(_state_machines[i]._rcuckoo->get_stats());
+        }
+
+        //print statistics
+        for (int i=0;i<_num_clients;i++) {
+            printf("Printing Statistics Off of Client Thread %d\n", i);
+            for (auto it = statistics[i].begin(); it != statistics[i].end(); ++it) {
+                printf("%s: %s\n", it->first.c_str(), it->second.c_str());
+            }
+        }
+        uint64_t puts = stoull(statistics[0]["completed_puts"]);
+        printf("Throughput: %f\n", puts / (ms_int.count() / 1000.0));
+
 
  
         free(thread_ids);
@@ -280,6 +328,7 @@ namespace cuckoo_rdma_engine {
             exit(1);
         }
     }
+
 
     
     #define MAX_CONCURRENT_MESSAGES 32

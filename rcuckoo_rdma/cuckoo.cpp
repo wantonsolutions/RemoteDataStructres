@@ -45,6 +45,16 @@ namespace cuckoo_rcuckoo {
         _table.print_table();
     }
 
+    
+    void RCuckoo::set_global_start_flag(bool * flag) {
+        _global_start_flag = flag;
+    }
+
+    void RCuckoo::set_global_end_flag(bool * flag) {
+        _global_end_flag = flag;
+    }
+
+
     string vector_to_string(vector<unsigned int> buckets) {
 
         stringstream ss;
@@ -956,62 +966,66 @@ namespace cuckoo_rcuckoo {
 
 
     vector<VRMessage> RCuckoo::rdma_fsm(VRMessage message) {
-
         if (message.get_message_type() != NO_OP_MESSAGE) {
             VERBOSE(log_id(), "Received Message: %s\n", message.to_string().c_str());
         }
         vector<VRMessage> response = vector<VRMessage>();
 
+        //Hold here until the global start flag is set
+        while(!*_global_start_flag){};
+        printf("Starting RDMA FSM Start Flag Set\n");
+        while(!*_global_end_flag) {
 
-        //The client is done
-        if (_complete && _state == IDLE) {
-            response = vector<VRMessage>();
-            return response;
+            //The client is done
+            if (_complete && _state == IDLE) {
+                response = vector<VRMessage>();
+                return response;
+            }
+
+            Request next_request;
+            switch(_state) {
+                case IDLE:
+
+                    next_request = _workload_driver.next();
+                    VERBOSE("DEBUG: general idle fsm","Generated New Request: %s\n", next_request.to_string().c_str());
+
+                    if (next_request.op == NO_OP) {
+                            response = vector<VRMessage>();
+                    } else if (next_request.op == PUT) {
+                        _current_insert_key = next_request.key;
+                        response=put_direct();
+                    } else if (next_request.op == GET) {
+                        _current_read_key = next_request.key;
+                        response=get();
+                    } else {
+                        printf("ERROR: unknown operation\n");
+                        throw logic_error("ERROR: unknown operation");
+                    }
+                    break;
+
+
+                case READING:
+                    response = read_fsm(message);
+                    break;
+                case RELEASE_LOCKS_TRY_AGAIN:
+                    response = put_direct();
+                    break;
+                default:
+                    throw logic_error("ERROR: Invalid state");
+            }
+
+            for (unsigned int i = 0; i < response.size(); i++) {
+                VERBOSE(log_id(), "Sending Message: %s\n", response[i].to_string().c_str());
+            }
+
+        }
+        ALERT(log_id(), "BREAKING EXIT FLAG!!\n");
+
+        if(*_global_end_flag == true) {
+            _complete = true;
         }
 
-        Request next_request;
-        switch(_state) {
-            case IDLE:
-
-                next_request = _workload_driver.next();
-                VERBOSE("DEBUG: general idle fsm","Generated New Request: %s\n", next_request.to_string().c_str());
-
-                if (next_request.op == NO_OP) {
-                     response = vector<VRMessage>();
-                } else if (next_request.op == PUT) {
-                    _current_insert_key = next_request.key;
-                    response=put_direct();
-                } else if (next_request.op == GET) {
-                    _current_read_key = next_request.key;
-                    response=get();
-                } else {
-                    printf("ERROR: unknown operation\n");
-                    throw logic_error("ERROR: unknown operation");
-                }
-                break;
-
-
-            case READING:
-                response = read_fsm(message);
-                break;
-            case AQUIRE_LOCKS:
-                response = aquire_locks_with_reads_fsm(message);
-                break;
-            case RELEASE_LOCKS_TRY_AGAIN:
-                response = put_direct();
-                break;
-            case INSERTING:
-                response = insert_and_release_fsm(message);
-                break;
-            default:
-                throw logic_error("ERROR: Invalid state");
-        }
-
-        for (unsigned int i = 0; i < response.size(); i++) {
-            VERBOSE(log_id(), "Sending Message: %s\n", response[i].to_string().c_str());
-        }
         return response;
-
     }
 }
 
