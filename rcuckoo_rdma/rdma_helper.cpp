@@ -1,5 +1,6 @@
 #include "rdma_helper.h"
 #include "rdma_common.h"
+#include <cassert>
 
 namespace rdma_helper {
     int bulk_poll(struct ibv_cq *cq, int num_entries, struct ibv_wc *wc) {
@@ -22,6 +23,24 @@ namespace rdma_helper {
             }     
         } while (n < 1);
         return n;
+    }
+
+
+    void send_bulk(int n, ibv_qp * qp, struct ibv_exp_send_wr *send_work_request_batch) {
+        assert(n > 0);
+        assert(send_work_request_batch);
+        struct ibv_exp_send_wr **bad_send_wr;
+        for (int i = 0; i < n; i++) {
+            send_work_request_batch[i].next=&(send_work_request_batch[i+1]);
+        }
+        send_work_request_batch[n-1].next=NULL;
+        int ret = ibv_exp_post_send(qp, 
+                &(send_work_request_batch[0]),
+                bad_send_wr);
+        if (ret) {
+            rdma_error("Failed to write client src buffer, errno: %d \n", -errno);
+            exit(1);
+        }
     }
 
 
@@ -77,30 +96,54 @@ namespace rdma_helper {
         return true;
     }
 
+    void setRdmaReadExp(struct ibv_sge * sg, struct ibv_exp_send_wr * wr, uint64_t source, uint64_t dest, uint64_t size,
+        uint32_t lkey, uint32_t remoteRKey, bool signal, uint64_t wrID) {
+
+        fillSgeWr(*sg, *wr, source, size, lkey);
+
+        wr->exp_opcode = IBV_EXP_WR_RDMA_READ;
+
+        if (signal) {
+            wr->exp_send_flags |= IBV_EXP_SEND_SIGNALED;
+        }
+
+        wr->wr.rdma.remote_addr = dest;
+        wr->wr.rdma.rkey = remoteRKey;
+        wr->wr_id = wrID;
+
+    }
+
     bool rdmaReadExp(ibv_qp *qp, uint64_t source, uint64_t dest, uint64_t size,
         uint32_t lkey, uint32_t remoteRKey, bool signal, uint64_t wrID) {
         struct ibv_sge sg;
         struct ibv_exp_send_wr wr;
         struct ibv_exp_send_wr *wrBad;
 
-        fillSgeWr(sg, wr, source, 8, lkey);
-
-        wr.exp_opcode = IBV_EXP_WR_RDMA_READ;
-
-        if (signal) {
-            wr.exp_send_flags |= IBV_EXP_SEND_SIGNALED;
-        }
-
-        wr.wr.rdma.remote_addr = dest;
-        wr.wr.rdma.rkey = remoteRKey;
-        wr.wr_id = wrID;
-
+        setRdmaReadExp(&sg, &wr, source, dest, size, lkey, remoteRKey, signal, wrID);
         int ret = ibv_exp_post_send(qp, &wr, &wrBad);
         if (ret) {
             printf("send with rdma exp read failed due to %d\n", ret);
             return false;
         }
         return true;
+    }
+
+    void setRdmaCompareAndSwap(struct ibv_sge * sg, struct ibv_send_wr * wr, ibv_qp *qp, uint64_t source, uint64_t dest,
+            uint64_t compare, uint64_t swap, uint32_t lkey,
+            uint32_t remoteRKey, bool signal, uint64_t wrID) {
+            fillSgeWr(*sg, *wr, source, 8, lkey);
+
+            wr->opcode = IBV_WR_ATOMIC_CMP_AND_SWP;
+
+            if (signal) {
+                wr->send_flags = IBV_SEND_SIGNALED;
+            }
+
+            wr->wr.atomic.remote_addr = dest;
+            wr->wr.atomic.rkey = remoteRKey;
+            wr->wr.atomic.compare_add = compare;
+            wr->wr.atomic.swap = swap;
+            wr->wr_id = wrID;
     }
 
     // for RC & UC
@@ -111,20 +154,7 @@ namespace rdma_helper {
         struct ibv_send_wr wr;
         struct ibv_send_wr *wrBad;
 
-        fillSgeWr(sg, wr, source, 8, lkey);
-
-        wr.opcode = IBV_WR_ATOMIC_CMP_AND_SWP;
-
-        if (signal) {
-            wr.send_flags = IBV_SEND_SIGNALED;
-        }
-
-        wr.wr.atomic.remote_addr = dest;
-        wr.wr.atomic.rkey = remoteRKey;
-        wr.wr.atomic.compare_add = compare;
-        wr.wr.atomic.swap = swap;
-        wr.wr_id = wrID;
-
+        setRdmaCompareAndSwap(&sg, &wr, qp, source, dest, compare, swap, lkey, remoteRKey, signal, wrID);
         if (ibv_post_send(qp, &wr, &wrBad)) {
             printf("send with rdma compare and swap failed\n");
             // sleep(5);
@@ -133,33 +163,42 @@ namespace rdma_helper {
         return true;
     }
 
+    void setRdmaCompareAndSwapMask(struct ibv_sge* sg, struct ibv_exp_send_wr *wr, ibv_qp *qp, uint64_t source, uint64_t dest,
+                                uint64_t compare, uint64_t swap, uint32_t lkey,
+                                uint32_t remoteRKey, uint64_t mask, bool singal, uint64_t wr_ID) {
+        fillSgeWr(*sg, *wr, source, 8, lkey);
+
+        wr->next = NULL;
+        wr->exp_opcode = IBV_EXP_WR_EXT_MASKED_ATOMIC_CMP_AND_SWP;
+        wr->exp_send_flags = IBV_EXP_SEND_EXT_ATOMIC_INLINE;
+        wr->wr_id = wr_ID;
+
+        if (singal) {
+            wr->exp_send_flags |= IBV_EXP_SEND_SIGNALED;
+        }
+
+        wr->ext_op.masked_atomics.log_arg_sz = 3;
+        wr->ext_op.masked_atomics.remote_addr = dest;
+        wr->ext_op.masked_atomics.rkey = remoteRKey;
+
+        auto &op = wr->ext_op.masked_atomics.wr_data.inline_data.op.cmp_swap;
+        op.compare_val = compare;
+        op.swap_val = swap;
+
+        op.compare_mask = mask;
+        op.swap_mask = mask;
+
+
+    }
+
     bool rdmaCompareAndSwapMask(ibv_qp *qp, uint64_t source, uint64_t dest,
                                 uint64_t compare, uint64_t swap, uint32_t lkey,
                                 uint32_t remoteRKey, uint64_t mask, bool singal, uint64_t wr_ID) {
         struct ibv_sge sg;
         struct ibv_exp_send_wr wr;
         struct ibv_exp_send_wr *wrBad;
-        fillSgeWr(sg, wr, source, 8, lkey);
 
-        wr.next = NULL;
-        wr.exp_opcode = IBV_EXP_WR_EXT_MASKED_ATOMIC_CMP_AND_SWP;
-        wr.exp_send_flags = IBV_EXP_SEND_EXT_ATOMIC_INLINE;
-        wr.wr_id = wr_ID;
-
-        if (singal) {
-            wr.exp_send_flags |= IBV_EXP_SEND_SIGNALED;
-        }
-
-        wr.ext_op.masked_atomics.log_arg_sz = 3;
-        wr.ext_op.masked_atomics.remote_addr = dest;
-        wr.ext_op.masked_atomics.rkey = remoteRKey;
-
-        auto &op = wr.ext_op.masked_atomics.wr_data.inline_data.op.cmp_swap;
-        op.compare_val = compare;
-        op.swap_val = swap;
-
-        op.compare_mask = mask;
-        op.swap_mask = mask;
+        setRdmaCompareAndSwapMask(&sg, &wr, qp, source, dest, compare, swap, lkey, remoteRKey, mask, singal, wr_ID);
 
         int ret = ibv_exp_post_send(qp, &wr, &wrBad);
         if (ret) {

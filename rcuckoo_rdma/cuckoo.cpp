@@ -733,8 +733,48 @@ namespace cuckoo_rcuckoo {
     }
 
     void RCuckoo::send_lock_and_cover_message(VRMaskedCasData lock_message, VRReadData read_message, uint64_t wr_id) {
-        send_virtual_masked_cas_message(lock_message, wr_id);
-        send_virtual_read_message(read_message, wr_id + 1);
+        #define READ_AND_COVER_MESSAGE_COUNT 2
+        struct ibv_sge sg [READ_AND_COVER_MESSAGE_COUNT];
+        struct ibv_exp_send_wr wr [READ_AND_COVER_MESSAGE_COUNT];
+
+        //Lock
+        uint64_t local_lock_address = (uint64_t) get_lock_pointer(lock_message.min_lock_index);
+        uint64_t remote_lock_address = (uint64_t) _table_config->lock_table_address + lock_message.min_lock_index;
+        uint64_t compare = __builtin_bswap64(lock_message.old);
+        uint64_t swap = __builtin_bswap64(lock_message.new_value);
+        uint64_t mask = __builtin_bswap64(lock_message.mask);
+
+        setRdmaCompareAndSwapMask(
+            &sg[0],
+            &wr[0],
+            _qp,
+            local_lock_address,
+            remote_lock_address,
+            compare,
+            swap,
+            _lock_table_mr->lkey,
+            _table_config->lock_table_key,
+            mask,
+            true,
+            wr_id);
+
+        uint64_t local_address = (uint64_t) get_entry_pointer(read_message.row, read_message.offset);
+        uint64_t remote_server_address = local_to_remote_table_address(local_address);
+
+        //Covering Read
+        setRdmaReadExp(
+            &sg[1],
+            &wr[1],
+            local_address,
+            remote_server_address,
+            read_message.size,
+            _table_mr->lkey,
+            _table_config->remote_key,
+            true,
+            wr_id + 1
+        );
+        
+        send_bulk(READ_AND_COVER_MESSAGE_COUNT, _qp, wr);
     }
 
 
