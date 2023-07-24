@@ -33,10 +33,19 @@ namespace cuckoo_search {
 
         //todo fix this functionality
         set_sorted_buckets.pop_back(); // This removes the -1 element which will be big 4294967295 after sorting unsigned ints (legacy from searching weird)
-        // for (auto b : set_sorted_buckets){
-        //     cout << "search path to buckets bucket " << b << endl;
-        // }
         return set_sorted_buckets;
+    }
+
+    //Buckets should be initalized, it will be filled from the path
+    void search_path_to_buckets_fast(vector<path_element> &path, vector<unsigned int> &buckets) {
+        buckets.clear();
+        for (auto pe : path){
+            if (! (std::find(buckets.begin(), buckets.end(), pe.bucket_index) != buckets.end())){
+                buckets.push_back(pe.bucket_index);
+            }
+        }
+        sort(buckets.begin(), buckets.end());
+        buckets.pop_back();
     }
 
     vector<path_element> random_dfs_search(Key key, unsigned int table_size){

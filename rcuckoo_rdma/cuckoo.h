@@ -135,6 +135,7 @@ namespace cuckoo_rcuckoo {
 
             //Cached structures to prevent reinitalizations
             vector<vector<unsigned int>> _fast_lock_chunks;
+            vector<unsigned int> _buckets;
 
 
             // hash_locations  (*_location_function)(string, unsigned int);

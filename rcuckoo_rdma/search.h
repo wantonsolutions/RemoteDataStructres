@@ -85,6 +85,7 @@ namespace cuckoo_search {
 
     unsigned int get_table_id_from_index(unsigned int index);
     std::vector<unsigned int> search_path_to_buckets(std::vector<path_element> path);
+    void search_path_to_buckets_fast(vector<path_element> &path, vector<unsigned int> &buckets);
     std::vector<path_element> random_dfs_search(cuckoo_tables::Key key, unsigned int table_size);
     std::vector<path_element> bucket_cuckoo_insert(cuckoo_tables::Table table, hash_locations (*location_func) (std::string, unsigned int), cuckoo_tables::Key key, std::vector<unsigned int>  open_buckets);
     unsigned int next_search_index(path_element pe, hash_locations (*location_func) (std::string, unsigned int), cuckoo_tables::Table table);

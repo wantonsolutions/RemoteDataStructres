@@ -930,11 +930,11 @@ namespace cuckoo_rcuckoo {
 
         /* copied from aquire locks function */ 
         _locking_message_index = 0;
-        vector<unsigned int> buckets = search_path_to_buckets(_search_path);
+        search_path_to_buckets_fast(_search_path, _buckets);
         
         INFO(log_id(), "[aquire_locks] gathering locks for buckets %s\n", vector_to_string(buckets).c_str());
 
-        lock_list = get_lock_list_fast(buckets, _fast_lock_chunks, _buckets_per_lock, _locks_per_message);
+        lock_list = get_lock_list_fast(_buckets, _fast_lock_chunks, _buckets_per_lock, _locks_per_message);
         covering_reads = get_covering_reads_from_lock_list(lock_list, _buckets_per_lock, _table.row_size_bytes());
 
         for (unsigned int i = 0; i < lock_list.size(); i++) {

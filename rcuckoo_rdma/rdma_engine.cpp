@@ -173,7 +173,7 @@ namespace cuckoo_rdma_engine {
         //Start the treads
         auto t1 = high_resolution_clock::now();
         global_start_flag = true;
-        sleep(60);
+        sleep(20);
         global_end_flag = true;
         auto t2 = high_resolution_clock::now();
         auto ms_int = duration_cast<milliseconds>(t2 - t1);
