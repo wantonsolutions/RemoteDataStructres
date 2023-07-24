@@ -717,20 +717,11 @@ namespace cuckoo_virtual_rdma {
         return read_message;
     }
 
-    vector<VRReadData> get_covering_reads_from_lock_list(vector<VRMaskedCasData> masked_cas_list, unsigned int buckets_per_lock, unsigned int row_size_bytes) {
-        vector<VRReadData> read_data_list;
-        for (int i=0; i<masked_cas_list.size(); i++) {
-            read_data_list.push_back(get_covering_read_from_lock(masked_cas_list[i], buckets_per_lock, row_size_bytes));
-        }
-        return read_data_list;
-    }
-
     VRReadData get_covering_read_from_lock(VRMaskedCasData masked_cas, unsigned int buckets_per_lock, unsigned int row_size_bytes) {
-        VRReadData read_data;
-
         #define BITS_PER_BYTE 8
-
+        VRReadData read_data;
         hash_locations buckets;
+
         buckets.primary = (masked_cas.min_set_lock) * buckets_per_lock;
         buckets.secondary = (masked_cas.max_set_lock) * buckets_per_lock + (buckets_per_lock - 1);
 
@@ -739,6 +730,15 @@ namespace cuckoo_virtual_rdma {
         read_data.offset = 0;
         return read_data;
     }
+
+    void get_covering_reads_from_lock_list(vector<VRMaskedCasData> &masked_cas_list, vector<VRReadData> &read_data_list, unsigned int buckets_per_lock, unsigned int row_size_bytes) {
+        read_data_list.clear();
+        for (int i=0; i<masked_cas_list.size(); i++) {
+            read_data_list.push_back(get_covering_read_from_lock(masked_cas_list[i], buckets_per_lock, row_size_bytes));
+        }
+        return;
+    }
+
 
     VRMessage cas_table_entry_message(unsigned int bucket_index, unsigned int bucket_offset, Key old, Key new_value) {
         VRMessage cas_message;

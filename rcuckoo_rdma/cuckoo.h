@@ -139,6 +139,7 @@ namespace cuckoo_rcuckoo {
             vector<vector<unsigned int>> _fast_lock_chunks;
             vector<unsigned int> _buckets;
             vector<VRMaskedCasData> _lock_list;
+            vector<VRReadData> _covering_reads;
 
 
             // hash_locations  (*_location_function)(string, unsigned int);

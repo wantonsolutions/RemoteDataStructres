@@ -918,8 +918,7 @@ namespace cuckoo_rcuckoo {
 
         /* copied from the search function */ 
         vector<unsigned int> searchable_buckets;
-        // vector<VRMaskedCasData> lock_list;
-        vector<VRReadData> covering_reads;
+
         _search_path = (this->*_table_search_function)(searchable_buckets);
         //Search failed
         if (_search_path.size() <= 0) {
@@ -939,13 +938,13 @@ namespace cuckoo_rcuckoo {
         INFO(log_id(), "[aquire_locks] gathering locks for buckets %s\n", vector_to_string(_buckets).c_str());
 
         get_lock_list_fast(_buckets, _fast_lock_chunks, _lock_list ,_buckets_per_lock, _locks_per_message);
-        covering_reads = get_covering_reads_from_lock_list(_lock_list, _buckets_per_lock, _table.row_size_bytes());
+        get_covering_reads_from_lock_list(_lock_list, _covering_reads ,_buckets_per_lock, _table.row_size_bytes());
 
         for (unsigned int i = 0; i < _lock_list.size(); i++) {
             INFO(log_id(), "[aquire_locks] lock %d -> [lock %s] [read %s]\n", i, lock_list[i].to_string().c_str(), covering_reads[i].to_string().c_str());
         }
 
-        assert(_lock_list.size() == covering_reads.size());
+        assert(_lock_list.size() == _covering_reads.size());
 
         bool locking_complete = false;
         bool failed_last_request = false;
@@ -957,7 +956,7 @@ namespace cuckoo_rcuckoo {
             assert(message_index < _lock_list.size());
 
             VRMaskedCasData lock = _lock_list[message_index];
-            VRReadData read = covering_reads[message_index];
+            VRReadData read = _covering_reads[message_index];
 
             _wr_id++;
             int outstanding_cas_wr_id = _wr_id;
