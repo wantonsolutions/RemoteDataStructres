@@ -5,9 +5,11 @@ MLX5_INC := /usr/include/infiniband
 INCLUDES := -I$(XXHASH_INC) -I$(MLX5_INC)
 
 
-CFLAGS := -std=c++2a -g -O3 -Wall -Wall -Wextra -pedantic -fPIC
+# CFLAGS := -std=c++2a -g -O3 -Wall -Wall -Wextra -pedantic -fPIC
 # CFLAGS := -std=c++2a -g -Wall -Wall -Wextra -pedantic -fPIC
 # CFLAGS := -std=c++2a -g  -Wall -Wall -Wextra -pedantic -fPIC
+CFLAGS := -std=c++2a -O3 -Wall -Wall -Wextra -pedantic -fPIC -DNDEBUG
+
 RDMA_LIBS := -lrdmacm -libverbs -lpthread
 
 LIBRARIES := -L$(XXHASH_INC) -lxxhash $(RDMA_LIBS) -lmemcached

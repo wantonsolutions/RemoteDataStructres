@@ -295,19 +295,22 @@ namespace cuckoo_virtual_rdma {
 
     }
 
-    vector<unsigned int> lock_message_to_lock_indexes(VRMaskedCasData lock_message) {
-        vector<unsigned int> lock_indexes;
+    unsigned int lock_message_to_lock_indexes(VRMaskedCasData lock_message, unsigned int * lock_indexes) {
+        // vector<unsigned int> lock_indexes;
         uint64_t mask = reverse_uint64_t(lock_message.mask);
         unsigned int base_index = lock_message.min_lock_index * 8;
+        unsigned int total_locks = 0;
 
         uint64_t one = 1;
-        for (uint64_t i=0; i<64; i++) {
+        for (uint64_t i=0; i<BITS_IN_MASKED_CAS; i++) {
             if (mask & (one << i)) {
-                lock_indexes.push_back(base_index + i);
+                // lock_indexes.push_back(base_index + i);
+                lock_indexes[total_locks] = base_index + i;
+                total_locks++;
             }
         }
         // ALERT("lock_message to indexes","appending a total of %d locks\n", lock_indexes.size());
-        return lock_indexes;
+        return total_locks;
 
     }
 

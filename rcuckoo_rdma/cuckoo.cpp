@@ -360,8 +360,9 @@ namespace cuckoo_rcuckoo {
     }
 
     void RCuckoo::receive_successful_locking_message(VRMaskedCasData message) {
-        vector<unsigned int> lock_indexes = lock_message_to_lock_indexes(message);
-        for (unsigned int i = 0; i < lock_indexes.size(); i++) {
+        unsigned int lock_indexes[BITS_IN_MASKED_CAS];
+        int total_locks = lock_message_to_lock_indexes(message, lock_indexes);
+        for (unsigned int i = 0; i < total_locks; i++) {
             _locks_held.push_back(lock_indexes[i]);
         }
         //checking that the locks do not have duplicates
@@ -380,9 +381,10 @@ namespace cuckoo_rcuckoo {
     }
 
     void RCuckoo::receive_successful_unlocking_message(VRMaskedCasData message) {
-        vector<unsigned int> unlock_indexes = lock_message_to_lock_indexes(message);
-        for (unsigned int i = 0; i < unlock_indexes.size(); i++) {
-            _locks_held.erase(remove(_locks_held.begin(), _locks_held.end(), unlock_indexes[i]), _locks_held.end());
+        unsigned int lock_indexes[BITS_IN_MASKED_CAS];
+        int total_locks = lock_message_to_lock_indexes(message, lock_indexes);
+        for (unsigned int i = 0; i < total_locks; i++) {
+            _locks_held.erase(remove(_locks_held.begin(), _locks_held.end(), lock_indexes[i]), _locks_held.end());
         }
         //checking that the locks do not have duplicates
         assert(_locks_held.size() == set<unsigned int>(_locks_held.begin(), _locks_held.end()).size());

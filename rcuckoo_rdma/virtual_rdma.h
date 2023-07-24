@@ -183,7 +183,7 @@ namespace cuckoo_virtual_rdma {
     //RDMA specific functions
     vector<VRReadData> get_covering_reads_from_lock_list(vector<VRMaskedCasData> masked_cas_list, unsigned int buckets_per_lock, unsigned int row_size_bytes);
     VRReadData get_covering_read_from_lock(VRMaskedCasData masked_cas, unsigned int buckets_per_lock, unsigned int row_size_bytes);
-    vector<unsigned int> lock_message_to_lock_indexes(VRMaskedCasData lock_message);
+    unsigned int lock_message_to_lock_indexes(VRMaskedCasData lock_message, unsigned int * lock_indexes);
 
 
     VRCasData cas_table_entry_cas_data(unsigned int bucket_index, unsigned int bucket_offset, Key old, Key new_value);
