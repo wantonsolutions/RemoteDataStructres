@@ -182,8 +182,8 @@ namespace cuckoo_rcuckoo {
         
         INFO(log_id(), "[aquire_locks] gathering locks for buckets %s\n", vector_to_string(buckets).c_str());
 
-        vector<VRMaskedCasData> lock_list = get_lock_list_fast(buckets, _fast_lock_chunks, _buckets_per_lock, _locks_per_message);
-        vector<VRMessage> masked_cas_messages = create_masked_cas_messages_from_lock_list(lock_list);
+        get_lock_list_fast(buckets, _fast_lock_chunks, _lock_list, _buckets_per_lock, _locks_per_message);
+        vector<VRMessage> masked_cas_messages = create_masked_cas_messages_from_lock_list(_lock_list);
         _current_locking_messages = masked_cas_messages;
         return get_current_locking_message_with_covering_read();
     }
@@ -414,18 +414,19 @@ namespace cuckoo_rcuckoo {
         return release_locks_batched();
     }
 
-    vector<VRMaskedCasData> RCuckoo::get_current_unlock_list() {
+    void RCuckoo::fill_current_unlock_list() {
         vector<unsigned int> buckets = lock_indexes_to_buckets(_locks_held, _buckets_per_lock);
         //log info buckets
         sort(buckets.begin(), buckets.end());
         assert(is_sorted(buckets.begin(), buckets.end()));
-        return get_unlock_list_fast(buckets, _fast_lock_chunks, _buckets_per_lock, _locks_per_message);
+        get_unlock_list_fast(buckets, _fast_lock_chunks, _lock_list, _buckets_per_lock, _locks_per_message);
+        //_lock_list is now full of locks
     }
 
     vector<VRMessage> RCuckoo::release_locks_batched(){
         _locking_message_index=0;
-        vector<VRMaskedCasData> unlock_list = get_current_unlock_list();
-        _current_locking_messages = create_masked_cas_messages_from_lock_list(unlock_list);
+        fill_current_unlock_list();
+        _current_locking_messages = create_masked_cas_messages_from_lock_list(_lock_list);
         return _current_locking_messages;
     }
 
@@ -859,18 +860,19 @@ namespace cuckoo_rcuckoo {
         vector<VRCasData> insert_messages;
         // vector<VRMessage> unlock_messages = release_locks_batched();
         _locking_message_index = 0;
-        vector<VRMaskedCasData> unlock_messages = get_current_unlock_list();
+        fill_current_unlock_list();
+        // _lock_list is now full
 
         INFO("insert direct", "about to unlock a total of %d lock messages\n", unlock_messages.size());
 
 
-        unsigned int total_messages = unlock_messages.size();
+        unsigned int total_messages = _lock_list.size();
         if (_state == INSERTING) {
             insert_messages = gen_cas_data(_search_path);
             total_messages += insert_messages.size();
         }
 
-        send_insert_and_unlock_messages(insert_messages, unlock_messages, _wr_id);
+        send_insert_and_unlock_messages(insert_messages, _lock_list, _wr_id);
         _wr_id += total_messages;
 
         //Bulk poll to receive all messages
@@ -888,13 +890,13 @@ namespace cuckoo_rcuckoo {
             }
         }
 
-        for (unsigned int i = total_messages - unlock_messages.size() ; i < total_messages; i++) {
+        for (unsigned int i = total_messages - _lock_list.size() ; i < total_messages; i++) {
             if (_wc[i].status != IBV_WC_SUCCESS) {
                 printf("unlock failed\n");
                 exit(1);
             }
             //TODO check if pthe unlock failed
-            receive_successful_unlocking_message(unlock_messages[i-insert_messages.size()]);
+            receive_successful_unlocking_message(_lock_list[i-insert_messages.size()]);
         }
 
         if (_state == INSERTING) {
@@ -914,7 +916,7 @@ namespace cuckoo_rcuckoo {
 
         /* copied from the search function */ 
         vector<unsigned int> searchable_buckets;
-        vector<VRMaskedCasData> lock_list;
+        // vector<VRMaskedCasData> lock_list;
         vector<VRReadData> covering_reads;
         _search_path = (this->*_table_search_function)(searchable_buckets);
         //Search failed
@@ -932,16 +934,16 @@ namespace cuckoo_rcuckoo {
         _locking_message_index = 0;
         search_path_to_buckets_fast(_search_path, _buckets);
         
-        INFO(log_id(), "[aquire_locks] gathering locks for buckets %s\n", vector_to_string(buckets).c_str());
+        INFO(log_id(), "[aquire_locks] gathering locks for buckets %s\n", vector_to_string(_buckets).c_str());
 
-        lock_list = get_lock_list_fast(_buckets, _fast_lock_chunks, _buckets_per_lock, _locks_per_message);
-        covering_reads = get_covering_reads_from_lock_list(lock_list, _buckets_per_lock, _table.row_size_bytes());
+        get_lock_list_fast(_buckets, _fast_lock_chunks, _lock_list ,_buckets_per_lock, _locks_per_message);
+        covering_reads = get_covering_reads_from_lock_list(_lock_list, _buckets_per_lock, _table.row_size_bytes());
 
-        for (unsigned int i = 0; i < lock_list.size(); i++) {
+        for (unsigned int i = 0; i < _lock_list.size(); i++) {
             INFO(log_id(), "[aquire_locks] lock %d -> [lock %s] [read %s]\n", i, lock_list[i].to_string().c_str(), covering_reads[i].to_string().c_str());
         }
 
-        assert(lock_list.size() == covering_reads.size());
+        assert(_lock_list.size() == covering_reads.size());
 
         bool locking_complete = false;
         bool failed_last_request = false;
@@ -950,9 +952,9 @@ namespace cuckoo_rcuckoo {
         unsigned int message_index = 0;
         while (!locking_complete) {
 
-            assert(message_index < lock_list.size());
+            assert(message_index < _lock_list.size());
 
-            VRMaskedCasData lock = lock_list[message_index];
+            VRMaskedCasData lock = _lock_list[message_index];
             VRReadData read = covering_reads[message_index];
 
             _wr_id++;
@@ -1003,7 +1005,7 @@ namespace cuckoo_rcuckoo {
                 failed_last_request = true;
             }
 
-            if (lock_list.size() == message_index) {
+            if (_lock_list.size() == message_index) {
                 locking_complete = true;
                 SUCCESS(log_id(), " [put-direct] we got all the locks!\n");
                 break;

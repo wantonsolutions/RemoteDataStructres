@@ -77,6 +77,8 @@ namespace cuckoo_rcuckoo {
             unsigned int get_lock_table_size_bytes();
             void * get_lock_pointer(unsigned int lock_index);
 
+            void fill_current_unlock_list();
+
 
             /* RDMA specific functions */
             uint64_t local_to_remote_table_address(uint64_t local_address);
@@ -136,6 +138,7 @@ namespace cuckoo_rcuckoo {
             //Cached structures to prevent reinitalizations
             vector<vector<unsigned int>> _fast_lock_chunks;
             vector<unsigned int> _buckets;
+            vector<VRMaskedCasData> _lock_list;
 
 
             // hash_locations  (*_location_function)(string, unsigned int);

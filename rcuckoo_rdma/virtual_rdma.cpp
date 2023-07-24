@@ -527,10 +527,10 @@ namespace cuckoo_virtual_rdma {
     }
 
 
-    vector<VRMaskedCasData> get_lock_or_unlock_list_fast(vector<unsigned int> buckets, vector<vector<unsigned int>> & fast_lock_chunks, unsigned int buckets_per_lock, unsigned int locks_per_message, bool locking) {
+    void get_lock_or_unlock_list_fast(vector<unsigned int> buckets, vector<vector<unsigned int>> & fast_lock_chunks, vector<VRMaskedCasData> &masked_cas_data, unsigned int buckets_per_lock, unsigned int locks_per_message, bool locking) {
         assert(locks_per_message <= 64);
         // vector<vector<unsigned int>> fast_lock_chunks;
-        vector<VRMaskedCasData> masked_cas_data;
+        masked_cas_data.clear();
         if (fast_lock_chunks.size() == 0) {
             fast_lock_chunks.resize(MAX_LOCKS);
             for (int i=0; i<MAX_LOCKS; i++) {
@@ -589,7 +589,7 @@ namespace cuckoo_virtual_rdma {
         } else {
             unlock_chunks_to_masked_cas_data(fast_lock_chunks, masked_cas_data);
         }
-        return masked_cas_data;
+        //Masked cas data should be filled at this point
 
     }
 
@@ -621,16 +621,16 @@ namespace cuckoo_virtual_rdma {
         return get_lock_or_unlock_list(buckets,buckets_per_lock,locks_per_message, get_lock_messages);
     }
 
-    vector<VRMaskedCasData> get_lock_list_fast(vector<unsigned int> buckets,vector<vector<unsigned int>> &fast_lock_chunks, unsigned int buckets_per_lock, unsigned int locks_per_message) {
+    void get_lock_list_fast(vector<unsigned int> &buckets,vector<vector<unsigned int>> &fast_lock_chunks, vector<VRMaskedCasData> &lock_list, unsigned int buckets_per_lock, unsigned int locks_per_message) {
         bool get_lock_messages = true;
         // return get_lock_or_unlock_list(buckets,buckets_per_lock,locks_per_message, get_lock_messages);
-        return get_lock_or_unlock_list_fast(buckets, fast_lock_chunks, buckets_per_lock,locks_per_message, get_lock_messages);
+        get_lock_or_unlock_list_fast(buckets, fast_lock_chunks, lock_list, buckets_per_lock,locks_per_message, get_lock_messages);
     }
 
-    vector<VRMaskedCasData> get_unlock_list_fast(vector<unsigned int> buckets,vector<vector<unsigned int>> &fast_lock_chunks, unsigned int buckets_per_lock, unsigned int locks_per_message) {
+    void get_unlock_list_fast(vector<unsigned int> &buckets,vector<vector<unsigned int>> &fast_lock_chunks, vector<VRMaskedCasData> &lock_list, unsigned int buckets_per_lock, unsigned int locks_per_message) {
         bool get_lock_messages = false;
         // return get_lock_or_unlock_list(buckets,buckets_per_lock,locks_per_message, get_lock_messages);
-        return get_lock_or_unlock_list_fast(buckets,fast_lock_chunks, buckets_per_lock,locks_per_message, get_lock_messages);
+        get_lock_or_unlock_list_fast(buckets,fast_lock_chunks, lock_list, buckets_per_lock,locks_per_message, get_lock_messages);
     }
 
     VRMessage read_request_message(unsigned int start_bucket, unsigned int offset, unsigned int size) {

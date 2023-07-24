@@ -156,9 +156,9 @@ namespace cuckoo_virtual_rdma {
     vector<VRMaskedCasData> get_unlock_list(vector<unsigned int> buckets, unsigned int buckets_per_lock, unsigned int locks_per_message);
 
 
-    vector<VRMaskedCasData> get_lock_list_fast(vector<unsigned int> buckets,vector<vector<unsigned int>> &fast_lock_chunks, unsigned int buckets_per_lock, unsigned int locks_per_message);
-    vector<VRMaskedCasData> get_unlock_list_fast(vector<unsigned int> buckets,vector<vector<unsigned int>> &fast_lock_chunks, unsigned int buckets_per_lock, unsigned int locks_per_message);
-    vector<VRMaskedCasData> get_lock_or_unlock_list_fast(vector<unsigned int> buckets, vector<vector<unsigned int>> &fast_lock_chunks, unsigned int buckets_per_lock, unsigned int locks_per_message, bool locking);
+    void get_lock_list_fast(vector<unsigned int> &buckets,vector<vector<unsigned int>> &fast_lock_chunks, vector<VRMaskedCasData> &lock_list, unsigned int buckets_per_lock, unsigned int locks_per_message);
+    void get_unlock_list_fast(vector<unsigned int> &buckets,vector<vector<unsigned int>> &fast_lock_chunks, vector<VRMaskedCasData> &lock_list, unsigned int buckets_per_lock, unsigned int locks_per_message);
+    void get_lock_or_unlock_list_fast(vector<unsigned int> buckets, vector<vector<unsigned int>> & fast_lock_chunks, vector<VRMaskedCasData> &masked_cas_data, unsigned int buckets_per_lock, unsigned int locks_per_message, bool locking);
 
 
     VRMessage read_request_message(unsigned int start_bucket, unsigned int offset, unsigned int size);
