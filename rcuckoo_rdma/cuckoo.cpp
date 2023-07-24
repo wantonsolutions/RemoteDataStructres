@@ -599,7 +599,7 @@ namespace cuckoo_rcuckoo {
 
 
 
-        bool success = rdmaCompareAndSwap(
+        bool success = rdmaCompareAndSwapExp(
             _qp, 
             local_address, 
             remote_server_address,
@@ -777,6 +777,58 @@ namespace cuckoo_rcuckoo {
         send_bulk(READ_AND_COVER_MESSAGE_COUNT, _qp, wr);
     }
 
+    void RCuckoo::send_insert_and_unlock_messages(vector<VRCasData> &insert_messages, vector<VRMaskedCasData> & unlock_messages, uint64_t wr_id) {
+        #define MAX_INSERT_AND_UNLOCK_MESSAGE_COUNT 64
+        struct ibv_sge sg [MAX_INSERT_AND_UNLOCK_MESSAGE_COUNT];
+        struct ibv_exp_send_wr wr [MAX_INSERT_AND_UNLOCK_MESSAGE_COUNT];
+        assert(insert_messages.size() + unlock_messages.size() <= MAX_INSERT_AND_UNLOCK_MESSAGE_COUNT);
+
+        int total_messages = insert_messages.size() + unlock_messages.size();
+
+        for ( unsigned int i=0; i < insert_messages.size(); i++) {
+            uint64_t local_address = (uint64_t) get_entry_pointer(insert_messages[i].row, insert_messages[i].offset);
+            uint64_t remote_server_address = local_to_remote_table_address(local_address);
+            setRdmaCompareAndSwapExp(
+                &sg[i],
+                &wr[i],
+                _qp, 
+                local_address, 
+                remote_server_address,
+                insert_messages[i].old, 
+                insert_messages[i].new_value, 
+                _table_mr->lkey,
+                _table_config->remote_key, 
+                true, 
+                wr_id);
+            wr_id++;
+        }
+
+        for ( unsigned int i=0; i < unlock_messages.size(); i++) {
+            uint64_t local_lock_address = (uint64_t) get_lock_pointer(unlock_messages[i].min_lock_index);
+            uint64_t remote_lock_address = (uint64_t) _table_config->lock_table_address + unlock_messages[i].min_lock_index;
+            uint64_t compare = __builtin_bswap64(unlock_messages[i].old);
+            uint64_t swap = __builtin_bswap64(unlock_messages[i].new_value);
+            uint64_t mask = __builtin_bswap64(unlock_messages[i].mask);
+
+            setRdmaCompareAndSwapMask(
+                &sg[i + insert_messages.size()],
+                &wr[i + insert_messages.size()],
+                _qp,
+                local_lock_address,
+                remote_lock_address,
+                compare,
+                swap,
+                _lock_table_mr->lkey,
+                _table_config->lock_table_key,
+                mask,
+                true,
+                wr_id);
+            wr_id++;
+        }
+        send_bulk(total_messages, _qp, wr);
+        
+    }
+
 
     vector<VRMessage> RCuckoo::insert_direct() {
 
@@ -816,18 +868,22 @@ namespace cuckoo_rcuckoo {
         if (_state == INSERTING) {
             insert_messages = gen_cas_data(_search_path);
             total_messages += insert_messages.size();
-            for ( unsigned int i=0; i < insert_messages.size(); i++) {
-                // ALERT("State Machine Wrapper", "sending virtual cas message %d\n", i);
-                _wr_id++;
-                send_virtual_cas_message(insert_messages[i], _wr_id);
-            }
         }
 
-        for ( unsigned int i = 0; i < unlock_messages.size(); i++) {
-            _wr_id++;
-            // ALERT("State Machine Wrapper", "sending virtual masked cas message %d\n", i);
-            send_virtual_masked_cas_message(unlock_messages[i], _wr_id);
-        }
+        // for ( unsigned int i=0; i < insert_messages.size(); i++) {
+        //     // ALERT("State Machine Wrapper", "sending virtual cas message %d\n", i);
+        //     _wr_id++;
+        //     send_virtual_cas_message(insert_messages[i], _wr_id);
+        // }
+
+        // for ( unsigned int i = 0; i < unlock_messages.size(); i++) {
+        //     _wr_id++;
+        //     // ALERT("State Machine Wrapper", "sending virtual masked cas message %d\n", i);
+        //     send_virtual_masked_cas_message(unlock_messages[i], _wr_id);
+        // }
+
+        send_insert_and_unlock_messages(insert_messages, unlock_messages, _wr_id);
+        _wr_id += total_messages;
 
         //Bulk poll to receive all messages
         int n=0;

@@ -25,6 +25,15 @@ namespace rdma_helper {
                             uint64_t compare, uint64_t swap, uint32_t lkey,
                             uint32_t remoteRKey, bool signal, uint64_t wrID);
 
+    void setRdmaCompareAndSwapExp(struct ibv_sge * sg, struct ibv_exp_send_wr * wr, ibv_qp *qp, uint64_t source, uint64_t dest,
+        uint64_t compare, uint64_t swap, uint32_t lkey,
+        uint32_t remoteRKey, bool signal, uint64_t wrID);
+
+    bool rdmaCompareAndSwapExp(ibv_qp *qp, uint64_t source, uint64_t dest,
+        uint64_t compare, uint64_t swap, uint32_t lkey,
+        uint32_t remoteRKey, bool signal, uint64_t wrID);
+
+
 
     void setRdmaCompareAndSwapMask(struct ibv_sge* sg, struct ibv_exp_send_wr *wr, ibv_qp *qp, uint64_t source, uint64_t dest,
                                 uint64_t compare, uint64_t swap, uint32_t lkey,

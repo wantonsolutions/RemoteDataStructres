@@ -87,8 +87,9 @@ namespace cuckoo_rcuckoo {
             void send_virtual_masked_cas_message(VRMessage message, uint64_t wr_id);
             void send_virtual_masked_cas_message(VRMaskedCasData message, uint64_t wr_id);
 
-
             void send_lock_and_cover_message(VRMaskedCasData lock_message, VRReadData read_message, uint64_t wr_id);
+            void send_insert_and_unlock_messages(vector<VRCasData> &insert_messages, vector<VRMaskedCasData> & unlock_messages, uint64_t wr_id);
+
             vector<VRMessage> rdma_fsm(VRMessage message);
             void init_rdma_structures(rcuckoo_rdma_info info);
             vector<VRMessage> put_direct();

@@ -163,6 +163,40 @@ namespace rdma_helper {
         return true;
     }
 
+    void setRdmaCompareAndSwapExp(struct ibv_sge * sg, struct ibv_exp_send_wr * wr, ibv_qp *qp, uint64_t source, uint64_t dest,
+        uint64_t compare, uint64_t swap, uint32_t lkey,
+        uint32_t remoteRKey, bool signal, uint64_t wrID) {
+        fillSgeWr(*sg, *wr, source, 8, lkey);
+
+        wr->exp_opcode = IBV_EXP_WR_ATOMIC_CMP_AND_SWP;
+
+        if (signal) {
+            wr->exp_send_flags |= IBV_EXP_SEND_SIGNALED;
+        }
+
+        wr->wr.atomic.remote_addr = dest;
+        wr->wr.atomic.rkey = remoteRKey;
+        wr->wr.atomic.compare_add = compare;
+        wr->wr.atomic.swap = swap;
+        wr->wr_id = wrID;
+    }
+
+    bool rdmaCompareAndSwapExp(ibv_qp *qp, uint64_t source, uint64_t dest,
+        uint64_t compare, uint64_t swap, uint32_t lkey,
+        uint32_t remoteRKey, bool signal, uint64_t wrID) {
+        struct ibv_sge sg;
+        struct ibv_exp_send_wr wr;
+        struct ibv_exp_send_wr *wrBad;
+
+        setRdmaCompareAndSwapExp(&sg, &wr, qp, source, dest, compare, swap, lkey, remoteRKey, signal, wrID);
+        if (ibv_exp_post_send(qp, &wr, &wrBad)) {
+            printf("send with rdma compare and swap failed\n");
+            // sleep(5);
+            return false;
+        }
+        return true;
+    }
+
     void setRdmaCompareAndSwapMask(struct ibv_sge* sg, struct ibv_exp_send_wr *wr, ibv_qp *qp, uint64_t source, uint64_t dest,
                                 uint64_t compare, uint64_t swap, uint32_t lkey,
                                 uint32_t remoteRKey, uint64_t mask, bool singal, uint64_t wr_ID) {
