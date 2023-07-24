@@ -830,7 +830,7 @@ namespace cuckoo_rcuckoo {
     }
 
 
-    vector<VRMessage> RCuckoo::insert_direct() {
+    void RCuckoo::insert_direct() {
 
         _state = INSERTING;
 
@@ -870,18 +870,6 @@ namespace cuckoo_rcuckoo {
             total_messages += insert_messages.size();
         }
 
-        // for ( unsigned int i=0; i < insert_messages.size(); i++) {
-        //     // ALERT("State Machine Wrapper", "sending virtual cas message %d\n", i);
-        //     _wr_id++;
-        //     send_virtual_cas_message(insert_messages[i], _wr_id);
-        // }
-
-        // for ( unsigned int i = 0; i < unlock_messages.size(); i++) {
-        //     _wr_id++;
-        //     // ALERT("State Machine Wrapper", "sending virtual masked cas message %d\n", i);
-        //     send_virtual_masked_cas_message(unlock_messages[i], _wr_id);
-        // }
-
         send_insert_and_unlock_messages(insert_messages, unlock_messages, _wr_id);
         _wr_id += total_messages;
 
@@ -911,37 +899,30 @@ namespace cuckoo_rcuckoo {
 
         if (_state == INSERTING) {
             complete_insert();
-            return vector<VRMessage>();
         } else if (_state == RELEASE_LOCKS_TRY_AGAIN) {
             _current_insert_rtt++;
-            return vector<VRMessage>();
         } else {
             printf("invalid state\n");
             exit(1);
         }
-
-
-
-        //Continously poll for completion
-
-
-        // _current_insert_rtt++;
-        // return insert_messages;
+        return;
 
     }
 
-    vector<VRMessage> RCuckoo::put_direct() {
+    void RCuckoo::put_direct() {
         _current_insert_rtt++;
 
         /* copied from the search function */ 
         vector<unsigned int> searchable_buckets;
+        vector<VRMaskedCasData> lock_list;
+        vector<VRReadData> covering_reads;
         _search_path = (this->*_table_search_function)(searchable_buckets);
         //Search failed
         if (_search_path.size() <= 0) {
             ALERT(log_id(), "Search Failed for key %s unable to continue client %d is done\n", _current_insert_key.to_string().c_str(), _id);
             _complete=true;
             _state = IDLE;
-            return vector<VRMessage>();
+            return;
         }
         VERBOSE("search", "Successful local search for [key %s] -> [path %s]\n", _current_insert_key.to_string().c_str(), path_to_string(_search_path).c_str());
         _state = AQUIRE_LOCKS;
@@ -953,19 +934,14 @@ namespace cuckoo_rcuckoo {
         
         INFO(log_id(), "[aquire_locks] gathering locks for buckets %s\n", vector_to_string(buckets).c_str());
 
-        vector<VRMaskedCasData> lock_list = get_lock_list_fast(buckets, _fast_lock_chunks, _buckets_per_lock, _locks_per_message);
-        vector<VRReadData> covering_reads = get_covering_reads_from_lock_list(lock_list, _buckets_per_lock, _table.row_size_bytes());
-        // vector<VRMessage> masked_cas_messages = create_masked_cas_messages_from_lock_list(lock_list);
-        // _current_locking_messages = masked_cas_messages;
+        lock_list = get_lock_list_fast(buckets, _fast_lock_chunks, _buckets_per_lock, _locks_per_message);
+        covering_reads = get_covering_reads_from_lock_list(lock_list, _buckets_per_lock, _table.row_size_bytes());
 
         for (unsigned int i = 0; i < lock_list.size(); i++) {
             INFO(log_id(), "[aquire_locks] lock %d -> [lock %s] [read %s]\n", i, lock_list[i].to_string().c_str(), covering_reads[i].to_string().c_str());
         }
 
         assert(lock_list.size() == covering_reads.size());
-        
-        
-
 
         bool locking_complete = false;
         bool failed_last_request = false;
@@ -976,10 +952,6 @@ namespace cuckoo_rcuckoo {
 
             assert(message_index < lock_list.size());
 
-            // vector<VRMessage> lock_and_read =  get_current_locking_message_with_covering_read();
-            // VRMessage lock_message = lock_and_read[0];
-            // VRMessage read_message = lock_and_read[1];
-
             VRMaskedCasData lock = lock_list[message_index];
             VRReadData read = covering_reads[message_index];
 
@@ -988,13 +960,6 @@ namespace cuckoo_rcuckoo {
             _wr_id++;
             int outstanding_read_wr_id = _wr_id;
             send_lock_and_cover_message(lock, read, outstanding_cas_wr_id);
-
-
-            // //TODO obviously combine these two functions into a single one
-            // send_virtual_masked_cas_message(lock, outstanding_cas_wr_id);
-            // int outstanding_read_wr_id = _wr_id;
-            // send_virtual_read_message(read, outstanding_read_wr_id);
-
 
             int outstanding_messages = 2; //It's two because we send the read and CAS
             assert(_completion_queue != NULL);
@@ -1017,18 +982,10 @@ namespace cuckoo_rcuckoo {
                 exit(1);
             }
 
-            //TODO check for duplicate messages
-            //TODO check that we actually got the lock we wanted.
-            // ALERT(log_id(), "checking if we actually got the lock!\n");
-            // uint64_t old_value = stoull(lock_message.function_args["old"], 0, 2);
-            // uint64_t mask = stoull(lock_message.function_args["mask"], 0, 2);
-            // int lock_index = stoi(lock_message.function_args["lock_index"]);
-
             uint64_t old_value = lock.old;
             uint64_t mask = lock.mask;
             int lock_index = lock.min_lock_index;
             uint64_t received_locks = *((uint64_t*) get_lock_pointer(lock_index));
-
 
             //?? bswap the DMA'd value?
             received_locks = __builtin_bswap64(received_locks);
@@ -1041,16 +998,8 @@ namespace cuckoo_rcuckoo {
                 message_index++;
                 if (failed_last_request) {
                     failed_last_request = false;
-                    // ALERT("put direct", "grabbed some locks after failing!\n");
-                    // ALERT(log_id(), "received_locks %016lx\n", received_locks);
-                    // ALERT(log_id(), "old_value      %016lx\n", old_value);
-                    // ALERT(log_id(), "mask           %016lx\n", mask);
                 }
             } else {
-                // ALERT("put direct", "we did not get the lock reissuing request!\n");
-                // ALERT(log_id(), "received_locks %016lx\n", received_locks);
-                // ALERT(log_id(), "old_value      %016lx\n", old_value);
-                // ALERT(log_id(), "mask           %016lx\n", mask);
                 failed_last_request = true;
             }
 
@@ -1060,12 +1009,6 @@ namespace cuckoo_rcuckoo {
                 break;
             }
             _current_insert_rtt++;
-
-            // lock_index++;
-
-            // lock_and_read = get_current_locking_message_with_covering_read();
-            // lock_message = lock_and_read[0];
-            // read_message = lock_and_read[1];
         }
 
         return insert_direct();
@@ -1085,7 +1028,6 @@ namespace cuckoo_rcuckoo {
 
             //The client is done
             if (_complete && _state == IDLE) {
-                response = vector<VRMessage>();
                 return response;
             }
 
@@ -1097,10 +1039,10 @@ namespace cuckoo_rcuckoo {
                     VERBOSE("DEBUG: general idle fsm","Generated New Request: %s\n", next_request.to_string().c_str());
 
                     if (next_request.op == NO_OP) {
-                            response = vector<VRMessage>();
+                            break;
                     } else if (next_request.op == PUT) {
                         _current_insert_key = next_request.key;
-                        response=put_direct();
+                        put_direct();
                     } else if (next_request.op == GET) {
                         _current_read_key = next_request.key;
                         response=get();
@@ -1112,10 +1054,10 @@ namespace cuckoo_rcuckoo {
 
 
                 case READING:
-                    response = read_fsm(message);
+                    read_fsm(message);
                     break;
                 case RELEASE_LOCKS_TRY_AGAIN:
-                    response = put_direct();
+                    put_direct();
                     break;
                 default:
                     throw logic_error("ERROR: Invalid state");

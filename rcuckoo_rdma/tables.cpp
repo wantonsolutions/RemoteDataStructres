@@ -46,12 +46,14 @@ namespace cuckoo_tables {
     }
 
     bool Key::is_empty(){
-        for (int i = 0; i < KEY_SIZE; i++){
-            if (bytes[i] != 0){
-                return false;
-            }
-        }
-        return true;
+        assert(KEY_SIZE == 4);
+        return !((*(uint32_t *)bytes) || 0x00000000);
+        // for (int i = 0; i < KEY_SIZE; i++){
+        //     if (bytes[i] != 0){
+        //         return false;
+        //     }
+        // }
+        // return true;
     }
 
     string Value::to_string(){
