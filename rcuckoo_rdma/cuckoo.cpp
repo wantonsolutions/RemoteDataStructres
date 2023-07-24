@@ -182,7 +182,7 @@ namespace cuckoo_rcuckoo {
         
         INFO(log_id(), "[aquire_locks] gathering locks for buckets %s\n", vector_to_string(buckets).c_str());
 
-        vector<VRMaskedCasData> lock_list = get_lock_list(buckets, _buckets_per_lock, _locks_per_message);
+        vector<VRMaskedCasData> lock_list = get_lock_list_fast(buckets, _fast_lock_chunks, _buckets_per_lock, _locks_per_message);
         vector<VRMessage> masked_cas_messages = create_masked_cas_messages_from_lock_list(lock_list);
         _current_locking_messages = masked_cas_messages;
         return get_current_locking_message_with_covering_read();
@@ -419,7 +419,7 @@ namespace cuckoo_rcuckoo {
         //log info buckets
         sort(buckets.begin(), buckets.end());
         assert(is_sorted(buckets.begin(), buckets.end()));
-        return get_unlock_list(buckets, _buckets_per_lock, _locks_per_message);
+        return get_unlock_list_fast(buckets, _fast_lock_chunks, _buckets_per_lock, _locks_per_message);
     }
 
     vector<VRMessage> RCuckoo::release_locks_batched(){
@@ -851,7 +851,7 @@ namespace cuckoo_rcuckoo {
         
         INFO(log_id(), "[aquire_locks] gathering locks for buckets %s\n", vector_to_string(buckets).c_str());
 
-        vector<VRMaskedCasData> lock_list = get_lock_list(buckets, _buckets_per_lock, _locks_per_message);
+        vector<VRMaskedCasData> lock_list = get_lock_list_fast(buckets, _fast_lock_chunks, _buckets_per_lock, _locks_per_message);
         vector<VRReadData> covering_reads = get_covering_reads_from_lock_list(lock_list, _buckets_per_lock, _table.row_size_bytes());
         // vector<VRMessage> masked_cas_messages = create_masked_cas_messages_from_lock_list(lock_list);
         // _current_locking_messages = masked_cas_messages;

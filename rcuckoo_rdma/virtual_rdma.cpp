@@ -490,6 +490,8 @@ namespace cuckoo_virtual_rdma {
 
             VERBOSE("lock_chunks_to_masked_cas", "lock is %s", uint64t_to_bin_string(lock).c_str());
             lock = reverse_uint64_t(lock);
+            mcd.min_set_lock = lock_chunks[i][0] - min_index;
+            mcd.max_set_lock = lock_chunks[i][lock_chunks[i].size()-1] - min_index;
             mcd.min_lock_index = min_index / 8;
             mcd.old = 0;
             mcd.new_value = lock;
@@ -525,9 +527,9 @@ namespace cuckoo_virtual_rdma {
     }
 
 
-    vector<VRMaskedCasData> get_lock_or_unlock_list_fast(vector<unsigned int> buckets, unsigned int buckets_per_lock, unsigned int locks_per_message, bool locking) {
+    vector<VRMaskedCasData> get_lock_or_unlock_list_fast(vector<unsigned int> buckets, vector<vector<unsigned int>> & fast_lock_chunks, unsigned int buckets_per_lock, unsigned int locks_per_message, bool locking) {
         assert(locks_per_message <= 64);
-        vector<vector<unsigned int>> fast_lock_chunks;
+        // vector<vector<unsigned int>> fast_lock_chunks;
         vector<VRMaskedCasData> masked_cas_data;
         if (fast_lock_chunks.size() == 0) {
             fast_lock_chunks.resize(MAX_LOCKS);
@@ -611,14 +613,24 @@ namespace cuckoo_virtual_rdma {
 
     vector<VRMaskedCasData> get_lock_list(vector<unsigned int> buckets, unsigned int buckets_per_lock, unsigned int locks_per_message) {
         bool get_lock_messages = true;
-        // return get_lock_or_unlock_list(buckets,buckets_per_lock,locks_per_message, get_lock_messages);
-        return get_lock_or_unlock_list_fast(buckets,buckets_per_lock,locks_per_message, get_lock_messages);
+        return get_lock_or_unlock_list(buckets,buckets_per_lock,locks_per_message, get_lock_messages);
     }
 
     vector<VRMaskedCasData> get_unlock_list(vector<unsigned int> buckets, unsigned int buckets_per_lock, unsigned int locks_per_message) {
         bool get_lock_messages = false;
+        return get_lock_or_unlock_list(buckets,buckets_per_lock,locks_per_message, get_lock_messages);
+    }
+
+    vector<VRMaskedCasData> get_lock_list_fast(vector<unsigned int> buckets,vector<vector<unsigned int>> &fast_lock_chunks, unsigned int buckets_per_lock, unsigned int locks_per_message) {
+        bool get_lock_messages = true;
         // return get_lock_or_unlock_list(buckets,buckets_per_lock,locks_per_message, get_lock_messages);
-        return get_lock_or_unlock_list_fast(buckets,buckets_per_lock,locks_per_message, get_lock_messages);
+        return get_lock_or_unlock_list_fast(buckets, fast_lock_chunks, buckets_per_lock,locks_per_message, get_lock_messages);
+    }
+
+    vector<VRMaskedCasData> get_unlock_list_fast(vector<unsigned int> buckets,vector<vector<unsigned int>> &fast_lock_chunks, unsigned int buckets_per_lock, unsigned int locks_per_message) {
+        bool get_lock_messages = false;
+        // return get_lock_or_unlock_list(buckets,buckets_per_lock,locks_per_message, get_lock_messages);
+        return get_lock_or_unlock_list_fast(buckets,fast_lock_chunks, buckets_per_lock,locks_per_message, get_lock_messages);
     }
 
     VRMessage read_request_message(unsigned int start_bucket, unsigned int offset, unsigned int size) {
@@ -712,40 +724,15 @@ namespace cuckoo_virtual_rdma {
 
     VRReadData get_covering_read_from_lock(VRMaskedCasData masked_cas, unsigned int buckets_per_lock, unsigned int row_size_bytes) {
         VRReadData read_data;
-        #define BITS_PER_MASKED_CAS 64
+
         #define BITS_PER_BYTE 8
-        unsigned int min_index = BITS_PER_MASKED_CAS;
-        unsigned int max_index = 0;
-        //TODO use something like __builtin_clz for better efficency
-        // printf("ITTERATING THROUGH MASK %16lx\n", masked_cas.mask);
-        uint64_t one = 1;
-        for (int i=0; i<BITS_PER_MASKED_CAS; i++) {
-            // printf("i: %d, mask: %16lx\n", i, masked_cas.mask);
-            // printf("i: %d, hit : %16lx\n", i, (one << i));
-            unsigned int index = (BITS_PER_MASKED_CAS - i) - 1;
-            if (masked_cas.mask & (one << i)) {
-
-                if (index > max_index) {
-                    // printf("HIT HIT HIT\n");
-                    // printf("max i: %d, hit : %16lx\n", i, (one << i));
-                    max_index = index;
-                }
-                if (index < min_index ) {
-                    // printf("min i: %d, hit : %16lx\n", i, (one << i));
-                    min_index = index;
-                }
-            }
-        }
-        assert(max_index >= min_index);
-
-        // ALERT("cover read", "Min index is %d, max index is %d\n", min_index, max_index);
 
         hash_locations buckets;
-        buckets.primary = (min_index) * buckets_per_lock;
-        buckets.secondary = (max_index) * buckets_per_lock + (buckets_per_lock - 1);
+        buckets.primary = (masked_cas.min_set_lock) * buckets_per_lock;
+        buckets.secondary = (masked_cas.max_set_lock) * buckets_per_lock + (buckets_per_lock - 1);
 
         read_data.size= single_read_size_bytes(buckets, row_size_bytes);
-        read_data.row = min_index + (BITS_PER_BYTE * masked_cas.min_lock_index);
+        read_data.row = masked_cas.min_set_lock + (BITS_PER_BYTE * masked_cas.min_lock_index);
         read_data.offset = 0;
         return read_data;
     }

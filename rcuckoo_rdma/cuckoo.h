@@ -129,6 +129,9 @@ namespace cuckoo_rcuckoo {
             struct ibv_wc *_wc;
             uint64_t _wr_id;
 
+            //Cached structures to prevent reinitalizations
+            vector<vector<unsigned int>> _fast_lock_chunks;
+
 
             // hash_locations  (*_location_function)(string, unsigned int);
             hash_locations  (*_location_function)(Key, unsigned int);

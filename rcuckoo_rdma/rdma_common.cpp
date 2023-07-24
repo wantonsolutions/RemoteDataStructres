@@ -36,7 +36,7 @@ struct sockaddr_in server_address_to_socket_addr(string server_address) {
 unordered_map<string, string> gen_config() {
     unordered_map<string, string> config;
     // int table_size = 1024 * 1024 * 10;
-    int table_size = 1024 * 1024;
+    int table_size = 1024 * 1024 * 10;
     // int table_size = 256;
     // int table_size = 1024;
     // int table_size = 256;

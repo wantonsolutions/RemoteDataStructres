@@ -1,5 +1,5 @@
 
-measuretime=30
+measuretime=40
 
 sudo killall test_cuckoo
 

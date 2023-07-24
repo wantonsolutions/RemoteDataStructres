@@ -62,6 +62,8 @@ namespace cuckoo_virtual_rdma {
 
     typedef struct VRMaskedCasData {
         unsigned int min_lock_index;
+        uint8_t min_set_lock;
+        uint8_t max_set_lock;
         uint64_t mask;
         uint64_t new_value;
         uint64_t old;
@@ -152,7 +154,18 @@ namespace cuckoo_virtual_rdma {
     vector<VRMaskedCasData> get_lock_or_unlock_list(vector<unsigned int> buckets, unsigned int buckets_per_lock, unsigned int locks_per_message, bool locking);
     vector<VRMaskedCasData> get_lock_list(vector<unsigned int> buckets, unsigned int buckets_per_lock, unsigned int locks_per_message);
     vector<VRMaskedCasData> get_unlock_list(vector<unsigned int> buckets, unsigned int buckets_per_lock, unsigned int locks_per_message);
+
+
+    vector<VRMaskedCasData> get_lock_list_fast(vector<unsigned int> buckets,vector<vector<unsigned int>> &fast_lock_chunks, unsigned int buckets_per_lock, unsigned int locks_per_message);
+    vector<VRMaskedCasData> get_unlock_list_fast(vector<unsigned int> buckets,vector<vector<unsigned int>> &fast_lock_chunks, unsigned int buckets_per_lock, unsigned int locks_per_message);
+    vector<VRMaskedCasData> get_lock_or_unlock_list_fast(vector<unsigned int> buckets, vector<vector<unsigned int>> &fast_lock_chunks, unsigned int buckets_per_lock, unsigned int locks_per_message, bool locking);
+
+
     VRMessage read_request_message(unsigned int start_bucket, unsigned int offset, unsigned int size);
+
+
+
+
     vector<VRMessage> multi_bucket_read_message(hash_locations buckets, unsigned int row_size_bytes);
     VRMessage single_bucket_read_message(unsigned int bucket, unsigned int row_size_bytes);
     vector<VRMessage> single_bucket_read_messages(hash_locations buckets, unsigned int row_size_bytes);
