@@ -77,6 +77,32 @@ namespace rdma_helper {
         return true;
     }
 
+    bool rdmaReadExp(ibv_qp *qp, uint64_t source, uint64_t dest, uint64_t size,
+        uint32_t lkey, uint32_t remoteRKey, bool signal, uint64_t wrID) {
+        struct ibv_sge sg;
+        struct ibv_exp_send_wr wr;
+        struct ibv_exp_send_wr *wrBad;
+
+        fillSgeWr(sg, wr, source, 8, lkey);
+
+        wr.exp_opcode = IBV_EXP_WR_RDMA_READ;
+
+        if (signal) {
+            wr.exp_send_flags |= IBV_EXP_SEND_SIGNALED;
+        }
+
+        wr.wr.rdma.remote_addr = dest;
+        wr.wr.rdma.rkey = remoteRKey;
+        wr.wr_id = wrID;
+
+        int ret = ibv_exp_post_send(qp, &wr, &wrBad);
+        if (ret) {
+            printf("send with rdma exp read failed due to %d\n", ret);
+            return false;
+        }
+        return true;
+    }
+
     // for RC & UC
     bool rdmaCompareAndSwap(ibv_qp *qp, uint64_t source, uint64_t dest,
                             uint64_t compare, uint64_t swap, uint32_t lkey,
@@ -101,7 +127,7 @@ namespace rdma_helper {
 
         if (ibv_post_send(qp, &wr, &wrBad)) {
             printf("send with rdma compare and swap failed\n");
-            sleep(5);
+            // sleep(5);
             return false;
         }
         return true;

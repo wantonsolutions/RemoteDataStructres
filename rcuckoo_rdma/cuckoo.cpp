@@ -564,7 +564,8 @@ namespace cuckoo_rcuckoo {
         // printf("offset pointer = %p\n", _rcuckoo->get_entry_pointer(bucket_id, bucket_offset));
         // printf("offset =         %p\n", (void *) (local_address - (uint64_t) _rcuckoo->get_table_pointer()));
 
-        bool success = rdmaRead(
+        // bool success = rdmaRead(
+        bool success = rdmaReadExp(
             _qp,
             local_address,
             remote_server_address,
@@ -731,6 +732,11 @@ namespace cuckoo_rcuckoo {
         }
     }
 
+    void RCuckoo::send_lock_and_cover_message(VRMaskedCasData lock_message, VRReadData read_message, uint64_t wr_id) {
+        send_virtual_masked_cas_message(lock_message, wr_id);
+        send_virtual_read_message(read_message, wr_id + 1);
+    }
+
 
     vector<VRMessage> RCuckoo::insert_direct() {
 
@@ -883,11 +889,16 @@ namespace cuckoo_rcuckoo {
 
             _wr_id++;
             int outstanding_cas_wr_id = _wr_id;
-            //TODO obviously combine these two functions into a single one
-            send_virtual_masked_cas_message(lock, outstanding_cas_wr_id);
             _wr_id++;
             int outstanding_read_wr_id = _wr_id;
-            send_virtual_read_message(read, outstanding_read_wr_id);
+            send_lock_and_cover_message(lock, read, outstanding_cas_wr_id);
+
+
+            // //TODO obviously combine these two functions into a single one
+            // send_virtual_masked_cas_message(lock, outstanding_cas_wr_id);
+            // int outstanding_read_wr_id = _wr_id;
+            // send_virtual_read_message(read, outstanding_read_wr_id);
+
 
             int outstanding_messages = 2; //It's two because we send the read and CAS
             assert(_completion_queue != NULL);

@@ -20,6 +20,10 @@ namespace rdma_helper {
     bool rdmaCompareAndSwapMask(ibv_qp *qp, uint64_t source, uint64_t dest,
                                 uint64_t compare, uint64_t swap, uint32_t lkey,
                                 uint32_t remoteRKey, uint64_t mask, bool singal, uint64_t wr_ID);
+
+
+    bool rdmaReadExp(ibv_qp *qp, uint64_t source, uint64_t dest, uint64_t size,
+        uint32_t lkey, uint32_t remoteRKey, bool signal, uint64_t wrID);
 }
 
 #endif
