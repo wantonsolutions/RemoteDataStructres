@@ -596,7 +596,8 @@ void print_periodically(int num_qps, int time_seconds, Memory_State_Machine &msm
         printf("Printing table after %d seconds\n", print_step * time_seconds);
         print_step++;
         copy_device_memory_to_host_lock_table(msm);
-        msm.print_table();
+        // msm.print_table();
+        printf("%2.3f Full\n", msm.get_fill_percentage());
 
         // for(int i = 0; i < num_qps; i++) {
         //     printf("buffer (%d)\n", i);

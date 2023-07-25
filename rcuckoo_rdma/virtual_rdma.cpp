@@ -35,6 +35,9 @@ namespace cuckoo_virtual_rdma {
             case DELETE:
                 s += "DELETE";
                 break;
+            case NO_OP:
+                s += "NO_OP";
+                break;
         }
         s += " Key: " + key.to_string();
         s += " Value: " + value.to_string();
@@ -48,6 +51,8 @@ namespace cuckoo_virtual_rdma {
         s += " mask: " + uint64t_to_bin_string(mask);
         s += " new_value: " + uint64t_to_bin_string(new_value);
         s += " old: " + uint64t_to_bin_string(old);
+        s += " min_set_lock: " + std::to_string(min_set_lock);
+        s += " max_set_lock: " + std::to_string(max_set_lock);
         s += "}";
         return s;
     }
@@ -441,6 +446,7 @@ namespace cuckoo_virtual_rdma {
 
         //Make sure that we have enough space to store the chunks
         locks_chunked.resize(lock_indexes_size);
+        locks_chunked[top_level_index].resize(locks_per_message);
         for(int i=0; i<lock_indexes_size; i++) {
             if(current_chunk_index == 0) {
                 min_lock_index = sixty_four_aligned_index(lock_indexes[i]);
@@ -467,10 +473,22 @@ namespace cuckoo_virtual_rdma {
             }
         }
         VERBOSE("final RESIZE", "Resizing [%d] to %d\n", top_level_index, current_chunk_index);
+        VERBOSE("final RESIZE", "top level size before %d\n", locks_chunked[top_level_index].size());
+        locks_chunked[top_level_index].resize(current_chunk_index);
         //This line is serious bullshit
-        locks_chunked[top_level_index].resize(current_chunk_index, locks_chunked[top_level_index][current_chunk_index-1]);
+        // locks_chunked[top_level_index].resize(current_chunk_index, locks_chunked[top_level_index][current_chunk_index-1]);
+
+
         VERBOSE("final RESIZE", "Resizing top level to %d\n", top_level_index + 1);
         locks_chunked.resize(top_level_index + 1);
+
+        VERBOSE("Final print", "-------");
+        for(int i=0;i<locks_chunked.size();i++){
+            for(int j=0;j<locks_chunked[i].size();j++){
+                VERBOSE("Final print", "locks_chunked[%d][%d] = %u\n", i, j, locks_chunked[i][j]);
+            }
+        }
+
 
         return;
 
@@ -479,7 +497,8 @@ namespace cuckoo_virtual_rdma {
 
     void lock_chunks_to_masked_cas_data(vector<vector<unsigned int>> lock_chunks, vector<VRMaskedCasData> &masked_cas_data) {
         // vector<VRMaskedCasData> masked_cas_data;
-        masked_cas_data.resize(0);
+        masked_cas_data.clear();
+        assert(masked_cas_data.size() == 0);
         for (int i=0; i<lock_chunks.size(); i++) {
             VRMaskedCasData mcd;
             uint64_t lock = 0;
@@ -611,6 +630,7 @@ namespace cuckoo_virtual_rdma {
                 unique_index++;
             }
         }
+        VERBOSE("unique locks", "found a total of %d unique lock indexes out of %d buckets\n", unique_index, buckets.size());
         return unique_index;
     }
 
@@ -725,9 +745,11 @@ namespace cuckoo_virtual_rdma {
         buckets.primary = (masked_cas.min_set_lock) * buckets_per_lock;
         buckets.secondary = (masked_cas.max_set_lock) * buckets_per_lock + (buckets_per_lock - 1);
 
+
         read_data.size= single_read_size_bytes(buckets, row_size_bytes);
         read_data.row = masked_cas.min_set_lock + (BITS_PER_BYTE * masked_cas.min_lock_index);
         read_data.offset = 0;
+        // ALERT("get_covering_read_from_lock", "min_bucket: %d, max_bucket: %d size %d\n", buckets.primary, buckets.secondary, read_data.size);
         return read_data;
     }
 

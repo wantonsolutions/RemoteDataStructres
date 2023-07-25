@@ -6,6 +6,9 @@ namespace rdma_helper {
     int bulk_poll(struct ibv_cq *cq, int num_entries, struct ibv_wc *wc) {
         int n = 0;
         int ret = 0;
+        assert(cq);
+        assert(wc);
+        assert(num_entries > 0);
         do {
             n = ibv_poll_cq(cq, num_entries, wc);       // get upto num_concur entries
             if (n < 0) {

@@ -345,6 +345,8 @@ namespace cuckoo_state_machines {
             ALERT("ERROR", "Delete not implemented\n");
             throw logic_error("ERROR: not implemented operation DELETE");
         } else {
+            ALERT("Gonna crash", " on client %d, Request %s\n", _client_id, _last_request.to_string().c_str());
+            ALERT("Gonna crash", " on client %d, Request value %d\n", _client_id, _last_request.op);
             ALERT("ERROR", "unknown operation\n");
             throw logic_error("ERROR: unknown operation");
         }

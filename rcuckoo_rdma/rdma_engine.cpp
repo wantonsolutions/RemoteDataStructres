@@ -22,6 +22,16 @@ using namespace cuckoo_state_machines;
 using namespace rdma_helper;
 
 namespace cuckoo_rdma_engine {
+
+    void * cuckoo_fsm_runner(void * args){
+        printf("launching threads in a cuckoo fsm runner\n");
+        State_Machine_Wrapper * smw = (State_Machine_Wrapper *) args;
+        VRMessage ingress_messages;
+        vector<VRMessage> output_messages;
+        // RCuckoo *cuck = smw->_rcuckoo;
+        output_messages = smw->_rcuckoo->rdma_fsm(ingress_messages);
+        return NULL;
+    }
     
     RDMA_Engine::RDMA_Engine(){
         ALERT("RDMA Engine", "Don't blindly allocate an RDMA state machine");
@@ -41,7 +51,11 @@ namespace cuckoo_rdma_engine {
         } 
 
         VERBOSE("RDMA Engine",": Initializing RDMA Engine for %d clients\n");
-        _state_machines = (State_Machine_Wrapper *) calloc(_num_clients, sizeof(State_Machine_Wrapper));
+        for(int i=0;i<_num_clients;i++) {
+            VERBOSE("RDMA Engine",": Initializing RDMA Engine for client %d\n", i);
+            _state_machines.push_back(State_Machine_Wrapper());
+        }
+
 
         try {
             RDMAConnectionManagerArguments args;
@@ -85,9 +99,9 @@ namespace cuckoo_rdma_engine {
                 _state_machines[i]._qp = _connection_manager->client_qp[i];
                 _state_machines[i]._rcuckoo = new RCuckoo(config);
                 _state_machines[i]._state_machine = _state_machines[i]._rcuckoo;
-                _state_machines[i]._memory_state_machine = new Memory_State_Machine(config);
-                _state_machines[i]._memory_state_machine->set_table_pointer(_state_machines[i]._rcuckoo->get_table_pointer());
-                _state_machines[i]._memory_state_machine->set_underlying_lock_table_address(_state_machines[i]._rcuckoo->get_lock_table_pointer());
+                // _state_machines[i]._memory_state_machine = new Memory_State_Machine(config);
+                // _state_machines[i]._memory_state_machine->set_table_pointer(_state_machines[i]._rcuckoo->get_table_pointer());
+                // _state_machines[i]._memory_state_machine->set_underlying_lock_table_address(_state_machines[i]._rcuckoo->get_lock_table_pointer());
 
 
                 //Exchange the connection information on the QP
@@ -163,7 +177,8 @@ namespace cuckoo_rdma_engine {
         }
         for (int i=0;i<_num_clients;i++) {
             printf("Creating Client Thread %d\n", i);
-            pthread_create(&thread_ids[i], NULL, (THREADFUNCPTR)&State_Machine_Wrapper::start, &_state_machines[i]);
+            // pthread_create(&thread_ids[i], NULL, (THREADFUNCPTR)&State_Machine_Wrapper::start, &_state_machines[i]);
+            pthread_create(&thread_ids[i], NULL, &cuckoo_fsm_runner, &_state_machines[i]);
         }
 
         using std::chrono::high_resolution_clock;
@@ -174,7 +189,7 @@ namespace cuckoo_rdma_engine {
         //Start the treads
         auto t1 = high_resolution_clock::now();
         global_start_flag = true;
-        sleep(4);
+        sleep(2);
         global_end_flag = true;
         auto t2 = high_resolution_clock::now();
         auto ms_int = duration_cast<milliseconds>(t2 - t1);
@@ -214,6 +229,9 @@ namespace cuckoo_rdma_engine {
         VERBOSE("RDMA Engine", "done running state machine!");
         return true;
     }
+
+
+    State_Machine_Wrapper::State_Machine_Wrapper() {};
 
     const char * State_Machine_Wrapper::log_id() {
         return _log_identifier;
@@ -334,6 +352,7 @@ namespace cuckoo_rdma_engine {
             exit(1);
         }
     }
+
 
 
     

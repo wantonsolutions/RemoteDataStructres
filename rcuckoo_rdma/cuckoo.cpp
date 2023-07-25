@@ -238,6 +238,9 @@ namespace cuckoo_rcuckoo {
         _state = IDLE;
         _inserting = false;
 
+        //TODO record this variable
+        _retries_due_to_failed_second_search=0;
+
         // complete_insert_stats(true);
         return;
     }
@@ -761,6 +764,19 @@ namespace cuckoo_rcuckoo {
             true,
             wr_id);
 
+        bool inside_rows = read_message.row < _table.get_row_count();
+        bool inside_buckets = read_message.offset < _table.get_buckets_per_row();
+        if (!inside_rows) {
+            ALERT(log_id(),"row %lu is not inside rows %lu\n", read_message.row, _table.get_row_count());
+        }
+        if (!inside_buckets) {
+            printf(log_id(),"offset %lu is not inside buckets %lu\n", read_message.offset, _table.get_buckets_per_row());
+        }
+        assert(inside_rows);
+        assert(inside_buckets);
+
+
+
         uint64_t local_address = (uint64_t) get_entry_pointer(read_message.row, read_message.offset);
         uint64_t remote_server_address = local_to_remote_table_address(local_address);
 
@@ -784,7 +800,22 @@ namespace cuckoo_rcuckoo {
         #define MAX_INSERT_AND_UNLOCK_MESSAGE_COUNT 64
         struct ibv_sge sg [MAX_INSERT_AND_UNLOCK_MESSAGE_COUNT];
         struct ibv_exp_send_wr wr [MAX_INSERT_AND_UNLOCK_MESSAGE_COUNT];
+
+
+        if (insert_messages.size() + unlock_messages.size() > MAX_INSERT_AND_UNLOCK_MESSAGE_COUNT) {
+            ALERT(log_id(),"Too many messages to send\n");
+            ALERT(log_id(), "insert_messages.size() %lu\n", insert_messages.size());
+            ALERT(log_id(), "unlock_messages.size() %lu\n", unlock_messages.size());
+            for (auto message : insert_messages) {
+                ALERT(log_id(), "insert_messages %lu %lu %lu\n", message.row, message.offset, message.new_value);
+            }
+            for (auto message : unlock_messages) {
+                ALERT(log_id(), "unlock_messages %lu %llX %llX\n", message.min_lock_index, message.old, message.new_value);
+            }
+            exit(1);
+        }
         assert(insert_messages.size() + unlock_messages.size() <= MAX_INSERT_AND_UNLOCK_MESSAGE_COUNT);
+
 
         int total_messages = insert_messages.size() + unlock_messages.size();
 
@@ -841,19 +872,30 @@ namespace cuckoo_rcuckoo {
         for (int i=0; i< _locks_held.size();i++) {
             VERBOSE("pre search", "lock %d\n", _locks_held[i]);
         }
+        assert(_buckets_per_lock = 1);
         vector<unsigned int> search_buckets = lock_indexes_to_buckets(_locks_held, _buckets_per_lock);
         _search_path = (this->*_table_search_function)(search_buckets);
         _search_path_index = _search_path.size() -1;
         if (_search_path.size() <=0 ) {
-            WARNING(log_id(), "Second Search Failed for key %s retry time\n", _current_insert_key.to_string().c_str(), _id);
-            assert(search_buckets.size() == _locks_held.size());
-            for (int i=0; i< search_buckets.size(); i++) {
-                WARNING(log_id(), "search_buckets[%d] = %d\n", i, search_buckets[i]);
-                WARNING(log_id(), "locks_held[%d] = %d\n", i, _locks_held[i]);
-                WARNING(log_id(), "%s\n", _table.row_to_string(search_buckets[i]).c_str());
+            _retries_due_to_failed_second_search++;
+            // INFO(log_id(), "Insert Direct -- Second Search Failed for key %s retry time #%d \n", _current_insert_key.to_string().c_str(),  _retries_due_to_failed_second_search);
+            // INFO(log_id(), "Unable to find path within buckets %s\n", vector_to_string(search_buckets).c_str());
 
-
+            if (search_buckets.size() != _locks_held.size()) {
+                WARNING("PRECRASH", "Client %d is about to crash\n", _id);
+                WARNING(log_id(), "search_buckets.size() != _locks_held.size()\n");
+                WARNING(log_id(), "search_buckets.size() = %d\n", search_buckets.size());
+                WARNING(log_id(), "_locks_held.size() = %d\n", _locks_held.size());
+                for (int i=0; i < search_buckets.size(); i++) {
+                    WARNING(log_id(), "search_buckets[%d] = %d\n", i, search_buckets[i]);
+             
+                }
+                for (int i=0; i < _locks_held.size(); i++) {
+                    WARNING(log_id(), "_locks_held[%d] = %d\n", i, _locks_held[i]);
+             
+                }
             }
+            assert(search_buckets.size() == _locks_held.size());
             INFO(log_id(), "Hi Stew, I\'m hoping you have a great day", _current_insert_key.to_string().c_str(), _id);
             _state = RELEASE_LOCKS_TRY_AGAIN;
         }
@@ -865,7 +907,7 @@ namespace cuckoo_rcuckoo {
         fill_current_unlock_list();
         // _lock_list is now full
 
-        INFO("insert direct", "about to unlock a total of %d lock messages\n", unlock_messages.size());
+        INFO("insert direct", "about to unlock a total of %d lock messages\n", _lock_list.size());
 
 
         unsigned int total_messages = _lock_list.size();
@@ -886,7 +928,7 @@ namespace cuckoo_rcuckoo {
         if (_state == INSERTING) {
             for (unsigned int i = 0; i < insert_messages.size(); i++) {
                 if (_wc[i].status != IBV_WC_SUCCESS) {
-                    printf("insert failed\n");
+                    ALERT(log_id(), "insert failed on message %s\n", insert_messages[i].to_string().c_str());
                     exit(1);
                 }
             }
@@ -933,6 +975,13 @@ namespace cuckoo_rcuckoo {
 
         /* copied from aquire locks function */ 
         _locking_message_index = 0;
+        assert(_locks_held.size() ==0);
+        _locks_held.clear();
+
+        for(int i=0; i < _fast_lock_chunks.size();i++) {
+            _fast_lock_chunks[i].clear();
+        }
+
         search_path_to_buckets_fast(_search_path, _buckets);
         
         INFO(log_id(), "[aquire_locks] gathering locks for buckets %s\n", vector_to_string(_buckets).c_str());
@@ -941,7 +990,7 @@ namespace cuckoo_rcuckoo {
         get_covering_reads_from_lock_list(_lock_list, _covering_reads ,_buckets_per_lock, _table.row_size_bytes());
 
         for (unsigned int i = 0; i < _lock_list.size(); i++) {
-            INFO(log_id(), "[aquire_locks] lock %d -> [lock %s] [read %s]\n", i, lock_list[i].to_string().c_str(), covering_reads[i].to_string().c_str());
+            INFO(log_id(), "[aquire_locks] lock %d -> [lock %s] [read %s]\n", i, _lock_list[i].to_string().c_str(), _covering_reads[i].to_string().c_str());
         }
 
         assert(_lock_list.size() == _covering_reads.size());
@@ -958,6 +1007,12 @@ namespace cuckoo_rcuckoo {
             VRMaskedCasData lock = _lock_list[message_index];
             VRReadData read = _covering_reads[message_index];
 
+            // ALERT(log_id(), "getting lock %s for buckets %s",lock.to_string().c_str(), vector_to_string(_buckets).c_str());
+            // ALERT(log_id(), "will have to get all locks");
+            // for (int i=0;i<_lock_list.size();i++) {
+            //     ALERT(log_id(), "lock %d -> %s", i, _lock_list[i].to_string().c_str());
+            // }
+
             _wr_id++;
             int outstanding_cas_wr_id = _wr_id;
             _wr_id++;
@@ -970,6 +1025,10 @@ namespace cuckoo_rcuckoo {
 
             if (n == 1) {
                 VERBOSE(log_id(), "first poll missed the read, polling again\n");
+                assert(_wc);
+                assert(_completion_queue);
+                assert(_wc + n);
+                assert(outstanding_messages - n > 0);
                 n += bulk_poll(_completion_queue, outstanding_messages - n, _wc + n);
             }
 
@@ -977,17 +1036,27 @@ namespace cuckoo_rcuckoo {
             assert(n == outstanding_messages); //This is just a safty for now.
             if (_wc[0].status != IBV_WC_SUCCESS) {
                 ALERT("lock aquire", " masked cas failed somehow\n");
+                ALERT("lock aquire", " masked cas %s\n", lock.to_string().c_str());
                 exit(1);
             }
 
             if (_wc[1].status != IBV_WC_SUCCESS) {
-                ALERT("lock aquire", " spanning read failed somehow\n");
+                ALERT(log_id(), " [lock aquire] spanning read failed somehow\n");
+                ALERT(log_id(), " [lock aquire] read %s\n", read.to_string().c_str());
+                ALERT(log_id(), " [lock aquire] table size %d\n", _table.get_row_count());
                 exit(1);
             }
 
             uint64_t old_value = lock.old;
             uint64_t mask = lock.mask;
             int lock_index = lock.min_lock_index;
+
+            if (!(lock_index >= 0 && lock_index < _table.get_underlying_lock_table_size_bytes())) {
+                WARNING(log_id(), "assert about to fail, lock_index = %d, lock_table_size = %d\n", lock_index, _table.get_underlying_lock_table_size_bytes());
+            }
+            assert(lock_index >= 0 && lock_index < _table.get_underlying_lock_table_size_bytes());
+            assert(get_lock_pointer(lock_index));
+
             uint64_t received_locks = *((uint64_t*) get_lock_pointer(lock_index));
 
             //?? bswap the DMA'd value?

@@ -18,6 +18,9 @@ namespace cuckoo_rdma_engine {
     //It's point is just to hold a bunch of pointers to associated objects
     class State_Machine_Wrapper {
         public:
+            State_Machine_Wrapper();
+            State_Machine_Wrapper(int id, State_Machine * state_machine, ibv_qp * qp, RCuckoo * rcuckoo, ibv_mr * table_mr, ibv_mr * lock_table_mr, Memory_State_Machine * memory_state_machine, table_config * table_config, struct ibv_cq * completion_queue);
+
             int _id;
             State_Machine * _state_machine;
             ibv_qp * _qp;
@@ -41,7 +44,9 @@ namespace cuckoo_rdma_engine {
     class RDMA_Engine {
         public:
             RDMA_Engine();
-            ~RDMA_Engine() {}
+            ~RDMA_Engine() {
+                printf("RDMA_Engine destructor\n");
+            }
             RDMA_Engine(unordered_map<string, string> config);
             // using namespace cuckoo_rcuckoo;
             // set_rcuckoo_state_machine(cuckoo_rcuckoo::RCuckoo * rcuckoo);
@@ -56,7 +61,7 @@ namespace cuckoo_rdma_engine {
             // Memory_State_Machine * _memory_state_machine;
             // table_config * _table_config;
             // struct ibv_cq *_completion_queue;
-            State_Machine_Wrapper * _state_machines;
+            vector<State_Machine_Wrapper> _state_machines;
             int _num_clients;
             RDMAConnectionManager  *_connection_manager;
     };
