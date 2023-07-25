@@ -1025,8 +1025,10 @@ namespace cuckoo_rcuckoo {
         vector<VRMessage> response = vector<VRMessage>();
 
         //Hold here until the global start flag is set
-        while(!*_global_start_flag){};
-        printf("Starting RDMA FSM Start Flag Set\n");
+        while(!*_global_start_flag){
+            ALERT(log_id(), "not globally started");
+        };
+        ALERT(log_id(),"Starting RDMA FSM Start Flag Set\n");
         while(!*_global_end_flag) {
 
             //The client is done

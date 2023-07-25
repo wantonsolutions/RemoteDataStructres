@@ -157,6 +157,7 @@ namespace cuckoo_rdma_engine {
         // bool *global_end_flag = (bool *) calloc(_num_clients, sizeof(bool));
 
         for(int i=0;i<_num_clients;i++){
+            printf("setting global start flags for rcuckoo %d\n", i);
             _state_machines[i]._rcuckoo->set_global_start_flag(&global_start_flag);
             _state_machines[i]._rcuckoo->set_global_end_flag(&global_end_flag);
         }
@@ -173,7 +174,7 @@ namespace cuckoo_rdma_engine {
         //Start the treads
         auto t1 = high_resolution_clock::now();
         global_start_flag = true;
-        sleep(20);
+        sleep(4);
         global_end_flag = true;
         auto t2 = high_resolution_clock::now();
         auto ms_int = duration_cast<milliseconds>(t2 - t1);
@@ -192,14 +193,19 @@ namespace cuckoo_rdma_engine {
             statistics.push_back(_state_machines[i]._rcuckoo->get_stats());
         }
 
-        //print statistics
+        // //print statistics
+        // for (int i=0;i<_num_clients;i++) {
+        //     printf("Printing Statistics Off of Client Thread %d\n", i);
+        //     for (auto it = statistics[i].begin(); it != statistics[i].end(); ++it) {
+        //         printf("%s: %s\n", it->first.c_str(), it->second.c_str());
+        //     }
+        // }
+        uint64_t puts = 0;
         for (int i=0;i<_num_clients;i++) {
-            printf("Printing Statistics Off of Client Thread %d\n", i);
-            for (auto it = statistics[i].begin(); it != statistics[i].end(); ++it) {
-                printf("%s: %s\n", it->first.c_str(), it->second.c_str());
-            }
+            puts += stoull(statistics[i]["completed_puts"]);
         }
-        uint64_t puts = stoull(statistics[0]["completed_puts"]);
+        // uint64_t puts = stoull(statistics[0]["completed_puts"]);
+
         printf("Throughput: %f\n", puts / (ms_int.count() / 1000.0));
 
 
