@@ -48,6 +48,8 @@ config["base_port"] = "20886"
 
 orch = orchestrator.orchestrator(config)
 orch.sanity_check()
-orch.build(clean=True)
-orch.sync()
+orch.kill()
+orch.build()
+# orch.build(clean=True)
+# orch.sync()
 orch.run_rdma_benchmark()

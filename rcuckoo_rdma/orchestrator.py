@@ -55,6 +55,9 @@ class rcuckoo_ssh_wrapper:
         self.run_cmd('git pull')
 
 class orchestrator:
+
+    memory_program_name = "rdma_memory_server"
+    client_program_name = "./test/test_cuckoo"
     def __init__(self, config):
         self.server = rcuckoo_ssh_wrapper('ssgrant', 'yak-00.sysnet.ucsd.edu')
         self.client = rcuckoo_ssh_wrapper('ssgrant', 'yak-01.sysnet.ucsd.edu')
@@ -73,15 +76,16 @@ class orchestrator:
             node.set_verbose(verbose)
 
     def kill(self):
-        self.client.run_cmd('killall rcuckoo_rdma')
-        self.server.run_cmd('killall rcuckoo_rdma')
+        self.server.run_cmd('echo iwicbV15 | sudo -S killall ' + self.memory_program_name)
+        self.client.run_cmd('echo iwicbV15 | sudo -S killall ' + self.client_program_name)
 
 
-    def build(self, clean=False):
+    def build(self, pull=False, clean=False):
         print("Starting Build on", self.build_location.hostname)
 
-        print("Pulling from git")
-        self.build_location.pull()
+        if pull:
+            print("Pulling from git")
+            self.build_location.pull()
 
         if clean:
             print("Cleaning First on", self.build_location.hostname)
@@ -89,7 +93,7 @@ class orchestrator:
                 'cd ' + self.project_directory + ';'
                 'make clean;')
 
-        threads = 40
+        threads = 30
         print("Building on ...", self.build_location.hostname, "with", threads, "threads")
         self.build_location.run_cmd(
             'cd ' + self.project_directory + ';'
@@ -111,21 +115,13 @@ class orchestrator:
         print("Starting RDMA Benchmark")
         self.server.run_cmd(
             'cd rcuckoo_rdma;'
-            './rdma_server -q ' + str(self.queue_pairs) + ' &')
+            './'+ self.memory_program_name + ' > memserver.out 2>&1 &')
 
         print("Server is started with queue pairs", self.queue_pairs)
 
         server_ip = self.server.get_mlx5_ip()
         self.client.run_cmd(
             'cd rcuckoo_rdma;'
-            './rdma_client -a ' + server_ip + ' -p 20886 -q '+str(self.queue_pairs)+ ' -x;'
+            '' + self.client_program_name + ''
+            # './rdma_client -a ' + server_ip + ' -p 20886 -q '+str(self.queue_pairs)+ ' -x;'
         )
-
-
-
-
-orch = orchestrator()
-orch.sanity_check()
-orch.build(clean=True)
-orch.sync()
-orch.run_rdma_benchmark()
