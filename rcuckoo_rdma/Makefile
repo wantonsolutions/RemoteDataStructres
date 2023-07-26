@@ -12,7 +12,7 @@ CFLAGS := -std=c++2a -g -O3 -Wall -Wall -Wextra -pedantic -fPIC
 
 RDMA_LIBS := -lrdmacm -libverbs -lpthread
 
-LIBRARIES := -L$(XXHASH_INC) -lxxhash $(RDMA_LIBS) -lmemcached
+LIBRARIES := -L$(XXHASH_INC) -lxxhash $(RDMA_LIBS) -lmemcached -lssl -lcrypto
 
 # TARGET := test_hash test_tables test_search rdma_server rdma_client
 

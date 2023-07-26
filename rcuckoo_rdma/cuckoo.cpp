@@ -13,6 +13,8 @@
 #include "hash.h"
 #include "log.h"
 #include "rdma_helper.h"
+#include "rdma_common.h"
+#include "memcached.h"
 #include <cassert>
 
 #define DEBUG
@@ -46,12 +48,18 @@ namespace cuckoo_rcuckoo {
     }
 
     
-    void RCuckoo::set_global_start_flag(bool * flag) {
+    void RCuckoo::set_global_start_flag(volatile bool * flag) {
+        assert(flag != NULL);
+        // printf("cuckoo address global start flag %p\n", flag);
         _global_start_flag = flag;
+        assert(_global_start_flag != NULL);
     }
 
-    void RCuckoo::set_global_end_flag(bool * flag) {
+    void RCuckoo::set_global_end_flag(volatile bool * flag) {
+        assert(flag != NULL);
+        // printf("cuckoo address global stop flag %p\n", flag);
         _global_end_flag = flag;
+        assert(_global_end_flag != NULL);
     }
 
 
@@ -72,9 +80,9 @@ namespace cuckoo_rcuckoo {
     }
 
     RCuckoo::RCuckoo() : Client_State_Machine() {
-        _table = Table();
-        printf("RCUCKOO no args, get outta here\n");
-        exit(0);
+        // _table = Table();
+        // printf("RCUCKOO no args, get outta here\n");
+        // exit(0);
     }
 
     RCuckoo::RCuckoo(unordered_map<string, string> config) : Client_State_Machine(config) {
@@ -500,18 +508,24 @@ namespace cuckoo_rcuckoo {
     void RCuckoo::init_rdma_structures(rcuckoo_rdma_info info){ 
 
         assert(info.qp != NULL);
-        assert(info.table_mr != NULL);
-        assert(info.lock_table_mr != NULL);
         assert(info.completion_queue != NULL);
-        assert(info.remote_table_config != NULL);
+        assert(info.pd != NULL);
 
         _qp = info.qp;
-        _table_mr = info.table_mr;
-        _lock_table_mr = info.lock_table_mr;
         _completion_queue = info.completion_queue;
-        _table_config = info.remote_table_config;
-        _wr_id = 10000000;
+        _protection_domain = info.pd;
 
+        _table_config = memcached_get_table_config();
+        assert(_table_config != NULL);
+        assert(_table_config->table_size_bytes == get_table_size_bytes());
+        INFO(log_id(),"got a table config from the memcached server and it seems to line up\n");
+
+        INFO(log_id(), "Registering table with RDMA device size %d, location %p\n", get_table_size_bytes(), get_table_pointer()[0]);
+        _table_mr = rdma_buffer_register(_protection_domain, get_table_pointer()[0], _table.get_table_size_bytes(), MEMORY_PERMISSION);
+        INFO(log_id(), "Registering lock table with RDMA device size %d, location %p\n", get_lock_table_size_bytes(), get_lock_table_pointer());
+        _lock_table_mr = rdma_buffer_register(_protection_domain, get_lock_table_pointer(), get_lock_table_size_bytes(), MEMORY_PERMISSION);
+
+        _wr_id = 10000000;
         _wc = (struct ibv_wc *) calloc (MAX_CONCURRENT_CUCKOO_MESSAGES, sizeof(struct ibv_wc));
 
     }
@@ -742,6 +756,11 @@ namespace cuckoo_rcuckoo {
         #define READ_AND_COVER_MESSAGE_COUNT 2
         struct ibv_sge sg [READ_AND_COVER_MESSAGE_COUNT];
         struct ibv_exp_send_wr wr [READ_AND_COVER_MESSAGE_COUNT];
+
+        // memset(sg, 0, sizeof(struct ibv_sge) * READ_AND_COVER_MESSAGE_COUNT);
+        // memset(wr, 0, sizeof(struct ibv_exp_send_wr) * READ_AND_COVER_MESSAGE_COUNT);
+        
+
 
         //Lock
         uint64_t local_lock_address = (uint64_t) get_lock_pointer(lock_message.min_lock_index);
@@ -1042,6 +1061,8 @@ namespace cuckoo_rcuckoo {
 
             if (_wc[1].status != IBV_WC_SUCCESS) {
                 ALERT(log_id(), " [lock aquire] spanning read failed somehow\n");
+
+                ALERT(log_id(), " errno: %d \n", -errno);
                 ALERT(log_id(), " [lock aquire] read %s\n", read.to_string().c_str());
                 ALERT(log_id(), " [lock aquire] table size %d\n", _table.get_row_count());
                 exit(1);
@@ -1087,22 +1108,19 @@ namespace cuckoo_rcuckoo {
     }
 
 
-    vector<VRMessage> RCuckoo::rdma_fsm(VRMessage message) {
-        if (message.get_message_type() != NO_OP_MESSAGE) {
-            VERBOSE(log_id(), "Received Message: %s\n", message.to_string().c_str());
-        }
-        vector<VRMessage> response = vector<VRMessage>();
+    void RCuckoo::rdma_fsm(void) {
 
         //Hold here until the global start flag is set
         while(!*_global_start_flag){
-            ALERT(log_id(), "not globally started");
+            // ALERT(log_id(), "not globally started");
         };
         ALERT(log_id(),"Starting RDMA FSM Start Flag Set\n");
+
         while(!*_global_end_flag) {
 
             //The client is done
             if (_complete && _state == IDLE) {
-                return response;
+                return;
             }
 
             Request next_request;
@@ -1119,7 +1137,8 @@ namespace cuckoo_rcuckoo {
                         put_direct();
                     } else if (next_request.op == GET) {
                         _current_read_key = next_request.key;
-                        response=get();
+                        throw logic_error("ERROR: GET not implemented");
+                        // response=get();
                     } else {
                         printf("ERROR: unknown operation\n");
                         throw logic_error("ERROR: unknown operation");
@@ -1128,7 +1147,8 @@ namespace cuckoo_rcuckoo {
 
 
                 case READING:
-                    read_fsm(message);
+                    // read_fsm(message);
+                    throw logic_error("ERROR: reading not implemented");
                     break;
                 case RELEASE_LOCKS_TRY_AGAIN:
                     put_direct();
@@ -1137,9 +1157,6 @@ namespace cuckoo_rcuckoo {
                     throw logic_error("ERROR: Invalid state");
             }
 
-            for (unsigned int i = 0; i < response.size(); i++) {
-                VERBOSE(log_id(), "Sending Message: %s\n", response[i].to_string().c_str());
-            }
 
         }
         ALERT(log_id(), "BREAKING EXIT FLAG!!\n");
@@ -1148,7 +1165,7 @@ namespace cuckoo_rcuckoo {
             _complete = true;
         }
 
-        return response;
+        return;
     }
 }
 

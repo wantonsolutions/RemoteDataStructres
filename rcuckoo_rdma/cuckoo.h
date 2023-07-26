@@ -21,17 +21,15 @@ namespace cuckoo_rcuckoo {
 
     typedef struct rcuckoo_rdma_info {
         ibv_qp *qp;
-        ibv_mr *table_mr;
-        ibv_mr *lock_table_mr;
+        ibv_pd *pd;
         struct ibv_cq * completion_queue;
-        table_config *remote_table_config;
     } rcuckoo_rdma_info;
 
     class RCuckoo : public Client_State_Machine {
         public:
             RCuckoo();
             RCuckoo(unordered_map<string, string> config);
-            ~RCuckoo() {}
+            ~RCuckoo() {printf("Killing RCuckoo!!!n");}
 
             const char * log_id();
 
@@ -92,13 +90,13 @@ namespace cuckoo_rcuckoo {
             void send_lock_and_cover_message(VRMaskedCasData lock_message, VRReadData read_message, uint64_t wr_id);
             void send_insert_and_unlock_messages(vector<VRCasData> &insert_messages, vector<VRMaskedCasData> & unlock_messages, uint64_t wr_id);
 
-            vector<VRMessage> rdma_fsm(VRMessage message);
+            void rdma_fsm(void);
             void init_rdma_structures(rcuckoo_rdma_info info);
             void put_direct();
             void insert_direct();
 
-            void set_global_start_flag(bool * flag);
-            void set_global_end_flag(bool * flag);
+            void set_global_start_flag(volatile bool * flag);
+            void set_global_end_flag(volatile bool * flag);
 
 
             vector<VRMaskedCasData> get_current_unlock_list();
@@ -111,8 +109,8 @@ namespace cuckoo_rcuckoo {
             unsigned int _buckets_per_lock;
             unsigned int _locks_per_message;
 
-            bool * _global_start_flag;
-            bool * _global_end_flag;
+            volatile bool * _global_start_flag;
+            volatile bool * _global_end_flag;
 
 
             Table _table;
@@ -130,6 +128,7 @@ namespace cuckoo_rcuckoo {
             ibv_qp * _qp;
             ibv_mr *_table_mr;
             ibv_mr *_lock_table_mr;
+            ibv_pd *_protection_domain;
             struct ibv_cq * _completion_queue;
             table_config * _table_config;
             struct ibv_wc *_wc;

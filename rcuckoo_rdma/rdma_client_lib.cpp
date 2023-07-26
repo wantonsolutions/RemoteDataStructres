@@ -287,24 +287,24 @@ RDMAConnectionManager::RDMAConnectionManager(RDMAConnectionManagerArguments args
     }
 }
 
-RDMAConnectionManager::~RDMAConnectionManager() {
+// RDMAConnectionManager::~RDMAConnectionManager() {
 
-    printf("TODO actually make constructior this one is really bad and fails because of the disconeect call\n");
-    return;
+//     printf("TODO actually make constructior this one is really bad and fails because of the disconeect call\n");
+//     return;
 
-    int ret;
-    for (int i = 0; i < _num_qps; i++) {
-        printf("RDMA CONNECTION MANAGER DESTRUCTOR disconnecting qp %d \n", i);
-        ret = client_disconnect_and_clean(i);
-        if (ret)
-            rdma_error("Failed to cleanly disconnect qp %d \n", i);
-            throw std::runtime_error("Failed to cleanly disconnect qp");
-    }
-    ret = client_clean();
-    if (ret)
-        rdma_error("Failed to clean client resources\n");
-        throw std::runtime_error("Failed to clean client resources");
-}
+//     int ret;
+//     for (int i = 0; i < _num_qps; i++) {
+//         printf("RDMA CONNECTION MANAGER DESTRUCTOR disconnecting qp %d \n", i);
+//         ret = client_disconnect_and_clean(i);
+//         if (ret)
+//             rdma_error("Failed to cleanly disconnect qp %d \n", i);
+//             throw std::runtime_error("Failed to cleanly disconnect qp");
+//     }
+//     ret = client_clean();
+//     if (ret)
+//         rdma_error("Failed to clean client resources\n");
+//         throw std::runtime_error("Failed to clean client resources");
+// }
 
 
 /* This function prepares client side shared resources for all connections */

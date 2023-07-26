@@ -432,8 +432,8 @@ namespace cuckoo_state_machines {
     }
 
     Client_State_Machine::Client_State_Machine() : State_Machine() {
-        ALERT("TODO","client state machine constructor with no argument\n");
-        exit(1);
+        // ALERT("TODO","client state machine constructor with no argument\n");
+        // exit(1);
     }
 
     Client_State_Machine::Client_State_Machine(unordered_map<string,string> config) : State_Machine(config) {

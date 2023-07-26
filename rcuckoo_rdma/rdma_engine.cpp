@@ -13,6 +13,7 @@
 #include "log.h"
 #include "memcached.h"
 #include "rdma_helper.h"
+#include <linux/kernel.h>
 
 #include <chrono>
 
@@ -20,17 +21,21 @@
 using namespace std;
 using namespace cuckoo_state_machines;
 using namespace rdma_helper;
+using namespace cuckoo_rcuckoo;
+
+
+#define MAX_THREADS 24
+volatile bool global_start_flag = false;
+volatile bool global_end_flag = false;
+RCuckoo *rcuckoo_state_machines[MAX_THREADS];
 
 namespace cuckoo_rdma_engine {
 
     void * cuckoo_fsm_runner(void * args){
         printf("launching threads in a cuckoo fsm runner\n");
-        State_Machine_Wrapper * smw = (State_Machine_Wrapper *) args;
-        VRMessage ingress_messages;
-        vector<VRMessage> output_messages;
-        // RCuckoo *cuck = smw->_rcuckoo;
-        output_messages = smw->_rcuckoo->rdma_fsm(ingress_messages);
-        return NULL;
+        RCuckoo * cuck = (RCuckoo *) args;
+        cuck->rdma_fsm();
+        pthread_exit(NULL);
     }
     
     RDMA_Engine::RDMA_Engine(){
@@ -95,55 +100,17 @@ namespace cuckoo_rdma_engine {
 
             for (i=0;i<_num_clients;i++) {
                 config["id"] = to_string(i);
-                _state_machines[i]._id = i;
-                _state_machines[i]._qp = _connection_manager->client_qp[i];
-                _state_machines[i]._rcuckoo = new RCuckoo(config);
-                _state_machines[i]._state_machine = _state_machines[i]._rcuckoo;
-                // _state_machines[i]._memory_state_machine = new Memory_State_Machine(config);
-                // _state_machines[i]._memory_state_machine->set_table_pointer(_state_machines[i]._rcuckoo->get_table_pointer());
-                // _state_machines[i]._memory_state_machine->set_underlying_lock_table_address(_state_machines[i]._rcuckoo->get_lock_table_pointer());
-
-
-                //Exchange the connection information on the QP
-                //the first index of the Entry** is the beginning of the table
-                char * table_pointer = (char *) _state_machines[i]._rcuckoo->get_table_pointer()[0];
-                uint32_t table_size = _state_machines[i]._rcuckoo->get_table_size_bytes();
-
-                char * lock_table_pointer = (char *) _state_machines[i]._rcuckoo->get_lock_table_pointer();
-                uint32_t lock_table_size = _state_machines[i]._rcuckoo->get_lock_table_size_bytes();
-
-                _state_machines[i]._table_config = memcached_get_table_config();
-                assert(_state_machines[i]._table_config != NULL);
-                assert(_state_machines[i]._table_config->table_size_bytes == table_size);
-                printf("got a table config from the memcached server and it seems to line up\n");
-                // rcuckoo->print_table();
-
-                //register the memory
-                printf("registering table memory\n");
-                // const int extra_table_memory = 256; //I get out of range errros unless i make the table a bit bigger
-                _state_machines[i]._table_mr = rdma_buffer_register(_connection_manager->pd, table_pointer, table_size, MEMORY_PERMISSION);
-
-                printf("register lock table memory\n");
-                _state_machines[i]._lock_table_mr = rdma_buffer_register(_connection_manager->pd, lock_table_pointer, lock_table_size, MEMORY_PERMISSION);
-
-                //Request a completion queue
-                printf("requesting completion queue\n");
-                void * context = NULL;
-                _state_machines[i]._completion_queue = _connection_manager->client_cq_threads[i];
-                if(_state_machines[i]._completion_queue == NULL){
-                    printf("completion queue is null\n");
-                }
-
-
-                assert(_state_machines[i]._completion_queue != NULL);
+                rcuckoo_state_machines[i] = new RCuckoo(config);
+                // _state_machines[i]._id = i;
+                // _state_machines[i]._rcuckoo = new RCuckoo(config);
 
                 struct rcuckoo_rdma_info info;
-                info.qp= _state_machines[i]._qp;
-                info.table_mr = _state_machines[i]._table_mr;
-                info.lock_table_mr = _state_machines[i]._lock_table_mr;
-                info.completion_queue = _state_machines[i]._completion_queue;
-                info.remote_table_config = _state_machines[i]._table_config;
-                _state_machines[i]._rcuckoo->init_rdma_structures(info);
+                info.qp = _connection_manager->client_qp[i];
+                info.completion_queue = _connection_manager->client_cq_threads[i];
+                info.pd = _connection_manager->pd;
+                // _state_machines[i]._rcuckoo->init_rdma_structures(info);
+                rcuckoo_state_machines[i]->init_rdma_structures(info);
+
             }
 
         } catch (exception& e) {
@@ -156,29 +123,24 @@ namespace cuckoo_rdma_engine {
         return;
     }
 
-
-    typedef void * (*THREADFUNCPTR)(void *);
     bool RDMA_Engine::start() {
         VERBOSE("RDMA Engine", "starting rdma engine\n");
         VERBOSE("RDMA Engine", "for the moment just start the first of the state machines\n");
-        pthread_t* thread_ids = (pthread_t*) calloc(_num_clients, sizeof(pthread_t));
-
-        bool global_start_flag = false;
-        bool global_end_flag = false;
-
-
-        // bool *global_start_flag = (bool *) calloc(_num_clients, sizeof(bool));
-        // bool *global_end_flag = (bool *) calloc(_num_clients, sizeof(bool));
+        assert(_num_clients <= MAX_THREADS);
+        if (_num_clients > MAX_THREADS) {
+            printf("Error: num_clients must be at most %d, we are only enabling a few QP per process\n", MAX_THREADS);
+            printf("TODO; we probably need a better way to scale clients if we are going more than this.\n");
+            exit(1);
+        }
+        pthread_t thread_ids[MAX_THREADS];
 
         for(int i=0;i<_num_clients;i++){
-            printf("setting global start flags for rcuckoo %d\n", i);
-            _state_machines[i]._rcuckoo->set_global_start_flag(&global_start_flag);
-            _state_machines[i]._rcuckoo->set_global_end_flag(&global_end_flag);
+            rcuckoo_state_machines[i]->set_global_start_flag(&global_start_flag);
+            rcuckoo_state_machines[i]->set_global_end_flag(&global_end_flag);
         }
         for (int i=0;i<_num_clients;i++) {
             printf("Creating Client Thread %d\n", i);
-            // pthread_create(&thread_ids[i], NULL, (THREADFUNCPTR)&State_Machine_Wrapper::start, &_state_machines[i]);
-            pthread_create(&thread_ids[i], NULL, &cuckoo_fsm_runner, &_state_machines[i]);
+            pthread_create(&thread_ids[i], NULL, &cuckoo_fsm_runner, (rcuckoo_state_machines[i]));
         }
 
         using std::chrono::high_resolution_clock;
@@ -189,7 +151,7 @@ namespace cuckoo_rdma_engine {
         //Start the treads
         auto t1 = high_resolution_clock::now();
         global_start_flag = true;
-        sleep(2);
+        sleep(60);
         global_end_flag = true;
         auto t2 = high_resolution_clock::now();
         auto ms_int = duration_cast<milliseconds>(t2 - t1);
@@ -205,25 +167,17 @@ namespace cuckoo_rdma_engine {
         vector<unordered_map<string,string>> statistics;
         for (int i=0;i<_num_clients;i++) {
             printf("Grabbing Statistics Off of Client Thread %d\n", i);
-            statistics.push_back(_state_machines[i]._rcuckoo->get_stats());
+            statistics.push_back(rcuckoo_state_machines[i]->get_stats());
         }
 
-        // //print statistics
-        // for (int i=0;i<_num_clients;i++) {
-        //     printf("Printing Statistics Off of Client Thread %d\n", i);
-        //     for (auto it = statistics[i].begin(); it != statistics[i].end(); ++it) {
-        //         printf("%s: %s\n", it->first.c_str(), it->second.c_str());
-        //     }
-        // }
         uint64_t puts = 0;
         for (int i=0;i<_num_clients;i++) {
             puts += stoull(statistics[i]["completed_puts"]);
         }
-        // uint64_t puts = stoull(statistics[0]["completed_puts"]);
 
         printf("Throughput: %f\n", puts / (ms_int.count() / 1000.0));
 
-
+        printf("RDMA Connection Manager location %p\n", _connection_manager);
  
         free(thread_ids);
         VERBOSE("RDMA Engine", "done running state machine!");
@@ -389,8 +343,7 @@ namespace cuckoo_rdma_engine {
                 // printf("nothing to supply to the state machine, sending in blank message\n");
             }
 
-            // messages = _state_machine->fsm(current_ingress_message);
-            messages = _rcuckoo->rdma_fsm(current_ingress_message);
+            messages = _state_machine->fsm(current_ingress_message);
             if (messages.size() > 0){
                 ALERT(log_id(), "State Machine returned %d messages\n", messages.size());
                 ALERT(log_id(), "State Machine returned %s\n", messages[0].to_string().c_str());

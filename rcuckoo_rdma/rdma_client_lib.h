@@ -26,7 +26,7 @@ class RDMAConnectionManager {
     public:
         /* Source and Destination buffers, where RDMA operations source and sink */
         RDMAConnectionManager();
-        ~RDMAConnectionManager();
+        // ~RDMAConnectionManager();
         RDMAConnectionManager(RDMAConnectionManagerArguments arg);
         /* These are basic RDMA resources */
         /* These are RDMA connection related resources */
