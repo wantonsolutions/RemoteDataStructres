@@ -40,7 +40,8 @@ TARGET := $(test_dir)/test_hash \
 	rdma_server.o \
 	rdma_helper.o \
 	rdma_memory_server.o \
-	memcached.o
+	memcached.o \
+	cuckoo_client.o
 # TARGET := rdma_memory_server
 # TARGET := rdma_server
 # TARGET := rdma_server rdma_client
@@ -105,6 +106,10 @@ rdma_memory_server: rdma_memory_server.cpp rdma_memory_server.o rdma_common.o st
 
 memcached.o : memcached.cpp memcached.h config.h
 	$(CC) -c $(CFLAGS) $(INCLUDES) -fPIC memcached.cpp -o memcached.o $(RDMA_LIBS)
+
+cuckoo_client: $cuckoo_client.cpp rdma_common.cpp cuckoo.o util.o state_machines.o rdma_engine.o rdma_common.o rdma_client_lib.o memcached.o config.h rdma_common.cpp rdma_helper.o
+	$(CC) $(CFLAGS)  cuckoo_client.cpp -o cuckoo_client cuckoo.o rdma_engine.o tables.o hash.o search.o virtual_rdma.o util.o state_machines.o rdma_common.o rdma_client_lib.o memcached.o rdma_helper.o $(LIBRARIES) $(RDMA_LIBS)
+
 	
 #rdma_common.o state_machines.o rdma_common.o state_machines.o tables.o hash.o search.o virtual_rdma.o util.o $(RDMA_LIBS)
 
