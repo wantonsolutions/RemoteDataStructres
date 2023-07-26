@@ -55,7 +55,7 @@ class rcuckoo_ssh_wrapper:
         self.run_cmd('git pull')
 
 class orchestrator:
-    def __init__(self):
+    def __init__(self, config):
         self.server = rcuckoo_ssh_wrapper('ssgrant', 'yak-00.sysnet.ucsd.edu')
         self.client = rcuckoo_ssh_wrapper('ssgrant', 'yak-01.sysnet.ucsd.edu')
 
