@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include "memcached.h"
 #include "config.h"
+#include "log.h"
 
 using namespace std;
 using namespace cuckoo_state_machines;
@@ -613,7 +614,18 @@ void print_periodically(int num_qps, int time_seconds, Memory_State_Machine &msm
 int main(int argc, char **argv) 
 {
 
-    unordered_map<string, string> config = gen_config();
+    ALERT("Starting server", "Starting server\n");
+
+    if (argc > 2) {
+        ALERT("parse error", "ERROR Too many arguemnts Usage: ./rdma_server <config_file>\n");
+        exit(1);
+    }
+    string config_filename = "configs/default_config.json";
+    if (argc == 2) {
+        config_filename = argv[1];
+    }
+    unordered_map<string, string> config = read_config_from_file(config_filename);
+
     Memory_State_Machine msm = Memory_State_Machine(config);
     // msm.fill_table_with_incremental_values();
 
@@ -679,3 +691,5 @@ int main(int argc, char **argv)
     }
     return 0;
 }
+
+

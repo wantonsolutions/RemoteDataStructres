@@ -4,6 +4,7 @@
 
 using namespace std;
 #include <string>
+#include <unordered_map>
 
 const string SERVER_TABLE_CONFIG_KEY = "server_table_config";
 
@@ -29,5 +30,8 @@ typedef struct table_config {
     int lock_table_key;
     int lock_table_size_bytes;
 } table_config;
+
+
+unordered_map<string, string> read_config_from_file(string config_filename);
 
 #endif

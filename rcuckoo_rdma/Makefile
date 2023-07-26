@@ -12,7 +12,7 @@ CFLAGS := -std=c++2a -g -O3 -Wall -Wall -Wextra -pedantic -fPIC
 
 RDMA_LIBS := -lrdmacm -libverbs -lpthread
 
-LIBRARIES := -L$(XXHASH_INC) -lxxhash $(RDMA_LIBS) -lmemcached -lssl -lcrypto
+LIBRARIES := -L$(XXHASH_INC) -lxxhash $(RDMA_LIBS) -lmemcached -lssl -lcrypto -ljsoncpp
 
 # TARGET := test_hash test_tables test_search rdma_server rdma_client
 
@@ -41,7 +41,7 @@ TARGET := $(test_dir)/test_hash \
 	rdma_helper.o \
 	rdma_memory_server.o \
 	memcached.o \
-	cuckoo_client.o
+	cuckoo_client
 # TARGET := rdma_memory_server
 # TARGET := rdma_server
 # TARGET := rdma_server rdma_client
@@ -71,6 +71,9 @@ state_machines.o: state_machines.cpp state_machines.h tables.o hash.o search.o v
 
 cuckoo.o: cuckoo.cpp cuckoo.h state_machines.o tables.o hash.o search.o virtual_rdma.o rdma_engine.o
 	g++ -c $(CFLAGS) $(INCLUDES) -fPIC cuckoo.cpp -o cuckoo.o state_machines.o tables.o hash.o search.o virtual_rdma.o rdma_engine.o $(RDMA_LIBS)
+
+config.o: config.cpp config.h
+	g++ -c $(CFLAGS) $(INCLUDES) -fPIC config.cpp -o config.o $(LIBRARIES)
 
 rdma_engine.o: rdma_engine.cpp rdma_engine.h state_machines.o virtual_rdma.o rdma_client_lib.o rdma_common.o memcached.o config.h rdma_helper.o
 	g++ -c $(CFLAGS) $(INCLUDES) -fPIC rdma_engine.cpp -o rdma_engine.o state_machines.o virtual_rdma.o rdma_common.o rdma_client_lib.o memcached.o rdma_helper.o $(RDMA_LIBS)
@@ -102,13 +105,13 @@ rdma_memory_server.o: rdma_memory_server.cpp rdma_common.o state_machines.o virt
 	$(CC) -c $(CFLAGS) $(INCLUDES) -fPIC rdma_memory_server.cpp -o rdma_memory_server.o rdma_common.o state_machines.o virtual_rdma.o search.o tables.o hash.o util.o memcached.o $(RDMA_LIBS) $(LIBRARIES)
  
 rdma_memory_server: rdma_memory_server.cpp rdma_memory_server.o rdma_common.o state_machines.o virtual_rdma.o search.o tables.o hash.o util.o memcached.o config.h
-	$(CC) $(CFLAGS) $(INCLUDES) -fPIC -o rdma_memory_server rdma_memory_server.o rdma_common.o state_machines.o virtual_rdma.o search.o tables.o hash.o util.o memcached.o $(RDMA_LIBS) $(LIBRARIES)
+	$(CC) $(CFLAGS) $(INCLUDES) -fPIC -o rdma_memory_server rdma_memory_server.o rdma_common.o state_machines.o virtual_rdma.o search.o tables.o hash.o util.o memcached.o config.o $(RDMA_LIBS) $(LIBRARIES)
 
 memcached.o : memcached.cpp memcached.h config.h
 	$(CC) -c $(CFLAGS) $(INCLUDES) -fPIC memcached.cpp -o memcached.o $(RDMA_LIBS)
 
-cuckoo_client: $cuckoo_client.cpp rdma_common.cpp cuckoo.o util.o state_machines.o rdma_engine.o rdma_common.o rdma_client_lib.o memcached.o config.h rdma_common.cpp rdma_helper.o
-	$(CC) $(CFLAGS)  cuckoo_client.cpp -o cuckoo_client cuckoo.o rdma_engine.o tables.o hash.o search.o virtual_rdma.o util.o state_machines.o rdma_common.o rdma_client_lib.o memcached.o rdma_helper.o $(LIBRARIES) $(RDMA_LIBS)
+cuckoo_client: cuckoo_client.cpp rdma_common.cpp cuckoo.o util.o state_machines.o rdma_engine.o rdma_common.o rdma_client_lib.o memcached.o config.h rdma_common.cpp rdma_helper.o config.o
+	$(CC) $(CFLAGS) cuckoo_client.cpp -o cuckoo_client cuckoo.o rdma_engine.o tables.o hash.o search.o virtual_rdma.o util.o state_machines.o rdma_common.o rdma_client_lib.o memcached.o rdma_helper.o config.o $(LIBRARIES) $(RDMA_LIBS)
 
 	
 #rdma_common.o state_machines.o rdma_common.o state_machines.o tables.o hash.o search.o virtual_rdma.o util.o $(RDMA_LIBS)
