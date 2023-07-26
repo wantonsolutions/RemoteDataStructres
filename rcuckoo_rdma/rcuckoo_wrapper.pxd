@@ -195,3 +195,11 @@ cdef extern from "state_machines.h" namespace "cuckoo_state_machines":
         float get_fill_percentage()
         void print_table()
         vector[VRMessage] fsm(VRMessage message) except +
+
+
+cdef extern from "rdma_engine.h" namespace "cuckoo_rdma_engine":
+    cdef cppclass RDMA_Engine:
+        RDMA_Engine() except +
+        RDMA_Engine(unordered_map[string, string] config) except +
+        bool start()
+        unordered_map[string, string] get_stats()

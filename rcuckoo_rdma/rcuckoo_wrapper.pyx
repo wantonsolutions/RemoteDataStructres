@@ -399,6 +399,29 @@ def decode_cpp_stats(client_stats):
                 exit(1)
     return decoded_stats
 
+cdef class PyRDMA_Engine:
+    cdef rw.RDMA_Engine *c_rdma_engine
+
+    def __init__(self, config=None):
+        print("---------------------Init PyRDMA_Engine------------------")
+        cdef unordered_map[string,string] c_config
+        if config is not None:
+            for k, v in config.items():
+                c_config[k.encode('utf8')] = v.encode('utf8')
+        self.c_rdma_engine = new rw.RDMA_Engine(c_config)
+        print("---------------------End PyRDMA_Engine------------------")
+
+    def start(self):
+        return self.c_rdma_engine.start()
+
+    def get_stats(self):
+        cdef unordered_map[string,string] c_stats
+        c_stats = self.c_rcuckoo.get_stats()
+        ret_stats = {}
+        for k, v in c_stats:
+            ret_stats[k] = v
+        return decode_cpp_stats(ret_stats)
+
 cdef class PyRCuckoo:
     cdef rw.RCuckoo *c_rcuckoo
 
