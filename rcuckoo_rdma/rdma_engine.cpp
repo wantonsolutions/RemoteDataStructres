@@ -46,6 +46,8 @@ namespace cuckoo_rdma_engine {
             
     RDMA_Engine::RDMA_Engine(unordered_map<string, string> config) {
 
+        _config = config;
+
 
         try {
             _num_clients = stoi(config["num_clients"]);
@@ -114,8 +116,8 @@ namespace cuckoo_rdma_engine {
             }
 
         } catch (exception& e) {
-            ALERT("RDMA Engin", "RDMAConnectionManager failed to create state machine wrapper %i\n", i);
-            ALERT("RDMA Engin", "Error: %s\n", e.what());
+            ALERT("RDMA Engine", "RDMAConnectionManager failed to create state machine wrapper %i\n", i);
+            ALERT("RDMA Engine", "Error: %s\n", e.what());
             exit(1);
             return;
         }
@@ -178,11 +180,13 @@ namespace cuckoo_rdma_engine {
         }
 
         float throughput = puts / (ms_int.count() / 1000.0);
-        ALERT("RDMA Engine", "Throughput: %f\n", throughput);
+        SUCCESS("RDMA Engine", "Throughput: %f\n", throughput);
+        ALERT("", "%d,%f\n", _num_clients, throughput);
 
         printf("RDMA Connection Manager location %p\n", _connection_manager);
+        write_statistics(_config, statistics);
  
-        free(thread_ids);
+        // free(thread_ids);
         VERBOSE("RDMA Engine", "done running state machine!");
         return true;
     }

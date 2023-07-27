@@ -33,5 +33,30 @@ unordered_map<string, string> read_config_from_file(string config_filename){
         config[it.key().asString()] = it->asString();
     }
     return config;
+}
+
+void write_statistics(unordered_map<string, string> config, vector<unordered_map<string,string>> client_stats) {
+    Json::Value client_json;
+
+    //Write the config to the json output
+    Json::Value config_json;
+    for (auto it = config.begin(); it != config.end(); it++) {
+        config_json[it->first] = it->second;
+    }
+    client_json["config"] = config_json;
+
+    //Take care of the client statistics
+    Json::Value client_vector (Json::arrayValue);
+    for (int i = 0; i < client_stats.size(); i++) {
+        Json::Value client_stats_json;
+        client_stats_json["client_id"] = client_stats[i]["client_id"];
+        for (auto it = client_stats[i].begin(); it != client_stats[i].end(); it++) {
+            client_stats_json["stats"][it->first] = it->second;
+        }
+        client_vector.append(client_stats_json);
+        // client_json.append(client_stats_json);
+    }
+    client_json["clients"] = client_vector;
+    cout << client_json << endl;
 
 }

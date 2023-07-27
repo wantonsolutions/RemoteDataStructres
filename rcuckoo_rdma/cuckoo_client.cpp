@@ -17,7 +17,10 @@ using namespace cuckoo_rcuckoo;
 
 int main(int argc, char **argv){
     if (argc > 2) {
-        ALERT("CUCKOO CLIENT", "ERROR Too many arguemnts Usage: ./rdma_server <config_file>\n");
+        ALERT("CUCKOO CLIENT", "ERROR Too many arguments Usage: ./rdma_server <config_file>\n");
+        for (int i = 0; i < argc; i++) {
+            ALERT("CUCKOO CLIENT", "ERROR Argument %d: %s\n", i, argv[i]);
+        }
         exit(1);
     }
     string config_filename = "configs/default_config.json";

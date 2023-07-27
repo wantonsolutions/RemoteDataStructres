@@ -5,6 +5,7 @@
 using namespace std;
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 const string SERVER_TABLE_CONFIG_KEY = "server_table_config";
 
@@ -33,5 +34,6 @@ typedef struct table_config {
 
 
 unordered_map<string, string> read_config_from_file(string config_filename);
+void write_statistics(unordered_map<string,string> config, vector<unordered_map<string,string>> client_stats);
 
 #endif
