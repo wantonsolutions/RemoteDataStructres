@@ -32,7 +32,7 @@ RCuckoo *rcuckoo_state_machines[MAX_THREADS];
 namespace cuckoo_rdma_engine {
 
     void * cuckoo_fsm_runner(void * args){
-        printf("launching threads in a cuckoo fsm runner\n");
+        VERBOSE("RDMA Engine","launching threads in a cuckoo fsm runner\n");
         RCuckoo * cuck = (RCuckoo *) args;
         cuck->rdma_fsm();
         pthread_exit(NULL);
@@ -68,13 +68,13 @@ namespace cuckoo_rdma_engine {
 
             args.num_qps = _num_clients;
             if (args.num_qps < 1) {
-                printf("Error: num_qps must be at least 1\n");
+                ALERT("RDMA Engine", "Error: num_qps must be at least 1\n");
                 exit(1);
             }
             #define MAX_RDMA_ENGINE_QPS 24
             if (args.num_qps > MAX_RDMA_ENGINE_QPS) {
-                printf("Error: num_qps must be at most %d, we are only enabling a few QP per process\n", MAX_RDMA_ENGINE_QPS);
-                printf("TODO; we probably need a better way to scale clients if we are going more than this.\n");
+                ALERT("RDMA Engine", "Error: num_qps must be at most %d, we are only enabling a few QP per process\n", MAX_RDMA_ENGINE_QPS);
+                ALERT("RDMA Engine", "TODO; we probably need a better way to scale clients if we are going more than this.\n");
                 exit(1);
             }
 
@@ -82,15 +82,15 @@ namespace cuckoo_rdma_engine {
             struct sockaddr_in server_sockaddr = server_address_to_socket_addr(config["server_address"]);
             args.server_sockaddr = &server_sockaddr;
 
-            printf("assigning base_port %s\n", config["base_port"].c_str());
+            INFO("RDMA Engine","assigning base_port %s\n", config["base_port"].c_str());
             args.base_port = stoi(config["base_port"]);
 
             // _connection_manager = RDMAConnectionManager(args);
             _connection_manager = new RDMAConnectionManager(args);
-            printf("RDMAConnectionManager created\n");
+            VERBOSE("RDMA Engine", "RDMAConnectionManager created\n");
         } catch (exception& e) {
-            printf("RDMAConnectionManager failed to create\n");
-            printf("Error: %s\n", e.what());
+            ALERT("RDMA Engine", "RDMAConnectionManager failed to create\n");
+            ALERT("RDMA Engine", "Error: %s\n", e.what());
             exit(1);
             return;
         }
@@ -119,7 +119,6 @@ namespace cuckoo_rdma_engine {
             exit(1);
             return;
         }
-        printf("returning from engine constructor\n");
         return;
     }
 
@@ -128,8 +127,8 @@ namespace cuckoo_rdma_engine {
         VERBOSE("RDMA Engine", "for the moment just start the first of the state machines\n");
         assert(_num_clients <= MAX_THREADS);
         if (_num_clients > MAX_THREADS) {
-            printf("Error: num_clients must be at most %d, we are only enabling a few QP per process\n", MAX_THREADS);
-            printf("TODO; we probably need a better way to scale clients if we are going more than this.\n");
+            ALERT("RDMA Engine", "Error: num_clients must be at most %d, we are only enabling a few QP per process\n", MAX_THREADS);
+            ALERT("RDMA Engine", "TODO; we probably need a better way to scale clients if we are going more than this.\n");
             exit(1);
         }
         pthread_t thread_ids[MAX_THREADS];
@@ -139,7 +138,7 @@ namespace cuckoo_rdma_engine {
             rcuckoo_state_machines[i]->set_global_end_flag(&global_end_flag);
         }
         for (int i=0;i<_num_clients;i++) {
-            printf("Creating Client Thread %d\n", i);
+            INFO("RDMA Engine","Creating Client Thread %d\n", i);
             pthread_create(&thread_ids[i], NULL, &cuckoo_fsm_runner, (rcuckoo_state_machines[i]));
         }
 
@@ -148,34 +147,38 @@ namespace cuckoo_rdma_engine {
         using std::chrono::duration;
         using std::chrono::milliseconds;
 
+        SUCCESS("RDMA Engine", "Starting Experiment\n");
         //Start the treads
         auto t1 = high_resolution_clock::now();
         global_start_flag = true;
-        sleep(3);
+        sleep(1);
         global_end_flag = true;
         auto t2 = high_resolution_clock::now();
         auto ms_int = duration_cast<milliseconds>(t2 - t1);
 
         //Get all of the threads to join
         for (int i=0;i<_num_clients;i++){
-            printf("Joining Client Thread %d\n", i);
+            INFO("RDMA Engine", "Joining Client Thread %d\n", i);
             pthread_join(thread_ids[i],NULL);
         }
+        SUCCESS("RDMA Engine", "Experiment Complete\n");
 
 
         //Collect statistics from each of the threads
         vector<unordered_map<string,string>> statistics;
         for (int i=0;i<_num_clients;i++) {
-            printf("Grabbing Statistics Off of Client Thread %d\n", i);
+            INFO("RDMA Engine", "Grabbing Statistics Off of Client Thread %d\n", i);
             statistics.push_back(rcuckoo_state_machines[i]->get_stats());
         }
+        SUCCESS("RDMA Engine", "Grabbed Statistics Off of All Client %d Threads\n", _num_clients);
 
         uint64_t puts = 0;
         for (int i=0;i<_num_clients;i++) {
             puts += stoull(statistics[i]["completed_puts"]);
         }
 
-        printf("Throughput: %f\n", puts / (ms_int.count() / 1000.0));
+        float throughput = puts / (ms_int.count() / 1000.0);
+        ALERT("RDMA Engine", "Throughput: %f\n", throughput);
 
         printf("RDMA Connection Manager location %p\n", _connection_manager);
  

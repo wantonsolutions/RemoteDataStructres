@@ -5,6 +5,7 @@
 #include "state_machines.h"
 #include <unordered_map>
 #include "config.h"
+#include "log.h"
 
 
 
@@ -14,16 +15,18 @@ using namespace cuckoo_rcuckoo;
 
 
 
-int main(){
-    printf("testing cuckoo!\n");
-
-
+int main(int argc, char **argv){
+    if (argc > 2) {
+        ALERT("CUCKOO CLIENT", "ERROR Too many arguemnts Usage: ./rdma_server <config_file>\n");
+        exit(1);
+    }
     string config_filename = "configs/default_config.json";
+    if (argc == 2) {
+        config_filename = argv[1];
+    }
+    INFO("CUCKOO CLIENT", "Starting Cuckoo Client with config file %s\n", config_filename.c_str());
     unordered_map<string, string> config = read_config_from_file(config_filename);
-
     RDMA_Engine client_1 = RDMA_Engine(config);
-
-    printf("starting client 0\n");
     client_1.start();
 
     //now we call the engine

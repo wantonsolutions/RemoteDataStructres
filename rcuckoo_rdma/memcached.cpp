@@ -2,6 +2,7 @@
 #include "assert.h"
 #include "stdio.h"
 #include "config.h"
+#include "log.h"
 
 __thread memcached_st *memc = NULL;
 char MEMCACHED_IP[64];
@@ -69,8 +70,8 @@ void memcached_pubish_table_config(table_config *config) {
 table_config * memcached_get_table_config(void) {
     table_config *config;
     int config_len = memcached_get_published(SERVER_TABLE_CONFIG_KEY.c_str(), (void **)&config);
-    printf("about to print the fetched table config of size %d\n",config_len);
-    printf("table config: %s\n", config->to_string().c_str());
+    INFO("Memcached", "about to print the fetched table config of size %d\n",config_len);
+    INFO("Memcached", "table config: %s\n", config->to_string().c_str());
     assert(config_len == sizeof(table_config));
     return config;
 }

@@ -11,6 +11,7 @@
 #include "rdma_client_lib.h"
 #include <netinet/in.h>
 #include <inttypes.h>
+#include "log.h"
 
 /* A fast but good enough pseudo-random number generator. Good enough for what? */
 /* Courtesy of https://stackoverflow.com/questions/1640258/need-a-fast-random-generator-for-c */
@@ -254,7 +255,9 @@ RDMAConnectionManager::RDMAConnectionManager(RDMAConnectionManagerArguments args
         throw std::runtime_error("Failed to setup shared RDMA resources");
     }
 
+    #ifdef __LOG_INFO
     CheckCapabilities();
+    #endif
 
     /* Connect the local QPs to the ones on server. 
      * NOTE: Make sure to connect all QPs before moving to 
@@ -265,26 +268,29 @@ RDMAConnectionManager::RDMAConnectionManager(RDMAConnectionManagerArguments args
         /* Each QP will try to connect to port numbers starting from base port */
         ret = client_prepare_connection(_server_sockaddr, i, _base_port + i);
         if (ret) { 
-            rdma_error("Failed to prepare client connection , ret = %d \n", ret);
+            ALERT("Connection Manager", "Failed to prepare client connection , ret = %d \n", ret);
             throw std::runtime_error("Failed to setup client connection");
         }
 
         ret = client_pre_post_recv_buffer(i); 
         if (ret) { 
-            rdma_error("Failed to post receive buffers client connection , ret = %d \n", ret);
+            ALERT("Connection Manager", "Failed to post receive buffers client connection , ret = %d \n", ret);
             throw std::runtime_error("Failed to setup client connection");
         }
         
         ret = client_connect_qp_to_server(i);
         if (ret) { 
-            rdma_error("Failed to setup client connection , ret = %d \n", ret);
+            ALERT("Connection Manager", "Failed to setup client connection , ret = %d \n", ret);
             throw std::runtime_error("Failed to setup client connection");
         }
+        INFO("Connection Manager", "Successfully setup client connection %d", i);
 
         // Give server some time to prepare for the next QP
-        usleep(100 * 1000);     // 100ms
+        // usleep(100);     // 100ms
         _connections_initialized = true;
     }
+    SUCCESS("Connection Manager", "Successfully setup %d QPs", _num_qps);
+    
 }
 
 // RDMAConnectionManager::~RDMAConnectionManager() {
@@ -314,11 +320,11 @@ int RDMAConnectionManager::client_setup_shared_resources()
     /* Get RDMA devices */
     devices = rdma_get_devices(&ret);
     if (ret == 0) {
-        rdma_error("No RDMA devices found\n");
+        ALERT("Connection Manager", "No RDMA devices found\n");
         return -ENODEV;
     }
-    printf("%d devices found, using the first one: %s\n", ret, devices[0]->device->name);
-    for(int i = 0; i < ret; i++)    debug("Device %d: %s\n", i+1, devices[i]->device->name);
+    SUCCESS("Connection Manager", "%d devices found, using the first one: %s\n", ret, devices[0]->device->name);
+    for(int i = 0; i < ret; i++)    VERBOSE("Connection Manager", "Device %d: %s\n", i+1, devices[i]->device->name);
 
     /* Create shared resources for all conections per device i.e., cq, pd, etc */
     /* Protection Domain (PD) is similar to a "process abstraction" 
@@ -327,34 +333,34 @@ int RDMAConnectionManager::client_setup_shared_resources()
      */
     pd = ibv_alloc_pd(devices[0]);
     if (!pd) {
-        rdma_error("Failed to alloc pd, errno: %d \n", -errno);
+        ALERT("Connection Manager","Failed to alloc pd, errno: %d \n", -errno);
         return -errno;
     }
-    debug("pd allocated at %p \n", pd);
+    VERBOSE("Connection Manager", "pd allocated at %p \n", pd);
 
     for(int i=0;i<MAX_THREADS;i++){
-        printf("allocing completion channel %d\n",i);
+        INFO("Connection Manager", "allocing completion channel %d\n",i);
         /* Now we need a completion channel, were the I/O completion 
         * notifications are sent. Remember, this is different from connection 
         * management (CM) event notifications. 
         * A completion channel is also tied to an RDMA device
         */
         io_completion_channel_threads[i] = ibv_create_comp_channel(devices[0]);
-        printf("io completion channel @ %p\n",(void*)io_completion_channel_threads[i]);
         if (!io_completion_channel_threads[i]) {
-            rdma_error("Failed to create IO completion event channel %d, errno: %d\n",
+            ALERT("Connection Manager","Failed to create IO completion event channel %d, errno: %d\n",
                     i,-errno);
             return -errno;
         }
-        debug("completion event channel created at : %p \n", io_completion_channel_threads[i]);
+        INFO("Connection Manager", "io completion channel @ %p\n",(void*)io_completion_channel_threads[i]);
     }
+    SUCCESS("Connection Manager", "created %d io completion channels\n",MAX_THREADS);
 
     ret = ibv_query_device(devices[0], &dev_attr);    
     if (ret) {
-        rdma_error("Failed to get device info, errno: %d\n", -errno);
+        ALERT("Connection Manager", "Failed to get device info, errno: %d\n", -errno);
         return -errno;
     }
-    printf("got device info. max qpe: %d, sge: %d, cqe: %d, max rd/at qp depth/outstanding: %d/%d max mr size: %lu\n", 
+    SUCCESS("Connection Manager", "got device info. max qpe: %d, sge: %d, cqe: %d, max rd/at qp depth/outstanding: %d/%d max mr size: %lu\n", 
         dev_attr.max_qp_wr, dev_attr.max_sge, dev_attr.max_cqe, dev_attr.max_qp_init_rd_atom, dev_attr.max_qp_rd_atom, 
         dev_attr.max_mr_size);
 
@@ -362,12 +368,12 @@ int RDMAConnectionManager::client_setup_shared_resources()
     /*  Open a channel used to report asynchronous communication event */
     cm_event_channel = rdma_create_event_channel();
     if (!cm_event_channel) {
-        rdma_error("Creating cm event channel failed, errno: %d \n", -errno);
+        ALERT("Connection Manager", "Creating cm event channel failed, errno: %d \n", -errno);
         return -errno;
     }
-    debug("RDMA CM event channel is created at : %p \n", cm_event_channel);
+    SUCCESS("Connection Manager", "RDMA CM event channel is created at : %p \n", cm_event_channel);
 
-    printf("making thread completion queues as well\n");
+    INFO("Connection Manager", "Making a total of %d completion queues\n", MAX_THREADS);
     for(int i=0;i<MAX_THREADS;i++){
         thread_contexts[i]=i;
         client_cq_threads[i] = ibv_create_cq(devices[0] /* which device*/, 
@@ -378,13 +384,13 @@ int RDMAConnectionManager::client_setup_shared_resources()
             //io_completion_channel_threads[i]   /* which IO completion channel */, 
             i                       /* signaling vector, not used here*/);
         if (!client_cq_threads[i]) {
-            rdma_error("Failed to create CQ, errno: %d \n", -errno);
+            ALERT("Connection Manager", "Failed to create CQ, errno: %d \n", -errno);
             return -errno;
         }
-        printf("CQ created at %p with %d elements \n", (void*)client_cq_threads[i], client_cq_threads[i]->cqe);
+        VERBOSE("Connection Manager", "CQ created at %p with %d elements \n", (void*)client_cq_threads[i], client_cq_threads[i]->cqe);
         ret = ibv_req_notify_cq(client_cq_threads[i], 0);
         if (ret) {
-            rdma_error("Failed to request notifications, errno: %d\n", -errno);
+            ALERT("Connection Manager", "Failed to request notifications, errno: %d\n", -errno);
             return -errno;
         }
 
@@ -405,7 +411,7 @@ int RDMAConnectionManager::client_prepare_connection(struct sockaddr_in *s_addr,
             devices[0],
             RDMA_PS_TCP);
     if (ret) {
-        rdma_error("Creating cm id failed with errno: %d \n", -errno); 
+        ALERT("Connection Manager", "Creating cm id failed with errno: %d \n", -errno); 
         return -errno;
     }
 
@@ -415,37 +421,37 @@ int RDMAConnectionManager::client_prepare_connection(struct sockaddr_in *s_addr,
     s_addr->sin_port = htons(port_num);
     ret = rdma_resolve_addr(cm_client_qp_id[qp_num], NULL, (struct sockaddr*) s_addr, 2000);
     if (ret) {
-        rdma_error("Failed to resolve address, errno: %d \n", -errno);
+        ALERT("Connection Manager", "Failed to resolve address, errno: %d \n", -errno);
         return -errno;
     }
-    debug("waiting for cm event: RDMA_CM_EVENT_ADDR_RESOLVED\n");
+    VERBOSE("Connection Manager", "waiting for cm event: RDMA_CM_EVENT_ADDR_RESOLVED\n");
     ret  = process_rdma_cm_event(cm_event_channel, 
             RDMA_CM_EVENT_ADDR_RESOLVED,
             &cm_event);
     if (ret) {
-        rdma_error("Failed to receive a valid event, ret = %d \n", ret);
+        ALERT("Connection Manager","Failed to receive a valid event, ret = %d \n", ret);
         return ret;
     }
     /* we ack the event */
     ret = rdma_ack_cm_event(cm_event);
     if (ret) {
-        rdma_error("Failed to acknowledge the CM event, errno: %d\n", -errno);
+        ALERT("Connection Manager", "Failed to acknowledge the CM event, errno: %d\n", -errno);
         return -errno;
     }
-    debug("RDMA address is resolved \n");
+    VERBOSE("Connection Manager","RDMA address is resolved \n");
     /* Resolves an RDMA route to the destination address in order to 
     * establish a connection */
     ret = rdma_resolve_route(cm_client_qp_id[qp_num], 2000);
     if (ret) {
-        rdma_error("Failed to resolve route, erno: %d \n", -errno);
+        ALERT("Connection Manager", "Failed to resolve route, erno: %d \n", -errno);
         return -errno;
     }
-    debug("waiting for cm event: RDMA_CM_EVENT_ROUTE_RESOLVED\n");
+    VERBOSE("Connection Manager","waiting for cm event: RDMA_CM_EVENT_ROUTE_RESOLVED\n");
     ret = process_rdma_cm_event(cm_event_channel, 
             RDMA_CM_EVENT_ROUTE_RESOLVED,
             &cm_event);
     if (ret) {
-        rdma_error("Failed to receive a valid event, ret = %d \n", ret);
+        ALERT("Connectiopn Manager","Failed to receive a valid event, ret = %d \n", ret);
         return ret;
     }
     /* we ack the event */
@@ -454,7 +460,7 @@ int RDMAConnectionManager::client_prepare_connection(struct sockaddr_in *s_addr,
         rdma_error("Failed to acknowledge the CM event, errno: %d \n", -errno);
         return -errno;
     }
-    printf("Trying to connect QP %d to server at : %s port: %d \n", qp_num, 
+    INFO("Connection Manager", "Trying to connect QP %d to server at : %s port: %d \n", qp_num, 
         inet_ntoa(s_addr->sin_addr), ntohs(s_addr->sin_port));
 
     /* TODO: Get capacity from device */
@@ -482,11 +488,11 @@ int RDMAConnectionManager::client_prepare_connection(struct sockaddr_in *s_addr,
         #endif
         ret = rdma_create_qp(cm_client_qp_id[qp_num], pd, &qp_init_attr);
         if (ret) {
-            rdma_error("Failed to create QP, errno: %d \n", -errno);
+            ALERT("Connection Manager","Failed to create QP, errno: %d \n", -errno);
             return -errno;
         }
         client_qp[qp_num] = cm_client_qp_id[qp_num]->qp;
-        printf("QP %d created at %p \n", qp_num, (void *)client_qp[qp_num]);
+        INFO("Connection Manager", "QP %d created at %p \n", qp_num, (void *)client_qp[qp_num]);
     } else {
         bzero(&qp_init_attr_exp, sizeof(qp_init_attr_exp));
         // qp_init_attr.qp_context = nullptr;
@@ -519,11 +525,11 @@ int RDMAConnectionManager::client_prepare_connection(struct sockaddr_in *s_addr,
         client_qp[qp_num] = ibv_exp_create_qp(devices[0], &qp_init_attr_exp);
         cm_client_qp_id[qp_num]->qp = client_qp[qp_num];
         if (!client_qp[qp_num]) {
-            rdma_error("Failed to EXP create QP, errno#: %d error %s\n", -errno, strerror(errno));
+            ALERT("Connection Manager", "Failed to EXP create QP, errno#: %d error %s\n", -errno, strerror(errno));
             return -errno;
         }
         // client_qp[qp_num] = cm_client_qp_id[qp_num]->qp;
-        printf("EXP QP %d created at %p \n", qp_num, (void *)client_qp[qp_num]);
+        INFO("Connection Manager", "EXP QP %d created at %p \n", qp_num, (void *)client_qp[qp_num]);
     }
 
     return ret;
@@ -571,10 +577,10 @@ int RDMAConnectionManager::client_connect_qp_to_server(int qp_num)
     conn_param.retry_count = 3; // if fail, then how many times to retry
     ret = rdma_connect(cm_client_qp_id[qp_num], &conn_param);
     if (ret) {
-        rdma_error("Failed to connect to remote host , errno: %d\n", -errno);
+        ALERT("Connection Manager", "Failed to connect to remote host , errno: %d\n", -errno);
         return -errno;
     }
-    debug("waiting for cm event: RDMA_CM_EVENT_ESTABLISHED on qp num %d\n", qp_num);
+    VERBOSE("Connection Manager", "waiting for cm event: RDMA_CM_EVENT_ESTABLISHED on qp num %d\n", qp_num);
     // ret = process_rdma_cm_event(cm_event_channel, 
     //         RDMA_CM_EVENT_CONNECT_RESPONSE,
     //         &cm_event);
@@ -583,16 +589,16 @@ int RDMAConnectionManager::client_connect_qp_to_server(int qp_num)
             RDMA_CM_EVENT_ESTABLISHED,
             &cm_event);
     if (ret) {
-        rdma_error("Failed to get cm event, ret = %d \n", ret);
+        ALERT("Connection Manager", "Failed to get cm event, ret = %d \n", ret);
            return ret;
     }
     ret = rdma_ack_cm_event(cm_event);
     if (ret) {
-        rdma_error("Failed to acknowledge cm event, errno: %d\n", 
+        ALERT("Connection Manager", "Failed to acknowledge cm event, errno: %d\n", 
                    -errno);
         return -errno;
     }
-    printf("The client qp %d is connected successfully \n", qp_num);
+    INFO("Connection Manager", "The client qp %d is connected successfully \n", qp_num);
     return 0;
 }
 

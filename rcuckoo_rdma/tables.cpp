@@ -7,6 +7,7 @@
 #include <memory>
 #include <stdexcept>
 #include <bitset>
+#include "log.h"
 // #include "spdlog/spdlog.h" //sudo apt install libspdlog-dev
 
 template<typename ... Args>
@@ -110,16 +111,16 @@ namespace cuckoo_tables {
     }
     Lock_Table::Lock_Table(unsigned int memory_size, unsigned int bucket_size, unsigned int buckets_per_lock){
 
-        printf("memory_size: %d\n", memory_size);
+        INFO("Lock Table", "memory_size: %d\n", memory_size);
         assert(memory_size % sizeof(Entry) == 0 );
         unsigned int total_entries = memory_size / sizeof(Entry);
-        printf("total_entries: %d\n", total_entries);
+        INFO("Lock Table", "total_entries: %d\n", total_entries);
         assert(total_entries % bucket_size == 0);
         unsigned int table_rows = total_entries / bucket_size;
-        printf("table_rows: %d\n", table_rows);
+        INFO("Lock Table", "table_rows: %d\n", table_rows);
         assert(table_rows % buckets_per_lock == 0);
         _total_locks = table_rows / buckets_per_lock;
-        printf("_total_locks: %d\n", _total_locks);
+        INFO("Lock Table", "_total_locks: %d\n", _total_locks);
         const int cas_size = 8;
         const int bits_per_byte=8;
         _total_lock_entries = (_total_locks / bits_per_byte) + cas_size;
@@ -131,7 +132,7 @@ namespace cuckoo_tables {
             _total_lock_entries += cas_size - (_total_lock_entries % cas_size);
         }
 
-        printf("_total_lock_entries: %d\n", _total_lock_entries);
+        INFO("Lock Table", "_total_lock_entries: %d\n", _total_lock_entries);
         _locks = new uint8_t[_total_lock_entries];
         this->unlock_all();
 
@@ -446,7 +447,7 @@ namespace cuckoo_tables {
     }
 
     Entry ** Table::generate_bucket_cuckoo_hash_index(unsigned int memory_size, unsigned int bucket_size){
-        cout << "Table::generate_bucket_cuckoo_hash_index" << endl;
+        VERBOSE("Table", "Table::generate_bucket_cuckoo_hash_index");
         //Sanity checking asserts
         assert(memory_size > 0);
         assert(bucket_size > 0);
@@ -456,9 +457,9 @@ namespace cuckoo_tables {
         unsigned int total_entries = memory_size / sizeof(Entry);
         assert(total_entries % bucket_size == 0);
         unsigned int total_rows = int(memory_size / bucket_size) / sizeof(Entry);
-        cout << "memory_size: " << memory_size << endl;
-        cout << "bucket_size: " << bucket_size << endl;
-        cout << "total_entries: " << total_entries << endl;
+        INFO("Table", "memory_size: %d",memory_size);
+        INFO("Table", "bucket_size: %d", bucket_size);
+        INFO("Table", "total_entries: %d",total_entries);
 
         //Allocate memory for the table
         unsigned int nrows = total_rows;
@@ -475,7 +476,7 @@ namespace cuckoo_tables {
             }
             return ptr;
         } catch (std::bad_alloc& ba) {
-            std::cerr << "bad_alloc caught: " << ba.what() << '\n';
+            ALERT("Table", "bad_alloc caught: %s", ba.what());
             return NULL;
         }
         return NULL;

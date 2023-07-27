@@ -91,10 +91,10 @@ namespace cuckoo_rcuckoo {
             unsigned int memory_size = stoi(config["memory_size"]);
             unsigned int bucket_size = stoi(config["bucket_size"]);
             unsigned int buckets_per_lock = stoi(config["buckets_per_lock"]);
-            printf("Creating Table : Table_size: %d, bucket_size %d, buckets_per_lock %d\n", memory_size, bucket_size, buckets_per_lock);
+            INFO(log_id(), "Creating Table : Table_size: %d, bucket_size %d, buckets_per_lock %d\n", memory_size, bucket_size, buckets_per_lock);
             _table = Table(memory_size, bucket_size, buckets_per_lock);
         } catch (exception& e) {
-            printf("ERROR: Memory_State_Machine config missing required field\n");
+            ALERT(log_id(), "ERROR: Memory_State_Machine config missing required field\n");
             throw logic_error("ERROR: Memory_State_Machine config missing required field");
         }
 
@@ -1098,7 +1098,7 @@ namespace cuckoo_rcuckoo {
 
             if (_lock_list.size() == message_index) {
                 locking_complete = true;
-                SUCCESS(log_id(), " [put-direct] we got all the locks!\n");
+                INFO(log_id(), " [put-direct] we got all the locks!\n");
                 break;
             }
             _current_insert_rtt++;
@@ -1114,7 +1114,7 @@ namespace cuckoo_rcuckoo {
         while(!*_global_start_flag){
             // ALERT(log_id(), "not globally started");
         };
-        ALERT(log_id(),"Starting RDMA FSM Start Flag Set\n");
+        INFO(log_id(),"Starting RDMA FSM Start Flag Set\n");
 
         while(!*_global_end_flag) {
 
@@ -1159,7 +1159,7 @@ namespace cuckoo_rcuckoo {
 
 
         }
-        ALERT(log_id(), "BREAKING EXIT FLAG!!\n");
+        INFO(log_id(), "BREAKING EXIT FLAG!!\n");
 
         if(*_global_end_flag == true) {
             _complete = true;

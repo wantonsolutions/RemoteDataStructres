@@ -1,8 +1,8 @@
 #include "config.h"
-
 #include <jsoncpp/json/json.h>
 #include <iostream>
 #include <fstream>
+#include "log.h"
 
 #include <unordered_map>
 
@@ -19,7 +19,7 @@ unordered_map<string, string> read_config_from_file(string config_filename){
         exit(1);
     }
 
-    cout << "reading config file " << config_filename << endl;
+    printf("Client Input Config: %s\n",config_filename.c_str());
 
     ifstream ifs(config_filename);
     Json::Reader reader;
@@ -28,7 +28,8 @@ unordered_map<string, string> read_config_from_file(string config_filename){
 
     unordered_map<string, string> config;
     for(Json::Value::iterator it = obj.begin(); it != obj.end(); ++it) {
-        cout << it.key() << "  " << it->asString() <<endl;
+        printf("%-30s : %s\n", it.key().asString().c_str(), it->asString().c_str());
+        // cout << it.key().asString() << "  " << it->asString() <<endl;
         config[it.key().asString()] = it->asString();
     }
     return config;
