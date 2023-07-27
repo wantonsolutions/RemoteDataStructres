@@ -167,24 +167,34 @@ namespace cuckoo_rdma_engine {
 
 
         //Collect statistics from each of the threads
-        vector<unordered_map<string,string>> statistics;
+        vector<unordered_map<string,string>> client_statistics;
         for (int i=0;i<_num_clients;i++) {
             INFO("RDMA Engine", "Grabbing Statistics Off of Client Thread %d\n", i);
-            statistics.push_back(rcuckoo_state_machines[i]->get_stats());
+            client_statistics.push_back(rcuckoo_state_machines[i]->get_stats());
         }
         SUCCESS("RDMA Engine", "Grabbed Statistics Off of All Client %d Threads\n", _num_clients);
 
         uint64_t puts = 0;
+        uint64_t gets = 0;
         for (int i=0;i<_num_clients;i++) {
-            puts += stoull(statistics[i]["completed_puts"]);
+            puts += stoull(client_statistics[i]["completed_puts"]);
+            gets += stoull(client_statistics[i]["completed_gets"]);
         }
+
+        unordered_map<string,string> system_statistics;
+        system_statistics["runtime_ms"] = to_string(ms_int.count());
+        system_statistics["runtime_s"]= to_string(ms_int.count() / 1000.0);
+        system_statistics["put_throughput"] = to_string(puts / (ms_int.count() / 1000.0));
+        system_statistics["get_throughput"] = to_string(gets / (ms_int.count() / 1000.0));
+        system_statistics["throughput"]= to_string((puts + gets) / (ms_int.count() / 1000.0));
+
 
         float throughput = puts / (ms_int.count() / 1000.0);
         SUCCESS("RDMA Engine", "Throughput: %f\n", throughput);
         ALERT("", "%d,%f\n", _num_clients, throughput);
 
         printf("RDMA Connection Manager location %p\n", _connection_manager);
-        write_statistics(_config, statistics);
+        write_statistics(_config, system_statistics, client_statistics);
  
         // free(thread_ids);
         VERBOSE("RDMA Engine", "done running state machine!");

@@ -35,8 +35,19 @@ unordered_map<string, string> read_config_from_file(string config_filename){
     return config;
 }
 
-void write_statistics(unordered_map<string, string> config, vector<unordered_map<string,string>> client_stats) {
+void write_statistics(
+    unordered_map<string, string> config, 
+    unordered_map<string,string> system_stats, 
+    vector<unordered_map<string,string>> client_stats) {
+
     Json::Value client_json;
+
+    //Write the system stats to the json output
+    Json::Value system_stats_json;
+    for (auto it = system_stats.begin(); it != system_stats.end(); it++) {
+        system_stats_json[it->first] = it->second;
+    }
+    client_json["system"] = system_stats_json;
 
     //Write the config to the json output
     Json::Value config_json;

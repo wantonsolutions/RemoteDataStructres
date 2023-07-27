@@ -34,6 +34,9 @@ typedef struct table_config {
 
 
 unordered_map<string, string> read_config_from_file(string config_filename);
-void write_statistics(unordered_map<string,string> config, vector<unordered_map<string,string>> client_stats);
+void write_statistics(
+    unordered_map<string, string> config, 
+    unordered_map<string,string> system_stats, 
+    vector<unordered_map<string,string>> client_stats);
 
 #endif
