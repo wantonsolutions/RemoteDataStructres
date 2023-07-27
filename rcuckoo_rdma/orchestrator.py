@@ -1,8 +1,11 @@
 import warnings
+
 from cryptography.utils import CryptographyDeprecationWarning
 with warnings.catch_warnings():
     warnings.filterwarnings('ignore', category=CryptographyDeprecationWarning)
     import paramiko
+
+import json
 
 # import asyncio use this eventually when you want to parallelize the builds
 
@@ -57,8 +60,10 @@ class rcuckoo_ssh_wrapper:
 class orchestrator:
 
     memory_program_name = "rdma_memory_server"
-    client_program_name = "./test/test_cuckoo"
-    def __init__(self, config):
+    client_program_name = "cuckoo_client"
+    config_name = "remote_config.json"
+    config = dict()
+    def __init__(self, conf):
         self.server = rcuckoo_ssh_wrapper('ssgrant', 'yak-00.sysnet.ucsd.edu')
         self.client = rcuckoo_ssh_wrapper('ssgrant', 'yak-01.sysnet.ucsd.edu')
 
@@ -70,6 +75,14 @@ class orchestrator:
         self.sync_dependents = [self.server]
 
         self.queue_pairs = 24
+
+
+    def transfer_configs_to_nodes(self, config, config_name):
+        self.config_name = config_name
+        for node in self.all_nodes:
+            node.run_cmd(
+                'cd rcuckoo_rdma/configs;'
+                'echo \'' + json.dumps(config) + '\' > ' + config_name + ';')
 
     def set_verbose(self, verbose):
         for node in self.all_nodes:
@@ -115,13 +128,13 @@ class orchestrator:
         print("Starting RDMA Benchmark")
         self.server.run_cmd(
             'cd rcuckoo_rdma;'
-            './'+ self.memory_program_name + ' > memserver.out 2>&1 &')
+            './'+ self.memory_program_name + ' ' + 'configs/' + self.config_name + ' > memserver.out 2>&1 &')
 
         print("Server is started with queue pairs", self.queue_pairs)
 
-        server_ip = self.server.get_mlx5_ip()
         self.client.run_cmd(
             'cd rcuckoo_rdma;'
-            '' + self.client_program_name + ''
-            # './rdma_client -a ' + server_ip + ' -p 20886 -q '+str(self.queue_pairs)+ ' -x;'
+            './' + self.client_program_name + ' ' + 'configs/' + self.config_name + ' > client.out 2>&1;'
+            'cat client.out;'
         )
+            # './rdma_client -a ' + server_ip + ' -p 20886 -q '+str(self.queue_pairs)+ ' -x;'

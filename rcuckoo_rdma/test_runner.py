@@ -1,10 +1,9 @@
-# import orchestrator
+import orchestrator
 import json
 
-def write_config_to_json_file(config, filename):
-    with open(filename, 'w') as outfile:
-        json.dump(config, outfile)
-
+# def write_config_to_json_file(config, filename):
+#     with open(filename, 'w') as outfile:
+#         json.dump(config, outfile)
 
 config=dict()
 
@@ -52,12 +51,17 @@ config["num_clients"]=str(num_clients)
 config["server_address"]="192.168.1.12"
 config["base_port"] = "20886"
 
-write_config_to_json_file(config, "configs/default_config.json")
 
-# orch = orchestrator.orchestrator(config)
-# orch.sanity_check()
-# orch.kill()
-# orch.build()
-# # orch.build(clean=True)
-# # orch.sync()
-# orch.run_rdma_benchmark()
+clients = [1, 2, 4 , 8, 16, 24]
+for c in clients:
+    lconfig = config.copy()
+    lconfig["num_clients"] = str(c)
+    orch = orchestrator.orchestrator(lconfig)
+    orch.transfer_configs_to_nodes(lconfig, "remote_config.json")
+    orch.sanity_check()
+    orch.kill()
+    # orch.build()
+    # # orch.build(clean=True)
+    # orch.sync()
+    orch.run_rdma_benchmark()
+    orch.kill()

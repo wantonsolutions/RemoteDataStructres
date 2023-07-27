@@ -182,7 +182,7 @@ namespace cuckoo_rdma_engine {
 
         printf("RDMA Connection Manager location %p\n", _connection_manager);
  
-        free(thread_ids);
+        // free(thread_ids);
         VERBOSE("RDMA Engine", "done running state machine!");
         return true;
     }
