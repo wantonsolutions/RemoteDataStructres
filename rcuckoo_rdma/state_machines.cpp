@@ -205,6 +205,7 @@ namespace cuckoo_state_machines {
         stats["insert_operation_bytes"] = to_string(_insert_operation_bytes);
         stats["insert_operation_messages"] = to_string(_insert_operation_messages);
         stats["failed_lock_aquisitions"] = array_to_string(_failed_lock_aquisitions);
+        stats["failed_lock_aquisition_count"] = to_string(_failed_lock_aquisition_count);
 
         stats["insert_rtt"] = array_to_string(_insert_rtt);
         stats["insert_rtt_count"] = to_string(_insert_rtt_count);

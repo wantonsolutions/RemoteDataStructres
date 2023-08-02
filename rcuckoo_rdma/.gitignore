@@ -7,6 +7,9 @@ rcuckoo_wrapper.cpp
 rcuckoo_wrapper.egg-info
 rcuckoo_wrap.egg-info
 
+configs
+statistics
+
 test/test_hash
 test/test_tables
 test/test_search
@@ -16,6 +19,7 @@ test/test_cuckoo
 rdma_client
 rdma_server
 rdma_memory_server
+cuckoo_client
 
 flamechart
 perf.data
