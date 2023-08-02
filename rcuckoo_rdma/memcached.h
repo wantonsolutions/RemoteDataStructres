@@ -15,4 +15,7 @@ void memcached_publish(const char *key, void *value, int len);
 void memcached_pubish_table_config(table_config *config);
 table_config *memcached_get_table_config(void);
 
+void memcached_publish_experiment_control(experiment_control *control);
+experiment_control *memcached_get_experiment_control(void);
+
 #endif

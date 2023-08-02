@@ -690,6 +690,10 @@ namespace cuckoo_state_machines {
         return _table.get_fill_percentage();
     }
 
+    float Memory_State_Machine::get_max_fill() {
+        return _max_fill;
+    }
+
     void Memory_State_Machine::print_table(){
         _table.print_table();
     }

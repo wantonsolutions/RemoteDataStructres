@@ -1,11 +1,11 @@
 {
     "bucket_size": "8",
     "entry_size": "8",
-    "indexes": "10485760",
+    "indexes": "1048576",
     "read_threshold_bytes": "256",
     "buckets_per_lock": "1",
     "locks_per_message": "64",
-    "memory_size": "83886080",
+    "memory_size": "8388608",
     "deterministic": "True",
     "workload": "ycsb-w",
     "id": "0",
@@ -13,8 +13,8 @@
     "location_function": "dependent",
     "total_inserts": "1",
     "total_requests": "1",
-    "max_fill": "90",
-    "num_clients": "24",
+    "max_fill": "50",
+    "num_clients": "1",
     "server_address": "192.168.1.12",
     "base_port": "20886"
 }

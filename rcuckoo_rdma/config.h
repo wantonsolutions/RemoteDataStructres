@@ -8,6 +8,7 @@ using namespace std;
 #include <vector>
 
 const string SERVER_TABLE_CONFIG_KEY = "server_table_config";
+const string EXPERIMENT_CONTROL_KEY = "experiment_control";
 
 typedef struct table_config {
     string to_string() {
@@ -31,6 +32,15 @@ typedef struct table_config {
     int lock_table_key;
     int lock_table_size_bytes;
 } table_config;
+
+typedef struct experiment_control {
+    string to_string(){
+        return "experiment_start: " + std::to_string(experiment_start) + "\n" +
+            "experiment_stop: " + std::to_string(experiment_stop) + "\n";
+    }
+    bool experiment_start;
+    bool experiment_stop;
+} experiment_control;
 
 
 unordered_map<string, string> read_config_from_file(string config_filename);

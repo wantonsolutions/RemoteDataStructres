@@ -87,6 +87,7 @@ namespace cuckoo_rcuckoo {
     }
 
     RCuckoo::RCuckoo(unordered_map<string, string> config) : Client_State_Machine(config) {
+
         //Try to init the table
         try {
             unsigned int memory_size = stoi(config["memory_size"]);

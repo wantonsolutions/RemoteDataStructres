@@ -1,17 +1,18 @@
 
 measuretime=40
 
-sudo killall test_cuckoo
+program=cuckoo_client
+sudo killall "$program"
 
 # page_script="LD_PRELOAD=libhugetlbfs.so HUGETLB_MORECORE=yes"
-LD_PRELOAD=libhugetlbfs.so HUGETLB_MORECORE=yes ./test/test_cuckoo &
+LD_PRELOAD=libhugetlbfs.so HUGETLB_MORECORE=yes ./"$program" &
 # LD_PRELOAD=libhugetlbfs.so HUGETLB_MORECORE=yes ./test/test_search &
 cuckoopid=$!
 
 
 sudo perf record -F 99 -p$cuckoopid -g -- sleep $measuretime
 sudo perf script | ./flamechart/FlameGraph/stackcollapse-perf.pl > out.perf-folded
-sudo killall test_cuckoo
+sudo killall "$program"
 ./flamechart/FlameGraph/flamegraph.pl out.perf-folded > flamechart.svg
 firefox flamechart.svg
 
