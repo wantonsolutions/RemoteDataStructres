@@ -61,6 +61,10 @@ namespace cuckoo_rdma_engine {
             // Memory_State_Machine * _memory_state_machine;
             // table_config * _table_config;
             // struct ibv_cq *_completion_queue;
+            void start_distributed_experiment();
+            void stop_distributed_experiment();
+            experiment_control *get_experiment_control();
+            memory_stats * get_memory_stats();
             unordered_map<string, string> _config;
             vector<State_Machine_Wrapper> _state_machines;
             int _num_clients;

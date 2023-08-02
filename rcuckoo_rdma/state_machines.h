@@ -233,6 +233,7 @@ namespace cuckoo_state_machines {
             vector<Duplicate_Entry> get_duplicates();
             bool contains(Key key);
             float get_fill_percentage();
+            float get_max_fill();
             void print_table();
 
             void fill_table_with_incremental_values();

@@ -14,6 +14,7 @@
 #include "memcached.h"
 #include "rdma_helper.h"
 #include <linux/kernel.h>
+#include <sched.h>
 
 #include <chrono>
 
@@ -28,6 +29,19 @@ using namespace cuckoo_rcuckoo;
 volatile bool global_start_flag = false;
 volatile bool global_end_flag = false;
 RCuckoo *rcuckoo_state_machines[MAX_THREADS];
+
+
+int stick_thread_to_core(pthread_t thread, int core_id) {
+  int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
+  if (core_id < 0 || core_id >= num_cores) {
+        ALERT("CORE_PIN_DEATH","%s: core_id %d invalid\n", __func__, core_id);
+        exit(0);
+  }
+  cpu_set_t cpuset;
+  CPU_ZERO(&cpuset);
+  CPU_SET(core_id, &cpuset);
+  return pthread_setaffinity_np(thread, sizeof(pthread_t), &cpuset);
+}
 
 namespace cuckoo_rdma_engine {
 
@@ -124,6 +138,42 @@ namespace cuckoo_rdma_engine {
         return;
     }
 
+    void RDMA_Engine::start_distributed_experiment(){
+        experiment_control ec;
+        ec.experiment_start = true;
+        ec.experiment_stop = false;
+        memcached_publish_experiment_control(&ec);
+    }
+
+    void RDMA_Engine::stop_distributed_experiment(){
+        experiment_control ec;
+        ec.experiment_start = true;
+        ec.experiment_stop = true;
+        memcached_publish_experiment_control(&ec);
+    }
+
+    experiment_control * RDMA_Engine::get_experiment_control(){
+        return memcached_get_experiment_control();
+    }
+
+    memory_stats * RDMA_Engine::get_memory_stats(){
+        int wait_coutner = 0;
+        while (true) {
+            memory_stats * stats = memcached_get_memory_stats();
+            if (stats->finished_run) {
+                return stats;
+            }
+            wait_coutner++;
+            usleep(1000);
+            printf("Waiting for the memory server to deliver the stats %d\n", wait_coutner);
+
+            if (wait_coutner > 1000) {
+                printf("Error: the memory server is not responding\n");
+                exit(1);
+            }
+        }
+    }
+
     bool RDMA_Engine::start() {
         VERBOSE("RDMA Engine", "starting rdma engine\n");
         VERBOSE("RDMA Engine", "for the moment just start the first of the state machines\n");
@@ -139,10 +189,14 @@ namespace cuckoo_rdma_engine {
             rcuckoo_state_machines[i]->set_global_start_flag(&global_start_flag);
             rcuckoo_state_machines[i]->set_global_end_flag(&global_end_flag);
         }
+        int yak_01_core_order[24]={0,2,4,6,8,10,12,14,16,18,20,22,1,3,5,7,9,11,13,15,17,19,21,23};
+        int yak_01_control_core = 23;
         for (int i=0;i<_num_clients;i++) {
             INFO("RDMA Engine","Creating Client Thread %d\n", i);
             pthread_create(&thread_ids[i], NULL, &cuckoo_fsm_runner, (rcuckoo_state_machines[i]));
+            stick_thread_to_core(thread_ids[i], yak_01_core_order[i]);
         }
+        stick_this_thread_to_core(yak_01_control_core);
 
         using std::chrono::high_resolution_clock;
         using std::chrono::duration_cast;
@@ -150,11 +204,24 @@ namespace cuckoo_rdma_engine {
         using std::chrono::milliseconds;
 
         SUCCESS("RDMA Engine", "Starting Experiment\n");
+
+        start_distributed_experiment();
         //Start the treads
         auto t1 = high_resolution_clock::now();
         global_start_flag = true;
-        sleep(1);
-        global_end_flag = true;
+
+        while(true){
+            experiment_control *ec = get_experiment_control();
+            if(ec->experiment_stop){
+                ALERT("RDMA Engine", "Experiment Stop Globally\n");
+                global_end_flag = true;
+                break;
+            }
+            if(global_end_flag == true) {
+                break;
+            }
+            free(ec);
+        }
         auto t2 = high_resolution_clock::now();
         auto ms_int = duration_cast<milliseconds>(t2 - t1);
 
@@ -193,8 +260,15 @@ namespace cuckoo_rdma_engine {
         SUCCESS("RDMA Engine", "Throughput: %f\n", throughput);
         ALERT("", "%d,%f\n", _num_clients, throughput);
 
-        printf("RDMA Connection Manager location %p\n", _connection_manager);
-        write_statistics(_config, system_statistics, client_statistics);
+        memory_stats *ms = get_memory_stats();
+
+        unordered_map<string,string> memory_statistics;
+        memory_statistics["fill"]= to_string(ms->fill);
+
+
+
+
+        write_statistics(_config, system_statistics, client_statistics, memory_statistics);
  
         // free(thread_ids);
         VERBOSE("RDMA Engine", "done running state machine!");

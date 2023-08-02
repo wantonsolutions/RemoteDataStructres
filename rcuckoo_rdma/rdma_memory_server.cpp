@@ -328,6 +328,34 @@ void copy_device_memory_to_host_lock_table(Memory_State_Machine &msm) {
     ibv_exp_memcpy_dm(device_memory.dm, &cpy_attr);
 }
 
+static void send_inital_experiment_control_to_memcached_server() {
+    experiment_control ec;
+    ec.experiment_start = false;
+    ec.experiment_stop = false;
+    memcached_publish_experiment_control(&ec);
+}
+
+static void end_experiment_globally(){
+    experiment_control ec;
+    ec.experiment_start = true;
+    ec.experiment_stop = true;
+    memcached_publish_experiment_control(&ec);
+}
+
+static void send_inital_memory_stats_to_memcached_server(){
+    memory_stats ms;
+    ms.finished_run = false;
+    ms.fill = 0.0;
+    memcached_publish_memory_stats(&ms);
+}
+
+static void send_final_memory_stats_to_memcached_server(Memory_State_Machine &msm){
+    memory_stats ms;
+    ms.finished_run = true;
+    ms.fill = msm.get_fill_percentage();
+    memcached_publish_memory_stats(&ms);
+}
+
 static void send_table_config_to_memcached_server(Memory_State_Machine& msm)
 {
 
@@ -588,17 +616,30 @@ void usage()
 }
 
 
-void print_periodically(int num_qps, int time_seconds, Memory_State_Machine &msm) {
+void moniter_run(int num_qps, int print_frequency, Memory_State_Machine &msm) {
 
     //print buffers every second
     int print_step=0;
+    time_t last_print;
+    time(&last_print);
     while(true) {
-        sleep(time_seconds);
-        printf("Printing table after %d seconds\n", print_step * time_seconds);
-        print_step++;
-        copy_device_memory_to_host_lock_table(msm);
-        // msm.print_table();
-        printf("%2.3f Full\n", msm.get_fill_percentage());
+        time_t now;
+        time(&now);
+        float fill_percentage = msm.get_fill_percentage();
+        if(now - last_print >= print_frequency) {
+            last_print = now;
+            printf("Printing table after %d seconds\n", print_step * print_frequency);
+            print_step++;
+            copy_device_memory_to_host_lock_table(msm);
+            // msm.print_table();
+            printf("%2.3f/%2.3f Full\n", fill_percentage, msm.get_max_fill());
+        }
+
+        if((fill_percentage * 100.0) >= msm.get_max_fill()) {
+            printf("Table has reached it's full capactiy. Exiting globally\n");
+            end_experiment_globally();
+            break;
+        }
 
         // for(int i = 0; i < num_qps; i++) {
         //     printf("buffer (%d)\n", i);
@@ -606,6 +647,8 @@ void print_periodically(int num_qps, int time_seconds, Memory_State_Machine &msm
         //     // printf("%s\n", (char *)(server_qp_buffer_mr[i]->addr));
         // }
     }
+    ALERT("RDMA memory server", "Experiment has been ended globally\n");
+    ALERT("RDMA memory server", "Write the stats to the memcached server\n");
 
 }
 
@@ -669,6 +712,8 @@ int main(int argc, char **argv)
             return ret;
         }
     }
+    send_inital_memory_stats_to_memcached_server();
+    send_inital_experiment_control_to_memcached_server();
     send_table_config_to_memcached_server(msm);
 
 
@@ -681,8 +726,10 @@ int main(int argc, char **argv)
     //     }
     // }
     printf("All server setup complete, now serving memory requests\n");
+    moniter_run(num_qps, 1 /* sec */, msm);
 
-    print_periodically(num_qps, 1 /* sec */, msm);
+    ALERT("RDMA memory server", "Sending results to the memcached server\n");
+    send_final_memory_stats_to_memcached_server(msm);
 
     ret = disconnect_and_cleanup(num_qps);
     if (ret) { 
