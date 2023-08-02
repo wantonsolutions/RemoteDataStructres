@@ -65,6 +65,8 @@ def stderr(data):
     return np.std(data) / np.sqrt(np.size(data))
 
 def div_by_zero_to_zero(x, y):
+    x = float(x)
+    y = float(y)
     if y == 0:
         print("ERROR - div by zero")
 
@@ -353,10 +355,10 @@ def messages_per_operation_line(axs, stats, label, x_axis="clients"):
     x_axis_vals = get_x_axis(stats, x_axis)
 
     #half the values because we count two messages for each sent message
-    read_messages = [x/2 for x in read_messages]
-    write_messages = [x/2 for x in write_messages]
-    read_err = [x/2 for x in read_err]
-    write_err = [x/2 for x in write_err]
+    # read_messages = [x/2 for x in read_messages]
+    # write_messages = [x/2 for x in write_messages]
+    # read_err = [x/2 for x in read_err]
+    # write_err = [x/2 for x in write_err]
 
     h1 = ax.errorbar(x_axis_vals,write_messages,yerr=write_err, linestyle=op_linestyles['insert'], marker=op_markers['insert'], label=label+"-insert")
     color = h1[0].get_color()
@@ -490,9 +492,10 @@ def single_run_approx_throughput(stat):
 
         normal_throughput = div_by_zero_to_zero(total_operations, total_rtt)
         normal_throughputs.append(normal_throughput)
+    num_clients = int(stat['config']['num_clients'])
     mean, std = np.mean(normal_throughputs), np.std(normal_throughputs)
-    mean = mean * stat['config']['num_clients']
-    std = std * stat['config']['num_clients']
+    mean = mean *num_clients
+    std = std *num_clients
     return mean, std
     # return (np.mean(per_client_success_rate), stderr(per_client_success_rate))
 
@@ -573,6 +576,9 @@ def single_run_op_success_rate(stat, op_string):
         ops = client['stats']['completed_'+op_string+'_count']
         op_failures = client['stats']['failed_'+op_string+'_count']
 
+        ops=int(ops)
+        op_failures=int(op_failures)
+
         op_success_rate = 0
         if ops != 0:
             op_success_rate = float(ops)/(ops+op_failures)
@@ -625,7 +631,10 @@ def client_stats_x_per_y_get_mean_std(stat, x,y):
         for client in stat['clients']:
             y_val = client['stats'][y]
             x_val = client['stats'][x]
+            print("yval - ",y,y_val)
+            print("xval - ",x,x_val)
             vals.append(div_by_zero_to_zero(x_val, y_val))
+        print("vals: ", vals)
         return np.mean(vals), stderr(vals)
         # print("90th percentile: ", np.percentile(vals,99))
         # return np.percentile(vals,99), stderr(vals)
@@ -645,8 +654,30 @@ def client_stats_x_per_y_get_mean_std_multi_run_trials(stats, x, y):
 
 def client_stats_get_percentile_err(stat, key, percentile):
     vals = []
+    # print("STAT: ", stat)
+    print("KEY: ", key)
+
     for client in stat['clients']:
-        vals.extend(client['stats'][key])
+        value = client['stats'][key]
+        try:
+            print("VALUE: ", value)
+            # value = int(value)
+            if isinstance(value, list):
+                vals.extend(value)
+            elif isinstance(value, str):
+                # print("value is a string", value)
+                val_list = value.split(",")
+                # print("val_list: ", val_list)
+                if val_list[0] == '':
+                    continue
+                val_list = [int(x) for x in val_list]
+                vals.extend(val_list)
+            else:
+                continue
+
+        except:
+            exit(0)
+            continue
     if len(vals) == 0:
         return 0, 0
     print("PERCENTILE: ",np.percentile(vals, percentile))
@@ -801,7 +832,8 @@ def workload_entry(stats):
     stats = get_flattened_stats(stats)
     for s in stats:
         for c in s['clients']:
-            w = c['stats']['workload_stats']['workload']
+            w = c['stats']['workload']
+            # w = c['stats']['workload_stats']['workload']
             workloads[w] = True
     loads = ""
     for w in workloads:
