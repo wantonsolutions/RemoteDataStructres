@@ -38,6 +38,10 @@ def multi_plot_runs(runs, plot_names, directory=""):
             fill_factor(axs[i],runs, x_axis)
         elif plot_name == "throughput_approximation":
             throughput_approximation(axs[i],runs, x_axis)
+        elif plot_name == "throughput":
+            throughput(axs[i],runs, x_axis)
+        elif plot_name == "retry_breakdown":
+            retry_breakdown(axs[i],runs, x_axis)
         else:
             print("unknown plot name: ", plot_name)
         i+=1
@@ -68,7 +72,7 @@ def div_by_zero_to_zero(x, y):
     x = float(x)
     y = float(y)
     if y == 0:
-        print("ERROR - div by zero")
+        # print("ERROR - div by zero")
 
         # raise Exception("Div by zero")
         return float(0)
@@ -318,6 +322,35 @@ def bytes_per_operation_line(ax, stats, label, x_axis="clients"):
     color = p[0].get_color()
     ax.errorbar(x_axis_vals,write_bytes,yerr=write_err,label=label+"-insert", marker="o", linestyle=":", color=color)
 
+def retry_breakdown_line(ax, stats, label, x_axis="clients"):
+
+    print("Retries per insert")
+    if isinstance(stats, dict):
+        stats = [stats]
+
+    insert_retries, insert_errors = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'failed_insert_second_search_count', 'completed_insert_count')
+    lock_retries, lock_errors = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'failed_lock_aquisition_count', 'completed_insert_count')
+    x_axis_vals = get_x_axis(stats, x_axis)
+
+    p = ax.errorbar(x_axis_vals,insert_retries,yerr=insert_errors,label="second search retries", marker="s")
+    color = p[0].get_color()
+    ax.errorbar(x_axis_vals,lock_retries,yerr=lock_errors,label="failed lock aquisitions", marker="o", linestyle=":", color=color)
+
+
+def retry_breakdown_decoration(ax, x_axis):
+    ax.set_ylabel("Retries per operation")
+    ax.set_xlabel(x_axis)
+    ax.legend()
+
+def retry_breakdown(ax, stats, x_axis="clients", decoration=True):
+    stats = correct_stat_shape(stats)
+    lines = []
+    for stat in stats:
+        state_machine_label = stat[0][0]['config']['state_machine']
+        retry_breakdown_line(ax, stat, label=state_machine_label, x_axis=x_axis)
+    if decoration:
+        retry_breakdown_decoration(ax, x_axis)
+
 
 
 op_markers={"read": "s", "insert": "o"}
@@ -391,6 +424,7 @@ def messages_per_operation(ax, stats, x_axis="clients", decoration=True, twin=Tr
         lines.extend(l)
     if decoration:
         messages_per_operation_decoration(axs[0], axs[1], x_axis, lines)
+
 
 def rtt_per_operation_decoration(ax, axt, x_axis, lines):
     ax.set_ylabel("insert - rtt/op")
@@ -532,6 +566,56 @@ def throughput_approximation(ax, stats, x_axis='clients', decoration=True):
         approximate_throughput_decoration(ax, x_axis)
 
 
+def single_run_throughput(stat):
+    total_operations_mop = 0
+    for client in stat['clients']:
+        read_operations = int(client['stats']['completed_read_count'])
+        read_operations_mop =read_operations/1000000
+        insert_operations = int(client['stats']['completed_insert_count'])
+        print("insert_operations: ", insert_operations)
+        insert_operations_mop = insert_operations/1000000
+        total_operations_mop += read_operations_mop + insert_operations_mop
+        print("total_operations_mop: ", total_operations_mop)
+
+    execution_time_ms = int(stat['system']['runtime_ms'])
+    execution_time_s = execution_time_ms / 1000.0
+    throughput = div_by_zero_to_zero(total_operations_mop, execution_time_s)
+    return throughput
+
+def throughput_line(ax,stats,label,x_axis="clients"):
+    throughputs = []
+    std_errs = []
+    x_axis_vals = get_x_axis(stats, x_axis)
+    for stat in stats:
+        single_run_throughputs=[]
+        for r in stat:
+            s = single_run_throughput(r)
+            single_run_throughputs.append(s)
+        print("single_run_throughput: ", single_run_throughputs)
+        throughputs.append(np.mean(single_run_throughputs))
+        std_errs.append(np.std(single_run_throughputs))
+    # x_pos = np.arange(len(success_rates))
+    print("throughputs: ", throughputs)
+    print("tput errs  : ", std_errs)
+    ax.errorbar(x_axis_vals,throughputs,yerr=std_errs,label=label, marker='o', capsize=3)
+
+def throughput_decoration(ax, x_axis):
+    ax.set_xlabel(x_axis)
+    ax.set_ylabel('Throughput MOPS')
+    ax.set_title('Throughput vs ' + x_axis)
+    ax.legend()
+
+def throughput(ax, stats, x_axis='clients', decoration=True):
+    stats = correct_stat_shape(stats)
+    for stat in stats:
+        state_machine_label = stat[0][0]['config']['state_machine']
+        throughput_line(ax, stat, label=state_machine_label, x_axis=x_axis)
+    if decoration:
+        throughput_decoration(ax, x_axis)
+
+    
+
+
 def fill_vs_latency_line(ax, stats, label, x_axis="max fill"):
     print("RTT PER OPERATION")
     # read_rtt, read_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'read_rtt_count', 'completed_read_count')
@@ -631,10 +715,10 @@ def client_stats_x_per_y_get_mean_std(stat, x,y):
         for client in stat['clients']:
             y_val = client['stats'][y]
             x_val = client['stats'][x]
-            print("yval - ",y,y_val)
-            print("xval - ",x,x_val)
+            # print("yval - ",y,y_val)
+            # print("xval - ",x,x_val)
             vals.append(div_by_zero_to_zero(x_val, y_val))
-        print("vals: ", vals)
+        # print("vals: ", vals)
         return np.mean(vals), stderr(vals)
         # print("90th percentile: ", np.percentile(vals,99))
         # return np.percentile(vals,99), stderr(vals)
@@ -660,7 +744,7 @@ def client_stats_get_percentile_err(stat, key, percentile):
     for client in stat['clients']:
         value = client['stats'][key]
         try:
-            print("VALUE: ", value)
+            # print("VALUE: ", value)
             # value = int(value)
             if isinstance(value, list):
                 vals.extend(value)

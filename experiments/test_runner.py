@@ -20,7 +20,9 @@ def plot_general_stats_last_run(dirname=""):
         "bytes_per_operation",
         "messages_per_operation",
         ### add a memory collection function first ### "fill_factor",
-        "throughput_approximation"
+        # "throughput_approximation",
+        "throughput",
+        "retry_breakdown"
         ]
     plot_cuckoo.multi_plot_runs(stats, plot_names, directory)
 
@@ -28,7 +30,7 @@ config=dict()
 
 
 # table_size = 1024 * 1024 * 10
-table_size = 1024 * 1024
+table_size = 1024 * 1024 * 2
 #int table_size = 1024 * 10;
 #int table_size = 256;
 #int table_size = 1024;
@@ -88,8 +90,8 @@ def debug_exp(config):
         lconfig["num_clients"] = str(c)
         stats = orchestrator.run_trials(lconfig)
         runs.append(stats)
-    print(runs)
+    # print(runs)
     dm.save_statistics(runs)
 
-debug_exp(config)
+# debug_exp(config)
 plot_general_stats_last_run()
