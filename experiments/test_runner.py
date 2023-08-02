@@ -19,7 +19,7 @@ def plot_general_stats_last_run(dirname=""):
         "rtt_per_operation",
         "bytes_per_operation",
         "messages_per_operation",
-        ### add a memory collection function first ### "fill_factor",
+        "fill_factor",
         # "throughput_approximation",
         "throughput",
         "retry_breakdown"
@@ -93,5 +93,5 @@ def debug_exp(config):
     # print(runs)
     dm.save_statistics(runs)
 
-debug_exp(config)
+# debug_exp(config)
 plot_general_stats_last_run()

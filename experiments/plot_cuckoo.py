@@ -471,7 +471,7 @@ def fill_factor_line(ax, stats, label, x_axis="table size"):
     for stat in stats:
         fill_rates = []
         for r in stat:
-            fill_rates.append(r['memory']['fill'])
+            fill_rates.append(float(r['memory']['fill']))
         # print("fill-rates", fill_rates)
         fr_avg.append(np.mean(fill_rates))
         fr_err.append(np.std(fill_rates))
