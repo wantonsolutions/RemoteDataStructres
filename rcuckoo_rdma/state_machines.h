@@ -12,6 +12,33 @@
 using namespace std;
 using namespace cuckoo_virtual_rdma;
 
+
+#define RDMA_READ_REQUSET_SIZE 74
+#define RDMA_MASKED_CAS_REQUEST_SIZE 102
+#define RDMA_CAS_REQUEST_SIZE 86
+
+#define RDMA_READ_RESPONSE_BASE_SIZE 62
+#define RDMA_ATOMIC_RESPONSE_SIZE 70
+#define RDMA_MASKED_CAS_RESPONSE_SIZE RDMA_ATOMIC_RESPONSE_SIZE
+#define RDMA_CAS_RESPONSE_SIZE RDMA_ATOMIC_RESPONSE_SIZE
+
+//Measurement DEFS
+#define MEASURE_ALL
+// #define MEASURE_MOST
+// #define MEASURE_ESSENTIAL
+// #define MEASURE_NONE
+
+#ifdef MEASURE_ALL
+    #define MEASURE_MOST
+#endif
+#ifdef MEASURE_MOST
+    #define MEASURE_ESSENTIAL
+#endif
+#ifdef MEASURE_ESSENTIAL
+    #define MEASURE_NONE
+#endif
+
+
 namespace cuckoo_state_machines {
 
 
@@ -46,11 +73,14 @@ namespace cuckoo_state_machines {
             uint64_t _read_bytes;
             uint64_t _write_bytes;
             uint64_t _cas_bytes;
+            uint64_t _masked_cas_bytes;
 
             uint32_t _total_reads;
             uint32_t _total_writes;
             uint32_t _total_cas;
             uint32_t _total_cas_failures;
+            uint32_t _total_masked_cas = 0;
+            uint32_t _total_masked_cas_failures=0;
 
             Key _current_insert_key;
 
@@ -59,9 +89,16 @@ namespace cuckoo_state_machines {
             uint32_t _current_insert_messages;
             vector<int> _messages_per_insert;
             vector<Key> _completed_inserts;
+
+            vector<int> _failed_inserts_second_search;
+            uint32_t _failed_insert_second_search_count;
+            uint32_t _failed_insert_second_search_this_insert;
+            vector<int> _failed_lock_aquisitions;
+            uint32_t _failed_lock_aquisition_count;
+            uint32_t _failed_lock_aquisition_this_insert;
+
+
             uint32_t _completed_insert_count;
-            vector<Key> _failed_inserts;
-            uint32_t _failed_insert_count;
             uint64_t _insert_operation_bytes;
             uint64_t _insert_operation_messages;
             //track rtt
