@@ -3,23 +3,31 @@ import warnings
 from cryptography.utils import CryptographyDeprecationWarning
 with warnings.catch_warnings():
     warnings.filterwarnings('ignore', category=CryptographyDeprecationWarning)
-    import paramiko
+import paramiko
+from scp import SCPClient
 
 import json
+import tempfile
+from tqdm import tqdm
+import copy
 
 # import asyncio use this eventually when you want to parallelize the builds
 
 
 class rcuckoo_ssh_wrapper:
     def __init__(self, username,hostname):
-        print("setting up ssh connection to", hostname)
+        # print("setting up ssh connection to", hostname)
         self.username = username
         self.hostname = hostname
         self.ssh = paramiko.SSHClient()
         self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         #ensure that we don't need a password to connect
         self.ssh.connect(self.hostname, username=self.username)
+        self.scp = SCPClient(self.ssh.get_transport())
         self.verbose = False
+
+    def get(self, remote_path, local_path):
+        self.scp.get(remote_path, local_path)
 
     def set_verbose(self, verbose):
         self.verbose = verbose
@@ -29,12 +37,12 @@ class rcuckoo_ssh_wrapper:
 
         error_code = stdout.channel.recv_exit_status()
         if (self.verbose) or (error_code != 0):
-            print("Error code is not zero: ", error_code)
-            print("ERROR:!")
-            print("STDOUT:")
+            # print("Error code is not zero: ", error_code)
+            # print("ERROR:!")
+            # print("STDOUT:")
             result =stdout.read()
             print(result.decode("utf-8"))
-            print("STDERR:")
+            # print("STDERR:")
             result = stderr.read()
             print(result.decode("utf-8"))
 
@@ -49,7 +57,7 @@ class rcuckoo_ssh_wrapper:
         if ip == "":
             print("ERROR: mlx5 ip is empty")
             exit()
-        print("Sanity Check: mlx5 ip is", ip)
+        # print("Sanity Check: mlx5 ip is", ip)
 
     def __del__(self):
         self.ssh.close()
@@ -57,15 +65,18 @@ class rcuckoo_ssh_wrapper:
     def pull(self):
         self.run_cmd('git pull')
 
-class orchestrator:
+class Orchestrator:
 
     memory_program_name = "rdma_memory_server"
     client_program_name = "cuckoo_client"
     config_name = "remote_config.json"
+    statistics_file = "statistics/statistics.json"
+    server_name = 'yak-00.sysnet.ucsd.edu'
+    client_name = 'yak-01.sysnet.ucsd.edu' 
     config = dict()
     def __init__(self, conf):
-        self.server = rcuckoo_ssh_wrapper('ssgrant', 'yak-00.sysnet.ucsd.edu')
-        self.client = rcuckoo_ssh_wrapper('ssgrant', 'yak-01.sysnet.ucsd.edu')
+        self.server = rcuckoo_ssh_wrapper('ssgrant', self.server_name)
+        self.client = rcuckoo_ssh_wrapper('ssgrant', self.client_name)
 
         #pointer to all of the nodes
         self.all_nodes = [self.client, self.server]
@@ -76,6 +87,11 @@ class orchestrator:
 
         self.queue_pairs = 24
 
+    def validate_run(self):
+        # print("Here we should check that the JSON responses make sense, and that the run was successful")
+        # print("At the moment validate run does nothing")
+        self=self
+
 
     def transfer_configs_to_nodes(self, config, config_name):
         self.config_name = config_name
@@ -83,6 +99,23 @@ class orchestrator:
             node.run_cmd(
                 'cd rcuckoo_rdma/configs;'
                 'echo \'' + json.dumps(config) + '\' > ' + config_name + ';')
+
+
+    def collect_stats(self):
+        temp_dir = tempfile.TemporaryDirectory()
+        # print(temp_dir.name)
+
+        client_stat_filename = 'client_statistics.json'
+        remote_client_stat_filename = 'rcuckoo_rdma/statistics/'+client_stat_filename
+        local_client_stat_filename = temp_dir.name+'/'+client_stat_filename
+        self.client.get(remote_client_stat_filename, local_client_stat_filename)
+
+        #we need to get the memory json
+
+        f = open(local_client_stat_filename, 'r')
+        client_stat = json.load(f)
+        temp_dir.cleanup()
+        return client_stat
 
     def set_verbose(self, verbose):
         for node in self.all_nodes:
@@ -124,13 +157,13 @@ class orchestrator:
             node.sanity_check_mlx5()
 
 
-    def run_rdma_benchmark(self):
-        print("Starting RDMA Benchmark")
+    def run(self):
+        # print("Starting RDMA Benchmark")
         self.server.run_cmd(
             'cd rcuckoo_rdma;'
             './'+ self.memory_program_name + ' ' + 'configs/' + self.config_name + ' > memserver.out 2>&1 &')
 
-        print("Server is started with queue pairs", self.queue_pairs)
+        # print("Server is started with queue pairs", self.queue_pairs)
 
         self.client.run_cmd(
             'cd rcuckoo_rdma;'
@@ -138,3 +171,30 @@ class orchestrator:
             'cat client.out;'
         )
             # './rdma_client -a ' + server_ip + ' -p 20886 -q '+str(self.queue_pairs)+ ' -x;'
+
+    
+def run_trials(config):
+    runs = []
+    trials = config['trials']
+    for i in tqdm(range(trials)):
+        c=copy.copy(config)
+        orch = Orchestrator(c)
+        #prepare for the run
+        orch.transfer_configs_to_nodes(config, "remote_config.json")
+        orch.sanity_check()
+        orch.kill()
+        stats_collected = False
+        try:
+            orch.run()
+            orch.kill()
+        except Exception as e:
+            print("Run ", i, " failed with exception -- we gotta fix this", e)
+            exit()
+
+        
+        if not stats_collected:
+            orch.validate_run()
+            stats = orch.collect_stats()
+        runs.append(stats)
+        del orch
+    return runs

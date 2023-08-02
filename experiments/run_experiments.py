@@ -266,7 +266,8 @@ def insertion_debug():
     config['max_fill']= 90
     # config['deterministic']=True
     # config["state_machine"]=race.race
-    config["state_machine"]=cuckoo.PyRCuckoo
+    config["state_machine"]=cuckoo.rcuckoo
+    # config["state_machine"]=cuckoo.PyRCuckoo
     config['workload']='ycsb-w'
     # log.set_debug()
     log.set_off()
