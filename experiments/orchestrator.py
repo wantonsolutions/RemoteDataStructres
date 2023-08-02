@@ -168,7 +168,6 @@ class Orchestrator:
         self.client.run_cmd(
             'cd rcuckoo_rdma;'
             './' + self.client_program_name + ' ' + 'configs/' + self.config_name + ' > client.out 2>&1;'
-            'cat client.out;'
         )
             # './rdma_client -a ' + server_ip + ' -p 20886 -q '+str(self.queue_pairs)+ ' -x;'
 
