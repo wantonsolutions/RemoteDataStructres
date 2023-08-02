@@ -342,6 +342,20 @@ static void end_experiment_globally(){
     memcached_publish_experiment_control(&ec);
 }
 
+static void send_inital_memory_stats_to_memcached_server(){
+    memory_stats ms;
+    ms.finished_run = false;
+    ms.fill = 0.0;
+    memcached_publish_memory_stats(&ms);
+}
+
+static void send_final_memory_stats_to_memcached_server(Memory_State_Machine &msm){
+    memory_stats ms;
+    ms.finished_run = true;
+    ms.fill = msm.get_fill_percentage();
+    memcached_publish_memory_stats(&ms);
+}
+
 static void send_table_config_to_memcached_server(Memory_State_Machine& msm)
 {
 
@@ -636,8 +650,6 @@ void moniter_run(int num_qps, int print_frequency, Memory_State_Machine &msm) {
     ALERT("RDMA memory server", "Experiment has been ended globally\n");
     ALERT("RDMA memory server", "Write the stats to the memcached server\n");
 
-    exit(0);
-
 }
 
 
@@ -700,6 +712,8 @@ int main(int argc, char **argv)
             return ret;
         }
     }
+    send_inital_memory_stats_to_memcached_server();
+    send_inital_experiment_control_to_memcached_server();
     send_table_config_to_memcached_server(msm);
 
 
@@ -712,8 +726,10 @@ int main(int argc, char **argv)
     //     }
     // }
     printf("All server setup complete, now serving memory requests\n");
-
     moniter_run(num_qps, 1 /* sec */, msm);
+
+    ALERT("RDMA memory server", "Sending results to the memcached server\n");
+    send_final_memory_stats_to_memcached_server(msm);
 
     ret = disconnect_and_cleanup(num_qps);
     if (ret) { 

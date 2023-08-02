@@ -53,7 +53,9 @@ void write_json_statistics_to_file(string filename, Json::Value statistics) {
 void write_statistics(
     unordered_map<string, string> config, 
     unordered_map<string,string> system_stats, 
-    vector<unordered_map<string,string>> client_stats) {
+    vector<unordered_map<string,string>> client_stats,
+    unordered_map<string, string> memory_statistics
+    ) {
 
     Json::Value client_json;
 
@@ -83,5 +85,11 @@ void write_statistics(
         // client_json.append(client_stats_json);
     }
     client_json["clients"] = client_vector;
+
+    Json::Value memory_stats_json;
+    for (auto it = memory_statistics.begin(); it != memory_statistics.end(); it++) {
+        memory_stats_json[it->first] = it->second;
+    }
+    client_json["memory"] = memory_stats_json;
     write_json_statistics_to_file("statistics/client_statistics.json", client_json);
 }

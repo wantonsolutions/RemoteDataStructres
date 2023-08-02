@@ -64,6 +64,7 @@ namespace cuckoo_rdma_engine {
             void start_distributed_experiment();
             void stop_distributed_experiment();
             experiment_control *get_experiment_control();
+            memory_stats * get_memory_stats();
             unordered_map<string, string> _config;
             vector<State_Machine_Wrapper> _state_machines;
             int _num_clients;

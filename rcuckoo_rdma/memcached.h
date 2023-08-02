@@ -18,4 +18,7 @@ table_config *memcached_get_table_config(void);
 void memcached_publish_experiment_control(experiment_control *control);
 experiment_control *memcached_get_experiment_control(void);
 
+void memcached_publish_memory_stats(memory_stats *ms);
+memory_stats *memcached_get_memory_stats(void);
+
 #endif

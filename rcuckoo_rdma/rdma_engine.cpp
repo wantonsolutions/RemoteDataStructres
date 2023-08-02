@@ -156,6 +156,24 @@ namespace cuckoo_rdma_engine {
         return memcached_get_experiment_control();
     }
 
+    memory_stats * RDMA_Engine::get_memory_stats(){
+        int wait_coutner = 0;
+        while (true) {
+            memory_stats * stats = memcached_get_memory_stats();
+            if (stats->finished_run) {
+                return stats;
+            }
+            wait_coutner++;
+            usleep(1000);
+            printf("Waiting for the memory server to deliver the stats %d\n", wait_coutner);
+
+            if (wait_coutner > 1000) {
+                printf("Error: the memory server is not responding\n");
+                exit(1);
+            }
+        }
+    }
+
     bool RDMA_Engine::start() {
         VERBOSE("RDMA Engine", "starting rdma engine\n");
         VERBOSE("RDMA Engine", "for the moment just start the first of the state machines\n");
@@ -242,8 +260,15 @@ namespace cuckoo_rdma_engine {
         SUCCESS("RDMA Engine", "Throughput: %f\n", throughput);
         ALERT("", "%d,%f\n", _num_clients, throughput);
 
-        printf("RDMA Connection Manager location %p\n", _connection_manager);
-        write_statistics(_config, system_statistics, client_statistics);
+        memory_stats *ms = get_memory_stats();
+
+        unordered_map<string,string> memory_statistics;
+        memory_statistics["fill"]= to_string(ms->fill);
+
+
+
+
+        write_statistics(_config, system_statistics, client_statistics, memory_statistics);
  
         // free(thread_ids);
         VERBOSE("RDMA Engine", "done running state machine!");
