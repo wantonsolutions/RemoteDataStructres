@@ -35,6 +35,21 @@ unordered_map<string, string> read_config_from_file(string config_filename){
     return config;
 }
 
+void write_json_statistics_to_file(string filename, Json::Value statistics) {
+    try{
+        std::ofstream file_id;
+        file_id.open(filename);
+        Json::StyledWriter styledWriter;
+        file_id << styledWriter.write(statistics);
+        file_id.close();
+    } catch (exception& e) {
+        ALERT("WRITE STATS", "ERROR: could not write statistics to file %s\n", filename.c_str());
+        ALERT("WRITE STATS", "ERROR: %s\n", e.what());
+        exit(1);
+    }
+
+}
+
 void write_statistics(
     unordered_map<string, string> config, 
     unordered_map<string,string> system_stats, 
@@ -68,6 +83,5 @@ void write_statistics(
         // client_json.append(client_stats_json);
     }
     client_json["clients"] = client_vector;
-    cout << client_json << endl;
-
+    write_json_statistics_to_file("statistics/client_statistics.json", client_json);
 }

@@ -24,6 +24,7 @@ using namespace cuckoo_search;
 using namespace cuckoo_state_machines;
 using namespace rdma_helper;
 
+
 namespace cuckoo_rcuckoo {
 
     Entry ** RCuckoo::get_table_pointer() {
@@ -247,9 +248,8 @@ namespace cuckoo_rcuckoo {
         _inserting = false;
 
         //TODO record this variable
-        _retries_due_to_failed_second_search=0;
 
-        // complete_insert_stats(true);
+        complete_insert_stats(true);
         return;
     }
 
@@ -813,6 +813,25 @@ namespace cuckoo_rcuckoo {
         );
         
         send_bulk(READ_AND_COVER_MESSAGE_COUNT, _qp, wr);
+
+        //Increment Measurement Counters
+        #ifdef MEASURE_ESSENTIAL
+        uint64_t read_bytes = RDMA_READ_REQUSET_SIZE;
+        read_bytes += RDMA_READ_RESPONSE_BASE_SIZE + read_message.size;
+        uint64_t masked_cas_bytes = RDMA_MASKED_CAS_REQUEST_SIZE + RDMA_MASKED_CAS_RESPONSE_SIZE;
+
+        _insert_operation_messages+=READ_AND_COVER_MESSAGE_COUNT;
+        _total_bytes += read_bytes + masked_cas_bytes;
+        _insert_operation_bytes += read_bytes + masked_cas_bytes;
+
+        _read_bytes += read_bytes;
+        _masked_cas_bytes +=masked_cas_bytes;
+        _total_reads++;
+        _total_masked_cas++;
+
+        _current_insert_rtt++;
+        _insert_rtt_count++;
+        #endif
     }
 
     void RCuckoo::send_insert_and_unlock_messages(vector<VRCasData> &insert_messages, vector<VRMaskedCasData> & unlock_messages, uint64_t wr_id) {
@@ -879,6 +898,22 @@ namespace cuckoo_rcuckoo {
             wr_id++;
         }
         send_bulk(total_messages, _qp, wr);
+        #ifdef MEASURE_ESSENTIAL
+        uint64_t cas_bytes = (RDMA_CAS_REQUEST_SIZE + RDMA_CAS_RESPONSE_SIZE) * insert_messages.size();
+        uint64_t masked_cas_bytes = (RDMA_MASKED_CAS_REQUEST_SIZE + RDMA_MASKED_CAS_RESPONSE_SIZE) * unlock_messages.size();
+
+        _total_bytes += cas_bytes + masked_cas_bytes;
+        _cas_bytes += cas_bytes;
+        _masked_cas_bytes +=masked_cas_bytes;
+
+        _total_cas += insert_messages.size();
+        _total_masked_cas += unlock_messages.size();
+
+        _current_insert_messages += total_messages;
+        _insert_operation_messages += total_messages;
+        _current_insert_rtt++;
+        _insert_rtt_count++;
+        #endif
         
     }
 
@@ -896,7 +931,8 @@ namespace cuckoo_rcuckoo {
         _search_path = (this->*_table_search_function)(search_buckets);
         _search_path_index = _search_path.size() -1;
         if (_search_path.size() <=0 ) {
-            _retries_due_to_failed_second_search++;
+            _failed_insert_second_search_this_insert++;
+            _failed_insert_second_search_count++;
             // INFO(log_id(), "Insert Direct -- Second Search Failed for key %s retry time #%d \n", _current_insert_key.to_string().c_str(),  _retries_due_to_failed_second_search);
             // INFO(log_id(), "Unable to find path within buckets %s\n", vector_to_string(search_buckets).c_str());
 
@@ -965,7 +1001,7 @@ namespace cuckoo_rcuckoo {
         if (_state == INSERTING) {
             complete_insert();
         } else if (_state == RELEASE_LOCKS_TRY_AGAIN) {
-            _current_insert_rtt++;
+            return;
         } else {
             printf("invalid state\n");
             exit(1);
@@ -975,7 +1011,6 @@ namespace cuckoo_rcuckoo {
     }
 
     void RCuckoo::put_direct() {
-        _current_insert_rtt++;
 
         /* copied from the search function */ 
         vector<unsigned int> searchable_buckets;
@@ -1093,6 +1128,11 @@ namespace cuckoo_rcuckoo {
                     failed_last_request = false;
                 }
             } else {
+                #ifdef MEASURE_ESSENTIAL
+                _total_masked_cas_failures++;
+                _failed_lock_aquisition_count++;
+                _failed_lock_aquisition_this_insert++;
+                #endif
                 failed_last_request = true;
             }
 
@@ -1101,7 +1141,6 @@ namespace cuckoo_rcuckoo {
                 INFO(log_id(), " [put-direct] we got all the locks!\n");
                 break;
             }
-            _current_insert_rtt++;
         }
 
         return insert_direct();

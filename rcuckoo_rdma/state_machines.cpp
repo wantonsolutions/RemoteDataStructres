@@ -64,11 +64,14 @@ namespace cuckoo_state_machines {
         _read_bytes = 0;
         _write_bytes = 0;
         _cas_bytes = 0;
+        _masked_cas_bytes=0;
 
         _total_reads = 0;
         _total_writes = 0;
         _total_cas = 0;
         _total_cas_failures = 0;
+        _total_masked_cas = 0;
+        _total_masked_cas_failures=0;
 
         _current_insert_key = Key();
 
@@ -79,10 +82,13 @@ namespace cuckoo_state_machines {
         _messages_per_insert = vector<int>();
         _completed_inserts = vector<Key>();
         _completed_insert_count = 0;
-        _failed_inserts = vector<Key>();
-        _failed_insert_count = 0;
+        _failed_inserts_second_search = vector<int>();
+        _failed_insert_second_search_count = 0;
         _insert_operation_bytes = 0;
         _insert_operation_messages = 0;
+
+        _failed_lock_aquisitions = vector<int>();
+        _failed_lock_aquisition_this_insert = 0;
 
         _current_insert_rtt = 0;
         _insert_rtt = vector<int>();
@@ -120,34 +126,61 @@ namespace cuckoo_state_machines {
 
     void State_Machine::complete_read_stats(bool success, Key read_key){
         if (success) {
+            #ifdef MEASURE_MOST
             _completed_reads.push_back(read_key);
+            #endif
+            #ifdef MEASURE_ESSENTIAL
             _completed_read_count++;
+            #endif
         } else {
+            #ifdef MEASURE_MOST
             _failed_reads.push_back(read_key);
+            #endif
+            #ifdef MEASURE_ESSENTIAL
             _failed_read_count++;
+            #endif
         }
+        #ifdef MEASURE_MOST
         _messages_per_read.push_back(_current_read_messages);
         _read_rtt.push_back(_current_read_rtt);
-        _read_rtt_count += _read_rtt_count;
+        #endif
 
+        #ifdef MEASURE_ESSENTIAL    
+        _read_rtt_count += _read_rtt_count;
         _current_read_messages = 0;
         _current_read_rtt = 0;
+        #endif
 
     }
     void State_Machine::complete_insert_stats(bool success){
-        if (success) {
-            _completed_inserts.push_back(_current_insert_key);
-            _completed_insert_count++;
-        } else {
-            _failed_inserts.push_back(_current_insert_key);
-            _failed_insert_count++;
-        }
+        //We should not have failed inserts
+        assert(success == true);
+
+
+        // if (success) {
+        //     #ifdef MEASURE_MOST
+        //     #endif
+        //     #ifdef MEASURE_ESSENTIAL
+        //     #endif
+        // } else {
+        //     ALERT("Failed insert", "EXITING");
+        //     exit(1);
+        // }
+
+        #ifdef MEASURE_MOST
+        _completed_inserts.push_back(_current_insert_key);
+        _failed_inserts_second_search.push_back(_failed_insert_second_search_this_insert);
+        _failed_lock_aquisitions.push_back(_failed_lock_aquisition_this_insert);
         _messages_per_insert.push_back(_current_insert_messages);
         _insert_rtt.push_back(_current_insert_rtt);
-        _insert_rtt_count += _insert_rtt_count;
-
+        #endif
+        #ifdef MEASURE_ESSENTIAL
+        _completed_insert_count++;
+        #endif
         _current_insert_messages = 0;
         _current_insert_rtt = 0;
+        _failed_insert_second_search_this_insert = 0;
+        _failed_lock_aquisition_this_insert=0;
 
     }
     unordered_map<string, string> State_Machine::get_stats(){
@@ -167,10 +200,12 @@ namespace cuckoo_state_machines {
         stats["messages_per_insert"] = array_to_string(_messages_per_insert);
         stats["completed_inserts"] = key_array_to_string(_completed_inserts);
         stats["completed_insert_count"] = to_string(_completed_insert_count);
-        stats["failed_inserts"] = key_array_to_string(_failed_inserts);
-        stats["failed_insert_count"] = to_string(_failed_insert_count);
+        stats["failed_inserts_second_search"] = array_to_string(_failed_inserts_second_search);
+        stats["failed_insert_second_search_count"] = to_string(_failed_insert_second_search_count);
         stats["insert_operation_bytes"] = to_string(_insert_operation_bytes);
         stats["insert_operation_messages"] = to_string(_insert_operation_messages);
+        stats["failed_lock_aquisitions"] = array_to_string(_failed_lock_aquisitions);
+        stats["failed_lock_aquisition_count"] = to_string(_failed_lock_aquisition_count);
 
         stats["insert_rtt"] = array_to_string(_insert_rtt);
         stats["insert_rtt_count"] = to_string(_insert_rtt_count);
