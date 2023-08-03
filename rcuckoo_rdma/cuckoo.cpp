@@ -1173,7 +1173,6 @@ namespace cuckoo_rcuckoo {
 
         while(!*_global_end_flag) {
 
-            while(*_global_pause_flag){};
 
             //The client is done
             if (_complete && _state == IDLE) {
@@ -1184,6 +1183,9 @@ namespace cuckoo_rcuckoo {
             switch(_state) {
                 case IDLE:
 
+                    //Pause goes here rather than anywhere else because I don't want
+                    //To have locks, or any outstanding requests
+                    while(*_global_pause_flag){};
                     next_request = _workload_driver.next();
                     VERBOSE("DEBUG: general idle fsm","Generated New Request: %s\n", next_request.to_string().c_str());
 
