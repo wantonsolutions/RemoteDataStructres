@@ -22,7 +22,8 @@ def plot_general_stats_last_run(dirname=""):
         "fill_factor",
         # "throughput_approximation",
         "throughput",
-        "retry_breakdown"
+        "latency_per_operation",
+        "retry_breakdown",
         ]
     plot_cuckoo.multi_plot_runs(stats, plot_names, directory)
 

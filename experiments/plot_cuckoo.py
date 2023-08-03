@@ -40,6 +40,8 @@ def multi_plot_runs(runs, plot_names, directory=""):
             throughput_approximation(axs[i],runs, x_axis)
         elif plot_name == "throughput":
             throughput(axs[i],runs, x_axis)
+        elif plot_name == "latency_per_operation":
+            latency_per_operation(axs[i],runs, x_axis)
         elif plot_name == "retry_breakdown":
             retry_breakdown(axs[i],runs, x_axis)
         else:
@@ -387,11 +389,6 @@ def messages_per_operation_line(axs, stats, label, x_axis="clients"):
     write_messages, write_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'insert_operation_messages', 'completed_insert_count')
     x_axis_vals = get_x_axis(stats, x_axis)
 
-    #half the values because we count two messages for each sent message
-    # read_messages = [x/2 for x in read_messages]
-    # write_messages = [x/2 for x in write_messages]
-    # read_err = [x/2 for x in read_err]
-    # write_err = [x/2 for x in write_err]
 
     h1 = ax.errorbar(x_axis_vals,write_messages,yerr=write_err, linestyle=op_linestyles['insert'], marker=op_markers['insert'], label=label+"-insert")
     color = h1[0].get_color()
@@ -424,6 +421,62 @@ def messages_per_operation(ax, stats, x_axis="clients", decoration=True, twin=Tr
         lines.extend(l)
     if decoration:
         messages_per_operation_decoration(axs[0], axs[1], x_axis, lines)
+
+def latency_per_operation_line(axs, stats, label, x_axis="clients"):
+    print("LATENCY PER OPERATION")
+
+    if len(axs) == 2:
+        ax = axs[0]
+        axt = axs[1]
+    else:
+        ax = axs[0]
+        axt = axs[0]
+
+    read_latency, read_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'sum_read_latency_ns','read_operation_messages' )
+    write_latency, write_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats,  'sum_insert_latency_ns','insert_operation_messages' )
+
+    print("read_latency", read_latency)
+    print("write_latency", write_latency)
+
+    read_latency = [x/1000 for x in read_latency]
+    write_latency = [x/1000 for x in write_latency]
+    read_err = [x/1000 for x in read_err]
+    write_err = [x/1000 for x in write_err]
+    x_axis_vals = get_x_axis(stats, x_axis)
+
+
+    h1 = ax.errorbar(x_axis_vals,write_latency,yerr=write_err, linestyle=op_linestyles['insert'], marker=op_markers['insert'], label=label+"-insert")
+    color = h1[0].get_color()
+    h2 = axt.errorbar(x_axis_vals,read_latency,yerr=read_err, linestyle=op_linestyles['read'], label=label+"-read", marker=op_markers['read'], color=color)
+
+    lines = [h1, h2] 
+    return lines
+
+
+def latency_per_operation_decoration(ax, axt, x_axis, lines):
+    ax.set_ylabel("insert - latency/op (us)")
+    axt.set_ylabel("read - latency/op (us)")
+    ax.set_xlabel(x_axis)
+    ax.set_ylim(bottom=0)
+    axt.set_ylim(bottom=0)
+    labs = [l.get_label() for l in lines]
+    ax.legend(lines, labs)
+
+def latency_per_operation(ax, stats, x_axis="clients", decoration=True, twin=True):
+    if twin:
+        axt=ax.twinx()
+        axs = [ax, axt]
+    else:
+        axs = [ax]
+
+    stats = correct_stat_shape(stats)
+    lines = []
+    for stat in stats:
+        state_machine_label = stat[0][0]['config']['state_machine']
+        l = latency_per_operation_line(axs, stat, label=state_machine_label, x_axis=x_axis)
+        lines.extend(l)
+    if decoration:
+        latency_per_operation_decoration(axs[0], axs[1], x_axis, lines)
 
 
 def rtt_per_operation_decoration(ax, axt, x_axis, lines):
