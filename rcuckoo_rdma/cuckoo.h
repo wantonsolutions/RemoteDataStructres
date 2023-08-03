@@ -97,6 +97,7 @@ namespace cuckoo_rcuckoo {
 
             void set_global_start_flag(volatile bool * flag);
             void set_global_end_flag(volatile bool * flag);
+            void set_global_pause_flag(volatile bool * flag);
 
 
             vector<VRMaskedCasData> get_current_unlock_list();
@@ -111,6 +112,7 @@ namespace cuckoo_rcuckoo {
 
             volatile bool * _global_start_flag;
             volatile bool * _global_end_flag;
+            volatile bool * _global_pause_flag;
 
 
 

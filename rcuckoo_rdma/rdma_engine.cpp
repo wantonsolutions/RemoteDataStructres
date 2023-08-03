@@ -27,6 +27,7 @@ using namespace cuckoo_rcuckoo;
 
 #define MAX_THREADS 24
 volatile bool global_start_flag = false;
+volatile bool global_pause_flag = false;
 volatile bool global_end_flag = false;
 RCuckoo *rcuckoo_state_machines[MAX_THREADS];
 
@@ -65,6 +66,7 @@ namespace cuckoo_rdma_engine {
 
         try {
             _num_clients = stoi(config["num_clients"]);
+            _prime = (config["prime"] == "true");
 
         } catch (exception &e) {
             ALERT("RDMA Engine",": unable to parse rdma engine config %s", e.what());
@@ -180,6 +182,7 @@ namespace cuckoo_rdma_engine {
         for(int i=0;i<_num_clients;i++){
             rcuckoo_state_machines[i]->set_global_start_flag(&global_start_flag);
             rcuckoo_state_machines[i]->set_global_end_flag(&global_end_flag);
+            rcuckoo_state_machines[i]->set_global_pause_flag(&global_pause_flag);
         }
         int yak_01_core_order[24]={0,2,4,6,8,10,12,14,16,18,20,22,1,3,5,7,9,11,13,15,17,19,21,23};
         int yak_01_control_core = 23;
@@ -210,9 +213,18 @@ namespace cuckoo_rdma_engine {
                 global_end_flag = true;
                 break;
             }
-            if(ec->priming_complete && !priming_action_taken) {
+            //reset statistics if we are doing a priming run
+            if(_prime &&
+             ec->priming_complete && 
+             !priming_action_taken) {
                 ALERT("RDMA Engine", "Experiment Priming Complete -- do priming things\n");
                 priming_action_taken = true;
+                global_pause_flag = true;
+                for(int i=0;i<_num_clients;i++){
+                    rcuckoo_state_machines[i]->clear_statistics();
+                }
+                global_pause_flag = false;
+                t1=high_resolution_clock::now();
             }
             if(global_end_flag == true) {
                 break;

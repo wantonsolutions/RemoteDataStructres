@@ -48,26 +48,18 @@ namespace cuckoo_rdma_engine {
                 printf("RDMA_Engine destructor\n");
             }
             RDMA_Engine(unordered_map<string, string> config);
-            // using namespace cuckoo_rcuckoo;
-            // set_rcuckoo_state_machine(cuckoo_rcuckoo::RCuckoo * rcuckoo);
             void debug_masked_cas();
             bool start();
 
         private:
-            // State_Machine * _state_machine;
-            // RCuckoo * _rcuckoo;
-            // ibv_mr * _table_mr;
-            // ibv_mr * _lock_table_mr;
-            // Memory_State_Machine * _memory_state_machine;
-            // table_config * _table_config;
-            // struct ibv_cq *_completion_queue;
+            bool _prime;
+            int _num_clients;
             void start_distributed_experiment();
             void stop_distributed_experiment();
             experiment_control *get_experiment_control();
             memory_stats * get_memory_stats();
             unordered_map<string, string> _config;
             vector<State_Machine_Wrapper> _state_machines;
-            int _num_clients;
             RDMAConnectionManager  *_connection_manager;
     };
 }

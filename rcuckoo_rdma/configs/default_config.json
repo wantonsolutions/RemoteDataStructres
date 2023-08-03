@@ -13,7 +13,9 @@
     "location_function": "dependent",
     "total_inserts": "1",
     "total_requests": "1",
+
     "max_fill": "50",
+    "prime": "false",
     "prime_fill": "30",
     "num_clients": "1",
     "server_address": "192.168.1.12",

@@ -622,10 +622,11 @@ void usage()
 }
 
 
-void moniter_run(int num_qps, int print_frequency, Memory_State_Machine &msm) {
+void moniter_run(int num_qps, int print_frequency, bool prime, Memory_State_Machine &msm) {
 
     //print buffers every second
     int print_step=0;
+    bool priming_complete = false;
     time_t last_print;
     time(&last_print);
     while(true) {
@@ -641,10 +642,13 @@ void moniter_run(int num_qps, int print_frequency, Memory_State_Machine &msm) {
             printf("%2.3f/%2.3f Full\n", fill_percentage, msm.get_max_fill());
         }
 
-        if((fill_percentage * 100.0) >= msm.get_prime_fill()) {
+        if(prime && 
+        !priming_complete &&
+        (fill_percentage * 100.0) >= msm.get_prime_fill()
+        ) {
             printf("Table has reached it's priming factor\n");
             announce_priming_complete();
-            break;
+            priming_complete = true;
         }
 
         if((fill_percentage * 100.0) >= msm.get_max_fill()) {
@@ -680,8 +684,9 @@ int main(int argc, char **argv)
         config_filename = argv[1];
     }
     unordered_map<string, string> config = read_config_from_file(config_filename);
-
     Memory_State_Machine msm = Memory_State_Machine(config);
+
+    bool prime = (config["prime"] == "true");
     // msm.fill_table_with_incremental_values();
 
 
@@ -738,7 +743,7 @@ int main(int argc, char **argv)
     //     }
     // }
     printf("All server setup complete, now serving memory requests\n");
-    moniter_run(num_qps, 1 /* sec */, msm);
+    moniter_run(num_qps, 1 ,prime, msm);
 
     ALERT("RDMA memory server", "Sending results to the memcached server\n");
     send_final_memory_stats_to_memcached_server(msm);

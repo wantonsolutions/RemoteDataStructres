@@ -70,6 +70,13 @@ namespace cuckoo_rcuckoo {
         assert(_global_end_flag != NULL);
     }
 
+    void RCuckoo::set_global_pause_flag(volatile bool * flag) {
+        assert(flag != NULL);
+        // printf("cuckoo address global stop flag %p\n", flag);
+        _global_pause_flag = flag;
+        assert(_global_pause_flag != NULL);
+    }
+
 
     string vector_to_string(vector<unsigned int> buckets) {
 
@@ -1165,6 +1172,8 @@ namespace cuckoo_rcuckoo {
         INFO(log_id(),"Starting RDMA FSM Start Flag Set\n");
 
         while(!*_global_end_flag) {
+
+            while(*_global_pause_flag){};
 
             //The client is done
             if (_complete && _state == IDLE) {
