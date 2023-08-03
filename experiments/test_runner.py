@@ -19,8 +19,11 @@ def plot_general_stats_last_run(dirname=""):
         "rtt_per_operation",
         "bytes_per_operation",
         "messages_per_operation",
-        ### add a memory collection function first ### "fill_factor",
-        "throughput_approximation"
+        "fill_factor",
+        # "throughput_approximation",
+        "throughput",
+        "latency_per_operation",
+        "retry_breakdown",
         ]
     plot_cuckoo.multi_plot_runs(stats, plot_names, directory)
 
@@ -28,8 +31,8 @@ config=dict()
 
 
 # table_size = 1024 * 1024 * 10
+# table_size = 1024 * 1024
 table_size = 1024 * 1024
-#int table_size = 1024 * 10;
 #int table_size = 256;
 #int table_size = 1024;
 #int table_size = 256;
@@ -65,7 +68,7 @@ config["location_function"]="dependent"
 
 #Client State Machine Arguements
 total_inserts = 1
-max_fill = 90
+max_fill = 50
 num_clients = 24
 #num_clinets = 1;
 config["total_inserts"]=str(total_inserts)
@@ -88,8 +91,8 @@ def debug_exp(config):
         lconfig["num_clients"] = str(c)
         stats = orchestrator.run_trials(lconfig)
         runs.append(stats)
-    print(runs)
+    # print(runs)
     dm.save_statistics(runs)
 
-debug_exp(config)
+# debug_exp(config)
 plot_general_stats_last_run()

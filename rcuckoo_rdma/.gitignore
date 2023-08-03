@@ -16,6 +16,8 @@ test/test_search
 test/test_state_machines
 test/test_cuckoo
 
+data
+
 rdma_client
 rdma_server
 rdma_memory_server
