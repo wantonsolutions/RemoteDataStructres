@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <vector>
 #include <any>
+#include <chrono>
 
 using namespace std;
 using namespace cuckoo_virtual_rdma;
@@ -118,6 +119,13 @@ namespace cuckoo_state_machines {
             uint32_t _current_read_rtt;
             vector<int> _read_rtt;
             uint64_t _read_rtt_count;
+
+            chrono::nanoseconds _operation_start_time;
+            chrono::nanoseconds _operation_end_time;
+            uint64_t _sum_insert_latency_ns;
+            uint64_t _sum_read_latency_ns;
+            vector<int> _insert_latency_ns;
+            vector<int> _read_latency_ns;
 
         private:
             void update_message_stats(vector<VRMessage>);
@@ -235,6 +243,8 @@ namespace cuckoo_state_machines {
             float get_fill_percentage();
             float get_max_fill();
             void print_table();
+
+
 
             void fill_table_with_incremental_values();
             unsigned int get_table_size();

@@ -2,7 +2,7 @@ Client Input Config: configs/remote_config.json
 base_port                      : 20886
 bucket_size                    : 8
 buckets_per_lock               : 1
-commit                         : 1411c714ef0c818acb56c9b5fd4c44521619c863
+commit                         : c39b320ae0ca69c38cc46b5dd2fa265c625809da
 date                           : 2023-08-02
 description                    : This is a test run and a manditory field
 deterministic                  : True
@@ -27,5 +27,5 @@ workload                       : ycsb-w
 get_addr succeeded
 connecting to 192.168.1.12
   [1;31mRDMA Engine : "Experiment Stop Globally\n" [m
-  [1;31m : "24,784539.500000\n" [m
+  [1;31m : "24,723171.437500\n" [m
 RDMA_Engine destructor

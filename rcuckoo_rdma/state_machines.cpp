@@ -105,6 +105,14 @@ namespace cuckoo_state_machines {
         _current_read_rtt =0;
         _read_rtt = vector<int>();
         _read_rtt_count = 0;
+
+
+        _operation_start_time; //not sure how to clear
+        _operation_end_time; //not sure how to clear
+        _sum_insert_latency_ns = 0;
+        _sum_read_latency_ns = 0;
+        _insert_latency_ns = vector<int>();
+        _read_latency_ns = vector<int>();
     }
 
     string State_Machine::get_state_machine_name() {
@@ -166,13 +174,14 @@ namespace cuckoo_state_machines {
         //     ALERT("Failed insert", "EXITING");
         //     exit(1);
         // }
-
+        uint64_t latency = (_operation_end_time - _operation_start_time).count();
         #ifdef MEASURE_MOST
         _completed_inserts.push_back(_current_insert_key);
         _failed_inserts_second_search.push_back(_failed_insert_second_search_this_insert);
         _failed_lock_aquisitions.push_back(_failed_lock_aquisition_this_insert);
         _messages_per_insert.push_back(_current_insert_messages);
         _insert_rtt.push_back(_current_insert_rtt);
+        _insert_latency_ns.push_back(latency);
         #endif
         #ifdef MEASURE_ESSENTIAL
         _completed_insert_count++;
@@ -181,6 +190,7 @@ namespace cuckoo_state_machines {
         _current_insert_rtt = 0;
         _failed_insert_second_search_this_insert = 0;
         _failed_lock_aquisition_this_insert=0;
+        _sum_insert_latency_ns += latency;
 
     }
     unordered_map<string, string> State_Machine::get_stats(){
@@ -220,6 +230,11 @@ namespace cuckoo_state_machines {
         stats["read_rtt"] = array_to_string(_read_rtt);
         stats["read_rtt_count"] = to_string(_read_rtt_count);
 
+        stats["sum_insert_latency_ns"] = to_string(_sum_insert_latency_ns);
+        stats["sum_read_latency_ns"] = to_string(_sum_read_latency_ns);
+        stats["insert_latency_ns"] = array_to_string(_insert_latency_ns);
+        stats["read_latency_ns"] = array_to_string(_read_latency_ns);
+        
         return stats;
     }
 

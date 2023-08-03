@@ -16,6 +16,7 @@
 #include "rdma_common.h"
 #include "memcached.h"
 #include <cassert>
+#include <chrono>
 
 #define DEBUG
 
@@ -23,6 +24,12 @@ using namespace std;
 using namespace cuckoo_search;
 using namespace cuckoo_state_machines;
 using namespace rdma_helper;
+
+chrono::nanoseconds get_current_ns(void)
+{
+  return chrono::duration_cast<chrono::nanoseconds>(
+      chrono::system_clock::now().time_since_epoch());
+}
 
 
 namespace cuckoo_rcuckoo {
@@ -247,6 +254,7 @@ namespace cuckoo_rcuckoo {
         INFO(log_id(), "[complete_insert] key %s\n", _current_insert_key.to_string().c_str());
         _state = IDLE;
         _inserting = false;
+        _operation_end_time = get_current_ns();
 
         //TODO record this variable
 
@@ -1173,9 +1181,11 @@ namespace cuckoo_rcuckoo {
                     if (next_request.op == NO_OP) {
                             break;
                     } else if (next_request.op == PUT) {
+                        _operation_start_time = get_current_ns();
                         _current_insert_key = next_request.key;
                         put_direct();
                     } else if (next_request.op == GET) {
+                        _operation_start_time = get_current_ns();
                         _current_read_key = next_request.key;
                         throw logic_error("ERROR: GET not implemented");
                         // response=get();

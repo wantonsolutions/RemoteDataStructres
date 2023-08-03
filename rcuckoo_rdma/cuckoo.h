@@ -113,6 +113,7 @@ namespace cuckoo_rcuckoo {
             volatile bool * _global_end_flag;
 
 
+
             Table _table;
             // Key _current_insert_key;
             vector<path_element> _search_path;
