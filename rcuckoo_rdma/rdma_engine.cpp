@@ -139,17 +139,9 @@ namespace cuckoo_rdma_engine {
     }
 
     void RDMA_Engine::start_distributed_experiment(){
-        experiment_control ec;
-        ec.experiment_start = true;
-        ec.experiment_stop = false;
-        memcached_publish_experiment_control(&ec);
-    }
-
-    void RDMA_Engine::stop_distributed_experiment(){
-        experiment_control ec;
-        ec.experiment_start = true;
-        ec.experiment_stop = true;
-        memcached_publish_experiment_control(&ec);
+        experiment_control *ec = (experiment_control *)memcached_get_experiment_control();
+        ec->experiment_start = true;
+        memcached_publish_experiment_control(ec);
     }
 
     experiment_control * RDMA_Engine::get_experiment_control(){
@@ -209,6 +201,7 @@ namespace cuckoo_rdma_engine {
         //Start the treads
         auto t1 = high_resolution_clock::now();
         global_start_flag = true;
+        bool priming_action_taken = false;
 
         while(true){
             experiment_control *ec = get_experiment_control();
@@ -217,10 +210,14 @@ namespace cuckoo_rdma_engine {
                 global_end_flag = true;
                 break;
             }
+            if(ec->priming_complete && !priming_action_taken) {
+                ALERT("RDMA Engine", "Experiment Priming Complete -- do priming things\n");
+                priming_action_taken = true;
+            }
             if(global_end_flag == true) {
                 break;
             }
-            free(ec);
+            // free(ec);
         }
         auto t2 = high_resolution_clock::now();
         auto ms_int = duration_cast<milliseconds>(t2 - t1);

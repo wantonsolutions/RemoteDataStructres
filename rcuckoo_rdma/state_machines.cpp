@@ -640,6 +640,11 @@ namespace cuckoo_state_machines {
             INFO("Creating Table", "Table_size: %d, bucket_size %d, buckets_per_lock %d\n", memory_size, bucket_size, buckets_per_lock);
             _table = Table(memory_size, bucket_size, buckets_per_lock);
             _max_fill = stoi(config["max_fill"]);
+            _prime_fill = stoi(config["prime_fill"]);
+            if (_max_fill < _prime_fill) {
+                ALERT("ERROR memory state machine init", "max_fill must be greater than or equal to prime_fill\n");
+                throw logic_error("ERROR: max_fill must be greater than or equal to prime_fill");
+            }
         } catch (exception& e) {
             ALERT("ERROR memory state machine init", "Memory_State_Machine config missing required field\n");
             throw logic_error("ERROR: Memory_State_Machine config missing required field");
@@ -648,6 +653,11 @@ namespace cuckoo_state_machines {
 
     void Memory_State_Machine::set_max_fill(int max_fill) {
         _max_fill = max_fill;
+        return;
+    }
+
+    void Memory_State_Machine::set_prime_fill(int prime_fill) {
+        _prime_fill = prime_fill;
         return;
     }
 
@@ -708,6 +718,10 @@ namespace cuckoo_state_machines {
     float Memory_State_Machine::get_max_fill() {
         return _max_fill;
     }
+
+    int Memory_State_Machine::get_prime_fill() {
+        return _prime_fill;
+    } 
 
     void Memory_State_Machine::print_table(){
         _table.print_table();

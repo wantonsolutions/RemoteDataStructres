@@ -242,6 +242,9 @@ namespace cuckoo_state_machines {
             bool contains(Key key);
             float get_fill_percentage();
             float get_max_fill();
+
+            void set_prime_fill(int prime_fill);
+            int get_prime_fill();
             void print_table();
 
 
@@ -261,6 +264,7 @@ namespace cuckoo_state_machines {
         private:
             Table _table;
             uint32_t _max_fill;
+            uint32_t _prime_fill;
     };
 }
 

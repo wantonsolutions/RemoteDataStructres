@@ -332,14 +332,20 @@ static void send_inital_experiment_control_to_memcached_server() {
     experiment_control ec;
     ec.experiment_start = false;
     ec.experiment_stop = false;
+    ec.priming_complete = false;
     memcached_publish_experiment_control(&ec);
 }
 
 static void end_experiment_globally(){
-    experiment_control ec;
-    ec.experiment_start = true;
-    ec.experiment_stop = true;
-    memcached_publish_experiment_control(&ec);
+    experiment_control *ec = (experiment_control *)memcached_get_experiment_control();
+    ec->experiment_stop = true;
+    memcached_publish_experiment_control(ec);
+}
+
+static void announce_priming_complete() {
+    experiment_control *ec = (experiment_control *)memcached_get_experiment_control();
+    ec->priming_complete = true;
+    memcached_publish_experiment_control(ec);
 }
 
 static void send_inital_memory_stats_to_memcached_server(){
@@ -633,6 +639,12 @@ void moniter_run(int num_qps, int print_frequency, Memory_State_Machine &msm) {
             copy_device_memory_to_host_lock_table(msm);
             // msm.print_table();
             printf("%2.3f/%2.3f Full\n", fill_percentage, msm.get_max_fill());
+        }
+
+        if((fill_percentage * 100.0) >= msm.get_prime_fill()) {
+            printf("Table has reached it's priming factor\n");
+            announce_priming_complete();
+            break;
         }
 
         if((fill_percentage * 100.0) >= msm.get_max_fill()) {
