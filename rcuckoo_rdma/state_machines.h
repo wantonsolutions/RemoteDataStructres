@@ -246,6 +246,7 @@ namespace cuckoo_state_machines {
             void set_prime_fill(int prime_fill);
             int get_prime_fill();
             void print_table();
+            void print_lock_table();
 
 
 

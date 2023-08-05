@@ -268,7 +268,7 @@ namespace cuckoo_search {
     #define MAX_SEARCH_ITEMS 5000
     vector<path_element> a_star_search(Table table, hash_locations (*location_func) (string, unsigned int), Key key, std::vector<unsigned int> open_buckets){
         vector<path_element> path;
-        const unsigned int target_count = 1;
+        const unsigned int target_count = 3;
         vector<unsigned int> targets = find_closest_target_n_bi_directional(table, location_func, key, target_count);
         bool found = false;
         a_star_pe closed_list_addressable[MAX_SEARCH_ITEMS];
@@ -410,7 +410,7 @@ namespace cuckoo_search {
     fast_a_star_pe closed_list_addressable[MAX_SEARCH_ITEMS];
     vector<path_element> a_star_search_fast(Table& table, hash_locations (*location_func) (Key, unsigned int), Key key, std::vector<unsigned int> open_buckets){
         vector<path_element> path;
-        const unsigned int target_count = 2;
+        const unsigned int target_count = 5;
         vector<unsigned int> targets = find_closest_target_n_bi_directional(table, location_func, key, target_count);
         bool found = false;
         fast_a_star_pe * prior_aspe = NULL;

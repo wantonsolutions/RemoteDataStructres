@@ -315,6 +315,11 @@ namespace cuckoo_tables {
         return;
     }
 
+    void Table::print_lock_table(){
+        cout << _lock_table.to_string() << endl;
+        return;
+    }
+
     CasOperationReturn Table::lock_table_masked_cas(unsigned int lock_index, uint64_t old, uint64_t new_value, uint64_t mask){
         return _lock_table.masked_cas(lock_index, old, new_value, mask);
     }

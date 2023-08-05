@@ -210,6 +210,7 @@ namespace cuckoo_tables {
             string to_string();
             string row_to_string(unsigned int row);
             void print_table();
+            void print_lock_table();
             Entry ** get_underlying_table();
             void set_underlying_table(Entry ** table);
             CasOperationReturn lock_table_masked_cas(unsigned int lock_index, uint64_t old, uint64_t new_value, uint64_t mask);

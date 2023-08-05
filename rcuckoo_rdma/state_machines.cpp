@@ -727,6 +727,10 @@ namespace cuckoo_state_machines {
         _table.print_table();
     }
 
+    void Memory_State_Machine::print_lock_table(){
+        _table.print_lock_table();
+    }
+
     unsigned int Memory_State_Machine::get_table_size(){
         return _table.get_table_size_bytes();
     }

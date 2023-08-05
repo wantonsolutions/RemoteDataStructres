@@ -17,6 +17,7 @@
 #include "memcached.h"
 #include <cassert>
 #include <chrono>
+#include <inttypes.h>
 
 #define DEBUG
 
@@ -785,6 +786,14 @@ namespace cuckoo_rcuckoo {
         uint64_t swap = __builtin_bswap64(lock_message.new_value);
         uint64_t mask = __builtin_bswap64(lock_message.mask);
 
+        assert(mask != 0);
+        assert(swap != 0);
+
+        // ALERT(log_id(),"[lock] %5d, m%" PRIx64 ", c%016X, s%016X", remote_lock_address, mask, compare, swap);
+        // printf("%2d [lock] %5d, m%016" PRIx64 ", c%016" PRIx64 ", s%016" PRIx64 "\n",_id, remote_lock_address, mask, compare, swap);
+        // ALERT(log_id(),"[lock] %5d, m%lld, c%lld, s%lld", remote_lock_address, mask, compare, swap);
+        // printf("%lld\n", remote_lock_address);
+
         setRdmaCompareAndSwapMask(
             &sg[0],
             &wr[0],
@@ -940,6 +949,8 @@ namespace cuckoo_rcuckoo {
 
         VERBOSE("pre search", "searching in buckets..\n");
         for (int i=0; i< _locks_held.size();i++) {
+            //delete this printf for locks held
+            // printf("%d\n", _locks_held[i]);
             VERBOSE("pre search", "lock %d\n", _locks_held[i]);
         }
         assert(_buckets_per_lock = 1);
@@ -949,6 +960,7 @@ namespace cuckoo_rcuckoo {
         if (_search_path.size() <=0 ) {
             _failed_insert_second_search_this_insert++;
             _failed_insert_second_search_count++;
+            printf("[%d] failed search current locks held: %s\n", _id, vector_to_string(_locks_held).c_str());
             // INFO(log_id(), "Insert Direct -- Second Search Failed for key %s retry time #%d \n", _current_insert_key.to_string().c_str(),  _retries_due_to_failed_second_search);
             // INFO(log_id(), "Unable to find path within buckets %s\n", vector_to_string(search_buckets).c_str());
 
@@ -1069,6 +1081,14 @@ namespace cuckoo_rcuckoo {
         bool failed_last_request = false;
 
         //Inital send TODO probably put this in a while loop
+
+        vector<unsigned int> temp_locks;
+        for (int i=0;i<_lock_list.size();i++) {
+            temp_locks.push_back(_lock_list[i].min_lock_index);
+        }
+        hash_locations both_buckets =(_location_function)(_current_insert_key, _table.get_row_count());
+        printf("[%d] key %s (%d,%d) aquire: %s\n", _id, _current_insert_key.to_string().c_str(),both_buckets.primary/8, both_buckets.secondary/8, vector_to_string(temp_locks).c_str());
+
         unsigned int message_index = 0;
         while (!locking_complete) {
 
@@ -1136,14 +1156,25 @@ namespace cuckoo_rcuckoo {
             *((uint64_t*) get_lock_pointer(lock_index)) = received_locks;
 
 
+            char rec_lock_buf[1024];
+            char fail_lock_buf[1024];
+            char succ_lock_buf[1024];
+            bzero(rec_lock_buf, 1024);
+            bzero(fail_lock_buf, 1024);
+            bzero(succ_lock_buf, 1024);
+            // printf("%2d [rec lock]    r%016" PRIx64 ", m%016" PRIx64 ", o%016" PRIx64 "\n", _id, received_locks, mask, old_value);
             if ((received_locks & mask) == old_value) {
                 // ALERT(log_id(), "we got the lock!\n");
+                if (failed_last_request == true) {
+                    sprintf(succ_lock_buf,"%2d [sccc lock]   l=%05d r%016" PRIx64 ", m%016" PRIx64 ", o%016" PRIx64 "\n", _id, lock_index, received_locks, mask, old_value);
+                }
                 receive_successful_locking_message(lock);
                 message_index++;
                 if (failed_last_request) {
                     failed_last_request = false;
                 }
             } else {
+                // printf("%2d [fail lock]   r%016" PRIx64 ", m%016" PRIx64 ", o%016" PRIx64 "\n", _id, received_locks, mask, old_value);
                 #ifdef MEASURE_ESSENTIAL
                 _total_masked_cas_failures++;
                 _failed_lock_aquisition_count++;
@@ -1151,6 +1182,15 @@ namespace cuckoo_rcuckoo {
                 #endif
                 failed_last_request = true;
             }
+
+            if (received_locks != 0) {
+                sprintf(rec_lock_buf,"%2d [nzo lock]    l=%05d r%016" PRIx64 ", m%016" PRIx64 ", o%016" PRIx64 "\n", _id, lock_index, received_locks, mask, old_value);
+            }
+            if (failed_last_request == true) {
+                sprintf(fail_lock_buf,"%2d [fail lock]   l=%05d r%016" PRIx64 ", m%016" PRIx64 ", o%016" PRIx64 "\n", _id, lock_index, received_locks, mask, old_value);
+            }
+            printf("%s%s%s", rec_lock_buf, fail_lock_buf, succ_lock_buf);
+
 
             if (_lock_list.size() == message_index) {
                 locking_complete = true;

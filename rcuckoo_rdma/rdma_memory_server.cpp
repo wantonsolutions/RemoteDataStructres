@@ -639,6 +639,7 @@ void moniter_run(int num_qps, int print_frequency, bool prime, Memory_State_Mach
             print_step++;
             copy_device_memory_to_host_lock_table(msm);
             // msm.print_table();
+            msm.print_lock_table();
             printf("%2.3f/%2.3f Full\n", fill_percentage, msm.get_max_fill());
         }
 
