@@ -407,8 +407,8 @@ namespace cuckoo_search {
         return path;
     }
 
-    fast_a_star_pe closed_list_addressable[MAX_SEARCH_ITEMS];
     vector<path_element> a_star_search_fast(Table& table, hash_locations (*location_func) (Key, unsigned int), Key key, std::vector<unsigned int> open_buckets){
+        fast_a_star_pe closed_list_addressable[MAX_SEARCH_ITEMS];
         vector<path_element> path;
         const unsigned int target_count = 5;
         vector<unsigned int> targets = find_closest_target_n_bi_directional(table, location_func, key, target_count);
@@ -464,7 +464,7 @@ namespace cuckoo_search {
                     fast_path_element open_pe = fast_path_element(&(table.get_entry_pointer(index,offset)->key), table_index, index, offset);
                     unsigned int distance = search_element.distance + 1;
                     unsigned int f_score = fast_fscore(search_element, target, table_rows);
-                    // cout << "found target: " << open_a_star_pe.pe.to_string() << endl;
+                    // cout << "found target: " << index << endl;
                     // cout << "setting prior to " << prior_aspe->pe.to_string() << endl;
                     // cout << "exiting search" << endl;
                     //todo this is a critial line but also a hack find a better way to set the tail of the search path
