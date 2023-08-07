@@ -111,7 +111,7 @@ void fill_key(Key &key, int value) {
 void run_single_insert() {
     // unsigned int indexes = 1024 * 1024;
     // unsigned int indexes = 32;
-    unsigned int indexes = 1024 * 512;
+    unsigned int indexes = 1024 * 128;
     unsigned int buckets = 8;
     unsigned int memory = indexes * sizeof(Entry);
     Table table = Table(memory, buckets, 1);
@@ -135,12 +135,13 @@ void run_single_insert() {
 
     // cout << "final table" << endl;
     // table.print_table();
-    // cout << " fill " << i << "/" << total_inserts << " " << i/total_inserts << "\%" << "final fill: " << table.get_fill_percentage() << endl;
+    cout << " fill " << i << "/" << total_inserts << " " << i/total_inserts << "\%" << "final fill: " << table.get_fill_percentage() << endl;
 }
 
 void time_and_check_search_algorithms() {
 
-    unsigned int indexes = 1024 * 1024;
+    // unsigned int indexes = 1024 * 1024;
+    unsigned int indexes = 1024 * 128;
     unsigned int buckets = 8;
     unsigned int memory = indexes * sizeof(Entry);
     int total_inserts = indexes+1;
@@ -153,6 +154,7 @@ void time_and_check_search_algorithms() {
     using std::chrono::duration_cast;
     using std::chrono::duration;
     using std::chrono::milliseconds;
+    printf("starting search\n");
 
 
     //The first stable insert
@@ -240,7 +242,7 @@ void time_and_check_search_algorithms() {
 
 int main() {
     // run_basic_table_tests();
-    // run_single_insert();
-    time_and_check_search_algorithms();
+    run_single_insert();
+    // time_and_check_search_algorithms();
     // cout << "Hello Search Test!" << endl;
 }

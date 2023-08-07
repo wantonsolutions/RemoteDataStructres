@@ -24,9 +24,9 @@ using namespace cuckoo_virtual_rdma;
 #define RDMA_CAS_RESPONSE_SIZE RDMA_ATOMIC_RESPONSE_SIZE
 
 //Measurement DEFS
-#define MEASURE_ALL
+// #define MEASURE_ALL
 // #define MEASURE_MOST
-// #define MEASURE_ESSENTIAL
+#define MEASURE_ESSENTIAL
 // #define MEASURE_NONE
 
 #ifdef MEASURE_ALL

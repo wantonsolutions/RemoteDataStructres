@@ -24,18 +24,18 @@ float get_factor(){
 
 inline XXH64_hash_t xxhash_value(const Key& key)
 {
-    // return XXH64(key.bytes, KEY_SIZE, 0);
+    return XXH64(key.bytes, KEY_SIZE, 0);
 
     // MD5 version
-    unsigned char hash_bytes[16];
-    bzero(hash_bytes, 16);
-    MD5((const unsigned char*)key.bytes, KEY_SIZE, (unsigned char*)hash_bytes);
-    XXH64_hash_t hash = 0;
-    for (int i = 0; i < 8; i++) {
-        hash = hash << 8;
-        hash += hash_bytes[i];
-    }
-    return hash;
+    // unsigned char hash_bytes[16];
+    // bzero(hash_bytes, 16);
+    // MD5((const unsigned char*)key.bytes, KEY_SIZE, (unsigned char*)hash_bytes);
+    // XXH64_hash_t hash = 0;
+    // for (int i = 0; i < 8; i++) {
+    //     hash = hash << 8;
+    //     hash += hash_bytes[i];
+    // }
+    // return hash;
 }
 
 inline XXH64_hash_t xxhash_value(const string& str)

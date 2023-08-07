@@ -1156,18 +1156,8 @@ namespace cuckoo_rcuckoo {
             *((uint64_t*) get_lock_pointer(lock_index)) = received_locks;
 
 
-            char rec_lock_buf[1024];
-            char fail_lock_buf[1024];
-            char succ_lock_buf[1024];
-            bzero(rec_lock_buf, 1024);
-            bzero(fail_lock_buf, 1024);
-            bzero(succ_lock_buf, 1024);
-            // printf("%2d [rec lock]    r%016" PRIx64 ", m%016" PRIx64 ", o%016" PRIx64 "\n", _id, received_locks, mask, old_value);
             if ((received_locks & mask) == old_value) {
                 // ALERT(log_id(), "we got the lock!\n");
-                if (failed_last_request == true) {
-                    sprintf(succ_lock_buf,"%2d [sccc lock]   l=%05d r%016" PRIx64 ", m%016" PRIx64 ", o%016" PRIx64 "\n", _id, lock_index, received_locks, mask, old_value);
-                }
                 receive_successful_locking_message(lock);
                 message_index++;
                 if (failed_last_request) {
@@ -1182,15 +1172,6 @@ namespace cuckoo_rcuckoo {
                 #endif
                 failed_last_request = true;
             }
-
-            if (received_locks != 0) {
-                sprintf(rec_lock_buf,"%2d [nzo lock]    l=%05d r%016" PRIx64 ", m%016" PRIx64 ", o%016" PRIx64 "\n", _id, lock_index, received_locks, mask, old_value);
-            }
-            if (failed_last_request == true) {
-                sprintf(fail_lock_buf,"%2d [fail lock]   l=%05d r%016" PRIx64 ", m%016" PRIx64 ", o%016" PRIx64 "\n", _id, lock_index, received_locks, mask, old_value);
-            }
-            // printf("%s%s%s", rec_lock_buf, fail_lock_buf, succ_lock_buf);
-
 
             if (_lock_list.size() == message_index) {
                 locking_complete = true;

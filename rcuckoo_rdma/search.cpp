@@ -54,7 +54,7 @@ namespace cuckoo_search {
         return path;
     }
     vector<path_element> bucket_cuckoo_insert(Table table, hash_locations (*location_func) (string, unsigned int), Key key, vector<unsigned int>  open_buckets){
-        ALERT("Bucket Cuckoo Insert", "Bucket Cuckoo Insert not implemented");
+        ALERT("Bucket Cuckoo Insert", "Bucket Cuckoo Insert not implemented");;
         vector<path_element> path;
         return path;
     }
