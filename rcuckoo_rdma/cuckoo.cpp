@@ -134,6 +134,8 @@ namespace cuckoo_rcuckoo {
         set_search_function(config);
         set_location_function(config);
 
+        _search_context.table = &_table;
+        _search_context.location_func = _location_function;
         sprintf(_log_identifier, "Client: %3d", _id);
     }
 
@@ -179,7 +181,11 @@ namespace cuckoo_rcuckoo {
     }
 
     vector<path_element> RCuckoo::a_star_insert_self(vector<unsigned int> searchable_buckets) {
-        return bucket_cuckoo_a_star_insert_fast(_table, _location_function, _current_insert_key, searchable_buckets);
+        bucket_cuckoo_a_star_insert_fast_context(_search_context);
+        _search_context.key = _current_insert_key;
+        _search_context.open_buckets = searchable_buckets;
+        return _search_context.path;
+        // return bucket_cuckoo_a_star_insert_fast(_table, _location_function, _current_insert_key, searchable_buckets);
     }
 
     vector<path_element> RCuckoo::random_insert_self(vector<unsigned int> searchable_buckets) {

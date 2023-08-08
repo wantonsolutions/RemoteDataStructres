@@ -2,6 +2,7 @@
 measuretime=40
 
 program=cuckoo_client
+program=test/test_search
 sudo killall "$program"
 
 # page_script="LD_PRELOAD=libhugetlbfs.so HUGETLB_MORECORE=yes"
