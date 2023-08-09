@@ -181,9 +181,9 @@ namespace cuckoo_rcuckoo {
     }
 
     vector<path_element> RCuckoo::a_star_insert_self(vector<unsigned int> searchable_buckets) {
-        bucket_cuckoo_a_star_insert_fast_context(_search_context);
         _search_context.key = _current_insert_key;
         _search_context.open_buckets = searchable_buckets;
+        bucket_cuckoo_a_star_insert_fast_context(_search_context);
         return _search_context.path;
         // return bucket_cuckoo_a_star_insert_fast(_table, _location_function, _current_insert_key, searchable_buckets);
     }
@@ -811,7 +811,7 @@ namespace cuckoo_rcuckoo {
             _lock_table_mr->lkey,
             _table_config->lock_table_key,
             mask,
-            true,
+            false,
             wr_id);
 
         bool inside_rows = read_message.row < _table.get_row_count();
@@ -901,12 +901,15 @@ namespace cuckoo_rcuckoo {
                 insert_messages[i].new_value, 
                 _table_mr->lkey,
                 _table_config->remote_key, 
-                true, 
+                false, 
                 wr_id);
             wr_id++;
         }
-
+        bool signal = false;
         for ( unsigned int i=0; i < unlock_messages.size(); i++) {
+            if (i == unlock_messages.size() - 1) {
+                signal = true;
+            }
             uint64_t local_lock_address = (uint64_t) get_lock_pointer(unlock_messages[i].min_lock_index);
             uint64_t remote_lock_address = (uint64_t) _table_config->lock_table_address + unlock_messages[i].min_lock_index;
             uint64_t compare = __builtin_bswap64(unlock_messages[i].old);
@@ -924,7 +927,7 @@ namespace cuckoo_rcuckoo {
                 _lock_table_mr->lkey,
                 _table_config->lock_table_key,
                 mask,
-                true,
+                signal,
                 wr_id);
             wr_id++;
         }
@@ -1010,27 +1013,35 @@ namespace cuckoo_rcuckoo {
 
         //Bulk poll to receive all messages
         int n=0;
-        while(n < total_messages) {
-            n += bulk_poll(_completion_queue, total_messages - n, _wc + n);
-        }
+        #define SIGNAL_MIN
+        #ifdef SIGNAL_MIN 
+            bulk_poll(_completion_queue, 1, _wc + 1);
+            for (unsigned int i = total_messages - _lock_list.size() ; i < total_messages; i++) {
+                receive_successful_unlocking_message(_lock_list[i-insert_messages.size()]);
+            }
+        #else
+            while(n < total_messages) {
+                n += bulk_poll(_completion_queue, total_messages - n, _wc + n);
+            }
 
-        if (_state == INSERTING) {
-            for (unsigned int i = 0; i < insert_messages.size(); i++) {
-                if (_wc[i].status != IBV_WC_SUCCESS) {
-                    ALERT(log_id(), "insert failed on message %s\n", insert_messages[i].to_string().c_str());
-                    exit(1);
+            if (_state == INSERTING) {
+                for (unsigned int i = 0; i < insert_messages.size(); i++) {
+                    if (_wc[i].status != IBV_WC_SUCCESS) {
+                        ALERT(log_id(), "insert failed on message %s\n", insert_messages[i].to_string().c_str());
+                        exit(1);
+                    }
                 }
             }
-        }
 
-        for (unsigned int i = total_messages - _lock_list.size() ; i < total_messages; i++) {
-            if (_wc[i].status != IBV_WC_SUCCESS) {
-                printf("unlock failed\n");
-                exit(1);
+            for (unsigned int i = total_messages - _lock_list.size() ; i < total_messages; i++) {
+                if (_wc[i].status != IBV_WC_SUCCESS) {
+                    printf("unlock failed\n");
+                    exit(1);
+                }
+                //TODO check if pthe unlock failed
+                receive_successful_unlocking_message(_lock_list[i-insert_messages.size()]);
             }
-            //TODO check if pthe unlock failed
-            receive_successful_unlocking_message(_lock_list[i-insert_messages.size()]);
-        }
+        #endif
 
         if (_state == INSERTING) {
             complete_insert();
@@ -1115,11 +1126,11 @@ namespace cuckoo_rcuckoo {
             int outstanding_read_wr_id = _wr_id;
             send_lock_and_cover_message(lock, read, outstanding_cas_wr_id);
 
-            int outstanding_messages = 2; //It's two because we send the read and CAS
+            int outstanding_messages = 1; //It's two because we send the read and CAS
             assert(_completion_queue != NULL);
             int n = bulk_poll(_completion_queue, outstanding_messages, _wc);
 
-            if (n == 1) {
+            while (n < outstanding_messages) {
                 VERBOSE(log_id(), "first poll missed the read, polling again\n");
                 assert(_wc);
                 assert(_completion_queue);
