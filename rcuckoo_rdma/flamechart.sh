@@ -1,7 +1,8 @@
 
 measuretime=40
 
-program=cuckoo_client
+# program=cuckoo_client
+program=test/test_virtual_rdma
 # program=test/test_search
 sudo killall "$program"
 

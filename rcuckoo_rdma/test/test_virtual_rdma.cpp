@@ -3,6 +3,7 @@
 #include <vector>
 #include <cassert>
 #include <iostream>
+#include <chrono>
 
 using namespace std;
 using namespace cuckoo_virtual_rdma;
@@ -120,6 +121,102 @@ bool test_4(){
     }
 }
 
+bool compare_test() {
+
+    vector<unsigned int> buckets = {1,2,5,7,9};
+    // buckets.push_back(0);
+
+    vector<vector<unsigned int>> fast_lock_chunks;
+    vector<VRMaskedCasData> lock_list;
+
+    LockingContext context;
+    context.locks_per_message = locks_per_message;
+    context.buckets_per_lock = buckets_per_lock;
+    context.fast_lock_chunks = vector<vector<unsigned int>>();
+    // context.lock_list = vector<VRMaskedCasData>();
+    context.buckets = buckets;
+    const int itterations = 10000;
+    for (int i = 0; i < itterations; i++) { 
+        buckets.clear();
+        for (int j = 0; j < 5; j++) {
+            buckets.push_back(rand() % 100);
+        }
+        sort(buckets.begin(), buckets.end());
+        for(int j = 0; j < buckets.size(); j++) {
+            if (j > 0 && buckets[j] <= buckets[j-1]) {
+                buckets[j] = buckets[j-1] + 1;
+            }
+        }
+        // for (int j = 0; j < buckets.size(); j++) {
+        //     printf("%d ", buckets[j]);
+        // }
+        // printf("\n");
+        context.buckets = buckets;
+        context.lock_list.clear();
+        lock_list.clear();
+        get_lock_list_fast(buckets,fast_lock_chunks,lock_list,buckets_per_lock,locks_per_message);
+        get_lock_list_fast_context(context);
+        // printf("lock list size %d context lock list size %d\n", lock_list.size(), context.lock_list.size());
+        for (int j = 0; j < lock_list.size(); j++) {
+            if (lock_list[j].mask != context.lock_list[j].mask || lock_list[j].min_lock_index != context.lock_list[j].min_lock_index) {
+                printf("failure at itteration %d\n", i);
+                printf("mcd: %s\n", lock_list[j].to_string().c_str());
+                printf("mcd_context: %s\n", context.lock_list[j].to_string().c_str());
+                return false;
+            }
+        }
+    }
+    printf("success!\n");
+
+}
+
+bool perftest() {
+    using std::chrono::high_resolution_clock;
+    using std::chrono::duration_cast;
+    using std::chrono::duration;
+    using std::chrono::milliseconds;
+    const int itterations = 100000000;
+
+
+
+    vector<unsigned int> buckets = {0};
+    vector<vector<unsigned int>> fast_lock_chunks;
+    vector<VRMaskedCasData> lock_list;
+
+    // auto t0 = high_resolution_clock::now();
+    // for (int i = 0; i < itterations; i++) {
+    //     get_lock_list_fast(buckets,fast_lock_chunks,lock_list,buckets_per_lock,locks_per_message);
+    // }
+    // auto t1 = high_resolution_clock::now();
+    // auto duration_0 = duration_cast<milliseconds>( t1 - t0 ).count();
+    // cout << "duration_0: " << duration_0 << endl;
+
+    // auto t2 = high_resolution_clock::now();
+    // for (int i = 0; i < itterations; i++) {
+    //     get_lock_list_fast(buckets,fast_lock_chunks,lock_list,buckets_per_lock,locks_per_message);
+    // }
+    // auto t3 = high_resolution_clock::now();
+    // auto duration_2 = duration_cast<milliseconds>( t3 - t2 ).count();
+    // cout << "duration_2: " << duration_2 << endl;
+
+    auto t4 = high_resolution_clock::now();
+    LockingContext context;
+    context.locks_per_message = locks_per_message;
+    context.buckets_per_lock = buckets_per_lock;
+    context.buckets = buckets;
+    for (int i = 0; i < itterations; i++) {
+        get_lock_list_fast_context(context);
+    }
+    auto t5 = high_resolution_clock::now();
+    auto duration_3 = duration_cast<milliseconds>( t5 - t4 ).count();
+    cout << "duration_3: " << duration_3 << endl;
+
+
+
+    // get_lock_list(buckets, buckets_per_lock, locks_per_message);
+    // cout << "time improvement" << float(duration_0)/float(duration_2) << "x" << endl;
+}
+
 // bool test_3 () {
 //     printf("basic test, get a mask with an index of 1 shifted\n");
 //     vector<unsigned int> buckets = {47, 30, 19};
@@ -145,11 +242,13 @@ bool test_4(){
 
 int main() {
 
-    test_0();
-    test_1();
-    test_2();
-    test_3();
-    test_4();
+    // test_0();
+    // test_1();
+    // test_2();
+    // test_3();
+    // test_4();
+    perftest();
+    compare_test();
     // test_3();
 
     //Translate a single lock

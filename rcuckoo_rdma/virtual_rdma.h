@@ -85,6 +85,20 @@ namespace cuckoo_virtual_rdma {
         string to_string();
     } VRCasData;
 
+    typedef struct LockingContext {
+        vector<unsigned int> buckets;
+        unsigned int number_of_chunks;
+        vector<vector<unsigned int>> fast_lock_chunks;
+        vector<VRMaskedCasData> lock_list;
+        unsigned int buckets_per_lock;
+        unsigned int locks_per_message;
+
+        bool locking;
+
+        unsigned int * lock_indexes;
+        unsigned int lock_indexes_size;
+    } LockingContext;
+
     #define ETHERNET_SIZE 18
     #define IP_SIZE 20
     #define UDP_SIZE 8
@@ -138,15 +152,20 @@ namespace cuckoo_virtual_rdma {
 
 
     vector<VRMaskedCasData> get_lock_list(vector<unsigned int> buckets, unsigned int buckets_per_lock, unsigned int locks_per_message);
-
     vector<unsigned int> get_unique_lock_indexes(vector<unsigned int> buckets, unsigned int buckets_per_lock);
     vector<VRMaskedCasData> get_lock_or_unlock_list_fast(vector<unsigned int> buckets, unsigned int buckets_per_lock, unsigned int locks_per_message, bool locking);
-    unsigned int get_unique_lock_indexes_fast(vector<unsigned int> buckets, unsigned int buckets_per_lock, unsigned int *unique_buckets, unsigned int unique_buckets_size);
+    unsigned int get_unique_lock_indexes_fast(vector<unsigned int> &buckets, unsigned int buckets_per_lock, unsigned int *unique_buckets, unsigned int unique_buckets_size);
+
+
+    void get_lock_or_unlock_list_fast_context(LockingContext & context);
+    void get_lock_list_fast_context(LockingContext &context);
+    void break_lock_indexes_into_chunks_fast_context(LockingContext &context);
+    void lock_chunks_to_masked_cas_data_context(LockingContext &context);
 
 
     unsigned int byte_aligned_index(unsigned int index);
     unsigned int sixty_four_aligned_index(unsigned int index);
-    unsigned int get_min_sixty_four_aligned_index(vector<unsigned int> indexes);
+    unsigned int get_min_sixty_four_aligned_index(vector<unsigned int> &indexes);
     vector<vector<unsigned int>> break_lock_indexes_into_chunks(vector<unsigned int> lock_indexes, unsigned int locks_per_message);
     // vector<VRMaskedCasData> lock_chunks_to_masked_cas_data(vector<vector<unsigned int>> lock_chunks);
     void lock_chunks_to_masked_cas_data(vector<vector<unsigned int>> lock_chunks, vector<VRMaskedCasData> &masked_cas_data);
