@@ -26,6 +26,9 @@ using namespace cuckoo_search;
 using namespace cuckoo_state_machines;
 using namespace rdma_helper;
 
+
+
+
 chrono::nanoseconds get_current_ns(void)
 {
   return chrono::duration_cast<chrono::nanoseconds>(
@@ -37,6 +40,19 @@ namespace cuckoo_rcuckoo {
 
     Entry ** RCuckoo::get_table_pointer() {
         return _table.get_underlying_table();
+    }
+
+    void RCuckoo::pause_for_an_rtt(){
+            const int sleep_ticks_min = 12000;
+            // const int sleep_ticks = 4000;
+            int sleep_ticks = _sleep_counter % 5;
+            sleep_ticks += sleep_ticks_min;
+            for(int i = 0; i < sleep_ticks; i++) {
+                _sleep_counter+=i;
+            }
+            if((_sleep_counter % 10000000) == 0) {
+                printf("we did run the sleep function counter = %d\n", _sleep_counter);
+            }
     }
 
 
@@ -1043,6 +1059,8 @@ namespace cuckoo_rcuckoo {
         send_insert_and_unlock_messages(_insert_messages, _lock_list, _wr_id);
         _wr_id += total_messages;
 
+        pause_for_an_rtt();
+
         //Bulk poll to receive all messages
         int n=0;
         #define SIGNAL_MIN
@@ -1103,9 +1121,6 @@ namespace cuckoo_rcuckoo {
         //Search failed
         //Search path is now set
 
-        //print the path found by search 
-        // printf("search path: %s\n", path_to_string(_search_context.path).c_str());
-
         if (!successful_search) [[unlikely]] {
             ALERT(log_id(), "Search Failed for key %s unable to continue client %d is done\n", _current_insert_key.to_string().c_str(), _id);
             _complete=true;
@@ -1118,8 +1133,6 @@ namespace cuckoo_rcuckoo {
 
         /* copied from aquire locks function */ 
         _locking_message_index = 0;
-        assert(_locks_held.size() ==0);
-        _locks_held.clear();
 
         
         INFO(log_id(), "[aquire_locks] gathering locks for buckets %s\n", vector_to_string(_buckets).c_str());
@@ -1156,6 +1169,8 @@ namespace cuckoo_rcuckoo {
             int outstanding_read_wr_id = _wr_id;
             send_lock_and_cover_message(lock, read, outstanding_cas_wr_id);
 
+            pause_for_an_rtt();
+
             int outstanding_messages = 1; //It's two because we send the read and CAS
             assert(_completion_queue != NULL);
             int n = bulk_poll(_completion_queue, outstanding_messages, _wc);
@@ -1171,13 +1186,13 @@ namespace cuckoo_rcuckoo {
 
             _outstanding_read_requests--;
             assert(n == outstanding_messages); //This is just a safty for now.
-            if (_wc[0].status != IBV_WC_SUCCESS) {
+            if (_wc[0].status != IBV_WC_SUCCESS) [[unlikely]] {
                 ALERT("lock aquire", " masked cas failed somehow\n");
                 ALERT("lock aquire", " masked cas %s\n", lock.to_string().c_str());
                 exit(1);
             }
 
-            if (_wc[1].status != IBV_WC_SUCCESS) {
+            if (_wc[1].status != IBV_WC_SUCCESS) [[unlikely]] {
                 ALERT(log_id(), " [lock aquire] spanning read failed somehow\n");
 
                 ALERT(log_id(), " errno: %d \n", -errno);
@@ -1281,7 +1296,7 @@ namespace cuckoo_rcuckoo {
                     throw logic_error("ERROR: reading not implemented");
                     break;
                 case RELEASE_LOCKS_TRY_AGAIN:
-                    
+
                     put_direct();
                     break;
                 default:

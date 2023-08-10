@@ -388,11 +388,11 @@ int RDMAConnectionManager::client_setup_shared_resources()
             return -errno;
         }
         VERBOSE("Connection Manager", "CQ created at %p with %d elements \n", (void*)client_cq_threads[i], client_cq_threads[i]->cqe);
-        ret = ibv_req_notify_cq(client_cq_threads[i], 0);
-        if (ret) {
-            ALERT("Connection Manager", "Failed to request notifications, errno: %d\n", -errno);
-            return -errno;
-        }
+        // ret = ibv_req_notify_cq(client_cq_threads[i], 0);
+        // if (ret) {
+        //     ALERT("Connection Manager", "Failed to request notifications, errno: %d\n", -errno);
+        //     return -errno;
+        // }
 
     }
 

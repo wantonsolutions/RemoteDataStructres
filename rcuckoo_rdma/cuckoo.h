@@ -68,6 +68,8 @@ namespace cuckoo_rcuckoo {
             void complete_insert_stats(bool success);
             void complete_insert();
 
+            void pause_for_an_rtt();
+
             //Table and lock table functions
             Entry ** get_table_pointer();
             unsigned int get_table_size_bytes();
@@ -115,6 +117,8 @@ namespace cuckoo_rcuckoo {
             volatile bool * _global_start_flag;
             volatile bool * _global_end_flag;
             volatile bool * _global_pause_flag;
+
+            uint64_t _sleep_counter = 1;
 
 
 
