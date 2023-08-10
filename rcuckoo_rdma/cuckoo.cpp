@@ -410,16 +410,32 @@ namespace cuckoo_rcuckoo {
         _locking_message_index++;
     }
 
+    void RCuckoo::receive_successful_locking_message(unsigned int message_index){
+        for (unsigned int i =0; i< _locking_context.fast_lock_chunks[message_index].size(); i++){
+            // printf("locking chunk %d\n", _locking_context.fast_lock_chunks[message_index][i]);
+            _locks_held.push_back(_locking_context.fast_lock_chunks[message_index][i]);
+        }
+        _locking_message_index++;
+    }
+
     void RCuckoo::receive_successful_locking_message(VRMaskedCasData message) {
         unsigned int lock_indexes[BITS_IN_MASKED_CAS];
         int total_locks = lock_message_to_lock_indexes(message, lock_indexes);
         for (unsigned int i = 0; i < total_locks; i++) {
+            // printf("locking messg %d\n", lock_indexes[i]);
             _locks_held.push_back(lock_indexes[i]);
         }
-        //checking that the locks do not have duplicates
-        // assert(_locks_held.size() == set<unsigned int>(_locks_held.begin(), _locks_held.end()).size());
         _locking_message_index++;
     }
+
+    void RCuckoo::receive_successful_unlocking_message(unsigned int message_index) {
+        for (unsigned int i =0; i< _locking_context.fast_lock_chunks[message_index].size(); i++){
+            _locks_held.erase(remove(_locks_held.begin(), _locks_held.end(), _locking_context.fast_lock_chunks[message_index][i]), _locks_held.end());
+        }
+        assert(_locks_held.size() == set<unsigned int>(_locks_held.begin(), _locks_held.end()).size());
+        _locking_message_index++;
+    }
+
 
     void RCuckoo::receive_successful_unlocking_message(VRMessage message) {
         vector<unsigned int> unlock_indexes = lock_message_to_lock_indexes(message);
@@ -1032,9 +1048,17 @@ namespace cuckoo_rcuckoo {
         #define SIGNAL_MIN
         #ifdef SIGNAL_MIN 
             bulk_poll(_completion_queue, 1, _wc + 1);
-            for (unsigned int i = total_messages - _lock_list.size() ; i < total_messages; i++) {
-                receive_successful_unlocking_message(_lock_list[i-_insert_messages.size()]);
-            }
+            // THIS WORKS
+            // for (unsigned int i = total_messages - _lock_list.size() ; i < total_messages; i++) {
+            //     receive_successful_unlocking_message(_lock_list[i-_insert_messages.size()]);
+            // }
+            //THIS ALSO WORKS
+            // for (unsigned int i = 0; i < _lock_list.size(); i++) {
+            //     receive_successful_unlocking_message(i);
+            // }
+            //Here we are not checking if we actually did the proper unlock. However, if we get the final messsage which was signaled, then we know that all the messages before it were successful
+            //I'm using this for efficiency
+            _locks_held.clear();
         #else
             while(n < total_messages) {
                 n += bulk_poll(_completion_queue, total_messages - n, _wc + n);
@@ -1181,7 +1205,8 @@ namespace cuckoo_rcuckoo {
 
             if ((received_locks & mask) == old_value) {
                 // ALERT(log_id(), "we got the lock!\n");
-                receive_successful_locking_message(lock);
+                // receive_successful_locking_message(lock);
+                receive_successful_locking_message(message_index);
                 message_index++;
                 if (failed_last_request) {
                     failed_last_request = false;
@@ -1256,6 +1281,7 @@ namespace cuckoo_rcuckoo {
                     throw logic_error("ERROR: reading not implemented");
                     break;
                 case RELEASE_LOCKS_TRY_AGAIN:
+                    
                     put_direct();
                     break;
                 default:

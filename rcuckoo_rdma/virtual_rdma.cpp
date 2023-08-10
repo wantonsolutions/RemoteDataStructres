@@ -301,7 +301,6 @@ namespace cuckoo_virtual_rdma {
     }
 
     unsigned int lock_message_to_lock_indexes(VRMaskedCasData lock_message, unsigned int * lock_indexes) {
-        // vector<unsigned int> lock_indexes;
         // uint64_t mask = reverse_uint64_t(lock_message.mask);
         uint64_t mask = __builtin_bswap64(lock_message.mask);
         unsigned int base_index = lock_message.min_lock_index * 8;

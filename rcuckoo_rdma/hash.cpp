@@ -118,6 +118,22 @@ unsigned int h3_suffix_base_two(Key key){
     #endif
     return zeros;
 }
+            // }
+            // for (unsigned int i = 0; i < _lock_list.size(); i++) {
+            //     receive_successful_unlocking_message(i);
+            // }
+
+inline double fastPow(double a, double b) {
+  union {
+    double d;
+    int x[2];
+  } u = { a };
+  u.x[1] = (int)(b * (u.x[1] - 1072632447) + 1072632447);
+  u.x[0] = 0;
+  return u.d;
+}
+
+
 
 unsigned int rcuckoo_secondary_location(string key, float factor, unsigned int table_size){
     int primary = rcuckoo_primary_location(key, table_size);
@@ -126,7 +142,7 @@ unsigned int rcuckoo_secondary_location(string key, float factor, unsigned int t
     #ifdef DEBUG
     cout << "key: " << key << " zeros: " << zeros << " exponent: " << exponent << endl;
     #endif
-    int mod_size = (int)pow(factor, exponent);
+    int mod_size = (int)fastPow(factor, exponent);
     int secondary = h2(key) % mod_size;
     if (secondary % 2 == 0) {
         secondary = secondary + 1;
@@ -141,7 +157,7 @@ unsigned int rcuckoo_secondary_location(Key key, float factor, unsigned int tabl
     #ifdef DEBUG
     cout << "key: " << key << " zeros: " << zeros << " exponent: " << exponent << endl;
     #endif
-    int mod_size = (int)pow(factor, exponent);
+    int mod_size = (int)fastPow(factor, exponent);
     int secondary = h2(key) % mod_size;
     if (secondary % 2 == 0) {
         secondary = secondary + 1;

@@ -57,10 +57,12 @@ namespace cuckoo_rcuckoo {
 
             void receive_successful_locking_message(VRMessage message);
             void receive_successful_unlocking_message(VRMessage message);
+            void receive_successful_unlocking_message(unsigned int message_index);
 
 
             void receive_successful_locking_message(VRMaskedCasData message);
             void receive_successful_unlocking_message(VRMaskedCasData message);
+            void receive_successful_locking_message(unsigned int message_index);
 
 
             void complete_insert_stats(bool success);

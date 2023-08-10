@@ -1,5 +1,5 @@
 
-measuretime=20
+measuretime=3
 
 program=cuckoo_client
 # program=test/test_virtual_rdma
@@ -15,6 +15,7 @@ cuckoopid=$!
 
 
 # sudo perf record -F 99 -p$cuckoopid -g -- sleep $measuretime
+sleep 1
 sudo perf record -F 99 -a -g -- sleep $measuretime
 sudo perf script | ./flamechart/FlameGraph/stackcollapse-perf.pl > out.perf-folded
 sudo killall "$program"
