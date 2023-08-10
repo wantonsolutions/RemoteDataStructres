@@ -302,7 +302,8 @@ namespace cuckoo_virtual_rdma {
 
     unsigned int lock_message_to_lock_indexes(VRMaskedCasData lock_message, unsigned int * lock_indexes) {
         // vector<unsigned int> lock_indexes;
-        uint64_t mask = reverse_uint64_t(lock_message.mask);
+        // uint64_t mask = reverse_uint64_t(lock_message.mask);
+        uint64_t mask = __builtin_bswap64(lock_message.mask);
         unsigned int base_index = lock_message.min_lock_index * 8;
         unsigned int total_locks = 0;
 
@@ -577,8 +578,8 @@ namespace cuckoo_virtual_rdma {
             }
 
             //TODO for performance we can probably use bswap instead of the swap I built
-            lock = reverse_uint64_t(lock);
-            // lock = __builtin_bswap64(lock);
+            // lock = reverse_uint64_t(lock);
+            lock = __builtin_bswap64(lock);
             mcd.min_set_lock = context.fast_lock_chunks[i][0] - min_index;
             mcd.max_set_lock = context.fast_lock_chunks[i][context.fast_lock_chunks[i].size()-1] - min_index;
             mcd.min_lock_index = min_index / 8;
@@ -702,14 +703,15 @@ namespace cuckoo_virtual_rdma {
                 context.fast_lock_chunks[i].resize(context.locks_per_message);
             }
         }
+
         assert(context.buckets.size() <= MAX_LOCKS);
         unsigned int unique_lock_indexes[MAX_LOCKS];
 
         //Lets make sure that all the buckets are allready sorted
         //I'm 90% sure this will get optimized out in the end
-        for (int i=0; i<context.buckets.size()-1; i++) {
-            assert(context.buckets[i] < context.buckets[i+1]);
-        }
+        // for (int i=0; i<context.buckets.size()-1; i++) {
+        //     assert(context.buckets[i] < context.buckets[i+1]);
+        // }
         unsigned int unique_lock_count = get_unique_lock_indexes_fast(context.buckets, context.buckets_per_lock, unique_lock_indexes, MAX_LOCKS);
         // break_lock_indexes_into_chunks_fast(unique_lock_indexes, unique_lock_count, context.locks_per_message, context.fast_lock_chunks);
         context.lock_indexes_size = unique_lock_count;
@@ -959,13 +961,13 @@ namespace cuckoo_virtual_rdma {
         return cas_messages;
     }
 
-    vector<VRCasData> gen_cas_data(vector<path_element> search_path) {
-        vector<VRCasData> cas_messages;
+    void gen_cas_data(vector<path_element>& search_path, vector<VRCasData>& cas_messages) {
+
+        cas_messages.clear();
         for (int i=0; i<search_path.size()-1; i++) {
             cas_messages.push_back(next_cas_data(search_path,i));
         }
         INFO("gen_cas_message", "Generated %d cas messages", cas_messages.size());
-        return cas_messages;
     }
 
     /*------------------------------------ Real RDMA functions ---------------------------- */

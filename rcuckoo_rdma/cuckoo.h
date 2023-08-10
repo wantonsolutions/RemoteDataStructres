@@ -118,7 +118,6 @@ namespace cuckoo_rcuckoo {
 
             Table _table;
             // Key _current_insert_key;
-            vector<path_element> _search_path;
             int _search_path_index;
             vector<unsigned int> _locks_held;
 
@@ -143,8 +142,11 @@ namespace cuckoo_rcuckoo {
             //Cached structures to prevent reinitalizations
             vector<vector<unsigned int>> _fast_lock_chunks;
             vector<unsigned int> _buckets;
+
+            vector<VRCasData> _insert_messages;
             vector<VRMaskedCasData> _lock_list;
             vector<VRReadData> _covering_reads;
+
 
             LockingContext _locking_context;
             search_context _search_context;
@@ -153,9 +155,9 @@ namespace cuckoo_rcuckoo {
             // hash_locations  (*_location_function)(string, unsigned int);
             hash_locations  (*_location_function)(Key, unsigned int);
 
-            vector<path_element> (RCuckoo::*_table_search_function)();
-            vector<path_element> a_star_insert_self();
-            vector<path_element> random_insert_self();
+            bool (RCuckoo::*_table_search_function)();
+            bool a_star_insert_self();
+            bool random_insert_self();
 
 
             bool read_complete();

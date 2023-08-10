@@ -209,7 +209,7 @@ namespace cuckoo_virtual_rdma {
 
     VRCasData cas_table_entry_cas_data(unsigned int bucket_index, unsigned int bucket_offset, Key old, Key new_value);
     VRCasData next_cas_data(vector<path_element> search_path, unsigned int index);
-    vector<VRCasData> gen_cas_data(vector<path_element> search_path);
+    void gen_cas_data(vector<path_element>& search_path, vector<VRCasData>& cas_messages);
 
 }
 
