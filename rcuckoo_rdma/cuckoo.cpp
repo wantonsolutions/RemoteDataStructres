@@ -136,6 +136,13 @@ namespace cuckoo_rcuckoo {
 
         _search_context.table = &_table;
         _search_context.location_func = _location_function;
+
+        const int max_in_flight_locks = 32;
+        for (int i=0;i<max_in_flight_locks;i++) {
+            _locking_context.fast_lock_chunks.push_back(vector<unsigned int>());
+        }
+        _locking_context.buckets_per_lock = _buckets_per_lock;
+        _locking_context.locks_per_message = _locks_per_message;
         sprintf(_log_identifier, "Client: %3d", _id);
     }
 
@@ -180,16 +187,16 @@ namespace cuckoo_rcuckoo {
         }
     }
 
-    vector<path_element> RCuckoo::a_star_insert_self(vector<unsigned int> searchable_buckets) {
+    vector<path_element> RCuckoo::a_star_insert_self() {
         _search_context.key = _current_insert_key;
-        _search_context.open_buckets = searchable_buckets;
         bucket_cuckoo_a_star_insert_fast_context(_search_context);
         return _search_context.path;
         // return bucket_cuckoo_a_star_insert_fast(_table, _location_function, _current_insert_key, searchable_buckets);
     }
 
-    vector<path_element> RCuckoo::random_insert_self(vector<unsigned int> searchable_buckets) {
-        return bucket_cuckoo_random_insert(_table, _location_function, _current_insert_key, searchable_buckets);
+    vector<path_element> RCuckoo::random_insert_self() {
+        _search_context.key = _current_insert_key;
+        return bucket_cuckoo_random_insert(*_search_context.table, _search_context.location_func, _search_context.key, _search_context.open_buckets);
     }
 
     vector<VRMessage> RCuckoo::get(){
@@ -220,8 +227,12 @@ namespace cuckoo_rcuckoo {
     }
 
     vector<VRMessage> RCuckoo::search() {
-        vector<unsigned int> searchable_buckets;
-        _search_path = (this->*_table_search_function)(searchable_buckets);
+        // vector<unsigned int> searchable_buckets;
+        // _search_path = (this->*_table_search_function)(searchable_buckets);
+        // ALERT("Inserting key %s\n", _current_insert_key.to_string().c_str());
+        ALERT("ERROR", "Ibroke this function because now we are using search contexts FIx by using the old version or setting up the context");
+        exit(1);
+        _search_path = (this->*_table_search_function)();
         //Search failed
         if (_search_path.size() <= 0) {
             ALERT(log_id(), "Search Failed for key %s unable to continue client %d is done\n", _current_insert_key.to_string().c_str(), _id);
@@ -400,7 +411,7 @@ namespace cuckoo_rcuckoo {
             _locks_held.push_back(lock_indexes[i]);
         }
         //checking that the locks do not have duplicates
-        assert(_locks_held.size() == set<unsigned int>(_locks_held.begin(), _locks_held.end()).size());
+        // assert(_locks_held.size() == set<unsigned int>(_locks_held.begin(), _locks_held.end()).size());
         _locking_message_index++;
     }
 
@@ -451,11 +462,12 @@ namespace cuckoo_rcuckoo {
     }
 
     void RCuckoo::fill_current_unlock_list() {
-        vector<unsigned int> buckets = lock_indexes_to_buckets(_locks_held, _buckets_per_lock);
+        lock_indexes_to_buckets(_locking_context.buckets,_locks_held, _buckets_per_lock);
         //log info buckets
-        sort(buckets.begin(), buckets.end());
-        assert(is_sorted(buckets.begin(), buckets.end()));
-        get_unlock_list_fast(buckets, _fast_lock_chunks, _lock_list, _buckets_per_lock, _locks_per_message);
+        sort(_locking_context.buckets.begin(), _locking_context.buckets.end());
+        get_unlock_list_fast_context(_locking_context);
+        _lock_list = _locking_context.lock_list;
+        // get_unlock_list_fast(buckets, _fast_lock_chunks, _lock_list, _buckets_per_lock, _locks_per_message);
         //_lock_list is now full of locks
     }
 
@@ -469,8 +481,11 @@ namespace cuckoo_rcuckoo {
 
     vector<VRMessage> RCuckoo::begin_insert() {
         _state = INSERTING;
-        vector<unsigned int> search_buckets = lock_indexes_to_buckets(_locks_held, _buckets_per_lock);
-        _search_path = (this->*_table_search_function)(search_buckets);
+        // vector<unsigned int> search_buckets = lock_indexes_to_buckets(_locks_held, _buckets_per_lock);
+        ALERT("failure", "I broke inserts by using contexts, if I need this function again it must be adjusted to use contets");
+        exit(0);
+        // _search_path = (this->*_table_search_function)(search_buckets); ## has to become this 
+        // _search_path = (this->*_table_search_function)();
         if (_search_path.size() <=0 ) {
             INFO(log_id(), "Second Search Failed for key %s retry time\n", _current_insert_key.to_string().c_str(), _id);
             INFO(log_id(), "Hi Stew, I\'m hoping you have a great day", _current_insert_key.to_string().c_str(), _id);
@@ -963,8 +978,8 @@ namespace cuckoo_rcuckoo {
             VERBOSE("pre search", "lock %d\n", _locks_held[i]);
         }
         assert(_buckets_per_lock = 1);
-        vector<unsigned int> search_buckets = lock_indexes_to_buckets(_locks_held, _buckets_per_lock);
-        _search_path = (this->*_table_search_function)(search_buckets);
+        lock_indexes_to_buckets(_search_context.open_buckets, _locks_held, _buckets_per_lock);
+        _search_path = (this->*_table_search_function)();
         _search_path_index = _search_path.size() -1;
         if (_search_path.size() <=0 ) {
             _failed_insert_second_search_this_insert++;
@@ -973,12 +988,12 @@ namespace cuckoo_rcuckoo {
             // INFO(log_id(), "Insert Direct -- Second Search Failed for key %s retry time #%d \n", _current_insert_key.to_string().c_str(),  _retries_due_to_failed_second_search);
             // INFO(log_id(), "Unable to find path within buckets %s\n", vector_to_string(search_buckets).c_str());
 
-            if (search_buckets.size() != _locks_held.size()) {
+            if (_search_context.open_buckets.size() != _locks_held.size()) {
                 WARNING("PRECRASH", "Client %d is about to crash\n", _id);
                 WARNING(log_id(), "search_buckets.size() != _locks_held.size()\n");
                 WARNING(log_id(), "search_buckets.size() = %d\n", search_buckets.size());
                 WARNING(log_id(), "_locks_held.size() = %d\n", _locks_held.size());
-                for (int i=0; i < search_buckets.size(); i++) {
+                for (int i=0; i < _search_context.open_buckets.size(); i++) {
                     WARNING(log_id(), "search_buckets[%d] = %d\n", i, search_buckets[i]);
              
                 }
@@ -987,7 +1002,7 @@ namespace cuckoo_rcuckoo {
              
                 }
             }
-            assert(search_buckets.size() == _locks_held.size());
+            assert(_search_context.open_buckets.size() == _locks_held.size());
             INFO(log_id(), "Hi Stew, I\'m hoping you have a great day", _current_insert_key.to_string().c_str(), _id);
             _state = RELEASE_LOCKS_TRY_AGAIN;
         }
@@ -1058,9 +1073,8 @@ namespace cuckoo_rcuckoo {
     void RCuckoo::put_direct() {
 
         /* copied from the search function */ 
-        vector<unsigned int> searchable_buckets;
-
-        _search_path = (this->*_table_search_function)(searchable_buckets);
+        _search_context.open_buckets.clear();
+        _search_path = (this->*_table_search_function)();
         //Search failed
         if (_search_path.size() <= 0) {
             ALERT(log_id(), "Search Failed for key %s unable to continue client %d is done\n", _current_insert_key.to_string().c_str(), _id);
@@ -1081,12 +1095,14 @@ namespace cuckoo_rcuckoo {
             _fast_lock_chunks[i].clear();
         }
 
-        search_path_to_buckets_fast(_search_path, _buckets);
         
         INFO(log_id(), "[aquire_locks] gathering locks for buckets %s\n", vector_to_string(_buckets).c_str());
 
-        get_lock_list_fast(_buckets, _fast_lock_chunks, _lock_list ,_buckets_per_lock, _locks_per_message);
-        get_covering_reads_from_lock_list(_lock_list, _covering_reads ,_buckets_per_lock, _table.row_size_bytes());
+        search_path_to_buckets_fast(_search_path, _locking_context.buckets);
+        get_lock_list_fast_context(_locking_context);
+        //TODO make this one thing
+        _lock_list = _locking_context.lock_list;
+        get_covering_reads_from_lock_list(_locking_context.lock_list, _covering_reads ,_buckets_per_lock, _table.row_size_bytes());
 
         for (unsigned int i = 0; i < _lock_list.size(); i++) {
             INFO(log_id(), "[aquire_locks] lock %d -> [lock %s] [read %s]\n", i, _lock_list[i].to_string().c_str(), _covering_reads[i].to_string().c_str());
@@ -1097,14 +1113,7 @@ namespace cuckoo_rcuckoo {
         bool locking_complete = false;
         bool failed_last_request = false;
 
-        //Inital send TODO probably put this in a while loop
-
-        vector<unsigned int> temp_locks;
-        for (int i=0;i<_lock_list.size();i++) {
-            temp_locks.push_back(_lock_list[i].min_lock_index);
-        }
         hash_locations both_buckets =(_location_function)(_current_insert_key, _table.get_row_count());
-        // printf("[%d] key %s (%d,%d) aquire: %s\n", _id, _current_insert_key.to_string().c_str(),both_buckets.primary/8, both_buckets.secondary/8, vector_to_string(temp_locks).c_str());
 
         unsigned int message_index = 0;
         while (!locking_complete) {
@@ -1114,11 +1123,6 @@ namespace cuckoo_rcuckoo {
             VRMaskedCasData lock = _lock_list[message_index];
             VRReadData read = _covering_reads[message_index];
 
-            // ALERT(log_id(), "getting lock %s for buckets %s",lock.to_string().c_str(), vector_to_string(_buckets).c_str());
-            // ALERT(log_id(), "will have to get all locks");
-            // for (int i=0;i<_lock_list.size();i++) {
-            //     ALERT(log_id(), "lock %d -> %s", i, _lock_list[i].to_string().c_str());
-            // }
 
             _wr_id++;
             int outstanding_cas_wr_id = _wr_id;

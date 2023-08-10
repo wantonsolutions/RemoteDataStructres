@@ -17,7 +17,7 @@
     "max_fill": "50",
     "prime": "false",
     "prime_fill": "40",
-    "num_clients": "1",
+    "num_clients": "4",
     "server_address": "192.168.1.12",
     "base_port": "20886"
 }

@@ -358,8 +358,8 @@ namespace cuckoo_virtual_rdma {
     }
 
     
-    vector<unsigned int> lock_indexes_to_buckets(vector<unsigned int> lock_indexes, unsigned int buckets_per_lock) {
-        vector<unsigned int> buckets;
+    void lock_indexes_to_buckets(vector<unsigned int> &buckets, vector<unsigned int>& lock_indexes, unsigned int buckets_per_lock) {
+        buckets.clear();
         // const uint8_t bits_in_byte = 8;
         //Translate locks by multiplying by the buckets per lock
         for (int i=0; i<lock_indexes.size(); i++) {
@@ -371,7 +371,6 @@ namespace cuckoo_virtual_rdma {
                 buckets.push_back(bucket + j);
             }
         }
-        return buckets;
     }
 
     vector<unsigned int> get_unique_lock_indexes(vector<unsigned int> buckets, unsigned int buckets_per_lock) {
@@ -806,6 +805,11 @@ namespace cuckoo_virtual_rdma {
 
     void get_lock_list_fast_context(LockingContext &context){
         context.locking=true;
+        get_lock_or_unlock_list_fast_context(context);
+    }
+
+    void get_unlock_list_fast_context(LockingContext &context){
+        context.locking=false;
         get_lock_or_unlock_list_fast_context(context);
     }
 

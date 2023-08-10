@@ -147,7 +147,8 @@ namespace cuckoo_virtual_rdma {
 
     unsigned int single_read_size_bytes(hash_locations buckets, unsigned int row_size_bytes);
     vector<VRMessage> read_threshold_message(hash_locations (*location_function)(string, unsigned int), Key current_read_key, unsigned int read_threshold_bytes,unsigned int table_size,unsigned int row_size_bytes);
-    vector<unsigned int> lock_indexes_to_buckets(vector<unsigned int> lock_indexes, unsigned int buckets_per_lock);
+    // vector<unsigned int> lock_indexes_to_buckets(vector<unsigned int> lock_indexes, unsigned int buckets_per_lock);
+    void lock_indexes_to_buckets(vector<unsigned int> &buckets, vector<unsigned int>& lock_indexes, unsigned int buckets_per_lock);
 
 
 
@@ -159,6 +160,7 @@ namespace cuckoo_virtual_rdma {
 
     void get_lock_or_unlock_list_fast_context(LockingContext & context);
     void get_lock_list_fast_context(LockingContext &context);
+    void get_unlock_list_fast_context(LockingContext &context);
     void break_lock_indexes_into_chunks_fast_context(LockingContext &context);
     void lock_chunks_to_masked_cas_data_context(LockingContext &context);
 
