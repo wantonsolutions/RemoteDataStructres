@@ -105,6 +105,16 @@ namespace cuckoo_rcuckoo {
     }
 
 
+    void RCuckoo::insert_cuckoo_path_local(Table &table, vector<path_element> &path) {
+        assert(path.size() >= 2);
+        for (int i=path.size()-2; i >=0; i--){
+            Entry e;
+            e.key = path[i+1].key;
+            table.set_entry(path[i].bucket_index, path[i].offset, e);
+        }
+    }
+
+
     string vector_to_string(vector<unsigned int> buckets) {
 
         stringstream ss;
@@ -1023,37 +1033,36 @@ namespace cuckoo_rcuckoo {
         _state = INSERTING;
 
         assert(_buckets_per_lock = 1);
-        lock_indexes_to_buckets(_search_context.open_buckets, _locks_held, _buckets_per_lock);
-        bool successful_search = (this->*_table_search_function)();
         //Search path is now set
-        if(path_valid()) {
-            printf("Path is valid\n");
-        }
-        _search_path_index = _search_context.path.size() -1;
-        if (!successful_search) {
-            _failed_insert_second_search_this_insert++;
-            _failed_insert_second_search_count++;
-            // printf("[%d] failed search current locks held: %s\n", _id, vector_to_string(_locks_held).c_str());
-            // INFO(log_id(), "Insert Direct -- Second Search Failed for key %s retry time #%d \n", _current_insert_key.to_string().c_str(),  _retries_due_to_failed_second_search);
-            // INFO(log_id(), "Unable to find path within buckets %s\n", vector_to_string(search_buckets).c_str());
+        if(!path_valid()) {
+            lock_indexes_to_buckets(_search_context.open_buckets, _locks_held, _buckets_per_lock);
+            bool successful_search = (this->*_table_search_function)();
+            _search_path_index = _search_context.path.size() -1;
+            if (!successful_search) {
+                _failed_insert_second_search_this_insert++;
+                _failed_insert_second_search_count++;
+                // printf("[%d] failed search current locks held: %s\n", _id, vector_to_string(_locks_held).c_str());
+                // INFO(log_id(), "Insert Direct -- Second Search Failed for key %s retry time #%d \n", _current_insert_key.to_string().c_str(),  _retries_due_to_failed_second_search);
+                // INFO(log_id(), "Unable to find path within buckets %s\n", vector_to_string(search_buckets).c_str());
 
-            if (_search_context.open_buckets.size() != _locks_held.size()) {
-                WARNING("PRECRASH", "Client %d is about to crash\n", _id);
-                WARNING(log_id(), "search_buckets.size() != _locks_held.size()\n");
-                WARNING(log_id(), "search_buckets.size() = %d\n", search_buckets.size());
-                WARNING(log_id(), "_locks_held.size() = %d\n", _locks_held.size());
-                for (int i=0; i < _search_context.open_buckets.size(); i++) {
-                    WARNING(log_id(), "search_buckets[%d] = %d\n", i, search_buckets[i]);
-             
+                if (_search_context.open_buckets.size() != _locks_held.size()) {
+                    WARNING("PRECRASH", "Client %d is about to crash\n", _id);
+                    WARNING(log_id(), "search_buckets.size() != _locks_held.size()\n");
+                    WARNING(log_id(), "search_buckets.size() = %d\n", search_buckets.size());
+                    WARNING(log_id(), "_locks_held.size() = %d\n", _locks_held.size());
+                    for (int i=0; i < _search_context.open_buckets.size(); i++) {
+                        WARNING(log_id(), "search_buckets[%d] = %d\n", i, search_buckets[i]);
+                
+                    }
+                    for (int i=0; i < _locks_held.size(); i++) {
+                        WARNING(log_id(), "_locks_held[%d] = %d\n", i, _locks_held[i]);
+                
+                    }
                 }
-                for (int i=0; i < _locks_held.size(); i++) {
-                    WARNING(log_id(), "_locks_held[%d] = %d\n", i, _locks_held[i]);
-             
-                }
+                assert(_search_context.open_buckets.size() == _locks_held.size());
+                INFO(log_id(), "Hi Stew, I\'m hoping you have a great day", _current_insert_key.to_string().c_str(), _id);
+                _state = RELEASE_LOCKS_TRY_AGAIN;
             }
-            assert(_search_context.open_buckets.size() == _locks_held.size());
-            INFO(log_id(), "Hi Stew, I\'m hoping you have a great day", _current_insert_key.to_string().c_str(), _id);
-            _state = RELEASE_LOCKS_TRY_AGAIN;
         }
 
 
@@ -1069,10 +1078,18 @@ namespace cuckoo_rcuckoo {
             total_messages += _insert_messages.size();
         }
 
+
+        // using std::chrono::high_resolution_clock;
+        // using std::chrono::duration_cast;
+        // using std::chrono::duration;
+        // using std::chrono::nanoseconds;
+        // auto t1 = high_resolution_clock::now();
+
         send_insert_and_unlock_messages(_insert_messages, _lock_list, _wr_id);
         _wr_id += total_messages;
 
-        pause_for_an_rtt();
+        insert_cuckoo_path_local(_table, _search_context.path);
+        // pause_for_an_rtt();
 
         //Bulk poll to receive all messages
         int n=0;
@@ -1114,7 +1131,12 @@ namespace cuckoo_rcuckoo {
             }
         #endif
 
+        // auto t2 = high_resolution_clock::now();
+        // auto duration_0 = duration_cast<nanoseconds>( t2 - t1 ).count();
+        // printf("2) %6lu ns\n", duration_0);
+
         if (_state == INSERTING) {
+            //finish the insert by inserting the key into the local table.
             complete_insert();
         } else if (_state == RELEASE_LOCKS_TRY_AGAIN) {
             return;
@@ -1180,15 +1202,20 @@ namespace cuckoo_rcuckoo {
             int outstanding_cas_wr_id = _wr_id;
             _wr_id++;
             int outstanding_read_wr_id = _wr_id;
+
+
+            // using std::chrono::high_resolution_clock;
+            // using std::chrono::duration_cast;
+            // using std::chrono::duration;
+            // using std::chrono::nanoseconds;
+
             send_lock_and_cover_message(lock, read, outstanding_cas_wr_id);
-
-
-            // ALERT("START HERE", "I should be able to do a full search here. I think that I can amortize the cost of doing work after getting the locks by filling up packet buffers here and just preparing for the next stage. If the search actually works I can just fire it off. Otherwise I just need to start again.");
-            pause_for_an_rtt();
-
+            // auto t1 = high_resolution_clock::now();
             int outstanding_messages = 1; //It's two because we send the read and CAS
-            assert(_completion_queue != NULL);
             int n = bulk_poll(_completion_queue, outstanding_messages, _wc);
+            // auto t2 = high_resolution_clock::now();
+            // auto duration_0 = duration_cast<nanoseconds>( t2 - t1 ).count();
+            // printf("1) %6lu ns req %d\n", duration_0,_completed_insert_count);
 
             while (n < outstanding_messages) {
                 VERBOSE(log_id(), "first poll missed the read, polling again\n");

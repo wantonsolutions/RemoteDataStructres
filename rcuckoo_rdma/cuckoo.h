@@ -84,6 +84,7 @@ namespace cuckoo_rcuckoo {
             void fill_current_unlock_list();
 
             bool path_valid();
+            void insert_cuckoo_path_local(Table &table, vector<path_element> &path);
 
             /* RDMA specific functions */
             uint64_t local_to_remote_table_address(uint64_t local_address);
