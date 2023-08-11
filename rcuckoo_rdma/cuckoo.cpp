@@ -94,6 +94,16 @@ namespace cuckoo_rcuckoo {
         assert(_global_pause_flag != NULL);
     }
 
+    bool RCuckoo::path_valid() {
+        //Check that all the entries in the path are the same as in the table
+        for (int i=0;i<_search_context.path.size()-1;i++) {
+            if(!(_table.get_entry(_search_context.path[i].bucket_index, _search_context.path[i].offset).key == _search_context.path[i].key)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
 
     string vector_to_string(vector<unsigned int> buckets) {
 
@@ -1016,6 +1026,9 @@ namespace cuckoo_rcuckoo {
         lock_indexes_to_buckets(_search_context.open_buckets, _locks_held, _buckets_per_lock);
         bool successful_search = (this->*_table_search_function)();
         //Search path is now set
+        if(path_valid()) {
+            printf("Path is valid\n");
+        }
         _search_path_index = _search_context.path.size() -1;
         if (!successful_search) {
             _failed_insert_second_search_this_insert++;
@@ -1169,6 +1182,8 @@ namespace cuckoo_rcuckoo {
             int outstanding_read_wr_id = _wr_id;
             send_lock_and_cover_message(lock, read, outstanding_cas_wr_id);
 
+
+            // ALERT("START HERE", "I should be able to do a full search here. I think that I can amortize the cost of doing work after getting the locks by filling up packet buffers here and just preparing for the next stage. If the search actually works I can just fire it off. Otherwise I just need to start again.");
             pause_for_an_rtt();
 
             int outstanding_messages = 1; //It's two because we send the read and CAS

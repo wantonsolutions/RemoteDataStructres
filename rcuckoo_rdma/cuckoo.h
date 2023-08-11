@@ -37,6 +37,8 @@ namespace cuckoo_rcuckoo {
             void set_location_function(unordered_map<string, string> config);
 
 
+
+
             vector<VRMessage> fsm_logic(VRMessage messages);
             vector<VRMessage> get();
             vector<VRMessage> aquire_locks();
@@ -81,6 +83,7 @@ namespace cuckoo_rcuckoo {
 
             void fill_current_unlock_list();
 
+            bool path_valid();
 
             /* RDMA specific functions */
             uint64_t local_to_remote_table_address(uint64_t local_address);
