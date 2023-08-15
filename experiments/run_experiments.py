@@ -154,7 +154,7 @@ def plot_insertion_range_cdf():
     ax1.vlines(x[nf], 0, 1, color='red', linestyle='--', label="95%")
     ax1.vlines(x[nn], 0, 1, color='black', linestyle='--', label="99%")
     ax1.legend()
-    
+   
 
     ax2.plot(ranges)
     ax2.set_xlabel("Insertion number")
