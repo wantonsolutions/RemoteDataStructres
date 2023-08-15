@@ -332,14 +332,20 @@ static void send_inital_experiment_control_to_memcached_server() {
     experiment_control ec;
     ec.experiment_start = false;
     ec.experiment_stop = false;
+    ec.priming_complete = false;
     memcached_publish_experiment_control(&ec);
 }
 
 static void end_experiment_globally(){
-    experiment_control ec;
-    ec.experiment_start = true;
-    ec.experiment_stop = true;
-    memcached_publish_experiment_control(&ec);
+    experiment_control *ec = (experiment_control *)memcached_get_experiment_control();
+    ec->experiment_stop = true;
+    memcached_publish_experiment_control(ec);
+}
+
+static void announce_priming_complete() {
+    experiment_control *ec = (experiment_control *)memcached_get_experiment_control();
+    ec->priming_complete = true;
+    memcached_publish_experiment_control(ec);
 }
 
 static void send_inital_memory_stats_to_memcached_server(){
@@ -616,10 +622,11 @@ void usage()
 }
 
 
-void moniter_run(int num_qps, int print_frequency, Memory_State_Machine &msm) {
+void moniter_run(int num_qps, int print_frequency, bool prime, Memory_State_Machine &msm) {
 
     //print buffers every second
     int print_step=0;
+    bool priming_complete = false;
     time_t last_print;
     time(&last_print);
     while(true) {
@@ -630,9 +637,19 @@ void moniter_run(int num_qps, int print_frequency, Memory_State_Machine &msm) {
             last_print = now;
             printf("Printing table after %d seconds\n", print_step * print_frequency);
             print_step++;
-            copy_device_memory_to_host_lock_table(msm);
+            // copy_device_memory_to_host_lock_table(msm);
             // msm.print_table();
+            // msm.print_lock_table();
             printf("%2.3f/%2.3f Full\n", fill_percentage, msm.get_max_fill());
+        }
+
+        if(prime && 
+        !priming_complete &&
+        (fill_percentage * 100.0) >= msm.get_prime_fill()
+        ) {
+            printf("Table has reached it's priming factor\n");
+            announce_priming_complete();
+            priming_complete = true;
         }
 
         if((fill_percentage * 100.0) >= msm.get_max_fill()) {
@@ -668,8 +685,9 @@ int main(int argc, char **argv)
         config_filename = argv[1];
     }
     unordered_map<string, string> config = read_config_from_file(config_filename);
-
     Memory_State_Machine msm = Memory_State_Machine(config);
+
+    bool prime = (config["prime"] == "true");
     // msm.fill_table_with_incremental_values();
 
 
@@ -726,7 +744,7 @@ int main(int argc, char **argv)
     //     }
     // }
     printf("All server setup complete, now serving memory requests\n");
-    moniter_run(num_qps, 1 /* sec */, msm);
+    moniter_run(num_qps, 1 ,prime, msm);
 
     ALERT("RDMA memory server", "Sending results to the memcached server\n");
     send_final_memory_stats_to_memcached_server(msm);

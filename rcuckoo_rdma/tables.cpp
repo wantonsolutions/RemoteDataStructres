@@ -48,7 +48,10 @@ namespace cuckoo_tables {
 
     bool Key::is_empty(){
         assert(KEY_SIZE == 4);
-        return !((*(uint32_t *)bytes) || 0x00000000);
+        // printf("byte location %p\n", bytes);
+        uint32_t b_val = *(uint32_t *)bytes;
+        // printf("byte value %x\n", b_val);
+        return !(b_val || 0x00000000);
         // for (int i = 0; i < KEY_SIZE; i++){
         //     if (bytes[i] != 0){
         //         return false;
@@ -315,6 +318,11 @@ namespace cuckoo_tables {
         return;
     }
 
+    void Table::print_lock_table(){
+        cout << _lock_table.to_string() << endl;
+        return;
+    }
+
     CasOperationReturn Table::lock_table_masked_cas(unsigned int lock_index, uint64_t old, uint64_t new_value, uint64_t mask){
         return _lock_table.masked_cas(lock_index, old, new_value, mask);
     }
@@ -384,9 +392,11 @@ namespace cuckoo_tables {
     }
 
     bool Table::bucket_has_empty(unsigned int bucket_index){
-        bool has_empty = false;
-        for (unsigned int i = 0; i < _bucket_size; i++){
+        // for (unsigned int i = 0; i < _bucket_size; i++){
+        for (int i = _bucket_size-1; i >= 0; i--){
+            // printf("bucket_index %d, i %d\n", bucket_index, i);
             if (_table[bucket_index][i].is_empty()){
+                // printf("returning true\n");
                 return true;
             }
         }

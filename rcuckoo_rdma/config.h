@@ -37,10 +37,12 @@ typedef struct table_config {
 typedef struct experiment_control {
     string to_string(){
         return "experiment_start: " + std::to_string(experiment_start) + "\n" +
-            "experiment_stop: " + std::to_string(experiment_stop) + "\n";
+            "experiment_stop: " + std::to_string(experiment_stop) + "\n" +
+            "priming_complete: " + std::to_string(priming_complete) + "\n";
     }
     bool experiment_start;
     bool experiment_stop;
+    bool priming_complete;
 } experiment_control;
 
 typedef struct memory_stats {

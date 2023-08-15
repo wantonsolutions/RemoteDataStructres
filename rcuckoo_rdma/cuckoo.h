@@ -37,6 +37,8 @@ namespace cuckoo_rcuckoo {
             void set_location_function(unordered_map<string, string> config);
 
 
+
+
             vector<VRMessage> fsm_logic(VRMessage messages);
             vector<VRMessage> get();
             vector<VRMessage> aquire_locks();
@@ -57,14 +59,18 @@ namespace cuckoo_rcuckoo {
 
             void receive_successful_locking_message(VRMessage message);
             void receive_successful_unlocking_message(VRMessage message);
+            void receive_successful_unlocking_message(unsigned int message_index);
 
 
             void receive_successful_locking_message(VRMaskedCasData message);
             void receive_successful_unlocking_message(VRMaskedCasData message);
+            void receive_successful_locking_message(unsigned int message_index);
 
 
             void complete_insert_stats(bool success);
             void complete_insert();
+
+            void pause_for_an_rtt();
 
             //Table and lock table functions
             Entry ** get_table_pointer();
@@ -77,6 +83,8 @@ namespace cuckoo_rcuckoo {
 
             void fill_current_unlock_list();
 
+            bool path_valid();
+            void insert_cuckoo_path_local(Table &table, vector<path_element> &path);
 
             /* RDMA specific functions */
             uint64_t local_to_remote_table_address(uint64_t local_address);
@@ -97,6 +105,7 @@ namespace cuckoo_rcuckoo {
 
             void set_global_start_flag(volatile bool * flag);
             void set_global_end_flag(volatile bool * flag);
+            void set_global_pause_flag(volatile bool * flag);
 
 
             vector<VRMaskedCasData> get_current_unlock_list();
@@ -111,13 +120,19 @@ namespace cuckoo_rcuckoo {
 
             volatile bool * _global_start_flag;
             volatile bool * _global_end_flag;
+            volatile bool * _global_pause_flag;
+
+            uint64_t _sleep_counter = 1;
+
 
 
             Table _table;
             // Key _current_insert_key;
-            vector<path_element> _search_path;
             int _search_path_index;
             vector<unsigned int> _locks_held;
+
+
+
             vector<VRMessage> _current_locking_messages;
             vector<VRMessage> _current_locking_read_messages;
 
@@ -137,16 +152,22 @@ namespace cuckoo_rcuckoo {
             //Cached structures to prevent reinitalizations
             vector<vector<unsigned int>> _fast_lock_chunks;
             vector<unsigned int> _buckets;
+
+            vector<VRCasData> _insert_messages;
             vector<VRMaskedCasData> _lock_list;
             vector<VRReadData> _covering_reads;
+
+
+            LockingContext _locking_context;
+            search_context _search_context;
 
 
             // hash_locations  (*_location_function)(string, unsigned int);
             hash_locations  (*_location_function)(Key, unsigned int);
 
-            vector<path_element> (RCuckoo::*_table_search_function)(vector<unsigned int> searchable_buckets);
-            vector<path_element> a_star_insert_self(vector<unsigned int> searchable_buckets);
-            vector<path_element> random_insert_self(vector<unsigned int> searchable_buckets);
+            bool (RCuckoo::*_table_search_function)();
+            bool a_star_insert_self();
+            bool random_insert_self();
 
 
             bool read_complete();

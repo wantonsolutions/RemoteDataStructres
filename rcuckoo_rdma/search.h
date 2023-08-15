@@ -8,7 +8,12 @@
 #include "hash.h"
 #include <unordered_map>
 
+#define MAX_SEARCH_ITEMS 5000
+#define MAX_SEARCH_DEPTH 50
 namespace cuckoo_search {
+
+
+
     typedef struct path_element {
         cuckoo_tables::Key key;
         unsigned int table_index;
@@ -48,7 +53,9 @@ namespace cuckoo_search {
         fast_a_star_pe *prior;
         unsigned int distance;
         unsigned int fscore;
-        std::string to_string();
+        std::string to_string() {
+            return pe.to_string() + " distance: " + std::to_string(distance) + " fscore: " + std::to_string(fscore);
+        }
         bool operator<( const fast_a_star_pe & aspe ) const {
             return fscore < aspe.fscore;
         }
@@ -83,6 +90,22 @@ namespace cuckoo_search {
             fscore = _fscore;}
     } a_star_pe;
 
+    typedef struct search_context {
+        //input values
+        cuckoo_tables::Table *table;
+        hash_locations (*location_func) (cuckoo_tables::Key, unsigned int);
+        cuckoo_tables::Key key;
+        vector<unsigned int> open_buckets;
+        //return values
+        vector<path_element> path;
+        //internal_values
+        fast_a_star_pe closed_list_addressable[MAX_SEARCH_ITEMS];
+        vector<fast_a_star_pe> open_list;
+        vector<fast_a_star_pe> closed_list;
+        vector<unsigned int> targets;
+        vector<unsigned int> visited_buckets;
+    } search_context;
+
     unsigned int get_table_id_from_index(unsigned int index);
     std::vector<unsigned int> search_path_to_buckets(std::vector<path_element> path);
     void search_path_to_buckets_fast(vector<path_element> &path, vector<unsigned int> &buckets);
@@ -105,6 +128,7 @@ namespace cuckoo_search {
 
     std::vector<path_element> a_star_search(cuckoo_tables::Table table, hash_locations (*location_func) (std::string, unsigned int), cuckoo_tables::Key key, std::vector<unsigned int> open_buckets);
     std::vector<path_element> a_star_search_fast(cuckoo_tables::Table &table, hash_locations (*location_func) (std::string, unsigned int), cuckoo_tables::Key key, std::vector<unsigned int> open_buckets);
+    void bucket_cuckoo_a_star_insert_fast_context(search_context &context);
     std::vector<path_element> bucket_cuckoo_a_star_insert(cuckoo_tables::Table table, hash_locations (*location_func) (std::string, unsigned int), cuckoo_tables::Key key, std::vector<unsigned int> open_buckets);
     std::vector<path_element> bucket_cuckoo_random_insert(cuckoo_tables::Table table, hash_locations (*location_func) (std::string, unsigned int), cuckoo_tables::Key key, std::vector<unsigned int> open_buckets);
     std::vector<path_element> bucket_cuckoo_a_star_insert_fast(cuckoo_tables::Table &table, hash_locations (*location_func) (Key, unsigned int), cuckoo_tables::Key key, std::vector<unsigned int> open_buckets);

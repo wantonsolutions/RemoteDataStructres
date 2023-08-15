@@ -32,12 +32,19 @@ namespace cuckoo_tables {
         uint64_t to_uint64_t();
         bool is_empty();
         bool operator==(const Key& rhs) const {
-            for (int i = 0; i < KEY_SIZE; i++){
-                if (bytes[i] != rhs.bytes[i]){
-                    return false;
+            if(KEY_SIZE == 4){
+                uint32_t lhs_int = *(uint32_t*)bytes;
+                uint32_t rhs_int = *(uint32_t*)rhs.bytes;
+                return lhs_int == rhs_int;
+            } else {
+
+                for (int i = KEY_SIZE; i >= 0; i++){
+                    if (bytes[i] != rhs.bytes[i]){
+                        return false;
+                    }
                 }
+                return true;
             }
-            return true;
         }
         bool operator=(const Key& rhs) {
             for (int i = 0; i < KEY_SIZE; i++){
@@ -210,6 +217,7 @@ namespace cuckoo_tables {
             string to_string();
             string row_to_string(unsigned int row);
             void print_table();
+            void print_lock_table();
             Entry ** get_underlying_table();
             void set_underlying_table(Entry ** table);
             CasOperationReturn lock_table_masked_cas(unsigned int lock_index, uint64_t old, uint64_t new_value, uint64_t mask);

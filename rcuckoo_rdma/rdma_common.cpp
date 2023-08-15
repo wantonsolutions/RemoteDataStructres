@@ -66,12 +66,14 @@ unordered_map<string, string> gen_config() {
 
     // Client State Machine Arguements
     int total_inserts = 1;
-    int max_fill = 90;
+    int max_fill = 50;
+	int prime_fill = 30;
     int num_clients = 24;
 	// int num_clinets = 1;
     config["total_inserts"]=to_string(total_inserts);
     config["total_requests"]=to_string(total_inserts);
     config["max_fill"]=to_string(max_fill);
+	config["prime_fill"]=to_string(prime_fill);
     config["num_clients"]=to_string(num_clients);
 
     // RDMA Engine Arguments
