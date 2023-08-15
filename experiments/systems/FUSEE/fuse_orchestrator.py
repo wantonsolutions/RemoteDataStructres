@@ -41,10 +41,10 @@ class ssh_wrapper:
 
     def run_cmd(self, cmd):
         stdin, stdout, stderr = self.ssh.exec_command(cmd)
-        # stdout_result =stdout.read()
-        # stderr_result = stderr.read()
-        # print("stdout: ", stdout_result.decode("utf-8"))
-        # print("stderr: ", stderr_result.decode("utf-8"))
+        stdout_result =stdout.read()
+        stderr_result = stderr.read()
+        print("stdout: ", stdout_result.decode("utf-8"))
+        print("stderr: ", stderr_result.decode("utf-8"))
 
         error_code = stdout.channel.recv_exit_status()
         return
@@ -82,6 +82,8 @@ class Orchestrator:
     throughput_memory_program_name = "ycsb_test_server"
     throughput_client_program_name = "micro_test_multi_client"
 
+    ycsb_throughput_memory_program_name = "ycsb_test_server"
+    ycsb_throughput_client_program_name = "ycsb_test_multi_client"
 
 
     server_name = 'yak-00.sysnet.ucsd.edu'
@@ -127,6 +129,9 @@ class Orchestrator:
 
         self.server.run_cmd('echo iwicbV15 | sudo -S killall ' + self.throughput_memory_program_name)
         self.client.run_cmd('echo iwicbV15 | sudo -S killall ' + self.throughput_client_program_name)
+
+        self.server.run_cmd('echo iwicbV15 | sudo -S killall ' + self.ycsb_throughput_memory_program_name)
+        self.client.run_cmd('echo iwicbV15 | sudo -S killall ' + self.ycsb_throughput_client_program_name)
 
 
     # def build(self, pull=False, clean=False):
@@ -217,6 +222,38 @@ class Orchestrator:
         print("Killing client and server")
         self.kill()
 
+    def run_ycsb_throughput_test(self,config):
+        print("Running YCSB Throughput Test " + str(config))
+        print("Starting server")
+
+        #run the actual experiment
+        self.kill()
+        command=("cd " + self.project_directory + ";"
+        "cd build;" 
+        "numactl -N 0 -m 0 ./ycsb-test/" +self.ycsb_throughput_memory_program_name + " 0 &")
+        "echo server started"
+        thr = threading.Thread(target=self.server.run_cmd,args=(command,), kwargs={})
+        thr.start()
+        print("Starting client")
+
+        output_file = "results/"+config["workload"] + '_'+str(config['clients'])+".tput"
+        client_command=("cd " + self.project_directory + ";"
+        "cd build/ycsb-test;"
+        "CLIENTS="+str(config['clients'])+";"
+        'rm -f '+output_file +';'
+        "yes | numactl -N 0 -m 0 ./" + self.ycsb_throughput_client_program_name + ' ../client_config.json '+ config["workload"]+ ' $CLIENTS > '+output_file)
+
+        print(client_command)
+        thr2 = threading.Thread(target=self.client.run_cmd,args=(client_command,), kwargs={})
+        thr2.start()
+        thr2.join()
+        # sleeptime=30
+        # print("Sleeping for ",sleeptime," seconds to let the test run")
+        # for i in tqdm(range(sleeptime)):
+        #     time.sleep(1)
+        print("Killing client and server")
+        self.kill()
+
     def collect_latency_stats(self):
 
         temp_dir = tempfile.TemporaryDirectory()
@@ -251,6 +288,27 @@ class Orchestrator:
             # the output is big and dirty so we are just searching for a specific line
             if search_query in line:
                 return int(line.split(" ")[2])
+
+    def get_ycsb_tput(self, lines):
+        for line in lines:
+            if "tpt" in line:
+                return int(line.split(" ")[1])
+
+        print("EXPERIMENT FAILED, unable to find a result")
+        exit(0)
+
+    def collect_ycsb_throughput_stats(self,config):
+        temp_dir = tempfile.TemporaryDirectory()
+        # print(temp_dir.name)
+        throughput_filename = str(config['workload']) + "_" + str(config['clients'])+".tput"
+        remote_latency_directory = self.project_directory +'/build/ycsb-test/results'
+        local_client_stat_directory = temp_dir.name
+        self.client.get(remote_latency_directory+"/"+throughput_filename, local_client_stat_directory+"/"+throughput_filename)
+        with open(local_client_stat_directory+"/"+throughput_filename) as file:
+            lines = [line.rstrip() for line in file]
+
+        return self.get_ycsb_tput(lines)
+
 
 
     def collect_throughput_stats(self,config):
@@ -310,6 +368,30 @@ def run_throughput_trial():
     print(results)
     dm.save_statistics(results,"data/fusee_throughput")
 
+def run_ycsb_throughput_trial():
+    orch = Orchestrator()
+    config = dict()
+    clients = [1,2,4,8]
+    workloads = ["workloada", "workloadb", "workloadc", "workloadd", "workloadupd100"]
+
+    # clients = [1]
+    # workloads = ["workloada"]
+    all_results = dict()
+    for workload in workloads:
+        results = []
+        for client in clients:
+            config["workload"] = workload
+            config["clients"] = client
+            orch.run_ycsb_throughput_test(config)
+            result = orch.collect_ycsb_throughput_stats(config)
+            results.append(result)
+        all_results[workload] = results
+    all_results['clients'] = clients
+    print(all_results)
+    dm.save_statistics(all_results,"data/fusee_ycsb")
+
+            # dm.save_statistics(result,"data/fusee_throughput_"+workload)
+
 
     
 
@@ -318,13 +400,17 @@ def run_throughput_trial():
     # result = orch.collect_throughput_stats()
     # dm.save_statistics(result,"data/fusee_throughput")
 
-
-run_throughput_trial()
-pf.plot_tput()
+#run throughput trial
+# run_throughput_trial()
+# pf.plot_tput()
 
 #get raw operation latency numbers
 # run_latency_trial()
 # pf.plot_latency()
+
+#run ycsb throughput trial
+# run_ycsb_throughput_trial()
+pf.plot_ycsb()
 
 
     

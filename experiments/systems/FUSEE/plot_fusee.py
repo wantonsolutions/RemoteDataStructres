@@ -76,3 +76,34 @@ def plot_tput():
     plt.tight_layout()
 
     plt.savefig("FUSEE-initial-throughput.pdf")
+
+def plot_ycsb():
+    fig, ax = plt.subplots(1, 1, figsize=(5, 3))
+    data, dir = dm.load_statistics("data/fusee_ycsb")
+    # data = json.loads(data)
+
+    a = mops(data["workloada"])
+    b = mops(data["workloadb"])
+    c = mops(data["workloadc"])
+    d = mops(data["workloadd"])
+    clients = data["clients"]
+
+    ax.plot(clients,a, marker='x', label="ycsb-a")
+    ax.plot(clients,b, marker='x', label="ycsb-b")
+    ax.plot(clients,c, marker='x', label="ycsb-c")
+    ax.plot(clients,d, marker='x', label="ycsb-d")
+    
+
+    # rcuckoo_insert=[120271.283245,234694.346647,459445.070634,917088.666479] #,1707337.275191,2391186.794957,]
+    # rcuckoo_clients=[1,2,4,8] #,16,24]
+    # rcuckoo_insert = [x / 1000000 for x in rcuckoo_insert]
+    # ax.plot(rcuckoo_clients,rcuckoo_insert, marker='x', label="rcuckoo insert")
+
+    ax.legend(ncol=2)
+    ax.set_ylabel("MOPS")
+    ax.set_xlabel("Clients")
+    ax.set_title("FUSEE YCSB throughput")
+    plt.tight_layout()
+
+    plt.savefig("FUSEE-ycsb-throughput.pdf")
+
