@@ -649,6 +649,7 @@ def throughput_line(ax,stats,label,x_axis="clients"):
         std_errs.append(np.std(single_run_throughputs))
     # x_pos = np.arange(len(success_rates))
     print("throughputs: ", throughputs)
+    print("table size: ", x_axis_vals)
     print("tput errs  : ", std_errs)
     ax.errorbar(x_axis_vals,throughputs,yerr=std_errs,label=label, marker='o', capsize=3)
 
@@ -936,7 +937,8 @@ def get_read_threshold_x_axis(stats):
     return get_config_axis(stats,'read_threshold_bytes')
 
 def get_table_size_x_axis(stats):
-    return get_config_axis(stats,'indexes')
+    axis = get_config_axis(stats,'indexes')
+    return [int(x) for x in axis]
 
 def get_locks_per_message_x_axis(stats):
     return get_config_axis(stats,'locks_per_message')

@@ -40,11 +40,12 @@ class rcuckoo_ssh_wrapper:
             # print("Error code is not zero: ", error_code)
             # print("ERROR:!")
             # print("STDOUT:")
-            result =stdout.read()
-            print(result.decode("utf-8"))
+            stdout_result =stdout.read()
+            # print(result.decode("utf-8"))
             # print("STDERR:")
-            result = stderr.read()
-            print(result.decode("utf-8"))
+            stderr_result = stderr.read()
+            # print(result.decode("utf-8"))
+            return (error_code, stdout_result, stderr_result)
 
     def get_mlx5_ip(self):
         stdin, stdout, stderr = self.ssh.exec_command(
@@ -165,9 +166,11 @@ class Orchestrator:
 
         # print("Server is started with queue pairs", self.queue_pairs)
 
+            # 'export MLX5_SINGLE_THREADED=1;'
         self.client.run_cmd(
             'cd rcuckoo_rdma;'
-            './' + self.client_program_name + ' ' + 'configs/' + self.config_name + ' > client.out 2>&1;'
+            'LD_PRELOAD=libhugetlbfs.so HUGETLB_MORECORE=yes ./' + self.client_program_name + ' ' + 'configs/' + self.config_name + ' > client.out 2>&1;'
+            'cat client.out;'
         )
             # './rdma_client -a ' + server_ip + ' -p 20886 -q '+str(self.queue_pairs)+ ' -x;'
 
