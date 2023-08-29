@@ -20,6 +20,16 @@ import plot_fusee as pf
 
 # import asyncio use this eventually when you want to parallelize the builds
 
+cx5_numa_node_from_host = {
+    'yak-00.sysnet.ucsd.edu': 0,
+    'yak-01.sysnet.ucsd.edu': 0,
+    'yeti-00.sysnet.ucsd.edu': 1,
+    'yeti-01.sysnet.ucsd.edu': 1,
+    'yeti-04.sysnet.ucsd.edu': 1,
+    'yeti-05.sysnet.ucsd.edu': 1,
+    'yeti-08.sysnet.ucsd.edu': 1,
+}
+
 
 class ssh_wrapper:
     def __init__(self, username,hostname):
@@ -38,6 +48,7 @@ class ssh_wrapper:
 
     def set_verbose(self, verbose):
         self.verbose = verbose
+
 
     def run_cmd(self, cmd):
         stdin, stdout, stderr = self.ssh.exec_command(cmd)
@@ -87,18 +98,27 @@ class Orchestrator:
 
 
     server_name = 'yak-00.sysnet.ucsd.edu'
-    client_name = 'yak-01.sysnet.ucsd.edu' 
+    # client_name = 'yak-01.sysnet.ucsd.edu' 
+    client_names = ['yeti-04.sysnet.ucsd.edu', 
+    'yeti-05.sysnet.ucsd.edu']
+    # client_name = 'yeti-05.sysnet.ucsd.edu' 
     config = dict()
     def __init__(self):
         self.server = ssh_wrapper('ssgrant', self.server_name)
-        self.client = ssh_wrapper('ssgrant', self.client_name)
+        self.build_server = ssh_wrapper('ssgrant', 'yak-01.sysnet.ucsd.edu')
+        self.clients=[]
+
+        for client_name in self.client_names:
+            self.clients.append(ssh_wrapper('ssgrant', client_name))
+
+        # self.client = ssh_wrapper('ssgrant', self.client_name)
 
         #pointer to all of the nodes
-        self.all_nodes = [self.client, self.server]
+        self.all_nodes = [self.server] + self.clients + [self.build_server]
 
-        self.build_location = self.client
+        self.build_location = self.build_server
         self.project_directory = '/usr/local/home/ssgrant/RemoteDataStructres/systems/FUSEE'
-        self.sync_dependents = [self.server]
+        self.sync_dependents = [self.server] + self.clients
 
 
 
@@ -125,13 +145,13 @@ class Orchestrator:
 
     def kill(self):
         self.server.run_cmd('echo iwicbV15 | sudo -S killall ' + self.latency_memory_program_name)
-        self.client.run_cmd('echo iwicbV15 | sudo -S killall ' + self.latency_client_program_name)
-
         self.server.run_cmd('echo iwicbV15 | sudo -S killall ' + self.throughput_memory_program_name)
-        self.client.run_cmd('echo iwicbV15 | sudo -S killall ' + self.throughput_client_program_name)
-
         self.server.run_cmd('echo iwicbV15 | sudo -S killall ' + self.ycsb_throughput_memory_program_name)
-        self.client.run_cmd('echo iwicbV15 | sudo -S killall ' + self.ycsb_throughput_client_program_name)
+
+        for client in self.clients:
+            client.run_cmd('echo iwicbV15 | sudo -S killall ' + self.latency_client_program_name)
+            client.run_cmd('echo iwicbV15 | sudo -S killall ' + self.throughput_client_program_name)
+            client.run_cmd('echo iwicbV15 | sudo -S killall ' + self.ycsb_throughput_client_program_name)
 
 
     # def build(self, pull=False, clean=False):
@@ -152,6 +172,14 @@ class Orchestrator:
     #     self.build_location.run_cmd(
     #         'cd ' + self.project_directory + ';'
     #         'make -j ' + str(threads) + ';')
+
+
+    def setup(self):
+        #do hugeppages on the server
+        #200gb of 2mb pages
+        self.server.run_cmd('echo iwicbV15 | sudo hugeadm --pool-pages-min 2MB:102400')
+        for client in self.clients:
+            client.run_cmd('echo iwicbV15 | sudo hugeadm --pool-pages-min 2MB:16384')
 
     def sync(self):
         for dep in self.sync_dependents:
@@ -179,9 +207,10 @@ class Orchestrator:
         thr.start()
         print("Starting client")
 
+        numa_node = cx5_numa_node_from_host[self.client_name]
         client_command=("cd " + self.project_directory + ";"
         "cd build/micro-test;"
-        "numactl -N 0 -m 0 ./" + self.latency_client_program_name + " ../client_config.json &")
+        "numactl -N " + str(numa_node) +" -m "+ str(numa_node) +" ./" + self.latency_client_program_name + " ../client_config.json &")
 
         thr2 = threading.Thread(target=self.client.run_cmd,args=(client_command,), kwargs={})
         thr2.start()
@@ -197,6 +226,9 @@ class Orchestrator:
         print("Running Throughput Test " + str(config))
         print("Starting server")
 
+        self.generate_and_send_configs(config)
+        exit(1)
+
         #run the actual experiment
         self.kill()
         command=("cd " + self.project_directory + ";"
@@ -207,11 +239,12 @@ class Orchestrator:
         thr.start()
         print("Starting client")
 
+        numa_node = cx5_numa_node_from_host[self.client_name]
         client_command=("cd " + self.project_directory + ";"
         "cd build/micro-test;"
         "CLIENTS="+str(config['clients'])+";"
         'rm results/$CLIENTS.tput;'
-        "yes | numactl -N 0 -m 0 ./" + self.throughput_client_program_name + ' ../client_config.json $CLIENTS > results/"$CLIENTS".tput')
+        "yes | numactl -N "+ str(numa_node) +" -m "+ str(numa_node) +" ./" + self.throughput_client_program_name + ' ../client_config.json $CLIENTS > results/"$CLIENTS".tput')
         thr2 = threading.Thread(target=self.client.run_cmd,args=(client_command,), kwargs={})
         thr2.start()
         thr2.join()
@@ -235,13 +268,14 @@ class Orchestrator:
         thr = threading.Thread(target=self.server.run_cmd,args=(command,), kwargs={})
         thr.start()
         print("Starting client")
+        numa_node = cx5_numa_node_from_host[self.client_name]
 
         output_file = "results/"+config["workload"] + '_'+str(config['clients'])+".tput"
         client_command=("cd " + self.project_directory + ";"
         "cd build/ycsb-test;"
         "CLIENTS="+str(config['clients'])+";"
         'rm -f '+output_file +';'
-        "yes | numactl -N 0 -m 0 ./" + self.ycsb_throughput_client_program_name + ' ../client_config.json '+ config["workload"]+ ' $CLIENTS > '+output_file)
+        "yes | numactl -N "+ str(numa_node) +" -m "+ str(numa_node) + " ./" + self.ycsb_throughput_client_program_name + ' ../client_config.json '+ config["workload"]+ ' $CLIENTS > '+output_file)
 
         print(client_command)
         thr2 = threading.Thread(target=self.client.run_cmd,args=(client_command,), kwargs={})
@@ -330,6 +364,59 @@ class Orchestrator:
 
         return tputs
 
+    def open_reference_config(self, filename):
+        try: 
+            f = open(filename, 'r')
+            config = json.load(f)
+        except:
+            print("Error opening config file", filename)
+            exit(0)
+        return config
+
+    def gb_to_bytes(self, gb):
+        return gb * (1024) * (1024) * (1024)
+
+    def generate_and_send_configs(self, config):
+        print("Doing the config thing")
+        print(config)
+
+        #
+
+        #read in the server config
+        server_config = self.open_reference_config("server_config.json")
+        client_config = self.open_reference_config("client_config.json")
+
+        #calculate the server data len
+        server_memory = 100
+        server_config["server_data_len"] = self.gb_to_bytes(server_memory)
+        client_config["server_data_len"] = self.gb_to_bytes(server_memory)
+
+        threads_per_client = int(config["clients"] / len(self.clients))
+        if (threads_per_client * len(self.clients) != config["clients"]):
+            print("ERROR: number of clients must be divisible by the number of machines. clients:", config["clients"], "machines:", len(self.clients))
+            exit(0)
+
+        client_config["num_coroutines"] = threads_per_client
+
+        client_configs=[]
+        index = 0
+        num_servers = 1
+        for client in self.clients:
+            copy_config = copy.deepcopy(client_config)
+            copy_config["server_id"] = num_servers + (index * threads_per_client)
+            client_configs.append(copy_config)
+            index += 1
+
+
+        for conf in client_configs:
+            print(json.dumps(conf, indent=4))
+
+        print(json.dumps(server_config, indent=4))
+        
+
+        print("start here tomorrow I'm in the middle of setting up automatic config generation. At the moment I've also added more than one client to this script, but I've not made it work yet. So this script is broken.")
+
+
 
 
 def run_latency_trial():
@@ -352,9 +439,12 @@ def consolidate_tput_results(clients, operations, tputs):
 
 def run_throughput_trial():
     orch = Orchestrator()
+
+    orch.setup()
     config = dict()
     # clients = [1,2,4,8]
-    clients = [1,2,3,4,5,6,7,8]
+    # clients = [1,2,4,8,16,32,40]
+    clients = [2,4,8,16,32,40]
     run_tputs = []
     operations = ["insert", "search", "update", "delete"]
     config["operations"] = operations
@@ -392,17 +482,9 @@ def run_ycsb_throughput_trial():
 
             # dm.save_statistics(result,"data/fusee_throughput_"+workload)
 
-
-    
-
-    # config["clients"] = 1
-    # orch.run_throughput_test(config)
-    # result = orch.collect_throughput_stats()
-    # dm.save_statistics(result,"data/fusee_throughput")
-
 #run throughput trial
-# run_throughput_trial()
-# pf.plot_tput()
+run_throughput_trial()
+pf.plot_tput()
 
 #get raw operation latency numbers
 # run_latency_trial()
@@ -410,7 +492,7 @@ def run_ycsb_throughput_trial():
 
 #run ycsb throughput trial
 # run_ycsb_throughput_trial()
-pf.plot_ycsb()
+# pf.plot_ycsb()
 
 
     

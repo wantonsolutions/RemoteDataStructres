@@ -21,7 +21,7 @@ def cdf(data):
     return x, y
 
 def mops(data):
-    return [x / 1000000 for x in data]
+    return [x / 1000000 if x is not None else 0 for x in data]
 
 def plot_latency():
     fig, ax = plt.subplots(1, 1, figsize=(5, 3))
