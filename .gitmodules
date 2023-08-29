@@ -10,3 +10,6 @@
 [submodule "systems/Sherman"]
 	path = systems/Sherman
 	url = git@github.com:wantonsolutions/Sherman.git
+[submodule "systems/ROLEX"]
+	path = systems/ROLEX
+	url = git@github.com:wantonsolutions/ROLEX.git
