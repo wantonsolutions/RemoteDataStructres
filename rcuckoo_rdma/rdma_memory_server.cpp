@@ -40,6 +40,17 @@ static struct ibv_sge client_recv_sge, server_send_sge;
 
 static on_chip_memory_attr device_memory;
 
+int stick_thread_to_core(pthread_t thread, int core_id) {
+  int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
+  if (core_id < 0 || core_id >= num_cores) {
+        ALERT("CORE_PIN_DEATH","%s: core_id %d invalid\n", __func__, core_id);
+        exit(0);
+  }
+  cpu_set_t cpuset;
+  CPU_ZERO(&cpuset);
+  CPU_SET(core_id, &cpuset);
+  return pthread_setaffinity_np(thread, sizeof(pthread_t), &cpuset);
+}
 
 
 /* Setup shared resources used for all connections */
@@ -669,6 +680,36 @@ void moniter_run(int num_qps, int print_frequency, bool prime, Memory_State_Mach
 
 }
 
+typedef struct rdma_connection_setup_args {
+    struct sockaddr_in *server_sockaddr;
+    int index;
+    int port;
+} rdma_connection_setup_args;
+
+//void *connection_setup(rdma_connection_setup_args args){
+void *connection_setup(void* void_args){
+    rdma_connection_setup_args args = *((rdma_connection_setup_args *)void_args);
+    /* Each QP will bind to port numbers starting from base port */
+    ALERT("RDMA memory server", "Starting RDMA server thread %d port %d\n", args.index, args.port);
+    int ret = start_rdma_server(args.server_sockaddr, args.index, args.port);
+    if (ret) {
+        rdma_error("RDMA server failed to start cleanly, ret = %d \n", ret);
+        exit(1);
+    }
+    ALERT("RDMA memory server", "RDMA server thread %d setting up resources\n", args.index);
+    ret = setup_client_qp(args.index);
+    if (ret) { 
+        rdma_error("Failed to setup client resources, ret = %d \n", ret);
+        exit(1);
+    }
+    ALERT("RDMA memory server", "RDMA server thread %d accepting client connections\n", args.index);
+    ret = accept_client_connection(args.index);
+    if (ret) {
+        rdma_error("Failed to handle client cleanly, ret = %d \n", ret);
+        exit(1);
+    }
+
+}
 
 
 int main(int argc, char **argv) 
@@ -712,7 +753,19 @@ int main(int argc, char **argv)
      * of things here without also making relevant changes in the client might not 
      * be wise!
      */
+
+    pthread_t thread_ids[MAX_QPS];
+    rdma_connection_setup_args args[MAX_QPS];
+
     for (i = 0; i < num_qps; i++) {
+        // ALERT("RDMA memory server", "FORKING %d\n", i);
+        // args[i].server_sockaddr = &server_sockaddr;
+        // args[i].index = i;
+        // args[i].port = base_port + i;
+        // pthread_create(&thread_ids[i], NULL, &connection_setup, (void *)&args[i]);
+        // stick_thread_to_core(thread_ids[i], 3);
+
+
         /* Each QP will bind to port numbers starting from base port */
         ret = start_rdma_server(&server_sockaddr, i, base_port + i);
         if (ret) {
@@ -730,6 +783,12 @@ int main(int argc, char **argv)
             return ret;
         }
     }
+    // ALERT("RDMA memory server", "Done forking\n");
+    // for (i=0;i<num_qps;i++){
+    //     ALERT("ALERT Memory Server", "Joining Client Connection Thread %d\n", i);
+    //     pthread_join(thread_ids[i],NULL);
+    // }
+    // ALERT("RDMA memory server", "Done joining\n");
     send_inital_memory_stats_to_memcached_server();
     send_inital_experiment_control_to_memcached_server();
     send_table_config_to_memcached_server(msm);

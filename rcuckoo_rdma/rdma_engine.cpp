@@ -177,8 +177,8 @@ namespace cuckoo_rdma_engine {
             ALERT("RDMA Engine", "TODO; we probably need a better way to scale clients if we are going more than this.\n");
             exit(1);
         }
-        pthread_t thread_ids[MAX_THREADS];
 
+        pthread_t thread_ids[MAX_THREADS];
         for(int i=0;i<_num_clients;i++){
             rcuckoo_state_machines[i]->set_global_start_flag(&global_start_flag);
             rcuckoo_state_machines[i]->set_global_end_flag(&global_end_flag);
