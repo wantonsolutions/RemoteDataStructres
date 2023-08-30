@@ -86,9 +86,9 @@ class Orchestrator:
     client_names = [
     'yeti-00.sysnet.ucsd.edu',
     'yeti-01.sysnet.ucsd.edu',
-    # 'yeti-04.sysnet.ucsd.edu', 
+    'yeti-04.sysnet.ucsd.edu', 
     # 'yeti-05.sysnet.ucsd.edu', 
-    # 'yeti-08.sysnet.ucsd.edu'
+    'yeti-08.sysnet.ucsd.edu'
     ]
     config = dict()
     def __init__(self, conf):
@@ -105,7 +105,6 @@ class Orchestrator:
         self.project_directory = '/usr/local/home/ssgrant/RemoteDataStructres/rcuckoo_rdma'
         self.sync_dependents = [self.server] + self.clients
 
-        self.queue_pairs = 24
 
     def validate_run(self):
         # print("Here we should check that the JSON responses make sense, and that the run was successful")
@@ -243,9 +242,8 @@ class Orchestrator:
             './'+ self.memory_program_name + ' ' + 'configs/' + self.config_name + ' > memserver.out 2>&1 &')
         server_thread = threading.Thread(target=self.server.run_cmd, args=(server_command,))
         server_thread.start()
-        time.sleep(1)
+        time.sleep(5)
 
-        # print("Server is started with queue pairs", self.queue_pairs)
 
             # 'export MLX5_SINGLE_THREADED=1;'
         client_threads=[]
@@ -270,7 +268,6 @@ class Orchestrator:
 
 
         # time.sleep(5)
-            # './rdma_client -a ' + server_ip + ' -p 20886 -q '+str(self.queue_pairs)+ ' -x;'
 
 def fix_stats(stats, config):
     print("fixing the number of clients")
