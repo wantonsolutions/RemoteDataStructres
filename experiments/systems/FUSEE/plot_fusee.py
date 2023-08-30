@@ -21,7 +21,8 @@ def cdf(data):
     return x, y
 
 def mops(data):
-    return [x / 1000000 if x is not None else 0 for x in data]
+    # return [x / 1000000 if x is not None else 0 for x in data]
+    return [float(x) if x is not None else 0 for x in data]
 
 def plot_latency():
     fig, ax = plt.subplots(1, 1, figsize=(5, 3))
@@ -81,17 +82,16 @@ def plot_ycsb():
     fig, ax = plt.subplots(1, 1, figsize=(5, 3))
     data, dir = dm.load_statistics("data/fusee_ycsb")
     # data = json.loads(data)
+    workloads = ["workloada", "workloadb", "workloadc", "workloadd"]
+    workload_labels = ["ycsb-a", "ycsb-b", "ycsb-c", "ycsb-d"]
 
-    a = mops(data["workloada"])
-    b = mops(data["workloadb"])
-    c = mops(data["workloadc"])
-    d = mops(data["workloadd"])
-    clients = data["clients"]
-
-    ax.plot(clients,a, marker='x', label="ycsb-a")
-    ax.plot(clients,b, marker='x', label="ycsb-b")
-    ax.plot(clients,c, marker='x', label="ycsb-c")
-    ax.plot(clients,d, marker='x', label="ycsb-d")
+    for load, label in zip(workloads, workload_labels):
+        try:
+            workload_data = mops(data[load])
+            clients = data["clients"]
+            ax.plot(clients,workload_data, marker='x', label=label)
+        except:
+            continue
     
 
     # rcuckoo_insert=[120271.283245,234694.346647,459445.070634,917088.666479] #,1707337.275191,2391186.794957,]
@@ -106,4 +106,55 @@ def plot_ycsb():
     plt.tight_layout()
 
     plt.savefig("FUSEE-ycsb-throughput.pdf")
+
+
+def extract_multiple_ycsb_runs(total_runs=10):
+    runs = []
+    print("Attempting to extract {} ycsb runs".format(total_runs))
+    for i in range(total_runs):
+        try :
+            data, dir = dm.load_statistics("data/fusee_ycsb_{}".format(i))
+            runs.append(data)
+        except:
+            print("Failed to load data for run {}".format(i))
+
+    print("Successfully able to extract {} ycsb runs".format(len(runs)))
+    return runs
+
+def average_runs(runs, workload):
+    workload_data = []
+    for run in runs:
+        workload_data.append(mops(run[workload]))
+    workload_data = np.array(workload_data)
+    workload_data[workload_data == 0] = np.nan
+    avg = np.nanmean(workload_data, axis=0)
+    err = np.nanstd(workload_data, axis=0)
+    return avg, err
+
+
+def plot_ycsb_multi_run():
+    fig, ax = plt.subplots(1, 1, figsize=(5, 3))
+    runs = extract_multiple_ycsb_runs(5)
+
+    workloads = ["workloada", "workloadb", "workloadc", "workloadd"]
+    workload_labels = ["ycsb-a", "ycsb-b", "ycsb-c", "ycsb-d"]
+
+    for load, label in zip(workloads, workload_labels):
+        avg, err = average_runs(runs, load)
+        print(label)
+        print("threads=", runs[0]["clients"])
+        print("avg_ops=", avg)
+        # exit(0)
+        # print(avg, err, runs[0]["clients"], label)
+        ax.errorbar(runs[0]["clients"], avg, yerr=err, marker='x', label=label)
+
+    ax.legend(ncol=2)
+    ax.set_ylabel("MOPS")
+    ax.set_xlabel("Clients")
+    ax.set_title("FUSEE YCSB throughput")
+    plt.tight_layout()
+    plt.savefig("FUSEE-ycsb-throughput-multi.pdf")
+
+# def __main__():
+plot_ycsb_multi_run()
 

@@ -118,8 +118,8 @@ def fill_factor_single_client(config):
     dm.save_statistics(runs)
 
 def client_fill_to_50_exp(config):
-    clients = [1, 2, 4, 8, 16, 24]
-    # clients = [4, 8, 16, 24]
+    # clients = [1, 2, 4, 8, 16, 24]
+    clients = [24]
     runs = []
     config["prime"]="false"
     config["max_fill"]="50"

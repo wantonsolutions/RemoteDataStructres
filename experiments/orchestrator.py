@@ -11,6 +11,10 @@ import tempfile
 from tqdm import tqdm
 import copy
 
+import threading
+
+import time
+
 # import asyncio use this eventually when you want to parallelize the builds
 
 
@@ -34,6 +38,10 @@ class rcuckoo_ssh_wrapper:
 
     def run_cmd(self, cmd):
         stdin, stdout, stderr = self.ssh.exec_command(cmd)
+        stdout_result =stdout.read()
+        stderr_result = stderr.read()
+        print("stdout: ", stdout_result.decode("utf-8"))
+        print("stderr: ", stderr_result.decode("utf-8"))
 
         error_code = stdout.channel.recv_exit_status()
         if (self.verbose) or (error_code != 0):
@@ -49,7 +57,7 @@ class rcuckoo_ssh_wrapper:
 
     def get_mlx5_ip(self):
         stdin, stdout, stderr = self.ssh.exec_command(
-            "ifconfig -a | grep enp -A 1 | tail -1 | awk '{print $2}'"
+            "dev=`ibdev2netdev | awk '{print $5}'`; ifconfig -a | grep $dev -A 1 | tail -1 | awk '{print $2}'"
         )
         return stdout.read().decode("utf-8").strip()
 
@@ -58,7 +66,7 @@ class rcuckoo_ssh_wrapper:
         if ip == "":
             print("ERROR: mlx5 ip is empty")
             exit()
-        # print("Sanity Check: mlx5 ip is", ip)
+        print("Sanity Check: mlx5 ip is", ip)
 
     def __del__(self):
         self.ssh.close()
@@ -73,18 +81,29 @@ class Orchestrator:
     config_name = "remote_config.json"
     statistics_file = "statistics/statistics.json"
     server_name = 'yak-00.sysnet.ucsd.edu'
-    client_name = 'yak-01.sysnet.ucsd.edu' 
+    build_server_name = 'yak-01.sysnet.ucsd.edu'
+    # client_name = 'yak-01.sysnet.ucsd.edu' 
+    client_names = [
+    'yeti-00.sysnet.ucsd.edu',
+    'yeti-01.sysnet.ucsd.edu',
+    # 'yeti-04.sysnet.ucsd.edu', 
+    # 'yeti-05.sysnet.ucsd.edu', 
+    # 'yeti-08.sysnet.ucsd.edu'
+    ]
     config = dict()
     def __init__(self, conf):
         self.server = rcuckoo_ssh_wrapper('ssgrant', self.server_name)
-        self.client = rcuckoo_ssh_wrapper('ssgrant', self.client_name)
+        self.build_server = rcuckoo_ssh_wrapper('ssgrant', self.build_server_name)
+        self.clients=[]
+        for client_name in self.client_names:
+            self.clients.append(rcuckoo_ssh_wrapper('ssgrant', client_name))
 
         #pointer to all of the nodes
-        self.all_nodes = [self.client, self.server]
+        self.all_nodes = [self.server] + self.clients + [self.build_server]
 
-        self.build_location = self.client
+        self.build_location = self.build_server
         self.project_directory = '/usr/local/home/ssgrant/RemoteDataStructres/rcuckoo_rdma'
-        self.sync_dependents = [self.server]
+        self.sync_dependents = [self.server] + self.clients
 
         self.queue_pairs = 24
 
@@ -101,22 +120,80 @@ class Orchestrator:
                 'cd rcuckoo_rdma/configs;'
                 'echo \'' + json.dumps(config) + '\' > ' + config_name + ';')
 
+    def get_threads_per_machine(self,config):
+        threads_per_client = int(int(config["num_clients"]) / len(self.clients))
+        if (threads_per_client * len(self.clients) != int(config["num_clients"])):
+            print("ERROR: number of clients must be divisible by the number of machines. clients:", config["num_clients"], "machines:", len(self.clients))
+            exit(0)
+        return threads_per_client
+
+    def generate_and_send_configs(self, config, config_name):
+        #start by checking the config
+
+        threads_per_machine = self.get_threads_per_machine(config)
+        print("threads per machine:", threads_per_machine)
+
+        if not "base_port" in config:
+            default_base_port=8500
+            print("WARNING: base_port should be specified in the config using default ", default_base_port)
+            config["base_port"] = str(default_base_port)
+
+        memory_server_addr = self.server.get_mlx5_ip()
+        print("memory server address:", memory_server_addr)
+        if memory_server_addr == "":
+            print("ERROR: mlx5 ip is empty (how):", memory_server_addr)
+            exit()
+        if not "server_address" in config:
+            print("WARNING: server_address should be specified in the config using default ", memory_server_addr)
+            config["server_address"] = memory_server_addr
+
+        if config["server_address"] != memory_server_addr:
+            print("ERROR: server_address in config does not match mlx5 ip")
+            exit()
+
+        ##at this point we should be good to generate the configs
+        #send the memory configuration to the memory server
+
+        self.server.run_cmd(
+            'cd rcuckoo_rdma/configs;'
+            'echo \'' + json.dumps(config) + '\' > ' + config_name + ';')
+
+        #send the client configuration to the clients
+        base_port = int(config["base_port"])
+        config["num_clients"] = threads_per_machine
+        for client in self.clients:
+            config["base_port"] = str(base_port)
+            client.run_cmd(
+                'cd rcuckoo_rdma/configs;'
+                'echo \'' + json.dumps(config) + '\' > ' + config_name + ';')
+            base_port += threads_per_machine
+
+
+
 
     def collect_stats(self):
         temp_dir = tempfile.TemporaryDirectory()
         # print(temp_dir.name)
 
+        master_stats = dict()
         client_stat_filename = 'client_statistics.json'
-        remote_client_stat_filename = 'rcuckoo_rdma/statistics/'+client_stat_filename
+        remote_client_stat_filename = self.project_directory + '/statistics/'+client_stat_filename
         local_client_stat_filename = temp_dir.name+'/'+client_stat_filename
-        self.client.get(remote_client_stat_filename, local_client_stat_filename)
+        for i, client in enumerate(self.clients):
+            client.get(remote_client_stat_filename, local_client_stat_filename)
+            f = open(local_client_stat_filename, 'r')
+            client_stat = json.load(f)
+            if i ==0:
+                master_stats = client_stat
+            else:
+                clients = master_stats["clients"]
+                t_clients = client_stat["clients"]
+                clients.extend(t_clients)
+                master_stats["clients"] = clients
 
-        #we need to get the memory json
-
-        f = open(local_client_stat_filename, 'r')
-        client_stat = json.load(f)
+            f.close()
         temp_dir.cleanup()
-        return client_stat
+        return master_stats
 
     def set_verbose(self, verbose):
         for node in self.all_nodes:
@@ -124,7 +201,8 @@ class Orchestrator:
 
     def kill(self):
         self.server.run_cmd('echo iwicbV15 | sudo -S killall ' + self.memory_program_name)
-        self.client.run_cmd('echo iwicbV15 | sudo -S killall ' + self.client_program_name)
+        for client in self.clients:
+            client.run_cmd('echo iwicbV15 | sudo -S killall ' + self.client_program_name)
 
 
     def build(self, pull=False, clean=False):
@@ -160,19 +238,56 @@ class Orchestrator:
 
     def run(self):
         # print("Starting RDMA Benchmark")
-        self.server.run_cmd(
-            'cd rcuckoo_rdma;'
+
+        server_command=('cd rcuckoo_rdma;'
             './'+ self.memory_program_name + ' ' + 'configs/' + self.config_name + ' > memserver.out 2>&1 &')
+        server_thread = threading.Thread(target=self.server.run_cmd, args=(server_command,))
+        server_thread.start()
+        time.sleep(1)
 
         # print("Server is started with queue pairs", self.queue_pairs)
 
             # 'export MLX5_SINGLE_THREADED=1;'
-        self.client.run_cmd(
-            'cd rcuckoo_rdma;'
-            'LD_PRELOAD=libhugetlbfs.so HUGETLB_MORECORE=yes ./' + self.client_program_name + ' ' + 'configs/' + self.config_name + ' > client.out 2>&1;'
-            'cat client.out;'
+        client_threads=[]
+        client_command=(
+                'cd rcuckoo_rdma;'
+                'LD_PRELOAD=libhugetlbfs.so HUGETLB_MORECORE=yes ./' + self.client_program_name + ' ' + 'configs/' + self.config_name + ' > client.out 2>&1;'
+                'cat client.out;'
         )
+        for client in self.clients:
+            print("Preparing client on", client.hostname)
+            client_thread = threading.Thread(target=client.run_cmd, args=(client_command,))
+            client_threads.append(client_thread)
+
+        print("Starting all clients")
+        for client_thread in client_threads:
+            client_thread.start()
+        print("waiting for clients to join") 
+        for client_thread in client_threads:
+            client_thread.join()
+
+        self.kill()
+
+
+        # time.sleep(5)
             # './rdma_client -a ' + server_ip + ' -p 20886 -q '+str(self.queue_pairs)+ ' -x;'
+
+def fix_stats(stats, config):
+    print("fixing the number of clients")
+
+    #make sure that the total number of clients is correct
+    clients = stats["clients"]
+    for i, client in enumerate(clients):
+        clients[i]["client_id"] = str(i)
+        clients[i]["stats"]["client_id"] = str(i)
+        clients[i]["stats"]["num_clients"] = len(clients)
+    stats["clients"] = clients
+
+    stats["config"]["num_clients"] = len(clients)
+    return stats
+
+
+
 
     
 def run_trials(config):
@@ -182,7 +297,8 @@ def run_trials(config):
         c=copy.copy(config)
         orch = Orchestrator(c)
         #prepare for the run
-        orch.transfer_configs_to_nodes(config, "remote_config.json")
+        # orch.transfer_configs_to_nodes(config, "remote_config.json")
+        orch.generate_and_send_configs(config, "remote_config.json")
         orch.sanity_check()
         orch.kill()
         stats_collected = False
@@ -197,6 +313,7 @@ def run_trials(config):
         if not stats_collected:
             orch.validate_run()
             stats = orch.collect_stats()
+            stats = fix_stats(stats, config)
         runs.append(stats)
         del orch
     return runs
