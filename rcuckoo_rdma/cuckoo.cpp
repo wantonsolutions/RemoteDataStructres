@@ -1048,10 +1048,10 @@ namespace cuckoo_rcuckoo {
                 if (_search_context.open_buckets.size() != _locks_held.size()) {
                     WARNING("PRECRASH", "Client %d is about to crash\n", _id);
                     WARNING(log_id(), "search_buckets.size() != _locks_held.size()\n");
-                    WARNING(log_id(), "search_buckets.size() = %d\n", search_buckets.size());
+                    WARNING(log_id(), "search_buckets.size() = %d\n", _search_context.open_buckets.size());
                     WARNING(log_id(), "_locks_held.size() = %d\n", _locks_held.size());
                     for (int i=0; i < _search_context.open_buckets.size(); i++) {
-                        WARNING(log_id(), "search_buckets[%d] = %d\n", i, search_buckets[i]);
+                        WARNING(log_id(), "search_buckets[%d] = %d\n", i, _search_context.open_buckets[i]);
                 
                     }
                     for (int i=0; i < _locks_held.size(); i++) {
@@ -1162,7 +1162,7 @@ namespace cuckoo_rcuckoo {
             _state = IDLE;
             return;
         }
-        VERBOSE("search", "Successful local search for [key %s] -> [path %s]\n", _current_insert_key.to_string().c_str(), path_to_string(_search_path).c_str());
+        // VERBOSE("search", "Successful local search for [key %s] -> [path %s]\n", _current_insert_key.to_string().c_str(), path_to_string(_search_path).c_str());
         _state = AQUIRE_LOCKS;
 
 
