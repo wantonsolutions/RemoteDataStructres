@@ -1288,6 +1288,11 @@ namespace cuckoo_rcuckoo {
         return insert_direct();
     }
 
+    void RCuckoo::get_direct(void) {
+        ALERT("get_direct", "not implemented\n");
+        return;
+    }
+
 
     void RCuckoo::rdma_fsm(void) {
 
@@ -1324,8 +1329,8 @@ namespace cuckoo_rcuckoo {
                     } else if (next_request.op == GET) {
                         _operation_start_time = get_current_ns();
                         _current_read_key = next_request.key;
-                        throw logic_error("ERROR: GET not implemented");
-                        // response=get();
+                        // throw logic_error("ERROR: GET not implemented");
+                        get_direct();
                     } else {
                         printf("ERROR: unknown operation\n");
                         throw logic_error("ERROR: unknown operation");
