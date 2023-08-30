@@ -13,6 +13,7 @@
 #include "memcached.h"
 #include "config.h"
 #include "log.h"
+#include <mutex>
 
 using namespace std;
 using namespace cuckoo_state_machines;
@@ -26,6 +27,7 @@ using namespace cuckoo_state_machines;
 static struct ibv_context **devices;
 static struct rdma_event_channel *cm_event_channel = NULL;
 static struct rdma_cm_id *cm_server_qp_id[MAX_QPS] = {NULL}, *cm_client_qp_id[MAX_QPS] = {NULL};
+static struct rdma_cm_id *cm_actual_qp_id[MAX_QPS] = {NULL};
 static struct ibv_pd *pd = NULL;
 static struct ibv_comp_channel *io_completion_channel = NULL;
 static struct ibv_cq *cq = NULL;
@@ -38,7 +40,140 @@ static struct ibv_recv_wr client_recv_wr, *bad_client_recv_wr = NULL;
 static struct ibv_send_wr server_send_wr, *bad_server_send_wr = NULL;
 static struct ibv_sge client_recv_sge, server_send_sge;
 
+static struct rdma_cm_event * event_mailbox[MAX_QPS];
+
+std::mutex event_mailbox_lock;
+
+int rdma_cm_event_to_qp_id(struct rdma_cm_event * event) {
+  rdma_cm_id * id;
+  if (event->listen_id != NULL) {
+    id = event->listen_id;
+    for(int i=0;i<MAX_QPS;i++) {
+        if (cm_server_qp_id[i] == id) {
+        return i;
+        }
+    }
+  } 
+  //printf("dang, listen id is NULL\n");
+  if (event->id != NULL) {
+    id = event->id;
+    for(int i=0;i<MAX_QPS;i++) {
+        if (cm_actual_qp_id[i] == id) {
+        return i;
+        }
+    }
+  } 
+  //printf("dang, id is NULL\n");
+  printf("unable to find qp_id for event\n");
+  exit(0);
+}
+
+void add_event_to_mailbox(struct rdma_cm_event * event, int qp_id) {
+  event_mailbox_lock.lock();
+  if (event_mailbox[qp_id] != NULL) {
+    ALERT("RDMA Common", "Mailbox for qp_id %d is not empty. This should not happen", qp_id);
+    exit(0);
+  }
+  event_mailbox[qp_id] = event;
+  event_mailbox_lock.unlock();
+}
+
+void get_event_from_mailbox(struct rdma_cm_event ** event, int qp_id) {
+  event_mailbox_lock.lock();
+  *event = event_mailbox[qp_id];
+  if (*event != NULL) {
+    event_mailbox[qp_id] = NULL;
+  }
+  event_mailbox_lock.unlock();
+  return;
+}
+
+void poll_get_event_from_mailbox(struct rdma_cm_event **event, int qp_id) {
+  get_event_from_mailbox(event, qp_id);
+  while(*event == NULL) {
+    get_event_from_mailbox(event, qp_id);
+  }
+  return;
+}
+
 static on_chip_memory_attr device_memory;
+
+int stick_thread_to_core(pthread_t thread, int core_id) {
+  int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
+  if (core_id < 0 || core_id >= num_cores) {
+        ALERT("CORE_PIN_DEATH","%s: core_id %d invalid\n", __func__, core_id);
+        exit(0);
+  }
+  cpu_set_t cpuset;
+  CPU_ZERO(&cpuset);
+  CPU_SET(core_id, &cpuset);
+  return pthread_setaffinity_np(thread, sizeof(pthread_t), &cpuset);
+}
+
+
+// int process_rdma_cm_event(struct rdma_event_channel *echannel, 
+// 		enum rdma_cm_event_type expected_event,
+// 		struct rdma_cm_event **cm_event)
+// {
+// 	int ret = 1;
+// 	ret = rdma_get_cm_event(echannel, cm_event);
+// 	if (ret) {
+// 		ALERT("RDMA Common", "Failed to retrieve a cm event, errno: %d \n",
+// 				-errno);
+// 		return -errno;
+// 	}
+// 	/* lets see, if it was a good event */
+// 	if(0 != (*cm_event)->status){
+// 		ALERT("RDMA Common", "CM event has non zero status: %d\n", (*cm_event)->status);
+// 		ret = -((*cm_event)->status);
+// 		/* important, we acknowledge the event */
+// 		rdma_ack_cm_event(*cm_event);
+// 		return ret;
+// 	}
+// 	/* if it was a good event, was it of the expected type */
+// 	if ((*cm_event)->event != expected_event) {
+// 		ALERT("RDMA Common", "Unexpected event received: %s [ expecting: %s ]", 
+// 				rdma_event_str((*cm_event)->event),
+// 				rdma_event_str(expected_event));
+// 		/* important, we acknowledge the event */
+// 		rdma_ack_cm_event(*cm_event);
+// 		return -1; // unexpected event :(
+// 	}
+// 	VERBOSE("RDMA Common", "A new %s type event is received \n", rdma_event_str((*cm_event)->event));
+// 	/* The caller must acknowledge the event */
+// 	return ret;
+// }
+
+void * connection_event_manager_loop(void *) {
+    while(true) {
+        struct rdma_cm_event *cm_event = NULL;
+        int ret = 1;
+        ret = rdma_get_cm_event(cm_event_channel, &cm_event);
+        if (ret) {
+            rdma_error("Failed to retrieve a cm event, errno: %d \n", -errno);
+            return NULL;
+        }
+        /* lets see, if it was a good event */
+        if(0 != cm_event->status){
+            rdma_error("CM event has non zero status: %d\n", cm_event->status);
+            ret = -(cm_event->status);
+            /* important, we acknowledge the event */
+            rdma_ack_cm_event(cm_event);
+            return NULL;
+        }
+        int mailbox_id = rdma_cm_event_to_qp_id(cm_event);
+        if (mailbox_id == -1) {
+          rdma_error("Unknown qp_id for cm_event\n");
+          return NULL;
+        }
+        // printf("event received: %s\n", 
+                // rdma_event_str(cm_event->event));
+        // printf("adding event to mailbox %d\n", mailbox_id);
+        add_event_to_mailbox(cm_event, mailbox_id);
+        //Now we need to store the event somewhere so that other threads can get it.
+
+    }
+}
 
 
 
@@ -193,6 +328,8 @@ static int start_rdma_server(struct sockaddr_in *server_addr, int qp_num, int po
         rdma_error("Failed to bind server address, errno: %d \n", -errno);
         return -errno;
     }
+    // cm_server_qp_id[qp_num]->port_num = port_num;
+    // printf("we are bound to port num %d should be in id also %d\n", port_num, cm_server_qp_id[qp_num]->port_num);
     debug("Server RDMA CM id is successfully binded \n");
     /* Now we start to listen on the passed IP and port. However unlike
     * normal TCP listen, this is a non-blocking call. When a new client is 
@@ -200,6 +337,7 @@ static int start_rdma_server(struct sockaddr_in *server_addr, int qp_num, int po
     * RDMA CM event channel from where the listening id was created. Here we
     * have only one channel, so it is easy. */
     ret = rdma_listen(cm_server_qp_id[qp_num], 8); /* backlog = 8 clients, same as TCP, see man listen*/
+
     if (ret) {
         rdma_error("rdma_listen failed to listen on server address, errno: %d ",
                 -errno);
@@ -212,9 +350,34 @@ static int start_rdma_server(struct sockaddr_in *server_addr, int qp_num, int po
     * We wait (block) on the connection management event channel for 
     * the connect event. 
     */
-    ret = process_rdma_cm_event(cm_event_channel, 
-            RDMA_CM_EVENT_CONNECT_REQUEST,
-            &cm_event);
+
+
+    poll_get_event_from_mailbox(&cm_event, qp_num);
+    if (cm_event->event != RDMA_CM_EVENT_CONNECT_REQUEST) {
+        rdma_error("RDMA connect request event expected but got %d \n", cm_event->event);
+        return -1;
+    }
+
+    // ret = process_rdma_cm_event(cm_event_channel, 
+    //         RDMA_CM_EVENT_CONNECT_REQUEST,
+    //         &cm_event);
+
+    //Keep this part
+    if (cm_event) {
+        // printf("rdma id pointer     %p\n", cm_server_qp_id[qp_num]);
+        // printf("rdma client id pointer     %p\n", cm_client_qp_id[qp_num]);
+        // printf("cm eveint id ponter %p\n", cm_event->id);
+        // printf("cm event listen poi %p\n", cm_event->listen_id);
+        // printf("about to print cm event\n");
+        if (cm_event->listen_id == cm_server_qp_id[qp_num]) {
+            //make an assignment for the actual id 
+            cm_actual_qp_id[qp_num] = cm_event->id;
+            // printf("got an event on the channel we wanted\n");
+            // printf("CM event port num %d\n", cm_event->id->);
+        }
+
+    }
+    // printf("CM event id %d qp_id %d", cm_event->id, cm_event->id->qp->qp_num);
     if (ret) {
         rdma_error("Failed to get cm event, ret = %d \n" , ret);
         return ret;
@@ -294,9 +457,20 @@ static int accept_client_connection(int qp_num)
     * as well as the client sides.
     */
     debug("Going to wait for : RDMA_CM_EVENT_ESTABLISHED event \n");
-    ret = process_rdma_cm_event(cm_event_channel, 
-            RDMA_CM_EVENT_ESTABLISHED,
-            &cm_event);
+
+    poll_get_event_from_mailbox(&cm_event, qp_num);
+    if (cm_event->event != RDMA_CM_EVENT_ESTABLISHED) {
+        rdma_error("Unexpected event received: %s, expecting %s \n", 
+                rdma_event_str(cm_event->event), 
+                rdma_event_str(RDMA_CM_EVENT_ESTABLISHED));
+        return -EINVAL;
+    }
+
+
+    // ret = process_rdma_cm_event(cm_event_channel, 
+    //         RDMA_CM_EVENT_ESTABLISHED,
+    //         &cm_event);
+
     if (ret) {
         rdma_error("Failed to get the cm event, errnp: %d \n", -errno);
         return -errno;
@@ -334,6 +508,11 @@ static void send_inital_experiment_control_to_memcached_server() {
     ec.experiment_stop = false;
     ec.priming_complete = false;
     memcached_publish_experiment_control(&ec);
+}
+static void start_distributed_experiment(){
+    experiment_control *ec = (experiment_control *)memcached_get_experiment_control();
+    ec->experiment_start = true;
+    memcached_publish_experiment_control(ec);
 }
 
 static void end_experiment_globally(){
@@ -545,9 +724,15 @@ static int disconnect_and_cleanup(int num_qps)
     for (i = 0; i < num_qps; i++) {
         /* Now we wait for the client to send us disconnect events for all QPs */
         debug("Waiting for cm event: RDMA_CM_EVENT_DISCONNECTED\n");
-        ret = process_rdma_cm_event(cm_event_channel, 
-                RDMA_CM_EVENT_DISCONNECTED, 
-                &cm_event);
+
+        poll_get_event_from_mailbox(&cm_event, i);
+        if (cm_event->event != RDMA_CM_EVENT_DISCONNECTED) {
+            rdma_error("RDMA connect request event expected but got %d \n", cm_event->event);
+            return -1;
+        }
+        // ret = process_rdma_cm_event(cm_event_channel, 
+        //         RDMA_CM_EVENT_DISCONNECTED, 
+        //         &cm_event);
         if (ret) {
             rdma_error("Failed to get disconnect event, ret = %d \n", ret);
             return ret;
@@ -669,6 +854,36 @@ void moniter_run(int num_qps, int print_frequency, bool prime, Memory_State_Mach
 
 }
 
+typedef struct rdma_connection_setup_args {
+    struct sockaddr_in *server_sockaddr;
+    int index;
+    int port;
+} rdma_connection_setup_args;
+
+//void *connection_setup(rdma_connection_setup_args args){
+void *connection_setup(void* void_args){
+    rdma_connection_setup_args args = *((rdma_connection_setup_args *)void_args);
+    /* Each QP will bind to port numbers starting from base port */
+    ALERT("RDMA memory server", "Starting RDMA server thread %d port %d\n", args.index, args.port);
+    int ret = start_rdma_server(args.server_sockaddr, args.index, args.port);
+    if (ret) {
+        rdma_error("RDMA server failed to start cleanly, ret = %d \n", ret);
+        exit(1);
+    }
+    ALERT("RDMA memory server", "RDMA server thread %d setting up resources\n", args.index);
+    ret = setup_client_qp(args.index);
+    if (ret) { 
+        rdma_error("Failed to setup client resources, ret = %d \n", ret);
+        exit(1);
+    }
+    ALERT("RDMA memory server", "RDMA server thread %d accepting client connections\n", args.index);
+    ret = accept_client_connection(args.index);
+    if (ret) {
+        rdma_error("Failed to handle client cleanly, ret = %d \n", ret);
+        exit(1);
+    }
+
+}
 
 
 int main(int argc, char **argv) 
@@ -712,27 +927,55 @@ int main(int argc, char **argv)
      * of things here without also making relevant changes in the client might not 
      * be wise!
      */
-    for (i = 0; i < num_qps; i++) {
-        /* Each QP will bind to port numbers starting from base port */
-        ret = start_rdma_server(&server_sockaddr, i, base_port + i);
-        if (ret) {
-            rdma_error("RDMA server failed to start cleanly, ret = %d \n", ret);
-            return ret;
-        }
-        ret = setup_client_qp(i);
-        if (ret) { 
-            rdma_error("Failed to setup client resources, ret = %d \n", ret);
-            return ret;
-        }
-        ret = accept_client_connection(i);
-        if (ret) {
-            rdma_error("Failed to handle client cleanly, ret = %d \n", ret);
-            return ret;
-        }
-    }
+
+    ALERT("RDMA memory server", "RDMA server setting up distributed resources\n");
     send_inital_memory_stats_to_memcached_server();
     send_inital_experiment_control_to_memcached_server();
     send_table_config_to_memcached_server(msm);
+
+    pthread_t thread_ids[MAX_QPS];
+    rdma_connection_setup_args args[MAX_QPS];
+
+
+    pthread_t connection_event_manager;
+
+    pthread_create(&connection_event_manager, NULL, &connection_event_manager_loop, NULL);
+
+    for (i = 0; i < num_qps; i++) {
+        ALERT("RDMA memory server", "FORKING %d\n", i);
+        args[i].server_sockaddr = &server_sockaddr;
+        args[i].index = i;
+        args[i].port = base_port + i;
+        pthread_create(&thread_ids[i], NULL, &connection_setup, (void *)&args[i]);
+        stick_thread_to_core(thread_ids[i], 3);
+
+
+        /* Each QP will bind to port numbers starting from base port */
+        // ret = start_rdma_server(&server_sockaddr, i, base_port + i);
+        // if (ret) {
+        //     rdma_error("RDMA server failed to start cleanly, ret = %d \n", ret);
+        //     return ret;
+        // }
+        // ret = setup_client_qp(i);
+        // if (ret) { 
+        //     rdma_error("Failed to setup client resources, ret = %d \n", ret);
+        //     return ret;
+        // }
+        // ret = accept_client_connection(i);
+        // if (ret) {
+        //     rdma_error("Failed to handle client cleanly, ret = %d \n", ret);
+        //     return ret;
+        // }
+    }
+    ALERT("RDMA memory server", "Done forking\n");
+    for (i=0;i<num_qps;i++){
+        ALERT("ALERT Memory Server", "Joining Client Connection Thread %d\n", i);
+        pthread_join(thread_ids[i],NULL);
+    }
+    ALERT("RDMA memory server", "Done joining\n");
+
+    ALERT("RDMA memory server", "Starting Experiment\n");
+    start_distributed_experiment();
 
 
     // /* Exchange metadata */

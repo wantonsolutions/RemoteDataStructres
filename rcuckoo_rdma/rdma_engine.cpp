@@ -140,11 +140,6 @@ namespace cuckoo_rdma_engine {
         return;
     }
 
-    void RDMA_Engine::start_distributed_experiment(){
-        experiment_control *ec = (experiment_control *)memcached_get_experiment_control();
-        ec->experiment_start = true;
-        memcached_publish_experiment_control(ec);
-    }
 
     experiment_control * RDMA_Engine::get_experiment_control(){
         return memcached_get_experiment_control();
@@ -177,8 +172,8 @@ namespace cuckoo_rdma_engine {
             ALERT("RDMA Engine", "TODO; we probably need a better way to scale clients if we are going more than this.\n");
             exit(1);
         }
-        pthread_t thread_ids[MAX_THREADS];
 
+        pthread_t thread_ids[MAX_THREADS];
         for(int i=0;i<_num_clients;i++){
             rcuckoo_state_machines[i]->set_global_start_flag(&global_start_flag);
             rcuckoo_state_machines[i]->set_global_end_flag(&global_end_flag);
@@ -198,12 +193,17 @@ namespace cuckoo_rdma_engine {
         using std::chrono::duration;
         using std::chrono::milliseconds;
 
-        SUCCESS("RDMA Engine", "Starting Experiment\n");
+        while(true){
+            experiment_control *ec = get_experiment_control();
+            if(ec->experiment_start){
+                ALERT("RDMA Engine", "Experiment Starting Globally\n");
+                global_start_flag = true;
+                break;
+            }
+        }
 
-        start_distributed_experiment();
         //Start the treads
         auto t1 = high_resolution_clock::now();
-        global_start_flag = true;
         bool priming_action_taken = false;
 
         while(true){

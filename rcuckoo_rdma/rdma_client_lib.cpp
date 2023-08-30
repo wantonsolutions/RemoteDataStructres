@@ -42,7 +42,7 @@ void RDMAConnectionManager::CheckDMSupported(struct ibv_context *ctx) {
   attrs.comp_mask |= IBV_EXP_DEVICE_ATTR_MAX_DM_SIZE;
 
   if (ibv_exp_query_device(ctx, &attrs)) {
-    printf("Couldn't query device attributes\n");
+    printf("Couldn't query device attributes: error %s\n", strerror(errno));
   }
 
   if (!(attrs.comp_mask & IBV_EXP_DEVICE_ATTR_MAX_DM_SIZE)) {
@@ -256,7 +256,6 @@ RDMAConnectionManager::RDMAConnectionManager(RDMAConnectionManagerArguments args
     }
 
     #ifdef __LOG_INFO
-    CheckCapabilities();
     #endif
 
     /* Connect the local QPs to the ones on server. 
@@ -326,6 +325,10 @@ int RDMAConnectionManager::client_setup_shared_resources()
     SUCCESS("Connection Manager", "%d devices found, using the first one: %s\n", ret, devices[0]->device->name);
     for(int i = 0; i < ret; i++)    VERBOSE("Connection Manager", "Device %d: %s\n", i+1, devices[i]->device->name);
 
+
+
+    CheckCapabilities();
+
     /* Create shared resources for all conections per device i.e., cq, pd, etc */
     /* Protection Domain (PD) is similar to a "process abstraction" 
      * in the operating system. All resources are tied to a particular PD. 
@@ -368,7 +371,7 @@ int RDMAConnectionManager::client_setup_shared_resources()
     /*  Open a channel used to report asynchronous communication event */
     cm_event_channel = rdma_create_event_channel();
     if (!cm_event_channel) {
-        ALERT("Connection Manager", "Creating cm event channel failed, errno: %d \n", -errno);
+        ALERT("Connection Manager", "Creating cm event channel failed, errno: %s \n", strerror(errno));
         return -errno;
     }
     SUCCESS("Connection Manager", "RDMA CM event channel is created at : %p \n", cm_event_channel);
