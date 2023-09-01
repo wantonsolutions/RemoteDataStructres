@@ -385,9 +385,9 @@ int RDMAConnectionManager::client_setup_shared_resources()
             //io_completion_channel   /* which IO completion channel */, 
             io_completion_channel_threads[i]   /* which IO completion channel */, 
             //io_completion_channel_threads[i]   /* which IO completion channel */, 
-            i                       /* signaling vector, not used here*/);
+            0                       /* signaling vector, not used here*/);
         if (!client_cq_threads[i]) {
-            ALERT("Connection Manager", "Failed to create CQ, errno: %d \n", -errno);
+            ALERT("Connection Manager", "Failed to create CQ %d, errno: %s \n", i, strerror(errno));
             return -errno;
         }
         VERBOSE("Connection Manager", "CQ created at %p with %d elements \n", (void*)client_cq_threads[i], client_cq_threads[i]->cqe);

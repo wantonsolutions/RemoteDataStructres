@@ -25,17 +25,22 @@ using namespace rdma_helper;
 using namespace cuckoo_rcuckoo;
 
 
-#define MAX_THREADS 24
+#define MAX_THREADS 40
 volatile bool global_start_flag = false;
 volatile bool global_pause_flag = false;
 volatile bool global_end_flag = false;
 RCuckoo *rcuckoo_state_machines[MAX_THREADS];
 
+const int yeti_core_order[40]={1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61,63,65,67,69,71,73,75,77,79};
+const int yeti_control_core = 0;
+int yak_core_order[24]={0,2,4,6,8,10,12,14,16,18,20,22,1,3,5,7,9,11,13,15,17,19,21,23};
+int yak_control_core = 0;
+
 
 int stick_thread_to_core(pthread_t thread, int core_id) {
   int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
   if (core_id < 0 || core_id >= num_cores) {
-        ALERT("CORE_PIN_DEATH","%s: core_id %d invalid\n", __func__, core_id);
+        ALERT("CORE_PIN_DEATH","%s: core_id %d invalid total cores %d\n", __func__, core_id,_SC_NPROCESSORS_ONLN);
         exit(0);
   }
   cpu_set_t cpuset;
@@ -89,7 +94,7 @@ namespace cuckoo_rdma_engine {
                 ALERT("RDMA Engine", "Error: num_qps must be at least 1\n");
                 exit(1);
             }
-            #define MAX_RDMA_ENGINE_QPS 24
+            #define MAX_RDMA_ENGINE_QPS MAX_THREADS
             if (args.num_qps > MAX_RDMA_ENGINE_QPS) {
                 ALERT("RDMA Engine", "Error: num_qps must be at most %d, we are only enabling a few QP per process\n", MAX_RDMA_ENGINE_QPS);
                 ALERT("RDMA Engine", "TODO; we probably need a better way to scale clients if we are going more than this.\n");
@@ -179,14 +184,12 @@ namespace cuckoo_rdma_engine {
             rcuckoo_state_machines[i]->set_global_end_flag(&global_end_flag);
             rcuckoo_state_machines[i]->set_global_pause_flag(&global_pause_flag);
         }
-        int yak_01_core_order[24]={0,2,4,6,8,10,12,14,16,18,20,22,1,3,5,7,9,11,13,15,17,19,21,23};
-        int yak_01_control_core = 23;
         for (int i=0;i<_num_clients;i++) {
             INFO("RDMA Engine","Creating Client Thread %d\n", i);
             pthread_create(&thread_ids[i], NULL, &cuckoo_fsm_runner, (rcuckoo_state_machines[i]));
-            stick_thread_to_core(thread_ids[i], yak_01_core_order[i]);
+            stick_thread_to_core(thread_ids[i], yeti_core_order[i]);
         }
-        stick_this_thread_to_core(yak_01_control_core);
+        stick_this_thread_to_core(yeti_control_core);
 
         using std::chrono::high_resolution_clock;
         using std::chrono::duration_cast;
