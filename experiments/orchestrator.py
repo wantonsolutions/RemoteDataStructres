@@ -159,13 +159,17 @@ class Orchestrator:
 
         #send the client configuration to the clients
         base_port = int(config["base_port"])
+        starting_id = 0
+        config["global_clients"] = config["num_clients"]
         config["num_clients"] = threads_per_machine
         for client in self.clients:
             config["base_port"] = str(base_port)
+            config["starting_id"] = str(starting_id)
             client.run_cmd(
                 'cd rcuckoo_rdma/configs;'
                 'echo \'' + json.dumps(config) + '\' > ' + config_name + ';')
             base_port += threads_per_machine
+            starting_id += threads_per_machine
 
 
 
@@ -228,7 +232,7 @@ class Orchestrator:
             print("Syncing from", dep.hostname)
             dep.run_cmd(
                 'cd rcuckoo_rdma;'
-                'rsync -r ' + self.build_location.hostname + ':' + self.project_directory + '/*;')
+                'rsync -a ' + self.build_location.hostname + ':' + self.project_directory + '/* ./;')
 
     def sanity_check(self):
         for node in self.all_nodes:
@@ -293,9 +297,10 @@ def run_trials(config):
     for i in tqdm(range(trials)):
         c=copy.copy(config)
         orch = Orchestrator(c)
+        orch.sync()
         #prepare for the run
         # orch.transfer_configs_to_nodes(config, "remote_config.json")
-        orch.generate_and_send_configs(config, "remote_config.json")
+        orch.generate_and_send_configs(c, "remote_config.json")
         orch.sanity_check()
         orch.kill()
         stats_collected = False
@@ -310,7 +315,7 @@ def run_trials(config):
         if not stats_collected:
             orch.validate_run()
             stats = orch.collect_stats()
-            stats = fix_stats(stats, config)
+            stats = fix_stats(stats, c)
         runs.append(stats)
         del orch
     return runs

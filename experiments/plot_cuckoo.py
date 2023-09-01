@@ -240,8 +240,8 @@ def cas_success_rate_decoration(ax, x_axis):
 
 
 def get_client_total_ops(client):
-    reads = client['stats']['completed_read_count']
-    writes = client['stats']['completed_insert_count']
+    reads = int(client['stats']['completed_read_count'])
+    writes = int(client['stats']['completed_insert_count'])
     total_ops = reads + writes
     return total_ops
 
@@ -249,8 +249,9 @@ def single_run_client_average_ops(stat, op):
     op_percents = []
     op_string = "completed_" + op + "_count"
     for client in stat['clients']:
-        ops = client['stats'][op_string]
+        ops = int(client['stats'][op_string])
         total_ops = get_client_total_ops(client)
+        print("ops: ", ops, "total_ops: ", total_ops)
         op_percents.append(div_by_zero_to_zero(ops, total_ops))
 
     op_ratio = np.mean(op_percents)
@@ -285,6 +286,7 @@ def read_write_ratio_line(ax, stats, label, x_axis="clients"):
 def read_write_ratio_decoration(ax, x_axis):
     ax.set_ylabel("Read/Write ratio")
     ax.set_xlabel(x_axis)
+    ax.set_ylim(bottom=0, top=1.1)
     ax.legend()
 
 def read_write_ratio(ax, stats, x_axis="clients"):
@@ -488,15 +490,37 @@ def rtt_per_operation_decoration(ax, axt, x_axis, lines):
     labs = [l.get_label() for l in lines]
     ax.legend(lines, labs)
 
+def calculate_rtt(stats, key):
+    means, stds = [], []
+    for stat in stats:
+        r_means, r_stds = [], []
+        for run in stat:
+            c_means = []
+            for client in run["clients"]:
+                count_key = key + "rtt+count"
+                op_key = "completed_" + key + "_count"
+                rtts = client[count_key]
+                ops = client[op_key]
+                avg = float(rtts)/float(ops)
+                c_means.append(avg)
+            r_means.append(np.mean(c_means))
+            r_stds.append(np.std(c_means))
+        means.append(np.mean(r_means))
+        stds.append(np.mean(r_stds))
+    return means, stds
+
+
 def rtt_per_operation_line(ax, axt, stats, label, x_axis="clients"):
     print("RTT PER OPERATION")
 
-    # read_rtt, read_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'read_rtt_count', 'completed_read_count')
-    # insert_rtt, insert_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'insert_rtt_count', 'completed_insert_count')
-    percentile = 99
-    read_rtt, read_err = client_stats_get_percentile_err_trials(stats, 'read_rtt', percentile)
-    insert_rtt, insert_err = client_stats_get_percentile_err_trials(stats, 'insert_rtt', percentile)
+    percentile = 50
+    read_rtt, read_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'read_rtt_count', 'completed_read_count')
+    insert_rtt, insert_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'insert_rtt_count', 'completed_insert_count')
+    # read_rtt, read_err = client_stats_get_percentile_err_trials(stats, 'read_rtt', percentile)
+    # insert_rtt, insert_err = client_stats_get_percentile_err_trials(stats, 'insert_rtt', percentile)
 
+    # read_rtt, read_err = calculate_rtt(stats, 'read')
+    # insert_rtt, insert_err = calculate_rtt(stats, 'insert')
 
     x_axis_vals = get_x_axis(stats, x_axis)
 
@@ -623,6 +647,7 @@ def single_run_throughput(stat):
     total_operations_mop = 0
     for client in stat['clients']:
         read_operations = int(client['stats']['completed_read_count'])
+        print("read_operations: ", read_operations)
         read_operations_mop =read_operations/1000000
         insert_operations = int(client['stats']['completed_insert_count'])
         print("insert_operations: ", insert_operations)
