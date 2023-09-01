@@ -7,7 +7,7 @@
     "locks_per_message": "64",
     "memory_size": "8388608",
     "deterministic": "True",
-    "workload": "ycsb-w",
+    "workload": "ycsb-a",
     "id": "0",
     "search_function": "a_star",
     "location_function": "dependent",

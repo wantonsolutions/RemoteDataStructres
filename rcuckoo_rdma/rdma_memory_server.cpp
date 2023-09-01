@@ -987,7 +987,7 @@ int main(int argc, char **argv)
     //     }
     // }
     printf("All server setup complete, now serving memory requests\n");
-    moniter_run(num_qps, 1 ,prime, msm);
+    moniter_run(num_qps, 30 ,prime, msm);
 
     ALERT("RDMA memory server", "Sending results to the memcached server\n");
     send_final_memory_stats_to_memcached_server(msm);

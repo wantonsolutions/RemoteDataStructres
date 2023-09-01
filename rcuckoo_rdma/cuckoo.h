@@ -97,15 +97,21 @@ namespace cuckoo_rcuckoo {
 
             void send_lock_and_cover_message(VRMaskedCasData lock_message, VRReadData read_message, uint64_t wr_id);
             void send_insert_and_unlock_messages(vector<VRCasData> &insert_messages, vector<VRMaskedCasData> & unlock_messages, uint64_t wr_id);
+            void send_read(vector <VRReadData> reads, uint64_t wr_id);
 
             void rdma_fsm(void);
             void init_rdma_structures(rcuckoo_rdma_info info);
             void put_direct();
+            void get_direct(void);
             void insert_direct();
 
             void set_global_start_flag(volatile bool * flag);
             void set_global_end_flag(volatile bool * flag);
-            void set_global_pause_flag(volatile bool * flag);
+            void set_global_prime_flag(volatile bool * flag);
+
+
+            void complete_read_stats(bool success);
+            void complete_read(bool success);
 
 
             vector<VRMaskedCasData> get_current_unlock_list();
@@ -120,7 +126,8 @@ namespace cuckoo_rcuckoo {
 
             volatile bool * _global_start_flag;
             volatile bool * _global_end_flag;
-            volatile bool * _global_pause_flag;
+            volatile bool * _global_prime_flag;
+            bool _local_prime_flag;
 
             uint64_t _sleep_counter = 1;
 
@@ -160,6 +167,8 @@ namespace cuckoo_rcuckoo {
 
             LockingContext _locking_context;
             search_context _search_context;
+
+            vector<VRReadData> _reads;
 
 
             // hash_locations  (*_location_function)(string, unsigned int);

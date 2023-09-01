@@ -154,6 +154,8 @@ namespace cuckoo_state_machines {
         private:
             int _total_requests;
             int _client_id;
+            int _starting_id;
+            int _global_clients;
             int _num_clients;
             bool _deterministic;
             int _random_factor;
@@ -211,6 +213,8 @@ namespace cuckoo_state_machines {
             uint32_t _id;
             client_state _state;
             uint32_t _max_fill;
+            int _starting_id;
+            int _global_clients; 
 
             //Read State Machine
             Key _current_read_key;

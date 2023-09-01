@@ -149,12 +149,14 @@ namespace cuckoo_state_machines {
             #endif
         }
         #ifdef MEASURE_MOST
-        _messages_per_read.push_back(_current_read_messages);
+        _messages_per_read.push_back(_reads);
         _read_rtt.push_back(_current_read_rtt);
         #endif
 
         #ifdef MEASURE_ESSENTIAL    
-        _read_rtt_count += _read_rtt_count;
+        uint64_t latency = (_operation_end_time - _operation_start_time).count();
+        _sum_read_latency_ns += latency;
+        _read_rtt_count += _current_read_rtt;
         _current_read_messages = 0;
         _current_read_rtt = 0;
         #endif
@@ -339,7 +341,9 @@ namespace cuckoo_state_machines {
         // }
         try{
             _total_requests = stoi(config["total_requests"]);
-            _client_id = stoi(config["id"]);
+            _starting_id = stoi(config["starting_id"]);
+            _client_id = stoi(config["id"]) + _starting_id;
+            _global_clients = stoi(config["global_clients"]);
             _num_clients = stoi(config["num_clients"]);
             _deterministic = config["deterministic"] == "True";
             set_workload(config["workload"]);
@@ -363,6 +367,8 @@ namespace cuckoo_state_machines {
         stats["workload"] = to_string(_workload);
         stats["total_requests"] = to_string(_total_requests);
         stats["client_id"] = to_string(_client_id);
+        stats["global_clients"] = to_string(_global_clients);
+        stats["starting_id"] = to_string(_starting_id);
         stats["num_clients"] = to_string(_num_clients);
         return stats;
     }
@@ -419,7 +425,7 @@ namespace cuckoo_state_machines {
 
 
     Request Client_Workload_Driver::next_put() {
-        Key key = unique_insert(_completed_puts, _client_id, _num_clients, _random_factor);
+        Key key = unique_insert(_completed_puts, _client_id, _global_clients, _random_factor);
         Value val = Value();
         Request req = Request{PUT, key, val};
         _last_request = req;
@@ -431,7 +437,7 @@ namespace cuckoo_state_machines {
     Request Client_Workload_Driver::next_get() {
         uint32_t next_key_index;
         if (_deterministic){
-            next_key_index =  BASE_KEY + (_completed_puts - 1);
+            next_key_index =  BASE_KEY + (_completed_puts - 2);
         } else {
             if (_completed_puts <=1 ) {
                 next_key_index = 0;
@@ -439,7 +445,7 @@ namespace cuckoo_state_machines {
                 next_key_index = rand() % (_completed_puts - 1);
             }
         }
-        Key key = unique_get(next_key_index, _client_id, _num_clients, _random_factor);
+        Key key = unique_get(next_key_index, _client_id, _global_clients, _random_factor);
         Request req = Request{GET, key, Value()};
         _last_request = req;
         return req;
@@ -464,6 +470,9 @@ namespace cuckoo_state_machines {
         record_last_request();
         if (_completed_requests >= _total_requests) {
             return Request{NO_OP, Key(), Value()};
+        }
+        if (_completed_puts == 0) {
+            return next_put();
         }
         operation op = gen_next_operation();
         if (op == PUT) {

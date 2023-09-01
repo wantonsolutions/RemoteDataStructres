@@ -191,6 +191,7 @@ namespace cuckoo_virtual_rdma {
     VRMessage single_bucket_read_message(unsigned int bucket, unsigned int row_size_bytes);
     vector<VRMessage> single_bucket_read_messages(hash_locations buckets, unsigned int row_size_bytes);
     vector<VRMessage> read_threshold_message(hash_locations (*location_function)(Key, unsigned int), Key key, unsigned int read_threshold_bytes,unsigned int table_size,unsigned int row_size_bytes);
+    void read_theshold_message(vector<VRReadData> & messages, hash_locations (*location_function)(Key, unsigned int), Key key, unsigned int read_threshold_bytes,unsigned int table_size,unsigned int row_size_bytes);
 
     vector<unsigned int> lock_message_to_lock_indexes(VRMessage lock_message);
     VRMessage create_masked_cas_message_from_lock_list(VRMaskedCasData masked_cas_data);

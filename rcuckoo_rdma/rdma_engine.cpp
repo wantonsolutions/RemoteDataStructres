@@ -27,7 +27,7 @@ using namespace cuckoo_rcuckoo;
 
 #define MAX_THREADS 40
 volatile bool global_start_flag = false;
-volatile bool global_pause_flag = false;
+volatile bool global_prime_flag = false;
 volatile bool global_end_flag = false;
 RCuckoo *rcuckoo_state_machines[MAX_THREADS];
 
@@ -182,7 +182,7 @@ namespace cuckoo_rdma_engine {
         for(int i=0;i<_num_clients;i++){
             rcuckoo_state_machines[i]->set_global_start_flag(&global_start_flag);
             rcuckoo_state_machines[i]->set_global_end_flag(&global_end_flag);
-            rcuckoo_state_machines[i]->set_global_pause_flag(&global_pause_flag);
+            rcuckoo_state_machines[i]->set_global_prime_flag(&global_prime_flag);
         }
         for (int i=0;i<_num_clients;i++) {
             INFO("RDMA Engine","Creating Client Thread %d\n", i);
@@ -222,11 +222,11 @@ namespace cuckoo_rdma_engine {
              !priming_action_taken) {
                 ALERT("RDMA Engine", "Experiment Priming Complete -- do priming things\n");
                 priming_action_taken = true;
-                global_pause_flag = true;
-                for(int i=0;i<_num_clients;i++){
-                    rcuckoo_state_machines[i]->clear_statistics();
-                }
-                global_pause_flag = false;
+                global_prime_flag = true;
+                // for(int i=0;i<_num_clients;i++){
+                //     rcuckoo_state_machines[i]->clear_statistics();
+                // }
+                // global_prime_flag = false;
                 t1=high_resolution_clock::now();
             }
             if(global_end_flag == true) {

@@ -62,6 +62,7 @@ namespace cuckoo_virtual_rdma {
         s += "row: " + std::to_string(row);
         s += " offset: " + std::to_string(offset);
         s += " size: " + std::to_string(size);
+        s += "}";
         return s;
     }
 
@@ -823,6 +824,14 @@ namespace cuckoo_virtual_rdma {
         return message;
     }
 
+    VRReadData read_request_data(unsigned int start_bucket, unsigned int offset, unsigned int size) {
+        VRReadData message;
+        message.size = size;
+        message.row = start_bucket;
+        message.offset = offset;
+        return message;
+    }
+
     vector<VRMessage> multi_bucket_read_message(hash_locations buckets, unsigned int row_size_bytes) {
         vector<VRMessage> messages;
         unsigned int min_bucket = buckets.min_bucket();
@@ -830,6 +839,14 @@ namespace cuckoo_virtual_rdma {
         VRMessage message = read_request_message(min_bucket, 0, size);
         messages.push_back(message);
         return messages;
+    }
+
+    void multi_bucket_read_message(vector<VRReadData> & messages, hash_locations buckets, unsigned int row_size_bytes) {
+        messages.clear();
+        unsigned int min_bucket = buckets.min_bucket();
+        unsigned int size = single_read_size_bytes(buckets, row_size_bytes);
+        VRReadData message = read_request_data(min_bucket, 0, size);
+        messages.push_back(message);
     }
 
     VRMessage single_bucket_read_message(unsigned int bucket, unsigned int row_size_bytes){
@@ -844,6 +861,12 @@ namespace cuckoo_virtual_rdma {
 
     }
 
+    void single_bucket_read_messages(vector<VRReadData> & messages, hash_locations buckets, unsigned int row_size_bytes){
+        messages.clear();
+        messages.push_back(read_request_data(buckets.primary, 0, row_size_bytes));
+        messages.push_back(read_request_data(buckets.secondary, 0, row_size_bytes));
+    }
+
     vector<VRMessage> read_threshold_message(hash_locations (*location_function)(Key, unsigned int), Key key, unsigned int read_threshold_bytes,unsigned int table_size,unsigned int row_size_bytes) {
         hash_locations buckets = location_function(key.to_string(), table_size);
         VERBOSE("read_threshold_message", "buckets are %s", buckets.to_string().c_str());
@@ -854,6 +877,16 @@ namespace cuckoo_virtual_rdma {
             messages = single_bucket_read_messages(buckets, row_size_bytes);
         }
         return messages;
+    }
+
+    void read_theshold_message(vector<VRReadData> & messages, hash_locations (*location_function)(Key, unsigned int), Key key, unsigned int read_threshold_bytes,unsigned int table_size,unsigned int row_size_bytes){
+        hash_locations buckets = location_function(key, table_size);
+        VERBOSE("read_threshold_message", "buckets are %s", buckets.to_string().c_str());
+        if (single_read_size_bytes(buckets, row_size_bytes) <= read_threshold_bytes) {
+            multi_bucket_read_message(messages, buckets, row_size_bytes);
+        } else {
+            single_bucket_read_messages(messages, buckets, row_size_bytes);
+        }
     }
 
     VRMessage create_masked_cas_message_from_lock_list(VRMaskedCasData masked_cas_data) {

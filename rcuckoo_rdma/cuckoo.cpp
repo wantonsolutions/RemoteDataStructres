@@ -87,17 +87,18 @@ namespace cuckoo_rcuckoo {
         assert(_global_end_flag != NULL);
     }
 
-    void RCuckoo::set_global_pause_flag(volatile bool * flag) {
+    void RCuckoo::set_global_prime_flag(volatile bool * flag) {
         assert(flag != NULL);
         // printf("cuckoo address global stop flag %p\n", flag);
-        _global_pause_flag = flag;
-        assert(_global_pause_flag != NULL);
+        _global_prime_flag = flag;
+        assert(_global_prime_flag != NULL);
     }
 
     bool RCuckoo::path_valid() {
         //Check that all the entries in the path are the same as in the table
         for (int i=0;i<_search_context.path.size()-1;i++) {
-            if(!(_table.get_entry(_search_context.path[i].bucket_index, _search_context.path[i].offset).key == _search_context.path[i].key)) {
+            Entry current_table_entry = _table.get_entry(_search_context.path[i].bucket_index, _search_context.path[i].offset);
+            if (!(current_table_entry.key == _search_context.path[i].key)) {
                 return false;
             }
         }
@@ -158,7 +159,9 @@ namespace cuckoo_rcuckoo {
             _buckets_per_lock = stoi(config["buckets_per_lock"]);
             _locks_per_message = stoi(config["locks_per_message"]);
             assert(_locks_per_message == 64);
-            _id = stoi(config["id"]);
+            _starting_id = stoi(config["starting_id"]);
+            _global_clients = stoi(config["global_clients"]);
+            _id = stoi(config["id"]) + _starting_id;
 
         } catch (exception& e) {
             printf("ERROR: RCuckoo config missing required field\n");
@@ -180,6 +183,8 @@ namespace cuckoo_rcuckoo {
         _locking_context.buckets_per_lock = _buckets_per_lock;
         _locking_context.locks_per_message = _locks_per_message;
         sprintf(_log_identifier, "Client: %3d", _id);
+
+        _local_prime_flag = false; //we have yet to prime
     }
 
     string RCuckoo::get_state_machine_name() {
@@ -311,14 +316,16 @@ namespace cuckoo_rcuckoo {
 
     void RCuckoo::complete_insert_stats(bool success){
         // exit(0);
+        #ifdef MEASURE_MOST
         _insert_path_lengths.push_back(_search_context.path.size());
         _index_range_per_insert.push_back(path_index_range(_search_context.path));
+        #endif
         Client_State_Machine::complete_insert_stats(success);
         return;
     }
 
     void RCuckoo::complete_insert(){
-        INFO(log_id(), "[complete_insert] key %s\n", _current_insert_key.to_string().c_str());
+        SUCCESS(log_id(), "[complete_insert] key %s\n", _current_insert_key.to_string().c_str());
         _state = IDLE;
         _inserting = false;
         _operation_end_time = get_current_ns();
@@ -326,6 +333,20 @@ namespace cuckoo_rcuckoo {
         //TODO record this variable
 
         complete_insert_stats(true);
+        return;
+    }
+
+    void RCuckoo::complete_read_stats(bool success){
+        Client_State_Machine::complete_read_stats(success, _current_read_key);
+        return;
+    }
+
+    void RCuckoo::complete_read(bool success){
+        INFO(log_id(), "[complete_read] key %s\n", _current_read_key.to_string().c_str());
+        _state = IDLE;
+        _reading = false;
+        _operation_end_time = get_current_ns();
+        complete_read_stats(success);
         return;
     }
 
@@ -890,6 +911,7 @@ namespace cuckoo_rcuckoo {
             false,
             wr_id);
 
+
         bool inside_rows = read_message.row < _table.get_row_count();
         bool inside_buckets = read_message.offset < _table.get_buckets_per_row();
         if (!inside_rows) {
@@ -939,6 +961,46 @@ namespace cuckoo_rcuckoo {
         _current_insert_rtt++;
         _insert_rtt_count++;
         #endif
+    }
+
+    void RCuckoo::send_read(vector <VRReadData> reads, uint64_t wr_id) {
+
+        #define MAX_READ_PACKETS 2
+        struct ibv_sge sg [MAX_READ_PACKETS];
+        struct ibv_exp_send_wr wr [MAX_READ_PACKETS];
+
+        for(int i=0;i<reads.size();i++) {
+            uint64_t local_address = (uint64_t) get_entry_pointer(reads[i].row, reads[i].offset);
+            uint64_t remote_server_address = local_to_remote_table_address(local_address);
+
+            bool signal = (i == reads.size() - 1);            
+
+            setRdmaReadExp(
+                &sg[i],
+                &wr[i],
+                local_address,
+                remote_server_address,
+                reads[i].size,
+                _table_mr->lkey,
+                _table_config->remote_key,
+                signal,
+                wr_id + i
+            );
+        }
+        send_bulk(reads.size(), _qp, wr);
+        #ifdef MEASURE_ESSENTIAL
+        uint64_t read_bytes = RDMA_READ_REQUSET_SIZE * reads.size();
+        for(int i=0;i<reads.size();i++) {
+            read_bytes += RDMA_READ_RESPONSE_BASE_SIZE + reads[i].size;
+        }
+        _read_operation_messages+=reads.size();
+        _total_bytes += read_bytes;
+        _read_operation_bytes += read_bytes;
+        _read_bytes += read_bytes;
+        _total_reads++;
+        _current_read_rtt++;
+        #endif
+
     }
 
     void RCuckoo::send_insert_and_unlock_messages(vector<VRCasData> &insert_messages, vector<VRMaskedCasData> & unlock_messages, uint64_t wr_id) {
@@ -1035,6 +1097,8 @@ namespace cuckoo_rcuckoo {
         assert(_buckets_per_lock = 1);
         //Search path is now set
         if(!path_valid()) {
+            // INFO(log_id(), "Path is not valid\n");
+            // INFO(log_id(), "first path %s\n", path_to_string(_search_context.path).c_str());
             lock_indexes_to_buckets(_search_context.open_buckets, _locks_held, _buckets_per_lock);
             bool successful_search = (this->*_table_search_function)();
             _search_path_index = _search_context.path.size() -1;
@@ -1042,8 +1106,8 @@ namespace cuckoo_rcuckoo {
                 _failed_insert_second_search_this_insert++;
                 _failed_insert_second_search_count++;
                 // printf("[%d] failed search current locks held: %s\n", _id, vector_to_string(_locks_held).c_str());
-                // INFO(log_id(), "Insert Direct -- Second Search Failed for key %s retry time #%d \n", _current_insert_key.to_string().c_str(),  _retries_due_to_failed_second_search);
-                // INFO(log_id(), "Unable to find path within buckets %s\n", vector_to_string(search_buckets).c_str());
+                INFO(log_id(), "Insert Direct -- Second Search Failed for key %s \n", _current_insert_key.to_string().c_str());
+                INFO(log_id(), "Unable to find path within buckets %s\n", vector_to_string(_search_context.open_buckets).c_str());
 
                 if (_search_context.open_buckets.size() != _locks_held.size()) {
                     WARNING("PRECRASH", "Client %d is about to crash\n", _id);
@@ -1062,6 +1126,13 @@ namespace cuckoo_rcuckoo {
                 assert(_search_context.open_buckets.size() == _locks_held.size());
                 INFO(log_id(), "Hi Stew, I\'m hoping you have a great day", _current_insert_key.to_string().c_str(), _id);
                 _state = RELEASE_LOCKS_TRY_AGAIN;
+            } else {
+                INFO(log_id(), "second search succeeded\n");
+                INFO(log_id(), "new path %s", path_to_string(_search_context.path).c_str());
+                if(!path_valid()){
+                    ALERT(log_id(), "Path is not valid second search is broken\n");
+                    exit(1);
+                }
             }
         }
 
@@ -1076,6 +1147,8 @@ namespace cuckoo_rcuckoo {
         if (_state == INSERTING) {
             gen_cas_data(_search_context.path, _insert_messages);
             total_messages += _insert_messages.size();
+        } else {
+            _insert_messages.clear();
         }
 
 
@@ -1088,7 +1161,6 @@ namespace cuckoo_rcuckoo {
         send_insert_and_unlock_messages(_insert_messages, _lock_list, _wr_id);
         _wr_id += total_messages;
 
-        insert_cuckoo_path_local(_table, _search_context.path);
         // pause_for_an_rtt();
 
         //Bulk poll to receive all messages
@@ -1107,6 +1179,11 @@ namespace cuckoo_rcuckoo {
             //Here we are not checking if we actually did the proper unlock. However, if we get the final messsage which was signaled, then we know that all the messages before it were successful
             //I'm using this for efficiency
             _locks_held.clear();
+
+
+            //At this point I have set my local table to all of the old values that were in the remote table
+            //Assuming that I got them right, the last value inthe insert train should be 0
+            //If this is true lets assume that we got everything correct and insert our values
         #else
             while(n < total_messages) {
                 n += bulk_poll(_completion_queue, total_messages - n, _wc + n);
@@ -1136,6 +1213,28 @@ namespace cuckoo_rcuckoo {
         // printf("2) %6lu ns\n", duration_0);
 
         if (_state == INSERTING) {
+            #define VALIDATE_INSERT
+            #ifdef VALIDATE_INSERT
+            for (int i=0;i<_insert_messages.size();i++){
+                int insert_offset = _insert_messages[i].offset;
+                int insert_row = _insert_messages[i].row;
+                Entry open_entry = _table.get_entry(insert_row, insert_offset);
+                if(open_entry.get_as_uint64_t() != _insert_messages[i].old){
+                    ALERT(log_id(), "open_entry is not empty\n");
+                    ALERT(log_id(), "open_entry = %s\n", open_entry.to_string().c_str());
+                    ALERT(log_id(), "insert_row = %d\n", insert_row);
+                    ALERT(log_id(), "insert_offset = %d\n", insert_offset);
+                    for (int j=0;j<_insert_messages.size();j++){
+                        ALERT("insert direct", "_insert_messages[%d] = %s\n", j, _insert_messages[j].to_string().c_str());
+                    }
+                    // _table.print_table();
+                    exit(1);
+
+                }
+                assert(open_entry.get_as_uint64_t() == _insert_messages[i].old);
+            }
+            #endif
+            insert_cuckoo_path_local(_table, _search_context.path);
             //finish the insert by inserting the key into the local table.
             complete_insert();
         } else if (_state == RELEASE_LOCKS_TRY_AGAIN) {
@@ -1289,7 +1388,35 @@ namespace cuckoo_rcuckoo {
     }
 
     void RCuckoo::get_direct(void) {
-        ALERT("get_direct", "not implemented\n");
+        read_theshold_message(_reads, _location_function, _current_read_key, _read_threshold_bytes, _table.get_row_count(), _table.get_buckets_per_row());
+        send_read(_reads, _wr_id);
+
+        int outstanding_messages = _reads.size();
+        int n = bulk_poll(_completion_queue, outstanding_messages, _wc);
+
+        while (n < 1) {
+            //We only signal a single read, so we should only get a single completion
+            n = bulk_poll(_completion_queue, outstanding_messages - n, _wc + n);
+        }
+
+        //At this point we should have the values
+        hash_locations buckets = _location_function(_current_read_key, _table.get_row_count());
+
+        bool success = (_table.bucket_contains(buckets.primary, _current_read_key) || _table.bucket_contains(buckets.secondary, _current_read_key));
+        if  (success) {
+            //We found the key
+            SUCCESS("[get-direct]", "%2d found key %s \n", _id, _current_read_key.to_string().c_str());
+            // receive_successful_get_messege(_current_read_key);
+        } else {
+            ALERT("[get-direct]", "%2d did not find key %s \n", _id, _current_read_key.to_string().c_str());
+            ALERT("[get-direct]", "primany,seconday [%d,%d]\n", buckets.primary, buckets.secondary);
+            // _table.print_table();
+            // receive_failed_get_message(_current_read_key);
+        }
+        complete_read(success);
+        INFO("[get-direct]", "read completed");
+
+        
         return;
     }
 
@@ -1316,7 +1443,10 @@ namespace cuckoo_rcuckoo {
 
                     //Pause goes here rather than anywhere else because I don't want
                     //To have locks, or any outstanding requests
-                    while(*_global_pause_flag){};
+                    if (*_global_prime_flag && !_local_prime_flag){
+                        _local_prime_flag = true;
+                        clear_statistics();
+                    }
                     next_request = _workload_driver.next();
                     VERBOSE("DEBUG: general idle fsm","Generated New Request: %s\n", next_request.to_string().c_str());
 
@@ -1325,10 +1455,12 @@ namespace cuckoo_rcuckoo {
                     } else if (next_request.op == PUT) {
                         _operation_start_time = get_current_ns();
                         _current_insert_key = next_request.key;
+                        // ALERT("[gen key]","trying to put %s\n", _current_insert_key.to_string().c_str());
                         put_direct();
                     } else if (next_request.op == GET) {
                         _operation_start_time = get_current_ns();
                         _current_read_key = next_request.key;
+                        // ALERT("[gen key]","trying to read %s\n", _current_read_key.to_string().c_str());
                         // throw logic_error("ERROR: GET not implemented");
                         get_direct();
                     } else {
