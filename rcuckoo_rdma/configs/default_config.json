@@ -14,6 +14,7 @@
     "total_inserts": "1",
     "total_requests": "1",
 
+    "runtime": "10",
     "max_fill": "50",
     "prime": "false",
     "prime_fill": "40",

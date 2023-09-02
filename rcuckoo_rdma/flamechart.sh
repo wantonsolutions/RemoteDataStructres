@@ -15,7 +15,7 @@ cuckoopid=$!
 
 
 # sudo perf record -F 99 -p$cuckoopid -g -- sleep $measuretime
-sleep 1
+sleep 2
 sudo perf record -F 99 -a -g -- sleep $measuretime
 sudo perf script | ./flamechart/FlameGraph/stackcollapse-perf.pl > out.perf-folded
 sudo killall "$program"

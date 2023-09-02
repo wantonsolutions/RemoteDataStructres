@@ -335,6 +335,7 @@ namespace cuckoo_state_machines {
         _completed_puts = 0;
         _completed_gets = 0;
         _last_request = Request();
+        _time_seed = time(NULL);
 
         // for (auto it = config.begin(); it != config.end(); ++it) {
         //     printf("client workload driver : %s %s\n", it->first.c_str(), it->second.c_str());
@@ -355,7 +356,7 @@ namespace cuckoo_state_machines {
         if (_deterministic) {
             _random_factor = 1;
         } else {
-            _random_factor = rand() % 100;
+            _random_factor = rand_r(&_time_seed) % 100;
         }
     }
 
@@ -442,7 +443,7 @@ namespace cuckoo_state_machines {
             if (_completed_puts <=1 ) {
                 next_key_index = 0;
             } else {
-                next_key_index = rand() % (_completed_puts - 1);
+                next_key_index = rand_r(&_time_seed) % (_completed_puts - 1);
             }
         }
         Key key = unique_get(next_key_index, _client_id, _global_clients, _random_factor);
@@ -453,9 +454,9 @@ namespace cuckoo_state_machines {
 
     operation Client_Workload_Driver::gen_next_operation() {
         if (_workload == A) {
-            return (rand() % 100) < 50 ? GET : PUT;
+            return (rand_r(&_time_seed) % 100) < 50 ? GET : PUT;
         } else if (_workload == B) {
-            return (rand() % 100) < 95 ? GET : PUT;
+            return (rand_r(&_time_seed) % 100) < 95 ? GET : PUT;
         } else if (_workload == C) {
             return GET;
         } else if (_workload == W) {
