@@ -49,6 +49,35 @@ int stick_thread_to_core(pthread_t thread, int core_id) {
   return pthread_setaffinity_np(thread, sizeof(pthread_t), &cpuset);
 }
 
+typedef struct rcuckoo_init_arg{
+    unordered_map <string, string> config;
+    RDMAConnectionManager * cm;
+    int id;
+} rcuckoo_init_arg;
+
+void * rcuckoo_thread_init(void * arg) {
+    rcuckoo_init_arg * rcuckoo_arg = (rcuckoo_init_arg *) arg;
+    unordered_map <string, string> _config;
+    std::copy(rcuckoo_arg->config.begin(), rcuckoo_arg->config.end(), std::inserter(_config, _config.end()));
+    
+
+    ALERT("RDMA Engine", "Rcuckoo instace %i\n", rcuckoo_arg->id);
+    _config["id"]=to_string(rcuckoo_arg->id);
+    rcuckoo_state_machines[rcuckoo_arg->id] = new RCuckoo(_config);
+    // _state_machines[i]._id = i;
+    // _state_machines[i]._rcuckoo = new RCuckoo(config);
+
+    struct rcuckoo_rdma_info info;
+    info.qp = rcuckoo_arg->cm->client_qp[rcuckoo_arg->id];
+    info.completion_queue = rcuckoo_arg->cm->client_cq_threads[rcuckoo_arg->id];
+    info.pd = rcuckoo_arg->cm->pd;
+    // _state_machines[i]._rcuckoo->init_rdma_structures(info);
+    rcuckoo_state_machines[rcuckoo_arg->id]->init_rdma_structures(info);
+
+
+    pthread_exit(NULL);
+}
+
 namespace cuckoo_rdma_engine {
 
     void * cuckoo_fsm_runner(void * args){
@@ -119,21 +148,30 @@ namespace cuckoo_rdma_engine {
         }
 
         int i;
+
+
+        pthread_t thread_ids[MAX_THREADS];
+        rcuckoo_init_arg rcuckoo_args[MAX_THREADS];
         try {
-
             for (i=0;i<_num_clients;i++) {
-                config["id"] = to_string(i);
-                rcuckoo_state_machines[i] = new RCuckoo(config);
-                // _state_machines[i]._id = i;
-                // _state_machines[i]._rcuckoo = new RCuckoo(config);
 
-                struct rcuckoo_rdma_info info;
-                info.qp = _connection_manager->client_qp[i];
-                info.completion_queue = _connection_manager->client_cq_threads[i];
-                info.pd = _connection_manager->pd;
-                // _state_machines[i]._rcuckoo->init_rdma_structures(info);
-                rcuckoo_state_machines[i]->init_rdma_structures(info);
+                rcuckoo_args[i].config = config;
+                rcuckoo_args[i].cm = _connection_manager;
+                rcuckoo_args[i].id = i;
+                pthread_create(&thread_ids[i], NULL, rcuckoo_thread_init,&rcuckoo_args[i]);
 
+                // ALERT("RDMA Engine", "Rcuckoo instace %i\n", i);
+                // config["id"] = to_string(i);
+                // rcuckoo_state_machines[i] = new RCuckoo(config);
+                // // _state_machines[i]._id = i;
+                // // _state_machines[i]._rcuckoo = new RCuckoo(config);
+
+                // struct rcuckoo_rdma_info info;
+                // info.qp = _connection_manager->client_qp[i];
+                // info.completion_queue = _connection_manager->client_cq_threads[i];
+                // info.pd = _connection_manager->pd;
+                // // _state_machines[i]._rcuckoo->init_rdma_structures(info);
+                // rcuckoo_state_machines[i]->init_rdma_structures(info);
             }
 
         } catch (exception& e) {
@@ -142,6 +180,12 @@ namespace cuckoo_rdma_engine {
             exit(1);
             return;
         }
+
+        for (i=0;i<_num_clients;i++) {
+            ALERT("RDMA Engine", "Joinging Thread %d\n",i);
+            pthread_join(thread_ids[i], NULL);
+        }
+        ALERT("RDMA Engine", "Init Cuckoo Threads Joined\n");
         return;
     }
 
