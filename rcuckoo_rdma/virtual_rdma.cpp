@@ -589,7 +589,7 @@ namespace cuckoo_virtual_rdma {
             // printf("pushing mcd %d %s\n", i, mcd.to_string().c_str());
             context.lock_list.push_back(mcd);
         }
-        VERBOSE("lock_chunks_to_masked_cas", "returning %d masked cas data", masked_cas_data.size());
+        VERBOSE("lock_chunks_to_masked_cas", "returning %d masked cas data", context.lock_list.size());
         return;
     }
 
@@ -933,12 +933,15 @@ namespace cuckoo_virtual_rdma {
         VRReadData read_data;
         hash_locations buckets;
 
+
         buckets.primary = (masked_cas.min_set_lock) * buckets_per_lock;
         buckets.secondary = (masked_cas.max_set_lock) * buckets_per_lock + (buckets_per_lock - 1);
 
 
+
         read_data.size= single_read_size_bytes(buckets, row_size_bytes);
-        read_data.row = masked_cas.min_set_lock + (BITS_PER_BYTE * masked_cas.min_lock_index);
+        read_data.row = (masked_cas.min_set_lock + (BITS_PER_BYTE * masked_cas.min_lock_index)) * buckets_per_lock;
+        // read_data.row = buckets.primary;
         read_data.offset = 0;
         // ALERT("get_covering_read_from_lock", "min_bucket: %d, max_bucket: %d size %d\n", buckets.primary, buckets.secondary, read_data.size);
         return read_data;

@@ -83,9 +83,9 @@ void memcached_publish_experiment_control(experiment_control * ec){
 experiment_control * memcached_get_experiment_control(void){
     experiment_control * ec;
     int experiment_control_len = memcached_get_published(EXPERIMENT_CONTROL_KEY.c_str(), (void **)&ec);
-    INFO("Memcached", "about to print the fetched experiment control %d\n",experiment_control_len);
-    INFO("Memcached", "table config: %s\n", ec->to_string().c_str());
-    INFO("Memcached", "fetched %d struct size %d\n",experiment_control_len, sizeof(experiment_control));
+    // INFO("Memcached", "about to print the fetched experiment control %d\n",experiment_control_len);
+    // INFO("Memcached", "table config: %s\n", ec->to_string().c_str());
+    // INFO("Memcached", "fetched %d struct size %d\n",experiment_control_len, sizeof(experiment_control));
     // assert(experiment_control_len == sizeof(experiment_control));
     return ec;
 }
@@ -98,7 +98,7 @@ memory_stats *memcached_get_memory_stats(void) {
   memory_stats *ms;
   int memory_stats_len = memcached_get_published(MEMORY_STATS_KEY.c_str(), (void **)&ms);
   INFO("Memcached", "about to print the fetched memory stats %d\n",memory_stats_len);
-  INFO("Memcached", "memory stats: %s\n", ms->to_string().c_str());
+  INFO("Memcached", "memory stats: TODO IMPLEMENT PRINT\n"); //, ms->to_string().c_str());
   INFO("Memcached", "fetched %d struct size %d\n",memory_stats_len, sizeof(memory_stats));
   // assert(memory_stats_len == sizeof(memory_stats));
   return ms;

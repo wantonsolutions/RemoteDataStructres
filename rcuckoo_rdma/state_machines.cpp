@@ -498,9 +498,9 @@ namespace cuckoo_state_machines {
     Client_State_Machine::Client_State_Machine(unordered_map<string,string> config) : State_Machine(config) {
         _config = config;
         try{
-            INFO(log_id(), "Client_State_Machine config:");
+            INFO("CSM boot", "Client_State_Machine config:");
             for (auto i : config){
-                INFO(log_id(), "%s \t\t\t %s", i.first.c_str(), i.second.c_str());
+                INFO("CSM boot", "%s \t\t\t %s", i.first.c_str(), i.second.c_str());
             }
             _total_inserts = stoi(config["total_inserts"]);
             _id = stoi(config["id"]);

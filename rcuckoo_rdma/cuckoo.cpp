@@ -1094,11 +1094,11 @@ namespace cuckoo_rcuckoo {
 
         _state = INSERTING;
 
-        assert(_buckets_per_lock = 1);
+        // assert(_buckets_per_lock == 1);
         //Search path is now set
         if(!path_valid()) {
-            // INFO(log_id(), "Path is not valid\n");
-            // INFO(log_id(), "first path %s\n", path_to_string(_search_context.path).c_str());
+            INFO(log_id(), "Path is not valid\n");
+            INFO(log_id(), "first path %s\n", path_to_string(_search_context.path).c_str());
             lock_indexes_to_buckets(_search_context.open_buckets, _locks_held, _buckets_per_lock);
             bool successful_search = (this->*_table_search_function)();
             _search_path_index = _search_context.path.size() -1;
@@ -1109,21 +1109,21 @@ namespace cuckoo_rcuckoo {
                 INFO(log_id(), "Insert Direct -- Second Search Failed for key %s \n", _current_insert_key.to_string().c_str());
                 INFO(log_id(), "Unable to find path within buckets %s\n", vector_to_string(_search_context.open_buckets).c_str());
 
-                if (_search_context.open_buckets.size() != _locks_held.size()) {
-                    WARNING("PRECRASH", "Client %d is about to crash\n", _id);
-                    WARNING(log_id(), "search_buckets.size() != _locks_held.size()\n");
-                    WARNING(log_id(), "search_buckets.size() = %d\n", _search_context.open_buckets.size());
-                    WARNING(log_id(), "_locks_held.size() = %d\n", _locks_held.size());
-                    for (int i=0; i < _search_context.open_buckets.size(); i++) {
-                        WARNING(log_id(), "search_buckets[%d] = %d\n", i, _search_context.open_buckets[i]);
+                // if (_search_context.open_buckets.size() != _locks_held.size()) {
+                //     WARNING("PRECRASH", "Client %d is about to crash\n", _id);
+                //     WARNING(log_id(), "search_buckets.size() != _locks_held.size()\n");
+                //     WARNING(log_id(), "search_buckets.size() = %d\n", _search_context.open_buckets.size());
+                //     WARNING(log_id(), "_locks_held.size() = %d\n", _locks_held.size());
+                //     for (int i=0; i < _search_context.open_buckets.size(); i++) {
+                //         WARNING(log_id(), "search_buckets[%d] = %d\n", i, _search_context.open_buckets[i]);
                 
-                    }
-                    for (int i=0; i < _locks_held.size(); i++) {
-                        WARNING(log_id(), "_locks_held[%d] = %d\n", i, _locks_held[i]);
+                //     }
+                //     for (int i=0; i < _locks_held.size(); i++) {
+                //         WARNING(log_id(), "_locks_held[%d] = %d\n", i, _locks_held[i]);
                 
-                    }
-                }
-                assert(_search_context.open_buckets.size() == _locks_held.size());
+                //     }
+                // }
+                // assert(_search_context.open_buckets.size() == _locks_held.size());
                 INFO(log_id(), "Hi Stew, I\'m hoping you have a great day", _current_insert_key.to_string().c_str(), _id);
                 _state = RELEASE_LOCKS_TRY_AGAIN;
             } else {
@@ -1269,10 +1269,10 @@ namespace cuckoo_rcuckoo {
         _locking_message_index = 0;
 
         
-        INFO(log_id(), "[aquire_locks] gathering locks for buckets %s\n", vector_to_string(_buckets).c_str());
 
         search_path_to_buckets_fast(_search_context.path, _locking_context.buckets);
         get_lock_list_fast_context(_locking_context);
+        INFO(log_id(), "[aquire_locks] gathering locks for buckets %s\n", vector_to_string(_locking_context.buckets).c_str());
         //TODO make this one thing
         _lock_list = _locking_context.lock_list;
         get_covering_reads_from_lock_list(_locking_context.lock_list, _covering_reads ,_buckets_per_lock, _table.row_size_bytes());
