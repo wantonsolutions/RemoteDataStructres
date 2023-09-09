@@ -1,0 +1,33 @@
+\section{Implementation}
+
+We implement our algorithm in
+Python and emulate client-based RDMA using a custom-built
+simulator consisting of 1k lines of code. 
+
+\textbf{Simulator:} Our simulator is event based and does
+not emulate network transit time, processing time, or failed
+packets. Clients, memory, and switches are modeled as finite
+state machines, and the network as FIFO queues. Events are
+scheduled randomly, multiplexing clients, memory, and the
+network. RDMA verbs are modeled as function pointers with
+arguments passed by the client.
+
+\textbf{Rcuckoo} is implemented in 1.2k lines of
+python. We implement our own version of approximate A* with
+the use of Python's standard heap library for priority
+queuing. Clients store complete copies of the remote hash
+table index locally. We do not model the hash table extent
+in simulation all table accesses are inlined. In practice
+for better resource utilization cached pages of the index
+could be released using LRU. 
+
+\textbf{RACE~\cite{race}} has no publicly available
+implementation. Therefore we implemented our own version of
+RACE by closely following its protocol as described in its
+paper.  We only model the RACE index. In cases where
+blocking calls are made to RACE's extent we assume they
+succeed and simply reissue a read to the index to model the
+round trip incurred by the extent lookup. We model RACE's
+blocking behavior exactly in this way. We reached out to
+RACE's authors to check our implementation's correctness and
+were able to correlate our fill factor results with theirs.
