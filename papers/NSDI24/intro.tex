@@ -1,56 +1,105 @@
 \section{Introduction}
 \label{sec:intro}
 
-%concurrent data structures round trips
-Concurrent data structure design for remote memory is hard.
-Access latency to remote memory is high so round trips per
-operation must be minimized to achieve efficiency.
-Serialization is particularly hard because there is no
-centralized serialization point to guard access to remote
-memory. RDMA NIC's provide atomic verbs such as
-compare-and-swap (CAS), but these are by no means a silver
-bullet.  Each atomic request takes a round trip from client
-to server to execute. In the best case lock/unlock requires
-two round trips, if multiple locks are required, or locks
-are contested the number of round trips increases.
+DRAM capacity is scaling at an ever decreasing rate. As such
+the demand in data centers for high efficiency memory
+systems grows every year to improve memory utilization and
+sharing. Memory disaggregation i.e separating compute and
+memory into large pools is a promising approach to increase
+a CPU's per core memory access beyond what is available in a
+single machine while simultaneously decreasing per machine
+memory stranding.
 
-%cpu locking vs rdma
-In traditional key-value stores (Memcached~\cite{memcached})
-the CPU coordinates table access for read, write, and lock
-instructions. In contrast RDMA based Key-value
-stores~\cite{herd,erpc,pilaf} use a mixture of one-sided (no
-cpu) and two-sided (cpu involved) verbs to alleviate the CPU
-bottleneck. Reads are typically one sided to bypass the CPU
-bottleneck~\cite{pilaf,cell} while writes are typically two
-sided so memory-side CPU can orchestrate serialized
-operations (e.g. locking) with main memory access latency
-(50-100ns).  These small access times keep critical sections
-small for CPU based locking, and dramatically increase them
-for one-sided RDMA based locking schemes~\cite{clover,
-sherman}.
+Designing a fully disaggregated system is challenging.
+Access latencies to remote memory are approximately 20x that
+of local DRAM (50ns to 1us) which severely increases the
+cost of synchronizing shared data structures among many
+CPU's across multiple machines. Traditional and partially
+disaggregated key-value serialize updates with a CPU
+colocated with
+memory~\cite{memcached,herd,erpc,pilaf,cell,clover}(\todo{check
+sherman}). This approach does not meet the requirements of
+full disaggregation in which memory is a passive resource.
+In the fully disaggregated setting serialization is achieved
+entirely with a client based protocol. 
+
+Some prior work has examined the design of fully
+disaggregated indexes~\cite{sherman, race, fusee, rolex}.
+These approaches either use optimistic concurrency, or
+assume that most clients are colocated and can resolve their
+lock acquisitions in local memory. Optimistic approaches
+using RDMA atomics are limited by the width of the atomic
+instruction (64 bits for compare and swap). This update size
+is too encapsulate a key-value update, and is often too
+small to store a key. The result is that optimistic
+approaches require more round trips to remote memory to
+complete their operations. These approaches have dismissed
+lock based approaches outright as the size of their critical
+sections can bottleneck performance, and  the cost of
+acquiring and releasing locks (at minimum two round trips)
+is often higher than the optimistic approach (two or three
+round trips).
+
+% %concurrent data structures round trips
+% Concurrent data structure design for remote memory is hard.
+% Access latency to remote memory is high so round trips per
+% operation must be minimized to achieve efficiency.
+% Serialization is particularly hard because there is no
+% centralized serialization point to guard access to remote
+% memory. RDMA NIC's provide atomic verbs such as
+% compare-and-swap (CAS), but these are by no means a silver
+% bullet.  Each atomic request takes a round trip from client
+% to server to execute. In the best case lock/unlock requires
+% two round trips, if multiple locks are required, or locks
+% are contested the number of round trips increases.
+
+% %cpu locking vs rdma
+% In traditional key-value stores (Memcached~\cite{memcached})
+% the CPU coordinates table access for read, write, and lock
+% instructions. In contrast RDMA based Key-value
+% stores~\cite{herd,erpc,pilaf} use a mixture of one-sided (no
+% cpu) and two-sided (cpu involved) verbs to alleviate the CPU
+% bottleneck. Reads are typically one sided to bypass the CPU
+% bottleneck~\cite{pilaf,cell} while writes are typically two
+% sided so memory-side CPU can orchestrate serialized
+% operations (e.g. locking) with main memory access latency
+% (50-100ns).  These small access times keep critical sections
+% small for CPU based locking, and dramatically increase them
+% for one-sided RDMA based locking schemes~\cite{clover,
+% sherman}.
 
 %rdma and cuckoo hashing
 In this work we examine the tradeoffs between optimistic and
-lock based data structures for remote memory. Our
+lock based data structures for full disaggregation. Our
 contribution is a new concurrent hash table design which
 uses a novel cuckoo hashing algorithm. Our algorithm
 (rcuckoo) is designed to enable locking and unlocking
 efficiently using one-sided RDMA. In the common case our
 reads execute in a single round trip, and updates to the
-table are performed in two round trips. To achieve this
-efficiency we make use of \textit{dependent hashing} to
-increase the locality between hash location in our cuckoo
-hash. Dependent hashing enables efficient reads, fast
-heuristic search for open location, and efficient locking.
-To achieve fast locking we make use of new RDMA NIC device
-features, mainly RDMA masked CAS operations and device
-mapped memory. Rcuckoo is designed with RDMA NIC's in mind
-to achieve high throughput and low latency.
+table are performed in two round trips. 
 
-%%
-Implement a prototype of our algorithm in python and
-evaluate it in a simulator against another state of the art
-remote hashing algorithm RACE. We demonstrate that in the
-common case rcuckoo requires fewer round trips, and
-therefore achieves lower latency and higher throughput than
-race but up to a factor of 2x on YCSB workloads.
+Our algorithm makes use of multiple novel contributions
+which decrease round trips per operation. The first is a
+dependent hashing algorithm. Dependent hashing increases the
+likelihood that a key's hash locations will be spatially
+near one another. Locality improves the efficiency of both
+locking and reading. Inserting into a cuckoo hash table
+normally requires acquiring many locks randomly throughout
+the table, dependent hashing clusters lock acquisitions
+enabling many locks to be acquired in a single atomic
+request. Second, our algorithm uses speculative lock
+acquisition. Locks are acquired in bulk based on a local
+cache of the remote index. Once locks are held a second
+search on synchronized locked data is performed to ensure a
+correct insertion. Third we use optimized search for cuckoo
+hashing, prior approaches use random search (DFS), dependent
+hashing enables guided search (A*) as open entires in the
+table are more likely be be accessible in fewer hops.
+
+\sg{ It might be smart to mention using rare nic features,
+and how we trade off bandwidth for latency }
+
+We develop a prototype of our algorithm and evaluate it
+against two recent RDMA based key value stores. Our
+evaluation shows that we can achieve ~\todo{2x faster reads
+and 1.5x faster writes on a multitude of ycsb workloads.}

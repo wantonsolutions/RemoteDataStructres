@@ -97,25 +97,42 @@
 
 \section*{Abstract}
 
-Far memory data structures eschew locks in favor of
-optimistic concurrency as locks increase critical section
-size and messages. Optimistic concurrency unfortunately
-comes at the cost of high failure rates, complex protocols,
-and the need to perform data updates at small fixed sizes
-(64 bits for compare and swap). In this work we show that
+Memory disaggregation promises high resource utilization,
+and efficient resource sharing. However designing fully
+disaggregated systems remains challenging due to the high
+latency of remote memory. Key-value store indexes often
+adopt a ~\textit{partially disaggregated} approach where
+updates to the index are routed through a CPU for
+serialization, while reads
+ are made directly to memory.
+Fully disaggregated indexes assume no such CPU and must
+serialize updates entirely with remote clients.
+
+This paper focuses on the design of a
+ fully
+ disaggregated
+lock-based key-value index based on cuckoo
+ hashing. Prior
+work avoids locks in favor of optimistic concurrency as
+locks can have large critical sections and quickly
+bottleneck performance. However, optimistic approaches
+require multiple round trips for each operation, as atomic
+updates are limited to 64 bits with RDMA atomics. 
+
+In this work we show that
 with careful data structure and protocol design, as well as
 the architecture of modern RDMA NICs traditional locking
 strategies can perform better than state of the art
-optimistic concurrency algorithm. We demonstrate this
+optimistic concurrency algorithms. We demonstrate this
 through the design of a remote memory key value store based
-on cuckoo hashing. Our cuckoo hashing algorithm (rcuckoo)
-uses dependent, rather than independent hash functions to
-increase the probability that a keys two buckets are close
-in the hash table. This locality enables fast lock
+on cuckoo hashing. Our cuckoo hashing algorithm (rcuckoo)uses dependent,
+rather than independent hash functions to increase the
+probability that both hashes of a key will be
+close in the hash table. This locality enables fast lock
 acquisition and release. We demonstrate that rcuckoo
 outperforms optimistic concurrency algorithms by 2x in
 terms of throughput and up to a 2x improvement on read
-latency, as well as achieving higher fill factors.
+latency.
 
 \input{intro}
 \input{background}
