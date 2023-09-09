@@ -25,9 +25,14 @@ cx5_numa_node_from_host = {
     'yak-01.sysnet.ucsd.edu': 0,
     'yeti-00.sysnet.ucsd.edu': 1,
     'yeti-01.sysnet.ucsd.edu': 1,
+    'yeti-02.sysnet.ucsd.edu': 1,
+    'yeti-03.sysnet.ucsd.edu': 1,
     'yeti-04.sysnet.ucsd.edu': 1,
     'yeti-05.sysnet.ucsd.edu': 1,
+    'yeti-06.sysnet.ucsd.edu': 1,
+    'yeti-07.sysnet.ucsd.edu': 1,
     'yeti-08.sysnet.ucsd.edu': 1,
+    'yeti-09.sysnet.ucsd.edu': 1,
 }
 
 
@@ -53,8 +58,8 @@ class ssh_wrapper:
         stdin, stdout, stderr = self.ssh.exec_command(cmd)
         stdout_result =stdout.read()
         stderr_result = stderr.read()
-        print("stdout: ", stdout_result.decode("utf-8"))
-        print("stderr: ", stderr_result.decode("utf-8"))
+        print(self.hostname, "stdout: ", stdout_result.decode("utf-8"))
+        print(self.hostname, "stderr: ", stderr_result.decode("utf-8"))
 
         error_code = stdout.channel.recv_exit_status()
         return
@@ -94,12 +99,24 @@ class Orchestrator:
     # server_name = 'yak-00.sysnet.ucsd.edu'
     # client_name = 'yak-01.sysnet.ucsd.edu' 
 
+    # node_names = [
+    # 'yeti-00.sysnet.ucsd.edu',
+    # 'yeti-01.sysnet.ucsd.edu',
+    # 'yeti-04.sysnet.ucsd.edu', 
+    # 'yeti-05.sysnet.ucsd.edu', 
+    # 'yeti-08.sysnet.ucsd.edu'
+    # ]
     node_names = [
     'yeti-00.sysnet.ucsd.edu',
     'yeti-01.sysnet.ucsd.edu',
+    'yeti-02.sysnet.ucsd.edu',
+    'yeti-03.sysnet.ucsd.edu',
     'yeti-04.sysnet.ucsd.edu', 
     'yeti-05.sysnet.ucsd.edu', 
-    'yeti-08.sysnet.ucsd.edu'
+    'yeti-06.sysnet.ucsd.edu', 
+    'yeti-07.sysnet.ucsd.edu', 
+    'yeti-08.sysnet.ucsd.edu',
+    'yeti-09.sysnet.ucsd.edu', 
     ]
 
     master_node_index = 0
@@ -220,7 +237,7 @@ class Orchestrator:
             thr2.start()
             threads.append(thr2)
 
-        sleeptime=20
+        sleeptime=120
         print("Sleeping for ",sleeptime," seconds to let the test run")
         for i in tqdm(range(sleeptime)):
             time.sleep(1)
@@ -232,7 +249,7 @@ class Orchestrator:
         temp_dir = tempfile.TemporaryDirectory()
         # print(temp_dir.name)
         throughput_filename = "statistics.txt"
-        remote_latency_directory = self.project_directory +'/build/'
+        remote_latency_directory = self.project_directory +'/build'
         local_client_stat_directory = temp_dir.name
         self.master.get(remote_latency_directory+"/"+throughput_filename, local_client_stat_directory+"/"+throughput_filename)
         with open(local_client_stat_directory+"/"+throughput_filename) as file:
@@ -275,8 +292,9 @@ def run_ycsb_trial(datadir="data/sherman_ycsb"):
     workloads = ["workloada","workloadb","workloadc","workloadupd100"]
 
     # clients = [4,8,16,32,64,128,200]
-    clients = [5,10,20,40,80,160,200]
-    # workloads = ["workloada"]
+    # clients = [5,10,20,40,80,160,200]
+    clients = [250, 300, 400]
+    workloads = ["workloada"]
 
     all_results= dict()
     for workload in workloads:
@@ -294,7 +312,7 @@ def run_ycsb_trial(datadir="data/sherman_ycsb"):
     dm.save_statistics(all_results,datadir)
 
 
-# run_ycsb_trial("data/sherman_ycsb_zipf")
+run_ycsb_trial("data/sherman_ycsb_zipf")
 ps.plot_ycsb()
 # ps.plot_latency()
 

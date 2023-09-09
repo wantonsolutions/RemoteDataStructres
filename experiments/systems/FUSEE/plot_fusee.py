@@ -65,9 +65,11 @@ def plot_tput():
     ax.plot(clients,delete_data, marker='x', label="delete")
     
 
-    rcuckoo_insert=[120271.283245,234694.346647,459445.070634,917088.666479] #,1707337.275191,2391186.794957,]
-    rcuckoo_clients=[1,2,4,8] #,16,24]
-    rcuckoo_insert = [x / 1000000 for x in rcuckoo_insert]
+    # rcuckoo_insert=[120271.283245,234694.346647,459445.070634,917088.666479] #,1707337.275191,2391186.794957,]
+    # rcuckoo_clients=[1,2,4,8] #,16,24]
+    rcuckoo_insert=[0.3148210354061908, 0.6199394105755479, 1.1946543752999568, 2.3096083082187455, 4.1296484533547115, 5.993299988618042, 7.583539988986855]
+    rcuckoo_clients=[4, 8, 16, 32, 64, 128, 160]
+    # rcuckoo_insert = [x / 1000000 for x in rcuckoo_insert]
     ax.plot(rcuckoo_clients,rcuckoo_insert, marker='x', label="rcuckoo insert")
 
     ax.legend(ncol=2)
@@ -141,12 +143,19 @@ def plot_ycsb_multi_run():
 
     for load, label in zip(workloads, workload_labels):
         avg, err = average_runs(runs, load)
+        avg = avg / 1000000
+        err = err / 1000000
         print(label)
         print("threads=", runs[0]["clients"])
         print("avg_ops=", avg)
         # exit(0)
         # print(avg, err, runs[0]["clients"], label)
         ax.errorbar(runs[0]["clients"], avg, yerr=err, marker='x', label=label)
+
+    rcuckoo_insert=[0.3148210354061908, 0.6199394105755479, 1.1946543752999568, 2.3096083082187455, 4.1296484533547115, 5.993299988618042, 7.583539988986855]
+    rcuckoo_clients=[4, 8, 16, 32, 64, 128, 160]
+    # rcuckoo_insert = [x / 1000000 for x in rcuckoo_insert]
+    ax.plot(rcuckoo_clients,rcuckoo_insert, marker='x', label="rcuckoo insert")
 
     ax.legend(ncol=2)
     ax.set_ylabel("MOPS")

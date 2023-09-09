@@ -26,6 +26,7 @@ class rcuckoo_ssh_wrapper:
         self.ssh = paramiko.SSHClient()
         self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         #ensure that we don't need a password to connect
+        print("connecting to ", hostname, "as", username)
         self.ssh.connect(self.hostname, username=self.username)
         self.scp = SCPClient(self.ssh.get_transport())
         self.verbose = False
@@ -38,10 +39,10 @@ class rcuckoo_ssh_wrapper:
 
     def run_cmd(self, cmd):
         stdin, stdout, stderr = self.ssh.exec_command(cmd)
-        stdout_result =stdout.read()
-        stderr_result = stderr.read()
-        print("stdout: ", stdout_result.decode("utf-8"))
-        print("stderr: ", stderr_result.decode("utf-8"))
+        # stdout_result =stdout.read()
+        # stderr_result = stderr.read()
+        # print("stdout: ", stdout_result.decode("utf-8"))
+        # print("stderr: ", stderr_result.decode("utf-8"))
 
         error_code = stdout.channel.recv_exit_status()
         if (self.verbose) or (error_code != 0):
@@ -129,8 +130,16 @@ class Orchestrator:
     def generate_and_send_configs(self, config, config_name):
         #start by checking the config
 
+        print(
+            "workload:", config["workload"], 
+            "cores:", config["num_clients"], 
+            "fill:", config["max_fill"] ,
+            "lpm:", config["locks_per_message"],
+            "lock size:", config["buckets_per_lock"]
+            )
+
         threads_per_machine = self.get_threads_per_machine(config)
-        print("threads per machine:", threads_per_machine)
+        # print("threads per machine:", threads_per_machine)
 
         if not "base_port" in config:
             default_base_port=8500
@@ -138,7 +147,7 @@ class Orchestrator:
             config["base_port"] = str(default_base_port)
 
         memory_server_addr = self.server.get_mlx5_ip()
-        print("memory server address:", memory_server_addr)
+        # print("memory server address:", memory_server_addr)
         if memory_server_addr == "":
             print("ERROR: mlx5 ip is empty (how):", memory_server_addr)
             exit()
@@ -238,6 +247,15 @@ class Orchestrator:
         for node in self.all_nodes:
             node.sanity_check_mlx5()
 
+    def setup_huge(self):
+        #do hugeppages on the server
+        #200gb of 2mb pages
+        print("setting up huge pages on server")
+        self.server.run_cmd('echo iwicbV15 | sudo -S hugeadm --pool-pages-min 2MB:102400')
+        for client in self.clients:
+            # client.run_cmd('echo iwicbV15 | sudo hugeadm --pool-pages-min 2MB:16384')
+            print("setting up huge pages on client", client.hostname)
+            client.run_cmd('echo iwicbV15 | sudo -S hugeadm --pool-pages-min 2MB:65536')
 
     def run(self):
         # print("Starting RDMA Benchmark")
@@ -246,7 +264,7 @@ class Orchestrator:
             './'+ self.memory_program_name + ' ' + 'configs/' + self.config_name + ' > memserver.out 2>&1 &')
         server_thread = threading.Thread(target=self.server.run_cmd, args=(server_command,))
         server_thread.start()
-        time.sleep(5)
+        time.sleep(10)
 
 
             # 'export MLX5_SINGLE_THREADED=1;'
@@ -257,15 +275,16 @@ class Orchestrator:
                 'cat client.out;'
         )
         for client in self.clients:
-            print("Preparing client on", client.hostname)
+            # print("Preparing client on", client.hostname)
             client_thread = threading.Thread(target=client.run_cmd, args=(client_command,))
             client_threads.append(client_thread)
 
-        print("Starting all clients")
+        # print("Starting all clients")
         for client_thread in client_threads:
             client_thread.start()
-        print("waiting for clients to join") 
-        for client_thread in client_threads:
+        print("Waiting for all {} clients to finish..".format(len(client_threads)))
+        for i, client_thread in enumerate(client_threads):
+            print("Waiting for client", i)
             client_thread.join()
 
         self.kill()
@@ -288,25 +307,30 @@ def fix_stats(stats, config):
     return stats
 
 
-
+def boot(config):
+    boot_orch = Orchestrator(config)
+    boot_orch.sanity_check()
+    boot_orch.setup_huge()
+    boot_orch.sync()
+    boot_orch.kill()
+    del boot_orch
 
     
 def run_trials(config):
     runs = []
     trials = config['trials']
+
+
     for i in tqdm(range(trials)):
         c=copy.copy(config)
         orch = Orchestrator(c)
-        orch.sync()
         #prepare for the run
         # orch.transfer_configs_to_nodes(config, "remote_config.json")
         orch.generate_and_send_configs(c, "remote_config.json")
-        orch.sanity_check()
         orch.kill()
         stats_collected = False
         try:
             orch.run()
-            orch.kill()
         except Exception as e:
             print("Run ", i, " failed with exception -- we gotta fix this", e)
             exit()
