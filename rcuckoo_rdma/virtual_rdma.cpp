@@ -62,6 +62,7 @@ namespace cuckoo_virtual_rdma {
         s += "row: " + std::to_string(row);
         s += " offset: " + std::to_string(offset);
         s += " size: " + std::to_string(size);
+        s += "}";
         return s;
     }
 
@@ -588,7 +589,7 @@ namespace cuckoo_virtual_rdma {
             // printf("pushing mcd %d %s\n", i, mcd.to_string().c_str());
             context.lock_list.push_back(mcd);
         }
-        VERBOSE("lock_chunks_to_masked_cas", "returning %d masked cas data", masked_cas_data.size());
+        VERBOSE("lock_chunks_to_masked_cas", "returning %d masked cas data", context.lock_list.size());
         return;
     }
 
@@ -823,6 +824,14 @@ namespace cuckoo_virtual_rdma {
         return message;
     }
 
+    VRReadData read_request_data(unsigned int start_bucket, unsigned int offset, unsigned int size) {
+        VRReadData message;
+        message.size = size;
+        message.row = start_bucket;
+        message.offset = offset;
+        return message;
+    }
+
     vector<VRMessage> multi_bucket_read_message(hash_locations buckets, unsigned int row_size_bytes) {
         vector<VRMessage> messages;
         unsigned int min_bucket = buckets.min_bucket();
@@ -830,6 +839,14 @@ namespace cuckoo_virtual_rdma {
         VRMessage message = read_request_message(min_bucket, 0, size);
         messages.push_back(message);
         return messages;
+    }
+
+    void multi_bucket_read_message(vector<VRReadData> & messages, hash_locations buckets, unsigned int row_size_bytes) {
+        messages.clear();
+        unsigned int min_bucket = buckets.min_bucket();
+        unsigned int size = single_read_size_bytes(buckets, row_size_bytes);
+        VRReadData message = read_request_data(min_bucket, 0, size);
+        messages.push_back(message);
     }
 
     VRMessage single_bucket_read_message(unsigned int bucket, unsigned int row_size_bytes){
@@ -844,6 +861,12 @@ namespace cuckoo_virtual_rdma {
 
     }
 
+    void single_bucket_read_messages(vector<VRReadData> & messages, hash_locations buckets, unsigned int row_size_bytes){
+        messages.clear();
+        messages.push_back(read_request_data(buckets.primary, 0, row_size_bytes));
+        messages.push_back(read_request_data(buckets.secondary, 0, row_size_bytes));
+    }
+
     vector<VRMessage> read_threshold_message(hash_locations (*location_function)(Key, unsigned int), Key key, unsigned int read_threshold_bytes,unsigned int table_size,unsigned int row_size_bytes) {
         hash_locations buckets = location_function(key.to_string(), table_size);
         VERBOSE("read_threshold_message", "buckets are %s", buckets.to_string().c_str());
@@ -854,6 +877,16 @@ namespace cuckoo_virtual_rdma {
             messages = single_bucket_read_messages(buckets, row_size_bytes);
         }
         return messages;
+    }
+
+    void read_theshold_message(vector<VRReadData> & messages, hash_locations (*location_function)(Key, unsigned int), Key key, unsigned int read_threshold_bytes,unsigned int table_size,unsigned int row_size_bytes){
+        hash_locations buckets = location_function(key, table_size);
+        VERBOSE("read_threshold_message", "buckets are %s", buckets.to_string().c_str());
+        if (single_read_size_bytes(buckets, row_size_bytes) <= read_threshold_bytes) {
+            multi_bucket_read_message(messages, buckets, row_size_bytes);
+        } else {
+            single_bucket_read_messages(messages, buckets, row_size_bytes);
+        }
     }
 
     VRMessage create_masked_cas_message_from_lock_list(VRMaskedCasData masked_cas_data) {
@@ -900,12 +933,15 @@ namespace cuckoo_virtual_rdma {
         VRReadData read_data;
         hash_locations buckets;
 
+
         buckets.primary = (masked_cas.min_set_lock) * buckets_per_lock;
         buckets.secondary = (masked_cas.max_set_lock) * buckets_per_lock + (buckets_per_lock - 1);
 
 
+
         read_data.size= single_read_size_bytes(buckets, row_size_bytes);
-        read_data.row = masked_cas.min_set_lock + (BITS_PER_BYTE * masked_cas.min_lock_index);
+        read_data.row = (masked_cas.min_set_lock + (BITS_PER_BYTE * masked_cas.min_lock_index)) * buckets_per_lock;
+        // read_data.row = buckets.primary;
         read_data.offset = 0;
         // ALERT("get_covering_read_from_lock", "min_bucket: %d, max_bucket: %d size %d\n", buckets.primary, buckets.secondary, read_data.size);
         return read_data;

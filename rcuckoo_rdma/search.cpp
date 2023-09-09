@@ -468,6 +468,7 @@ namespace cuckoo_search {
 
     void a_star_search_fast_context(search_context &context){
         // fast_a_star_pe closed_list_addressable[MAX_SEARCH_ITEMS];
+        context.path.clear();
         const unsigned int target_count = 1;
         find_closest_target_n_bi_directional(context, target_count);
 

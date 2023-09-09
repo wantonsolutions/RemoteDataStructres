@@ -807,12 +807,14 @@ void usage()
 }
 
 
-void moniter_run(int num_qps, int print_frequency, bool prime, Memory_State_Machine &msm) {
+
+void moniter_run(int num_qps, int print_frequency, bool prime, int runtime, bool use_runtime, Memory_State_Machine &msm) {
 
     //print buffers every second
     int print_step=0;
     bool priming_complete = false;
     time_t last_print;
+    time_t experiment_start_time;
     time(&last_print);
     while(true) {
         time_t now;
@@ -835,10 +837,20 @@ void moniter_run(int num_qps, int print_frequency, bool prime, Memory_State_Mach
             printf("Table has reached it's priming factor\n");
             announce_priming_complete();
             priming_complete = true;
+            if (use_runtime) {
+                time(&experiment_start_time);
+            }
         }
 
         if((fill_percentage * 100.0) >= msm.get_max_fill()) {
             printf("Table has reached it's full capactiy. Exiting globally\n");
+            end_experiment_globally();
+            break;
+        }
+
+
+        if(use_runtime && (now - experiment_start_time) >= runtime) {
+            printf("Experiment has reached it's runtime capactiy. Exiting globally\n");
             end_experiment_globally();
             break;
         }
@@ -882,6 +894,7 @@ void *connection_setup(void* void_args){
         rdma_error("Failed to handle client cleanly, ret = %d \n", ret);
         exit(1);
     }
+    pthread_exit(NULL);
 
 }
 
@@ -913,6 +926,15 @@ int main(int argc, char **argv)
     int base_port = stoi(config["base_port"]);
     int num_qps = stoi(config["num_clients"]);
 
+    string workload = config["workload"];
+    int runtime = 0;
+    bool use_runtime = false;
+
+    if (workload == "ycsb-c") {
+        runtime = stoi(config["runtime"]);
+        use_runtime = true;
+    }
+
     int i; 
     int ret = setup_shared_resources();
     if (ret) { 
@@ -935,8 +957,6 @@ int main(int argc, char **argv)
 
     pthread_t thread_ids[MAX_QPS];
     rdma_connection_setup_args args[MAX_QPS];
-
-
     pthread_t connection_event_manager;
 
     pthread_create(&connection_event_manager, NULL, &connection_event_manager_loop, NULL);
@@ -987,7 +1007,7 @@ int main(int argc, char **argv)
     //     }
     // }
     printf("All server setup complete, now serving memory requests\n");
-    moniter_run(num_qps, 1 ,prime, msm);
+    moniter_run(num_qps, 1 ,prime, runtime, use_runtime, msm);
 
     ALERT("RDMA memory server", "Sending results to the memcached server\n");
     send_final_memory_stats_to_memcached_server(msm);

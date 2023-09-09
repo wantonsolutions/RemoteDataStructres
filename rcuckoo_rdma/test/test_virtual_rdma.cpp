@@ -34,6 +34,28 @@ bool test_0() {
     }
 }
 
+bool test_0_fast_context() {
+
+    LockingContext context;
+    context.locks_per_message = 64;
+    context.buckets_per_lock = 1;
+    context.buckets = {0};
+    get_lock_list_fast_context(context);
+
+    assert(context.lock_list.size() == 1);
+    VRMaskedCasData mcd = context.lock_list[0];
+    printf("Masked Cas Data: %s\n", mcd.to_string().c_str());
+
+    string outcome  = s("00000001") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000");
+    if (uint64t_to_bin_string(mcd.mask) == outcome) {
+        printf("success\n");
+        return true;
+    } else {
+        printf("failure\n");
+        return false;
+    }
+}
+
 bool test_1() {
     string test_name = "basic test, can we lock the first two indexes";
     vector<unsigned int> buckets = {0,1};
@@ -44,6 +66,28 @@ bool test_1() {
     printf("Masked Cas Data: %s\n", mcd.to_string().c_str());
 
     string outcome  = s("11000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000");
+    if (uint64t_to_bin_string(mcd.mask) == outcome) {
+        printf("success\n");
+        return true;
+    } else {
+        printf("failure\n");
+        return false;
+    }
+}
+
+bool test_1_fast_context() {
+
+    LockingContext context;
+    context.locks_per_message = 64;
+    context.buckets_per_lock = 1;
+    context.buckets = {0,1};
+    get_lock_list_fast_context(context);
+
+    assert(context.lock_list.size() == 1);
+    VRMaskedCasData mcd = context.lock_list[0];
+    printf("Masked Cas Data: %s\n", mcd.to_string().c_str());
+
+    string outcome  = s("00000011") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000");
     if (uint64t_to_bin_string(mcd.mask) == outcome) {
         printf("success\n");
         return true;
@@ -73,6 +117,29 @@ bool test_2 () {
     }
 }
 
+bool test_2_fast_context() {
+
+    LockingContext context;
+    context.locks_per_message = 64;
+    context.buckets_per_lock = 1;
+    context.buckets = {8};
+    get_lock_list_fast_context(context);
+
+    assert(context.lock_list.size() == 1);
+    VRMaskedCasData mcd = context.lock_list[0];
+    printf("Masked Cas Data: %s\n", mcd.to_string().c_str());
+
+    string outcome  = s("00000000") + s("00000001") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000");
+    if (uint64t_to_bin_string(mcd.mask) == outcome) {
+        printf("success\n");
+        return true;
+    } else {
+        printf("failure\n");
+        return false;
+    }
+}
+
+
 bool test_3 () {
     string test_name = "basic test, get a mask with an index of 8 shifted";
     vector<unsigned int> buckets = {64};
@@ -85,6 +152,28 @@ bool test_3 () {
     string outcome  = s("10000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000");
     int min_index = 8;
     if (uint64t_to_bin_string(mcd.mask) == outcome && mcd.min_lock_index == min_index) {
+        printf("success\n");
+        return true;
+    } else {
+        printf("failure\n");
+        return false;
+    }
+}
+
+bool test_3_fast_context() {
+
+    LockingContext context;
+    context.locks_per_message = 64;
+    context.buckets_per_lock = 1;
+    context.buckets = {64};
+    get_lock_list_fast_context(context);
+
+    assert(context.lock_list.size() == 1);
+    VRMaskedCasData mcd = context.lock_list[0];
+    printf("Masked Cas Data: %s\n", mcd.to_string().c_str());
+
+    string outcome  = s("00000001") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000");
+    if (uint64t_to_bin_string(mcd.mask) == outcome) {
         printf("success\n");
         return true;
     } else {
@@ -119,6 +208,39 @@ bool test_4(){
         printf("failure\n");
         return false;
     }
+}
+
+bool test_4_fast_context() {
+
+    LockingContext context;
+    context.locks_per_message = 64;
+    context.buckets_per_lock = 1;
+    context.buckets = {0,64};
+    get_lock_list_fast_context(context);
+
+    assert(context.lock_list.size() == 2);
+
+    VRMaskedCasData mcd_0 = context.lock_list[0];
+    VRMaskedCasData mcd_1 = context.lock_list[1];
+    printf("Masked Cas Data 0 : %s\n", mcd_0.to_string().c_str());
+    printf("Masked Cas Data 1 : %s\n", mcd_1.to_string().c_str());
+
+    string outcome_0  = s("00000001") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000");
+    int min_index_0 = 0;
+
+    string outcome_1  = s("00000001") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000");
+    int min_index_1 = 8;
+    if (
+        uint64t_to_bin_string(mcd_0.mask) == outcome_0 && mcd_0.min_lock_index == min_index_0 &&
+        uint64t_to_bin_string(mcd_1.mask) == outcome_1 && mcd_1.min_lock_index == min_index_1
+        ) {
+        printf("success\n");
+        return true;
+    } else {
+        printf("failure\n");
+        return false;
+    }
+
 }
 
 bool compare_test() {
@@ -240,15 +362,115 @@ bool perftest() {
 // bool test_4() {
 //     printf("test to ensure that we get 64 bit aligned CAS ");
 
+
+bool test_0b_fast_context() {
+    printf("two buckets per lock first index");
+    LockingContext context;
+    context.locks_per_message = 64;
+    context.buckets_per_lock = 2;
+    context.buckets = {0};
+    get_lock_list_fast_context(context);
+
+    assert(context.lock_list.size() == 1);
+    VRMaskedCasData mcd = context.lock_list[0];
+    printf("Masked Cas Data: %s\n", mcd.to_string().c_str());
+
+    string outcome  = s("00000001") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000");
+    if (uint64t_to_bin_string(mcd.mask) == outcome) {
+        printf("success\n");
+        return true;
+    } else {
+        printf("failure\n");
+        return false;
+    }
+}
+
+bool test_1b_fast_context() {
+    printf("two buckets per lock second index");
+    LockingContext context;
+    context.locks_per_message = 64;
+    context.buckets_per_lock = 2;
+    context.buckets = {1};
+    get_lock_list_fast_context(context);
+
+    assert(context.lock_list.size() == 1);
+    VRMaskedCasData mcd = context.lock_list[0];
+    printf("Masked Cas Data: %s\n", mcd.to_string().c_str());
+
+    string outcome  = s("00000001") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000");
+    if (uint64t_to_bin_string(mcd.mask) == outcome) {
+        printf("success\n");
+        return true;
+    } else {
+        printf("failure\n");
+        return false;
+    }
+}
+
+bool test_2b_fast_context() {
+    printf("two buckets per lock third index");
+    LockingContext context;
+    context.locks_per_message = 64;
+    context.buckets_per_lock = 2;
+    context.buckets = {2};
+    get_lock_list_fast_context(context);
+
+    assert(context.lock_list.size() == 1);
+    VRMaskedCasData mcd = context.lock_list[0];
+    printf("Masked Cas Data: %s\n", mcd.to_string().c_str());
+
+    string outcome  = s("00000010") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000");
+    if (uint64t_to_bin_string(mcd.mask) == outcome) {
+        printf("success\n");
+        return true;
+    } else {
+        printf("failure\n");
+        return false;
+    }
+}
+
+bool test_3b_fast_context() {
+    printf("two buckets per lock second byte");
+    LockingContext context;
+    context.locks_per_message = 64;
+    context.buckets_per_lock = 2;
+    context.buckets = {16};
+    get_lock_list_fast_context(context);
+
+    assert(context.lock_list.size() == 1);
+    VRMaskedCasData mcd = context.lock_list[0];
+    printf("Masked Cas Data: %s\n", mcd.to_string().c_str());
+
+    string outcome  = s("00000000") + s("00000001") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000") + s("00000000");
+    if (uint64t_to_bin_string(mcd.mask) == outcome) {
+        printf("success\n");
+        return true;
+    } else {
+        printf("failure\n");
+        return false;
+    }
+}
+
+
 int main() {
 
-    // test_0();
+    test_0();
+    test_0_fast_context();
+    test_1_fast_context();
+    test_2_fast_context();
+    test_3_fast_context();
+    test_4_fast_context();
+
+    test_0b_fast_context();
+    test_1b_fast_context();
+    test_2b_fast_context();
+    test_3b_fast_context();
     // test_1();
     // test_2();
     // test_3();
     // test_4();
-    perftest();
-    compare_test();
+    // perftest();
+    // compare_test();
     // test_3();
 
     //Translate a single lock
