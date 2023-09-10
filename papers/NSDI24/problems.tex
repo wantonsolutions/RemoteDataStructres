@@ -16,7 +16,7 @@ pessimistic updates acquire locks then read, write, and
 unlock. Porting prior cuckoo hashing algorithms to remote
 memory directly would result in poor performance as clients
 iteratively read one bucket at a time during search and then
-aquire locks~\cite{algorithmic-improvements, memc3, pilaf}.
+aquire locks~\cite{cuckoo-improvements, memc3, pilaf}.
 Determining how to accumulate a clients cache to perform an
 insert in the fewest number of round trips is a key
 challenge in building a remote cuckoo hash table.
