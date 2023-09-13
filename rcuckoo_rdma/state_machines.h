@@ -25,7 +25,7 @@ using namespace cuckoo_virtual_rdma;
 
 //Measurement DEFS
 // #define MEASURE_ALL
-#define MEASURE_MOST
+// #define MEASURE_MOST
 #define MEASURE_ESSENTIAL
 // #define MEASURE_NONE
 

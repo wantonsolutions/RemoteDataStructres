@@ -116,6 +116,64 @@ namespace rdma_helper {
 
     }
 
+    void setRdmaWriteExp(struct ibv_sge * sg, struct ibv_exp_send_wr * wr, uint64_t source, uint64_t dest, uint64_t size,
+        uint32_t lkey, uint32_t remoteRKey, int32_t imm, bool signal, uint64_t wrID) {
+
+        fillSgeWr(*sg, *wr, source, size, lkey);
+
+        if (imm == -1) {
+            wr->exp_opcode = IBV_EXP_WR_RDMA_WRITE;
+        } else {
+            wr->ex.imm_data = imm;
+            wr->exp_opcode = IBV_EXP_WR_RDMA_WRITE_WITH_IMM;
+        }
+
+        if (signal) {
+            wr->exp_send_flags |= IBV_EXP_SEND_SIGNALED;
+        }
+
+        wr->wr.rdma.remote_addr = dest;
+        wr->wr.rdma.rkey = remoteRKey;
+        wr->wr_id = wrID;
+
+    }
+
+    // for RC & UC
+    // bool rdmaWrite(ibv_qp *qp, uint64_t source, uint64_t dest, uint64_t size,
+    //             uint32_t lkey, uint32_t remoteRKey, int32_t imm, bool isSignaled,
+    //             uint64_t wrID) {
+
+    // struct ibv_sge sg;
+    // struct ibv_send_wr wr;
+    // struct ibv_send_wr *wrBad;
+
+    // fillSgeWr(sg, wr, source, size, lkey);
+
+    // if (imm == -1) {
+    //     wr.opcode = IBV_WR_RDMA_WRITE;
+    // } else {
+    //     wr.imm_data = imm;
+    //     wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
+    // }
+
+    // if (isSignaled) {
+    //     wr.send_flags = IBV_SEND_SIGNALED;
+    // }
+
+    // wr.wr.rdma.remote_addr = dest;
+    // wr.wr.rdma.rkey = remoteRKey;
+    // wr.wr_id = wrID;
+
+    // if (ibv_post_send(qp, &wr, &wrBad) != 0) {
+    //     Debug::notifyError("Send with RDMA_WRITE(WITH_IMM) failed.");
+    //     sleep(10);
+    //     return false;
+    // }
+    // return true;
+    // }
+
+
+
     bool rdmaReadExp(ibv_qp *qp, uint64_t source, uint64_t dest, uint64_t size,
         uint32_t lkey, uint32_t remoteRKey, bool signal, uint64_t wrID) {
         struct ibv_sge sg;
