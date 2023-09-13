@@ -62,8 +62,8 @@ class ssh_wrapper:
         stdin, stdout, stderr = self.ssh.exec_command(cmd)
         stdout_result =stdout.read()
         stderr_result = stderr.read()
-        print("stdout: ", stdout_result.decode("utf-8"))
-        print("stderr: ", stderr_result.decode("utf-8"))
+        print(self.hostname, "stdout: ", stdout_result.decode("utf-8"))
+        print(self.hostname,"stderr: ", stderr_result.decode("utf-8"))
 
         error_code = stdout.channel.recv_exit_status()
         return
@@ -114,8 +114,8 @@ class Orchestrator:
     'yeti-03.sysnet.ucsd.edu',
     'yeti-04.sysnet.ucsd.edu', 
     'yeti-05.sysnet.ucsd.edu', 
-    'yeti-06.sysnet.ucsd.edu', 
-    'yeti-07.sysnet.ucsd.edu', 
+    # 'yeti-06.sysnet.ucsd.edu', 
+    # 'yeti-07.sysnet.ucsd.edu', 
     'yeti-08.sysnet.ucsd.edu',
     'yeti-09.sysnet.ucsd.edu', 
     ]
@@ -193,6 +193,7 @@ class Orchestrator:
 
 
     def setup(self):
+        self.sync()
         #do hugeppages on the server
         #200gb of 2mb pages
         self.server.run_cmd('echo iwicbV15 | sudo -S hugeadm --pool-pages-min 2MB:102400')
@@ -200,16 +201,17 @@ class Orchestrator:
             # client.run_cmd('echo iwicbV15 | sudo hugeadm --pool-pages-min 2MB:16384')
             client.run_cmd('echo iwicbV15 | sudo -S hugeadm --pool-pages-min 2MB:65536')
 
-    def sync(self):
-        for dep in self.sync_dependents:
-            print("Syncing from", dep.hostname)
-            dep.run_cmd(
-                'cd rcuckoo_rdma;'
-                'rsync -r ' + self.build_location.hostname + ':' + self.project_directory + '/*;')
 
     def sanity_check(self):
         for node in self.all_nodes:
             node.sanity_check_mlx5()
+
+    def sync(self):
+        for dep in self.sync_dependents:
+            print("Syncing from", dep.hostname)
+            dep.run_cmd(
+                'cd ' + self.project_directory + '/build;'
+                'rsync -a ' + self.build_location.hostname + ':' + self.project_directory + '/build/* --exclude workloads ./;')
 
 
     def run_latency_test(self):
@@ -295,10 +297,13 @@ class Orchestrator:
         command=("cd " + self.project_directory + ";"
         "cd build;" 
         # "numactl -N 0 -m 0 ./ycsb-test/" +self.ycsb_throughput_memory_program_name + " 0 &")
-        "numactl ./ycsb-test/" +self.ycsb_throughput_memory_program_name + " 0 &")
+        "stdbuf -oL ./ycsb-test/" +self.ycsb_throughput_memory_program_name + " 0 > server.out &")
         "echo server started"
         thr = threading.Thread(target=self.server.run_cmd,args=(command,), kwargs={})
         thr.start()
+
+        for i in range(60):
+            time.sleep(1)
 
         threads_per_client = self.get_threads_per_client(config)
         client_threads=[]
@@ -311,7 +316,7 @@ class Orchestrator:
             "CLIENTS="+str(threads_per_client)+";"
             'rm -f '+output_file +';'
             # "yes | numactl -N "+ str(numa_node) +" -m "+ str(numa_node) + " ./" + self.ycsb_throughput_client_program_name + ' ../client_config_orc.json '+ config["workload"]+ ' $CLIENTS > '+output_file)
-            "yes |  ./" + self.ycsb_throughput_client_program_name + ' ../client_config_orc.json '+ config["workload"]+ ' $CLIENTS > '+output_file)
+            "yes | stdbuf -oL ./" + self.ycsb_throughput_client_program_name + ' ../client_config_orc.json '+ config["workload"]+ ' $CLIENTS > '+output_file +' 2> err.out')
 
             print(client_command)
             client_thread = threading.Thread(target=client.run_cmd,args=(client_command,), kwargs={})
@@ -320,6 +325,7 @@ class Orchestrator:
         print("Starting client")
         for client_thread in client_threads:
             client_thread.start()
+            print("starting client thread",client_thread)
         print("waiting for clients to join")    
         timeout_time = 120
         for i, client_thread in enumerate(client_threads):
@@ -327,7 +333,7 @@ class Orchestrator:
             client_thread.join(timeout=timeout_time)
             if client_thread.is_alive():
                 print("Client ",i, "timed out")
-            timeout_time = 10
+            timeout_time = 1
 
         
         # sleeptime=30
@@ -396,8 +402,10 @@ class Orchestrator:
             client.get(remote_filename, local_filename)
             with open(local_filename) as file:
                 lines = [line.rstrip() for line in file]
-
-            client_tput += self.get_ycsb_tput(lines)
+            res = self.get_ycsb_tput(lines)
+            client_tput += res
+            if res == 0:
+                print("Client ",i," failed")
         print(client_tput)
 
         return client_tput
@@ -457,8 +465,12 @@ class Orchestrator:
         server_config = self.open_reference_config("server_config.json")
         client_config = self.open_reference_config("client_config.json")
 
+        client_memory = 64
+        server_config["client_local_size"] = self.gb_to_bytes(client_memory)
+        client_config["client_local_size"] = self.gb_to_bytes(client_memory)
+
         #calculate the server data len
-        server_memory = 100
+        server_memory = 200
         # server_memory = int(config["clients"]) / 2
         server_config["server_data_len"] = self.gb_to_bytes(server_memory)
         client_config["server_data_len"] = self.gb_to_bytes(server_memory)
@@ -563,18 +575,20 @@ def run_ycsb_throughput_trial(data_file="data/fusee_ycsb"):
     orch = Orchestrator()
     orch.setup()
 
+
     config = dict()
     # clients = [1,2,4,8]
 
-    # clients = [2,4,8,16,32,48, 64, 80]
+    # clients = [2,4,8,16,32,48, 64,128,256]
     # clients = [200]
     # clients = [10, 20, 40, 80, 160, 320, 400]
-    clients = [200, 250]
+    # clients = [10, 20, 40, 80, 160, 200, 220]
     # clients = [5, 10, 20, 40, 80, 160, 200]
     # clients = [60, 96, 120]
-    # workloads = ["workloada", "workloadb", "workloadc", "workloadd", "workloadupd100"]
-    # workloads = ["workloada", "workloadb", "workloadc", "workloadd"]
-    workloads = ["workloada"]
+    clients = [8,16,32,64,128,256]
+    # clients = [256]
+    # clients = [200]
+    workloads = ["workloada", "workloadb", "workloadc", "workloadd"]
     all_results = dict()
     for workload in workloads:
         results = []
@@ -604,8 +618,8 @@ def run_many_ycsb_trials(trials=5):
 # pf.plot_latency()
 
 # run ycsb throughput trial
-run_ycsb_throughput_trial()
-# pf.plot_ycsb()
+# run_ycsb_throughput_trial()
+pf.plot_ycsb()
 
 # run_many_ycsb_trials(10)
 

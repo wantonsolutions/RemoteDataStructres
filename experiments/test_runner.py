@@ -34,7 +34,7 @@ def plot_general_stats_last_run(dirname=""):
 config=dict()
 
 
-table_size = 1024 * 1024 * 10
+table_size = 1024 * 1024 * 100
 # table_size = 1024 * 1024 * 10
 # table_size = 1024 * 1024
 #int table_size = 256;
@@ -55,14 +55,14 @@ config["name"] = "test_run"
 config["state_machine"] = "cuckoo"
 config['date']=datetime.datetime.now().strftime("%Y-%m-%d")
 config['commit']=git.Repo(search_parent_directories=True).head.object.hexsha
-config['hash_factor']=str(999999999)
+# config['hash_factor']=str(999999999)
 
 config["bucket_size"] = str(bucket_size)
 config["entry_size"] = str(entry_size)
 
-table_size = 1024 * 1024 * 10
 config["indexes"] = str(table_size)
 config["memory_size"] = str(memory_size)
+config["hash_factor"] = str(2.3)
 
 config["read_threshold_bytes"] = str(read_threshold_bytes)
 config["buckets_per_lock"] = str(buckets_per_lock)
@@ -87,6 +87,7 @@ config["prime"]="true"
 config["prime_fill"]=str(prime_fill)
 config["num_clients"]=str(num_clients)
 config["runtime"]=str(runtime)
+config["use_mask"]="true"
 
 #RDMA Engine Arguments
 config["server_address"]="192.168.1.12"
@@ -113,7 +114,7 @@ def fill_factor(config):
     # fill = [80,81,82,83]
     # fill = list(range(70,82))
 
-    table_size = 1024 * 1024 * 10
+    table_size = 1024 * 1024 * 1
     clients = 16
 
     runs = []
@@ -134,19 +135,31 @@ def fill_factor(config):
 
 def client_fill_to_50_exp(config):
     # clients = [1, 2, 4, 8, 16, 24]
-    clients = [4, 8, 16, 32, 64, 128, 160]
+    # clients = [4, 8, 16, 32, 64, 128, 160]
+    # clients = [10,20,40,80,160]
+    clients = [400]
     # clients = [4, 8]
     # clients = [16,32]
     # clients = [4]
     # clients = [40]
     # clients = [8]
     # clients = [160]
+    table_size = 1024 * 1024 * 10
+    memory_size = table_size * 8
+    config["indexes"] = str(table_size)
+    config["memory_size"] = str(memory_size)
+    config["hash_factor"] = str(2.3)
+
     runs = []
+    buckets_per_lock = 8
+    config["bucket_size"] = str(8)
+    config["buckets_per_lock"] = str(buckets_per_lock)
+    config['search_function'] = "bfs"
     config["trials"]=1
     config["prime"]="true"
     config["prime_fill"]="40"
     config["max_fill"]="50"
-    config["workload"]="ycsb-w"
+    config["workload"]="ycsb-c"
     orchestrator.boot(config.copy())
 
 
@@ -184,15 +197,20 @@ def table_size_contention(config):
     dm.save_statistics(runs)
 
 def run_hero_ycsb():
-    table_size = 1024 * 1024 * 10
-    clients = [4, 8, 16, 32, 64, 128, 160]
+    table_size = 1024 * 1024 * 100
+    # clients = [4, 8, 16, 32, 64, 128, 160]
+    clients = [10,20,40,80,160,320,400]
+    config["indexes"] = str(table_size)
+    config["memory_size"] = str(memory_size)
+    config["search_function"]="bfs"
 
     config["prime"]="true"
     config["prime_fill"]="40"
     config["max_fill"]="50"
 
-    config['trials'] = 1
+    config['trials'] = 3
     workloads = ["ycsb-a", "ycsb-b","ycsb-c", "ycsb-w"]
+    # workloads = ["ycsb-c"]
 
     orchestrator.boot(config.copy())
     for workload in workloads:
@@ -204,7 +222,7 @@ def run_hero_ycsb():
             runs.append(orchestrator.run_trials(lconfig))
         dirname="data/hero-"+workload
         dm.save_statistics(runs, dirname=dirname)
-        plot_general_stats_last_run(dirname=dirname)
+        # plot_general_stats_last_run(dirname=dirname)
 
 
 def plot_hero_ycsb():
@@ -450,6 +468,85 @@ def plot_round_trips_per_insert_operation():
     plt.savefig("rtt_per_operation.pdf")
 
 
+def search_fill_throughput():
+    table_size = 1024 *64
+    clients = 40
+    fills = [10,20,30,40,50,60,70,80,90,91,92,93,94,95]
+    # fills = [90,91,92]
+    # fills = [10,50,70,90] #,93,94,95]
+    # fills = [90]
+    # fills = [95]
+    # fills = [10,20]
+    # fills = [90]
+    # fills = [10,20,30,40,50]
+    # fills=[10]
+    config["deterministic"]="false"
+    config["prime"]="true"
+    config['trials'] = 1
+    config['workload'] = 'ycsb-w'
+    config['num_clients'] = str(clients)
+    config['indexes'] = str(table_size)
+    config['memory_size'] = str(entry_size * table_size)
+    config['hash_factor'] = str(2.3)
+
+    searches = ["a_star", "random", "bfs"]
+    config['trials'] = 5
+    # searches = ["a_star"]
+    # searches = ["a_star"]
+    
+    # searches = ["a_star"]
+    # searches = ["bfs"]
+
+    orchestrator.boot(config.copy())
+    for search in searches:
+        runs=[]
+        for fill in fills:
+            lconfig = config.copy()
+            lconfig['max_fill']=str(fill)
+            lconfig['prime_fill']=str(fill-10)
+            lconfig['search_function']=search
+            results = orchestrator.run_trials(lconfig)
+            if len(results) > 0:
+                runs.append(results)
+        dirname="data/search_fill_"+search
+        dm.save_statistics(runs, dirname=dirname)
+        # plot_general_stats_last_run(dirname=dirname)
+def print_recursive_sizes(stats,depth=0):
+    if isinstance(stats, dict):
+        return False
+    if isinstance(stats, list):
+        for s in stats:
+            print_recursive_sizes(s,depth+1)
+            print("    "*depth, "len",len(s), "depth",depth)
+
+
+def plot_search_fill_tput():
+    # searches = ["a_star", "random", "bfs"]
+    # searches = ["a_star", "random", "bfs"]
+    # searches = ["a_star", "random"]
+    # searches = ["a_star", "random", "bfs"]
+    searches = ["random", "bfs", "a_star"]
+    fig, ax = plt.subplots(1,1, figsize=(12,3))
+    for i in range(len(searches)):
+        dirname="data/search_fill_"+searches[i]
+        stats = dm.load_statistics(dirname=dirname)
+        stats=stats[0]
+        # plot_cuckoo.latency_per_operation(ax, stats, x_axis="max fill", twin=False, decoration=False, hide_zeros=True)
+        print(searches[i])
+        # plot_cuckoo.throughput(ax, stats, decoration=False, x_axis="max fill", label=searches[i])
+        
+        print_recursive_sizes(stats)
+        if searches[i] == "a_star":
+            plot_cuckoo.throughput(ax, stats, decoration=False, x_axis="max fill", label="a_star")
+        else:
+            plot_cuckoo.throughput(ax, stats, decoration=False, x_axis="max fill", label=searches[i])
+    ax.legend()
+    ax.set_xlabel("fill_factor")
+    ax.set_ylabel("MOPS")
+    # ax.set_ylim(0,15)
+
+    plt.tight_layout()
+    plt.savefig("search_fill_tput.pdf")
 
 
 
@@ -464,13 +561,16 @@ def plot_round_trips_per_insert_operation():
 # table_size_contention(config)
 # client_fill_to_50_exp(config)
 # run_hero_ycsb()
-# plot_hero_ycsb()
+plot_hero_ycsb()
 
 # run_hero_ycsb_fill()
 # plot_hero_ycsb_fill()
 # locks_per_message_test(config)
 # plot_buckets_per_lock_vs_locks_per_message_experiment()
 
-independent_search(config)
-plot_round_trips_per_insert_operation()
+# independent_search(config)
+# plot_round_trips_per_insert_operation()
 # plot_general_stats_last_run()
+
+# search_fill_throughput()
+# plot_search_fill_tput()

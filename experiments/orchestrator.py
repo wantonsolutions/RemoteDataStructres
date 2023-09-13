@@ -32,7 +32,12 @@ class rcuckoo_ssh_wrapper:
         self.verbose = False
 
     def get(self, remote_path, local_path):
-        self.scp.get(remote_path, local_path)
+        try:
+            self.scp.get(remote_path, local_path)
+        except:
+            print("ERROR: file not found")
+            return False
+        return True
 
     def set_verbose(self, verbose):
         self.verbose = verbose
@@ -87,9 +92,14 @@ class Orchestrator:
     client_names = [
     'yeti-00.sysnet.ucsd.edu',
     'yeti-01.sysnet.ucsd.edu',
-    'yeti-04.sysnet.ucsd.edu', 
-    # 'yeti-05.sysnet.ucsd.edu', 
-    'yeti-08.sysnet.ucsd.edu'
+    'yeti-02.sysnet.ucsd.edu',
+    'yeti-03.sysnet.ucsd.edu',
+    'yeti-04.sysnet.ucsd.edu',
+    'yeti-05.sysnet.ucsd.edu', 
+    'yeti-06.sysnet.ucsd.edu',
+    'yeti-07.sysnet.ucsd.edu',
+    'yeti-08.sysnet.ucsd.edu',
+    'yeti-09.sysnet.ucsd.edu',
     ]
     config = dict()
     def __init__(self, conf):
@@ -135,7 +145,8 @@ class Orchestrator:
             "cores:", config["num_clients"], 
             "fill:", config["max_fill"] ,
             "lpm:", config["locks_per_message"],
-            "lock size:", config["buckets_per_lock"]
+            "lock size:", config["buckets_per_lock"],
+            "search", config["search_function"],
             )
 
         threads_per_machine = self.get_threads_per_machine(config)
@@ -191,12 +202,19 @@ class Orchestrator:
         client_stat_filename = 'client_statistics.json'
         remote_client_stat_filename = self.project_directory + '/statistics/'+client_stat_filename
         local_client_stat_filename = temp_dir.name+'/'+client_stat_filename
+        success = False
         for i, client in enumerate(self.clients):
-            client.get(remote_client_stat_filename, local_client_stat_filename)
+            success = client.get(remote_client_stat_filename, local_client_stat_filename)
+
+            if not success:
+                print("ERROR: failed to get client statistics for client ", i, " from ", client.hostname)
+                continue
             f = open(local_client_stat_filename, 'r')
             client_stat = json.load(f)
             if i ==0:
+                success = True
                 master_stats = client_stat
+                print("master stats:", master_stats["system"])
             else:
                 clients = master_stats["clients"]
                 t_clients = client_stat["clients"]
@@ -205,7 +223,7 @@ class Orchestrator:
 
             f.close()
         temp_dir.cleanup()
-        return master_stats
+        return master_stats, success
 
     def set_verbose(self, verbose):
         for node in self.all_nodes:
@@ -261,17 +279,18 @@ class Orchestrator:
         # print("Starting RDMA Benchmark")
 
         server_command=('cd rcuckoo_rdma;'
-            './'+ self.memory_program_name + ' ' + 'configs/' + self.config_name + ' > memserver.out 2>&1 &')
+            'stdbuf -oL ./'+ self.memory_program_name + ' ' + 'configs/' + self.config_name + ' > memserver.out 2>&1 &')
         server_thread = threading.Thread(target=self.server.run_cmd, args=(server_command,))
         server_thread.start()
-        time.sleep(10)
+        time.sleep(15)
 
 
             # 'export MLX5_SINGLE_THREADED=1;'
         client_threads=[]
         client_command=(
                 'cd rcuckoo_rdma;'
-                'LD_PRELOAD=libhugetlbfs.so HUGETLB_MORECORE=yes ./' + self.client_program_name + ' ' + 'configs/' + self.config_name + ' > client.out 2>&1;'
+                'rm -f statistics/client_statistics.json;'
+                'LD_PRELOAD=libhugetlbfs.so HUGETLB_MORECORE=yes stdbuf -oL ./' + self.client_program_name + ' ' + 'configs/' + self.config_name + ' > client.out 2>&1;'
                 'cat client.out;'
         )
         for client in self.clients:
@@ -281,11 +300,15 @@ class Orchestrator:
 
         # print("Starting all clients")
         for client_thread in client_threads:
+            print("starting client thread", client_thread)
             client_thread.start()
+            time.sleep(1)
+        timeout = 30
         print("Waiting for all {} clients to finish..".format(len(client_threads)))
         for i, client_thread in enumerate(client_threads):
             print("Waiting for client", i)
-            client_thread.join()
+            client_thread.join(timeout=timeout)
+            timeout=5
 
         self.kill()
 
@@ -338,7 +361,10 @@ def run_trials(config):
         
         if not stats_collected:
             orch.validate_run()
-            stats = orch.collect_stats()
+            stats, success = orch.collect_stats()
+            if not success:
+                print("ERROR: failed to get stats for trial ", i)
+                continue
             stats = fix_stats(stats, c)
         runs.append(stats)
         del orch
