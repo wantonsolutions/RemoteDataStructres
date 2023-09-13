@@ -25,9 +25,14 @@ cx5_numa_node_from_host = {
     'yak-01.sysnet.ucsd.edu': 0,
     'yeti-00.sysnet.ucsd.edu': 1,
     'yeti-01.sysnet.ucsd.edu': 1,
+    'yeti-02.sysnet.ucsd.edu': 1,
+    'yeti-03.sysnet.ucsd.edu': 1,
     'yeti-04.sysnet.ucsd.edu': 1,
     'yeti-05.sysnet.ucsd.edu': 1,
+    'yeti-06.sysnet.ucsd.edu': 1,
+    'yeti-07.sysnet.ucsd.edu': 1,
     'yeti-08.sysnet.ucsd.edu': 1,
+    'yeti-09.sysnet.ucsd.edu': 1,
 }
 
 
@@ -105,9 +110,15 @@ class Orchestrator:
     client_names = [
     'yeti-00.sysnet.ucsd.edu',
     'yeti-01.sysnet.ucsd.edu',
+    'yeti-02.sysnet.ucsd.edu',
+    'yeti-03.sysnet.ucsd.edu',
     'yeti-04.sysnet.ucsd.edu', 
     'yeti-05.sysnet.ucsd.edu', 
-    'yeti-08.sysnet.ucsd.edu']
+    'yeti-06.sysnet.ucsd.edu', 
+    'yeti-07.sysnet.ucsd.edu', 
+    'yeti-08.sysnet.ucsd.edu',
+    'yeti-09.sysnet.ucsd.edu', 
+    ]
     # client_name = 'yeti-05.sysnet.ucsd.edu' 
     config = dict()
     def __init__(self):
@@ -557,11 +568,13 @@ def run_ycsb_throughput_trial(data_file="data/fusee_ycsb"):
 
     # clients = [2,4,8,16,32,48, 64, 80]
     # clients = [200]
-    clients = [5, 10, 20, 40, 80, 160, 200]
+    # clients = [10, 20, 40, 80, 160, 320, 400]
+    clients = [200, 250]
+    # clients = [5, 10, 20, 40, 80, 160, 200]
     # clients = [60, 96, 120]
     # workloads = ["workloada", "workloadb", "workloadc", "workloadd", "workloadupd100"]
-    workloads = ["workloada", "workloadb", "workloadc", "workloadd"]
-    # workloads = ["workloadb"]
+    # workloads = ["workloada", "workloadb", "workloadc", "workloadd"]
+    workloads = ["workloada"]
     all_results = dict()
     for workload in workloads:
         results = []
@@ -590,11 +603,11 @@ def run_many_ycsb_trials(trials=5):
 # run_latency_trial()
 # pf.plot_latency()
 
-#run ycsb throughput trial
-# run_ycsb_throughput_trial()
+# run ycsb throughput trial
+run_ycsb_throughput_trial()
 # pf.plot_ycsb()
 
-run_many_ycsb_trials(10)
+# run_many_ycsb_trials(10)
 
 
     

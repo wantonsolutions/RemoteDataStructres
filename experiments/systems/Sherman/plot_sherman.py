@@ -31,7 +31,7 @@ def tofloat(data):
 
 def plot_latency():
     fig, ax = plt.subplots(1, 1, figsize=(5, 3))
-    data, dir = dm.load_statistics("data/sherman_ycsb")
+    data, dir = dm.load_statistics("data/sherman_ycsb_uniform")
     clients = data["clients"]
 
     a99 = tofloat(data["workloada"]['th99'])
@@ -66,8 +66,8 @@ def plot_latency():
 
 def plot_ycsb():
     fig, ax = plt.subplots(1, 1, figsize=(5, 3))
-    # data, dir = dm.load_statistics("data/sherman_ycsb_uniform")
-    data, dir = dm.load_statistics("data/sherman_ycsb_zipf")
+    data, dir = dm.load_statistics("data/sherman_ycsb_uniform")
+    # data, dir = dm.load_statistics("data/sherman_ycsb_zipf")
     # data = json.loads(data)
 
     workloads = ["workloada", "workloadb", "workloadc", "workloadupd100"]
@@ -88,9 +88,9 @@ def plot_ycsb():
 
     
 
-    rcuckoo_insert=[120271.283245,234694.346647,459445.070634,917088.666479] #,1707337.275191,2391186.794957,]
-    rcuckoo_clients=[1,2,4,8] #,16,24]
-    rcuckoo_insert = [x / 1000000 for x in rcuckoo_insert]
+    rcuckoo_insert=[0.3148210354061908, 0.6199394105755479, 1.1946543752999568, 2.3096083082187455, 4.1296484533547115, 5.993299988618042, 7.583539988986855]
+    rcuckoo_clients=[4, 8, 16, 32, 64, 128, 160]
+    # rcuckoo_insert = [x / 1000000 for x in rcuckoo_insert]
     ax.plot(rcuckoo_clients,rcuckoo_insert, marker='x', label="rcuckoo insert")
 
     ax.legend(ncol=2)
@@ -98,8 +98,9 @@ def plot_ycsb():
     ax.set_xlabel("Clients")
     ax.set_title("Sherman YCSB throughput")
     plt.tight_layout()
-    plt.savefig("Sherman-ycsb-throughput-zipf.pdf")
-    # plt.savefig("Sherman-ycsb-throughput-uniform.pdf")
+    # plt.savefig("Sherman-ycsb-throughput-zipf.pdf")
+    plt.savefig("Sherman-ycsb-throughput-uniform.pdf")
 
 # plot_ycsb()
+plot_latency()
 
