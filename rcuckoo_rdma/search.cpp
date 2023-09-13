@@ -693,7 +693,6 @@ namespace cuckoo_search {
         const unsigned int table_rows = context.table->get_row_count();
         // Debugging print the list of targets
 
-        VERBOSE("DEBUG a_star search", "searching for target: %d\n", target);
         unsigned int closed_list_addressable_index = 0;
         fast_path_element starting_pe = fast_path_element(&(context.key), -1, -1, -1);
         search_element = fast_a_star_pe(starting_pe, NULL, 0, 0);

@@ -1054,18 +1054,34 @@ namespace cuckoo_rcuckoo {
         for ( unsigned int i=0; i < insert_messages.size(); i++) {
             uint64_t local_address = (uint64_t) get_entry_pointer(insert_messages[i].row, insert_messages[i].offset);
             uint64_t remote_server_address = local_to_remote_table_address(local_address);
-            setRdmaCompareAndSwapExp(
+            // setRdmaCompareAndSwapExp(
+            //     &sg[i],
+            //     &wr[i],
+            //     _qp, 
+            //     local_address, 
+            //     remote_server_address,
+            //     insert_messages[i].old, 
+            //     insert_messages[i].new_value, 
+            //     _table_mr->lkey,
+            //     _table_config->remote_key, 
+            //     false, 
+            //     wr_id);
+
+            int32_t imm = -1;
+            setRdmaWriteExp(
                 &sg[i],
                 &wr[i],
-                _qp, 
-                local_address, 
+                local_address,
                 remote_server_address,
-                insert_messages[i].old, 
-                insert_messages[i].new_value, 
+                sizeof(Entry),
                 _table_mr->lkey,
-                _table_config->remote_key, 
-                false, 
-                wr_id);
+                _table_config->remote_key,
+                imm,
+                false,
+                wr_id + 1
+            );
+
+
             wr_id++;
         }
         bool signal = false;
@@ -1182,7 +1198,9 @@ namespace cuckoo_rcuckoo {
         // using std::chrono::duration;
         // using std::chrono::nanoseconds;
         // auto t1 = high_resolution_clock::now();
-
+        if (_state == INSERTING) {
+            insert_cuckoo_path_local(_table, _search_context.path);
+        }
         send_insert_and_unlock_messages(_insert_messages, _lock_list, _wr_id);
         _wr_id += total_messages;
 
@@ -1238,7 +1256,7 @@ namespace cuckoo_rcuckoo {
         // printf("2) %6lu ns\n", duration_0);
 
         if (_state == INSERTING) {
-            #define VALIDATE_INSERT
+            // #define VALIDATE_INSERT
             #ifdef VALIDATE_INSERT
             for (int i=0;i<_insert_messages.size();i++){
                 int insert_offset = _insert_messages[i].offset;
