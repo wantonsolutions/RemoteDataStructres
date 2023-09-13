@@ -149,7 +149,7 @@ namespace cuckoo_state_machines {
             #endif
         }
         #ifdef MEASURE_MOST
-        _messages_per_read.push_back(_reads);
+        _messages_per_read.push_back(_read_operation_messages);
         _read_rtt.push_back(_current_read_rtt);
         #endif
 
@@ -159,6 +159,7 @@ namespace cuckoo_state_machines {
         _read_rtt_count += _current_read_rtt;
         _current_read_messages = 0;
         _current_read_rtt = 0;
+        _read_operation_messages = 0;
         #endif
 
     }
@@ -379,6 +380,7 @@ namespace cuckoo_state_machines {
     }
 
     void Client_Workload_Driver::set_workload(string workload) {
+        printf("setting workload to %s\n", workload.c_str());
         if (workload == "ycsb-a"){
             _workload = A;
         } else if (workload == "ycsb-b"){
@@ -513,6 +515,7 @@ namespace cuckoo_state_machines {
             _read_values_found = 0;
             _read_values = vector<Key>();
             _duplicates_found = 0;
+            _workload = config["workload"];
             _workload_driver = Client_Workload_Driver(config);
         } catch (exception& e) {
             ALERT("ERROR", "Client_State_Machine config missing required field\n");

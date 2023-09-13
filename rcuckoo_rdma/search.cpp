@@ -66,8 +66,8 @@ namespace cuckoo_search {
         return locations.secondary;
     }
 
-    unsigned int next_search_index(path_element pe, hash_locations (*location_func) (string, unsigned int), Table table){
-        hash_locations locations = location_func(pe.key.to_string(), table.get_row_count());
+    unsigned int next_search_index(path_element pe, hash_locations (*location_func) (Key, unsigned int), Table &table){
+        hash_locations locations = location_func(pe.key, table.get_row_count());
         unsigned int table_index = next_table_index(pe.table_index);
         return table_index_to_hash_location(locations, table_index);
     }
@@ -113,7 +113,7 @@ namespace cuckoo_search {
         return max - min;
     }
 
-    void search_closest_bi_n_locations_from_location(Table table, hash_locations locations, unsigned int n, vector<unsigned int>& targets){
+    void search_closest_bi_n_locations_from_location(Table &table, hash_locations locations, unsigned int n, vector<unsigned int>& targets){
         unsigned int index_0 = locations.primary;
         unsigned int index_1 = (locations.primary -1);
         // vector <unsigned int> targets;
@@ -121,45 +121,59 @@ namespace cuckoo_search {
 
         unsigned int counter = 0;
         unsigned int row_count = table.get_row_count();
-        while (targets.size() < n){
-            //deal with wrap around for unsigned ints
+
+        while(targets.size() < n) {
             if (index_0 >= row_count){
                 index_0 = 0;
             }
-            if (index_1 >= row_count){
-                index_1 = row_count - 1;
-            }
-            if (counter > row_count / 2) {
-                return;
-            }
-            if (index_0 < row_count){
-                // printf("index_0: %u\n", index_0);
-                if (table.bucket_has_empty(index_0)){
-                    targets.push_back(index_0);
-                }
-            }
-            if (index_1 < row_count && index_1 != index_0){
-                if (table.bucket_has_empty(index_1)){
-                    targets.push_back(index_1);
-                }
+            if (table.bucket_has_empty(index_0)){
+                targets.push_back(index_0);
             }
             index_0++;
-            index_1--;
-            counter++;
         }
+
+
+
+
+        // while (targets.size() < n){
+        //     //deal with wrap around for unsigned ints
+        //     if (index_0 >= row_count)[[unlikely]]{
+        //         index_0 = 0;
+        //     }
+        //     if (index_1 >= row_count)[[unlikeely]]{
+        //         index_1 = row_count - 1;
+        //     }
+        //     if (counter > row_count / 2)[[unlikely]]{
+        //         return;
+        //     }
+        //     if (index_0 < row_count){
+        //         // printf("index_0: %u\n", index_0);
+        //         if (table.bucket_has_empty(index_0)){
+        //             targets.push_back(index_0);
+        //         }
+        //     }
+        //     if (index_1 < row_count && index_1 != index_0){
+        //         if (table.bucket_has_empty(index_1)){
+        //             targets.push_back(index_1);
+        //         }
+        //     }
+        //     index_0++;
+        //     index_1--;
+        //     counter++;
+        // }
     }
 
     //A* search requires targets to search for. This function fines them.
     //It starts by finding the location we are inserting into, and then steps in both directions though the table looking for openings
     //It returns a vector of open slots
-    vector<unsigned int> find_closest_target_n_bi_directional(Table table, hash_locations (*location_func) (string, unsigned int), Key key, unsigned int n){
+    vector<unsigned int> find_closest_target_n_bi_directional(Table &table, hash_locations (*location_func) (string, unsigned int), Key key, unsigned int n){
         hash_locations locations = location_func(key.to_string(), table.get_row_count());
         vector<unsigned int> targets;
         search_closest_bi_n_locations_from_location(table, locations, n, targets);
         return targets;
     }
 
-    vector<unsigned int> find_closest_target_n_bi_directional(Table table, hash_locations (*location_func) (Key, unsigned int), Key key, unsigned int n){
+    vector<unsigned int> find_closest_target_n_bi_directional(Table &table, hash_locations (*location_func) (Key, unsigned int), Key key, unsigned int n){
         hash_locations locations = location_func(key, table.get_row_count());
         vector<unsigned int> targets;
         search_closest_bi_n_locations_from_location(table, locations, n,targets);
@@ -183,11 +197,27 @@ namespace cuckoo_search {
         return aspe;
     }
 
+    #define DELETED_FSCORE 99999
     inline fast_a_star_pe fast_pop_list(vector<fast_a_star_pe> &list){
-        pop_heap(list.begin(), list.end());
-        fast_a_star_pe aspe = list.back();
-        list.pop_back();
-        return aspe;
+        // pop_heap(list.begin(), list.end());
+        // fast_a_star_pe aspe = list.back();
+        // list.pop_back();
+        // return aspe;
+        fast_a_star_pe min = list[0];
+        int min_index = 0;
+        for (int i=1; i < list.size(); i++){
+            if (list[i].fscore == DELETED_FSCORE){
+                continue;
+            }
+            if (list[i] < min){
+                min = list[i];
+                min_index = i;
+            }
+        }
+        list[min_index].fscore = DELETED_FSCORE;
+        // list.erase(list.begin() + min_index);
+        return min;
+
     }
 
     a_star_pe pop_key_from_list(vector<a_star_pe> &list, unordered_map<Key, a_star_pe> &list_map, Key key){
@@ -220,19 +250,9 @@ namespace cuckoo_search {
         list_map[aspe.pe.key] = aspe;
     }
 
-    inline void fast_push_list(vector<fast_a_star_pe> &list, fast_a_star_pe aspe) {
+    inline void fast_push_list(vector<fast_a_star_pe> &list, fast_a_star_pe &aspe) {
         list.push_back(aspe);
-        push_heap(list.begin(), list.end());
-
-        // for (int i=0;i<list.size();i++){
-        //     for (int j=i+1;j<list.size();j++){
-        //         if (list[i].pe.key == list[j].pe.key){
-        //             assert(false);
-        //         }
-        //     }
-        // }
-        //sanity check for duplicates
-        // list_map[aspe.pe.key] = aspe;
+        // push_heap(list.begin(), list.end());
     }
 
     bool list_contains(unordered_map<Key, a_star_pe> &list_map, Key key){
@@ -256,8 +276,59 @@ namespace cuckoo_search {
         return (table_index + 1) % 2;
     }
 
+    const std::vector<std::pair<float,int>> median_distances {
+        {1.000000,1},
+        {1.200000,1},
+        {1.300000,1},
+        {1.400000,1},
+        {1.500000,1},
+        {1.600000,1},
+        {1.700000,1},
+        {1.800000,1},
+        {1.900000,3},
+        {2.000000,3},
+        {2.000000,3},
+        {2.100000,3},
+        {2.200000,3},
+        {2.300000,5},
+        {2.400000,5},
+        {2.500000,7},
+        {2.600000,9},
+        {2.700000,11},
+        {2.800000,13},
+        {2.900000,17},
+        {3.000000,21},
+        {3.100000,25},
+        {3.200000,33},
+        {3.300000,41},
+        {3.400000,51},
+        {3.500000,65},
+        {3.600000,87},
+        {3.700000,107},
+        {3.800000,147},
+        {3.900000,187},
+        {4.000000,247},
+    };
+
+    static volatile int median = 0;
+
+    inline int get_median(){
+        if (median != 0) [[likely]]{
+            return median;
+        } 
+        float factor = get_factor();
+        for (int i=0; i<median_distances.size(); i++){
+            if (factor < median_distances[i].first){
+                median = median_distances[i].second;
+                return median_distances[i].second;
+            }
+        }
+
+        exit(0);
+    }
+
     unsigned int heuristic(unsigned int current_index, unsigned int target_index, unsigned int table_size) {
-        const unsigned int median = 4;
+        const unsigned int median = get_median();
         unsigned int distance = 0;
         if (target_index == current_index){
             return distance;
@@ -267,6 +338,9 @@ namespace cuckoo_search {
         if (current_table != target_table) {
             distance += 1;
         }
+
+        distance += abs((int)current_index - (int)target_index) / median;
+
         return distance;
     }
 
@@ -280,6 +354,18 @@ namespace cuckoo_search {
         unsigned int g = pe.distance;
         unsigned int h = heuristic(pe.pe.bucket_index, target_index, table_size);
         return g + h;
+    }
+
+    unsigned int fast_min_fscore(fast_a_star_pe pe, vector<unsigned int>&target_index, unsigned int table_size){
+        unsigned int g = pe.distance;
+        unsigned int min_h = heuristic(pe.pe.bucket_index, target_index[0], table_size);
+        for(int i=1; i<target_index.size(); i++){
+            unsigned int h = heuristic(pe.pe.bucket_index, target_index[i], table_size);
+            if (h < min_h){
+                min_h = h;
+            }
+        }
+        return g + min_h;
     }
 
     vector<path_element> a_star_search(Table table, hash_locations (*location_func) (string, unsigned int), Key key, std::vector<unsigned int> open_buckets){
@@ -404,7 +490,7 @@ namespace cuckoo_search {
                 path.push_back(pe);
                 back_tracker = back_tracker->prior;
             }
-        }
+    }
         return path;
     }
 
@@ -435,6 +521,10 @@ namespace cuckoo_search {
             context.path.push_back(pe);
             back_tracker = back_tracker->prior;
         }
+        if (context.path.size() > (MAX_SEARCH_DEPTH + 1)) {
+            ALERT("a-star", "path too long going to crash now lengths %d",context.path.size());
+        }
+        assert(context.path.size() <= (MAX_SEARCH_DEPTH+1));
     }
 
     inline fast_a_star_pe get_child(search_context &context, unsigned int table_index, unsigned int row, unsigned int offset, unsigned int target, unsigned int table_rows, fast_a_star_pe * prior_aspe, fast_a_star_pe search_element) {
@@ -443,6 +533,16 @@ namespace cuckoo_search {
         unsigned int distance = search_element.distance + 1;
         fast_a_star_pe child = fast_a_star_pe(child_pe, prior_aspe, distance, 0);
         unsigned int f_score = fast_fscore(child, target, table_rows);
+        child.fscore = f_score;
+        return child;
+    }
+
+    inline fast_a_star_pe get_child_multi(search_context &context, unsigned int table_index, unsigned int row, unsigned int offset, vector<unsigned int> &target, unsigned int table_rows, fast_a_star_pe * prior_aspe, fast_a_star_pe search_element) {
+        Key * child_key = &(context.table->get_entry_pointer(row, offset))->key;
+        fast_path_element child_pe = fast_path_element(child_key, table_index, row, offset);
+        unsigned int distance = search_element.distance + 1;
+        fast_a_star_pe child = fast_a_star_pe(child_pe, prior_aspe, distance, 0);
+        unsigned int f_score = fast_min_fscore(child, target, table_rows);
         child.fscore = f_score;
         return child;
     }
@@ -466,10 +566,12 @@ namespace cuckoo_search {
         return false;
     }
 
+    #define MAX_A_STAR_DEPTH 50
+    #define FAST_A_STAR_MAX_DEPTH 5
     void a_star_search_fast_context(search_context &context){
         // fast_a_star_pe closed_list_addressable[MAX_SEARCH_ITEMS];
         context.path.clear();
-        const unsigned int target_count = 1;
+        const unsigned int target_count = 5;
         find_closest_target_n_bi_directional(context, target_count);
 
         bool found = false;
@@ -488,6 +590,7 @@ namespace cuckoo_search {
             context.open_list.clear();
             context.closed_list.clear();
             context.visited_buckets.clear();
+            context.path.clear();
 
             fast_push_list(context.open_list, search_element);
             VERBOSE("DEBUG a_star search", "starting search element %s",search_element.pe.to_string().c_str());
@@ -551,8 +654,8 @@ namespace cuckoo_search {
                 }
                 //TODO don't delete this is also protecting a segfault
                 search_depth++;
-                if(search_depth > MAX_SEARCH_DEPTH) [[unlikely]]{
-                    // ALERT("search depth exceeded %d moving to the next target \n", MAX_SEARCH_DEPTH);
+                if(search_depth > context.max_search_depth) [[unlikely]]{
+                    // ALERT("a-star", "search depth exceeded %d moving to the next target \n", context.max_search_depth);
                     break;
                 }
 
@@ -564,13 +667,122 @@ namespace cuckoo_search {
 
         if (found) {
             a_star_path_to_path_element(context, &search_element);
+        } else {
+            //second search
+            if (context.max_search_depth == MAX_A_STAR_DEPTH) {
+                ALERT("a-star", "search depth exceeded %d moving to the next target \n", context.max_search_depth);
+                return;
+            } else {
+                context.max_search_depth = MAX_A_STAR_DEPTH;
+                a_star_search_fast_context(context);
+            }
+        }
+    }
+
+
+    void a_star_search_fast_context_multi_home(search_context &context){
+        // fast_a_star_pe closed_list_addressable[MAX_SEARCH_ITEMS];
+        context.path.clear();
+        const unsigned int target_count = 1;
+        find_closest_target_n_bi_directional(context, target_count);
+
+        bool found = false;
+        fast_a_star_pe * prior_aspe = NULL;
+        fast_a_star_pe search_element;
+        bool restrict_search_to_subset_of_buckets=(context.open_buckets.size() > 0);
+        const unsigned int table_rows = context.table->get_row_count();
+        // Debugging print the list of targets
+
+        VERBOSE("DEBUG a_star search", "searching for target: %d\n", target);
+        unsigned int closed_list_addressable_index = 0;
+        fast_path_element starting_pe = fast_path_element(&(context.key), -1, -1, -1);
+        search_element = fast_a_star_pe(starting_pe, NULL, 0, 0);
+        prior_aspe = NULL;
+        context.open_list.clear();
+        context.closed_list.clear();
+        context.visited_buckets.clear();
+
+        fast_push_list(context.open_list, search_element);
+        VERBOSE("DEBUG a_star search", "starting search element %s",search_element.pe.to_string().c_str());
+
+        int search_depth = 0;
+        while (context.open_list.size() > 0){
+            search_element = fast_pop_list(context.open_list);
+
+            //I need to store back pointers to the closed list so I can reconstruct the path
+            context.closed_list_addressable[closed_list_addressable_index] = search_element;
+            closed_list_addressable_index++;
+            prior_aspe = &context.closed_list_addressable[closed_list_addressable_index - 1];
+            fast_push_list(context.closed_list, search_element);
+
+            hash_locations locations = context.location_func(*(search_element.pe.key), table_rows);
+            unsigned int table_index = next_table_index(search_element.pe.table_index);
+            unsigned int index = table_index_to_hash_location(locations, table_index);
+
+            //if the index is not in the open buckets continue
+            //Only check for open buckets if the size of the open buckets is greater than zero
+            //somewhat unintuitive no open buckets means that they are all open
+            if (restrict_search_to_subset_of_buckets) {
+                if (std::find(context.open_buckets.begin(), context.open_buckets.end(), index) == context.open_buckets.end()) {
+                    continue;
+                }
+            }
+
+            //We have found the slot if this is true
+            if (context.table->bucket_has_empty(index)){
+                unsigned int offset = context.table->get_first_empty_index(index);
+                search_element = get_child_multi(context, table_index, index, offset, context.targets, table_rows, prior_aspe, search_element);
+                found=true;
+                break;
+            }
+
+            bool row_has_been_visited = row_has_been_visited_before(context, index);
+            if (!row_has_been_visited) {
+                context.visited_buckets.push_back(index);
+                for (unsigned int i = 0; i < context.table->get_buckets_per_row(); i++){
+                    fast_a_star_pe child = get_child_multi(context, table_index, index, i, context.targets, table_rows, prior_aspe, search_element);
+                    fast_push_list(context.open_list, child);
+                }
+            } else {
+                for (unsigned int i = 0; i < context.table->get_buckets_per_row(); i++){
+                    fast_a_star_pe child = get_child_multi(context, table_index, index, i, context.targets, table_rows, prior_aspe, search_element);
+                    //If the child is in the closed list just continue
+                    if (fast_list_contains_vector(context.closed_list, child.pe.key)){
+                        continue;
+                    }
+                    //If the child exists in the open list, update the distance
+                    //TODO this is truely the slow path, consider using a hash tabler or something. It's just hard to find if values exist in the open list.
+                    for (unsigned int i = 0; i < context.open_list.size(); i++){
+                        if (context.open_list[i].pe.key == child.pe.key){
+                            context.open_list[i].distance = child.distance;
+                            context.open_list[i].prior = child.prior;
+                            context.open_list[i].fscore = child.fscore;
+                            break;
+                        }
+                    }
+                }
+            }
+            //TODO don't delete this is also protecting a segfault
+            search_depth++;
+            if(search_depth > MAX_SEARCH_DEPTH) [[unlikely]]{
+                // ALERT("search depth exceeded %d moving to the next target \n", MAX_SEARCH_DEPTH);
+                break;
+            }
+
+        }
+            // if (found) {
+            //     break;
+            // }
+
+        if (found) {
+            a_star_path_to_path_element(context, &search_element);
         }
     }
 
     vector<path_element> a_star_search_fast(Table& table, hash_locations (*location_func) (Key, unsigned int), Key key, std::vector<unsigned int> open_buckets){
         fast_a_star_pe closed_list_addressable[MAX_SEARCH_ITEMS];
         vector<path_element> path;
-        const unsigned int target_count = 5;
+        const unsigned int target_count = 15;
         vector<unsigned int> targets = find_closest_target_n_bi_directional(table, location_func, key, target_count);
         bool found = false;
         fast_a_star_pe * prior_aspe = NULL;
@@ -663,7 +875,7 @@ namespace cuckoo_search {
 
                 //TODO don't delete this is also protecting a segfault
                 search_depth++;
-                if(search_depth > MAX_SEARCH_DEPTH) [[unlikely]]{
+                if(search_depth > FAST_A_STAR_MAX_DEPTH) [[unlikely]]{
                     // ALERT("search depth exceeded %d moving to the next target \n", MAX_SEARCH_DEPTH);
                     break;
                 }
@@ -679,6 +891,207 @@ namespace cuckoo_search {
         return path;
     }
 
+    #define DEPTH_LIMIT 30
+    void random_dfs_search(search_context &context){
+        if (context.path.size() > DEPTH_LIMIT){
+            context.found = false;
+            return;
+        }
+
+        path_element pe = context.path.back();
+        if (std::find(context.visited_buckets.begin(), context.visited_buckets.end(), pe.key.to_uint64_t()) != context.visited_buckets.end()){
+            context.found=false;
+            return;
+        } else {
+            context.visited_buckets.push_back(pe.key.to_uint64_t());
+        }
+
+        int index = next_search_index(pe, context.location_func, *context.table);
+        int table_index = next_table_index(pe.table_index);
+
+        if (context.open_buckets.size() > 0){
+            if (std::find(context.open_buckets.begin(), context.open_buckets.end(), index) == context.open_buckets.end()){
+                context.found=false;
+                return;
+            }
+        }
+
+        if (context.table->bucket_has_empty(index)){
+            int bucket_index = context.table->get_first_empty_index(index);
+            path_element open_pe = path_element(context.table->get_entry_pointer(index,bucket_index)->key, table_index, index, bucket_index);
+            context.path.push_back(open_pe);
+            context.found = true;
+            return;
+        }
+
+        //now we need to choose a random entry in the bucket
+        unsigned int static_rand_seed = time(NULL);
+        int starting_index = rand_r(&static_rand_seed) % context.table->get_buckets_per_row();
+        for (int i = 0; i < context.table->get_buckets_per_row(); i++){
+            int bucket_index = (starting_index + i) % context.table->get_buckets_per_row();
+            Key * child_key = &(context.table->get_entry_pointer(index, bucket_index)->key);
+            if (std::find(context.visited_buckets.begin(), context.visited_buckets.end(), child_key->to_uint64_t()) != context.visited_buckets.end()){
+                continue;
+            }
+
+            path_element child_pe = path_element(*child_key, table_index, index, bucket_index);
+            context.path.push_back(child_pe);
+            random_dfs_search(context);
+            if (context.found){
+                return;
+            }
+            context.path.pop_back();
+        }
+        context.found=false;
+    }
+
+
+    #define MAX_BFS_DEPTH 10000
+    void bfs_search(search_context & context) {
+        // printf("inside bfs search\n");
+        vector<bfs_pe> bfs_queue;
+        int bfs_pointer_index=0;
+        
+        bfs_pe starting_bfs_pe = bfs_pe(context.path[0], NULL);
+        bfs_queue.push_back(starting_bfs_pe);
+        context.found=false;
+
+        while(bfs_queue.size() > 0){
+            //pop off the first element
+            bfs_pe current = bfs_queue.front();
+            bfs_pe *current_ptr;
+            context.closed_list_bfs_addressable[bfs_pointer_index] = current;
+            current_ptr = &context.closed_list_bfs_addressable[bfs_pointer_index];
+            bfs_pointer_index++;
+            bfs_queue.erase(bfs_queue.begin());
+
+
+
+            int index = next_search_index(current.pe, context.location_func, *context.table);
+            int table_index = next_table_index(current.pe.table_index);
+
+            //Move on if we cant search this bucket
+            if (context.open_buckets.size() > 0){
+                if (std::find(context.open_buckets.begin(), context.open_buckets.end(), index) == context.open_buckets.end()){
+                    continue;
+                }
+            }
+
+            //move on if this bucket is allready visited
+            if (std::find(context.visited_buckets.begin(), context.visited_buckets.end(), index) != context.visited_buckets.end()){
+                continue;
+            } 
+            context.visited_buckets.push_back(index);
+
+
+            if (context.table->bucket_has_empty(index)){
+                int bucket_index = context.table->get_first_empty_index(index);
+                path_element open_pe = path_element(context.table->get_entry_pointer(index,bucket_index)->key, table_index, index, bucket_index);
+                bfs_pe final_pe = bfs_pe(open_pe, current_ptr);
+
+                context.closed_list_bfs_addressable[bfs_pointer_index] = final_pe;
+                context.found = true;
+                break;
+            }
+
+            for (int i = 0; i < context.table->get_buckets_per_row(); i++){
+                // printf("appending keys\n");
+                int bucket_index = i;
+                Key * child_key = &(context.table->get_entry_pointer(index, bucket_index)->key);
+                path_element child_pe = path_element(*child_key, table_index, index, bucket_index);
+                bfs_pe chile_bfs_pe = bfs_pe(child_pe, current_ptr);
+                context.closed_list_bfs_addressable[bfs_pointer_index] = chile_bfs_pe;
+                bfs_pointer_index++;
+                bfs_queue.push_back(chile_bfs_pe);
+            }
+
+
+
+        }
+
+        //reconstruct the path
+        if (context.found){
+            context.path.clear();
+            bfs_pe *current = &context.closed_list_bfs_addressable[bfs_pointer_index];
+            while(current != NULL){
+                context.path.push_back(current->pe);
+                current = current->prior;
+            }
+        }
+        // print_path(context.path);
+        return;
+
+
+    }
+
+    void random_search_fast_context(search_context &context) {
+        context.path.clear();
+        path_element starting_pe = path_element(context.key, -1, -1, -1);
+        context.path.push_back(starting_pe);
+        context.visited_buckets.clear();
+        random_dfs_search(context);
+        reverse(context.path.begin(), context.path.end());
+        if (!context.found){
+            context.path.clear();
+        }
+
+    }
+
+    void bfs_search_fast_context(search_context &context) {
+        context.path.clear();
+        path_element starting_pe = path_element(context.key, -1, -1, -1);
+        context.path.push_back(starting_pe);
+        context.visited_buckets.clear();
+        bfs_search(context);
+        if (!context.found){
+            context.path.clear();
+        }
+    }
+
+
+// def random_dfs_search(table, location_func, path, open_buckets, visited):
+//     if len(path) > DEPTH_LIMIT:
+//         return False, path
+
+//     pe = path[-1]
+//     if pe.key in visited:
+//         return False, path
+//     else:
+//         visited[pe.key] = True
+//     index = next_search_index(pe, location_func, table)
+//     table_index = next_table_index(pe.table_index)
+
+//     if open_buckets != None:
+//         if not index in open_buckets:
+//             return False, path
+
+//     if table.bucket_has_empty(index):
+//         # print("Found Slot:" + str(search_element.pe))
+//         bucket_index = table.get_first_empty_index(index)
+//         pe = path_element(table.get_entry(index,bucket_index),table_index,index,bucket_index)
+//         path.append(pe)
+//         return True, path
+    
+//     #here we have a full bucket we need to evict a candidate
+//     #randomly select an eviction candidate
+//     indicies = list(range(0, table.get_buckets_per_row()))
+//     random.shuffle(indicies)
+//     for evict_index in indicies:
+//         pe = path_element(table.get_entry(index,evict_index), table_index, index, evict_index)
+//         if not key_in_path(path, pe.key):
+//             path.append(pe)
+//         else:
+//             continue
+        
+//         success, path = random_dfs_search(table, location_func, path, open_buckets, visited)
+
+//         if success:
+//             return True, path
+//         else:
+//             path.pop()
+        
+//     return False, path
+
 
     std::vector<path_element> bucket_cuckoo_a_star_insert_fast(cuckoo_tables::Table &table, hash_locations (*location_func) (cuckoo_tables::Key, unsigned int), cuckoo_tables::Key key, std::vector<unsigned int> open_buckets){
         std::vector<path_element> path = a_star_search_fast(table, location_func, key, open_buckets);
@@ -686,7 +1099,17 @@ namespace cuckoo_search {
     }
 
     void bucket_cuckoo_a_star_insert_fast_context(search_context &context) {
-        a_star_search_fast_context(context);
+        context.max_search_depth = FAST_A_STAR_MAX_DEPTH;
+        // a_star_search_fast_context(context);
+        a_star_search_fast_context_multi_home(context);
+    }
+
+    void bucket_cuckoo_random_insert_fast_context(search_context &context) {
+        random_search_fast_context(context);
+    }
+
+    void bucket_cuckoo_bfs_insert_fast_context(search_context & context) {
+        bfs_search_fast_context(context);
     }
 
 

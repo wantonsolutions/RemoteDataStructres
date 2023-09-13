@@ -222,6 +222,7 @@ namespace cuckoo_state_machines {
             // Key _current_insert_key;
             uint32_t _outstanding_read_requests;
             uint32_t _read_values_found;
+            string _workload;
             vector<Key> _read_values;
             uint32_t _duplicates_found;
             Client_Workload_Driver _workload_driver;

@@ -158,10 +158,11 @@ namespace cuckoo_rcuckoo {
             _read_threshold_bytes = stoi(config["read_threshold_bytes"]);
             _buckets_per_lock = stoi(config["buckets_per_lock"]);
             _locks_per_message = stoi(config["locks_per_message"]);
-            assert(_locks_per_message == 64);
+            // assert(_locks_per_message == 64);
             _starting_id = stoi(config["starting_id"]);
             _global_clients = stoi(config["global_clients"]);
             _id = stoi(config["id"]) + _starting_id;
+            _use_mask = (config["use_mask"] == "true");
 
         } catch (exception& e) {
             printf("ERROR: RCuckoo config missing required field\n");
@@ -185,6 +186,8 @@ namespace cuckoo_rcuckoo {
         sprintf(_log_identifier, "Client: %3d", _id);
 
         _local_prime_flag = false; //we have yet to prime
+
+        set_hash_factor(config);
     }
 
     string RCuckoo::get_state_machine_name() {
@@ -210,6 +213,8 @@ namespace cuckoo_rcuckoo {
             _table_search_function = &RCuckoo::a_star_insert_self;
         } else if (search_function_name == "random") {
             _table_search_function = &RCuckoo::random_insert_self;
+        } else if (search_function_name == "bfs") {
+            _table_search_function = &RCuckoo::bfs_insert_self;
         } else {
             printf("ERROR: Invalid search function name\n");
             throw logic_error("ERROR: Invalid search function name");
@@ -228,6 +233,19 @@ namespace cuckoo_rcuckoo {
         }
     }
 
+    void RCuckoo::set_hash_factor(unordered_map<string, string> config) {
+        try {
+            string factor = config["hash_factor"];
+            float hash_factor = stof(factor);
+            _hash_factor = hash_factor;
+            set_factor(hash_factor);
+
+        } catch(exception &e) {
+            printf("unable to parse hash factor");
+        }
+
+    }
+
     bool RCuckoo::a_star_insert_self() {
         _search_context.key = _current_insert_key;
         bucket_cuckoo_a_star_insert_fast_context(_search_context);
@@ -238,8 +256,15 @@ namespace cuckoo_rcuckoo {
 
     bool RCuckoo::random_insert_self() {
         _search_context.key = _current_insert_key;
-        ALERT("TODO", "fix this path we should not be returning a path here");
-        _search_context.path = bucket_cuckoo_random_insert(*_search_context.table, _search_context.location_func, _search_context.key, _search_context.open_buckets);
+        // ALERT("TODO", "fix this path we should not be returning a path here");
+        bucket_cuckoo_random_insert_fast_context(_search_context);
+        // _search_context.path = bucket_cuckoo_random_insert(*_search_context.table, _search_context.location_func, _search_context.key, _search_context.open_buckets);
+        return (_search_context.path.size() > 0);
+    }
+
+    bool RCuckoo::bfs_insert_self() {
+        _search_context.key = _current_insert_key;
+        bucket_cuckoo_bfs_insert_fast_context(_search_context);
         return (_search_context.path.size() > 0);
     }
 
@@ -1271,6 +1296,7 @@ namespace cuckoo_rcuckoo {
         
 
         search_path_to_buckets_fast(_search_context.path, _locking_context.buckets);
+        // assert(_locking_context.buckets.size() < 64);
         get_lock_list_fast_context(_locking_context);
         INFO(log_id(), "[aquire_locks] gathering locks for buckets %s\n", vector_to_string(_locking_context.buckets).c_str());
         //TODO make this one thing
@@ -1429,6 +1455,9 @@ namespace cuckoo_rcuckoo {
         };
         INFO(log_id(),"Starting RDMA FSM Start Flag Set\n");
 
+        //Prior to starting we are going to always set the workload driver to fill
+        _workload_driver.set_workload(W);
+
         while(!*_global_end_flag) {
 
 
@@ -1446,6 +1475,8 @@ namespace cuckoo_rcuckoo {
                     if (*_global_prime_flag && !_local_prime_flag){
                         _local_prime_flag = true;
                         clear_statistics();
+                        //Set the workload to what we actually want to be working with
+                        _workload_driver.set_workload(_workload);
                     }
                     next_request = _workload_driver.next();
                     VERBOSE("DEBUG: general idle fsm","Generated New Request: %s\n", next_request.to_string().c_str());

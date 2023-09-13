@@ -1,9 +1,9 @@
 
-measuretime=3
+measuretime=8
 
-program=cuckoo_client
+# program=cuckoo_client
 # program=test/test_virtual_rdma
-# program=test/test_search
+program=test/test_search
 sudo killall "$program"
 
 # page_script="LD_PRELOAD=libhugetlbfs.so HUGETLB_MORECORE=yes"
@@ -15,7 +15,7 @@ cuckoopid=$!
 
 
 # sudo perf record -F 99 -p$cuckoopid -g -- sleep $measuretime
-sleep 2
+# sleep 2
 sudo perf record -F 99 -a -g -- sleep $measuretime
 sudo perf script | ./flamechart/FlameGraph/stackcollapse-perf.pl > out.perf-folded
 sudo killall "$program"

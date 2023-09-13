@@ -47,7 +47,7 @@ namespace cuckoo_tables {
     }
 
     bool Key::is_empty(){
-        assert(KEY_SIZE == 4);
+        // assert(KEY_SIZE == 4);
         // printf("byte location %p\n", bytes);
         uint32_t b_val = *(uint32_t *)bytes;
         // printf("byte value %x\n", b_val);
@@ -380,6 +380,7 @@ namespace cuckoo_tables {
     }
 
     void Table::set_entry(unsigned int bucket_index, unsigned int offset, Entry entry){
+        // printf("setting entry %d %d\n", bucket_index, offset);
         Entry old = _table[bucket_index][offset];
         _table[bucket_index][offset] = entry;
         if (old.is_empty()){

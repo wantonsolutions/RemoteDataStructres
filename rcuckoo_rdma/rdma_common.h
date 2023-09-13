@@ -89,7 +89,7 @@ using namespace std;
 #define DEFAULT_RDMA_PORT (20886)
 
 /* Self-imposed limit of total queue pairs */
-#define MAX_QPS 256
+#define MAX_QPS 400
 
 //#define USE_DEVICE_MEMORY
 #define DEVICE_MEMORY_KB 262144

@@ -108,6 +108,7 @@ namespace cuckoo_rcuckoo {
             void set_global_start_flag(volatile bool * flag);
             void set_global_end_flag(volatile bool * flag);
             void set_global_prime_flag(volatile bool * flag);
+            void set_hash_factor(unordered_map<string, string> config);
 
 
             void complete_read_stats(bool success);
@@ -128,6 +129,8 @@ namespace cuckoo_rcuckoo {
             volatile bool * _global_end_flag;
             volatile bool * _global_prime_flag;
             bool _local_prime_flag;
+            bool _use_mask;
+            float _hash_factor;
 
             uint64_t _sleep_counter = 1;
 
@@ -177,6 +180,7 @@ namespace cuckoo_rcuckoo {
             bool (RCuckoo::*_table_search_function)();
             bool a_star_insert_self();
             bool random_insert_self();
+            bool bfs_insert_self();
 
 
             bool read_complete();
