@@ -90,6 +90,19 @@ namespace cuckoo_search {
             fscore = _fscore;}
     } a_star_pe;
 
+    typedef struct bfs_pe {
+        path_element pe;
+        bfs_pe * prior;
+        std::string to_string() {
+            return "this: " + pe.to_string() + "prior: " + prior->pe.to_string();
+        }
+        bfs_pe() {};
+        bfs_pe(path_element _pe, bfs_pe * _prior) {
+            pe = _pe;
+            prior = _prior;
+        }
+    } bfs_pe;
+
     typedef struct search_context {
         //input values
         cuckoo_tables::Table *table;
@@ -100,10 +113,13 @@ namespace cuckoo_search {
         vector<path_element> path;
         //internal_values
         fast_a_star_pe closed_list_addressable[MAX_SEARCH_ITEMS];
+        bfs_pe closed_list_bfs_addressable[MAX_SEARCH_ITEMS];
         vector<fast_a_star_pe> open_list;
         vector<fast_a_star_pe> closed_list;
         vector<unsigned int> targets;
         vector<unsigned int> visited_buckets;
+        int max_search_depth;
+        bool found;
     } search_context;
 
     unsigned int get_table_id_from_index(unsigned int index);
@@ -111,12 +127,14 @@ namespace cuckoo_search {
     void search_path_to_buckets_fast(vector<path_element> &path, vector<unsigned int> &buckets);
     std::vector<path_element> random_dfs_search(cuckoo_tables::Key key, unsigned int table_size);
     std::vector<path_element> bucket_cuckoo_insert(cuckoo_tables::Table table, hash_locations (*location_func) (std::string, unsigned int), cuckoo_tables::Key key, std::vector<unsigned int>  open_buckets);
-    unsigned int next_search_index(path_element pe, hash_locations (*location_func) (std::string, unsigned int), cuckoo_tables::Table table);
+    // unsigned int next_search_index(path_element pe, hash_locations (*location_func) (std::string, unsigned int), cuckoo_tables::Table table);
+
+    unsigned int next_search_index(path_element pe, hash_locations (*location_func) (Key, unsigned int), Table &table);
     bool key_in_path(std::vector<path_element> path, cuckoo_tables::Key key);
     void print_path(std::vector<path_element> path);
     string path_to_string(std::vector<path_element> path);
     unsigned int path_index_range(std::vector<path_element> path);
-    std::vector<unsigned int> find_closest_target_n_bi_directional(cuckoo_tables::Table table, hash_locations (*location_func) (std::string, unsigned int), cuckoo_tables::Key key, unsigned int n);
+    std::vector<unsigned int> find_closest_target_n_bi_directional(cuckoo_tables::Table &table, hash_locations (*location_func) (std::string, unsigned int), cuckoo_tables::Key key, unsigned int n);
 
     a_star_pe pop_list(std::vector<a_star_pe> &list, std::unordered_map<cuckoo_tables::Key, a_star_pe> &list_map);
     void push_list(std::vector<a_star_pe> &list, std::unordered_map<cuckoo_tables::Key, a_star_pe> &list_map, a_star_pe pe);
@@ -133,5 +151,10 @@ namespace cuckoo_search {
     std::vector<path_element> bucket_cuckoo_random_insert(cuckoo_tables::Table table, hash_locations (*location_func) (std::string, unsigned int), cuckoo_tables::Key key, std::vector<unsigned int> open_buckets);
     std::vector<path_element> bucket_cuckoo_a_star_insert_fast(cuckoo_tables::Table &table, hash_locations (*location_func) (Key, unsigned int), cuckoo_tables::Key key, std::vector<unsigned int> open_buckets);
     std::vector<path_element> bucket_cuckoo_random_insert(cuckoo_tables::Table & table, hash_locations (*location_func) (cuckoo_tables::Key, unsigned int), cuckoo_tables::Key key, std::vector<unsigned int> open_buckets);
+
+
+    void bucket_cuckoo_random_insert_fast_context(search_context &context);
+    void bucket_cuckoo_bfs_insert_fast_context(search_context & context);
+
 } 
 #endif

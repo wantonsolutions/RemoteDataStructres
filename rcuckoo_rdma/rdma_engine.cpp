@@ -222,6 +222,11 @@ namespace cuckoo_rdma_engine {
             exit(1);
         }
 
+        //if we are not priming then set the prime flag right away
+        if(!_prime){
+            global_prime_flag=true;
+        }
+
         pthread_t thread_ids[MAX_THREADS];
         for(int i=0;i<_num_clients;i++){
             rcuckoo_state_machines[i]->set_global_start_flag(&global_start_flag);

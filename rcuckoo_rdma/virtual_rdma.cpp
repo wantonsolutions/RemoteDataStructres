@@ -703,8 +703,10 @@ namespace cuckoo_virtual_rdma {
                 context.fast_lock_chunks[i].resize(context.locks_per_message);
             }
         }
-
-        assert(context.buckets.size() <= MAX_LOCKS);
+        // if(context.buckets.size() > MAX_LOCKS){
+        //     ALERT("get-lock-unlock","what the heck, trying to lock %d buckets locking=%d",context.buckets.size(),context.locking);
+        // }
+        // assert(context.buckets.size() <= MAX_LOCKS);
         unsigned int unique_lock_indexes[MAX_LOCKS];
 
         //Lets make sure that all the buckets are allready sorted
@@ -766,7 +768,7 @@ namespace cuckoo_virtual_rdma {
 
     unsigned int get_unique_lock_indexes_fast(vector<unsigned int> &buckets, unsigned int buckets_per_lock, unsigned int *unique_buckets, unsigned int unique_buckets_size)
     {
-        assert(unique_buckets_size >= buckets.size());
+        // assert(unique_buckets_size >= buckets.size());
         assert(unique_buckets);
 
         unique_buckets[0] = buckets[0] / buckets_per_lock;
@@ -778,6 +780,7 @@ namespace cuckoo_virtual_rdma {
             } 
             unique_buckets[unique_index] = lock_index;
             unique_index++;
+            assert(unique_index < MAX_LOCKS);
         }
         VERBOSE("unique locks", "found a total of %d unique lock indexes out of %d buckets\n", unique_index, buckets.size());
         return unique_index;

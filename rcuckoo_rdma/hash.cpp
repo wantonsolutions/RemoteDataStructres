@@ -12,6 +12,7 @@
 using namespace std;
 
 float DEFAULT_FACTOR = 2.3;
+// float DEFAULT_FACTOR = 3.0;
 
 void set_factor(float factor){
     // float local_factor = factor;
@@ -166,15 +167,23 @@ unsigned int rcuckoo_secondary_location(Key key, float factor, unsigned int tabl
 }
 
 unsigned int rcuckoo_secondary_location_independent(string key, unsigned int table_size){
+    // XXH64_hash_t hash = h2(key);
+    // unsigned int location = ((hash % (table_size / 2)) * 2) + 1;
+    // return location;
     XXH64_hash_t hash = h2(key);
-    unsigned int location = ((hash % (table_size / 2)) * 2) + 1;
-    return location;
+    if (hash % 2 == 1) {
+        hash +=1;
+    }
+    return hash % table_size;
+
 }
 
 unsigned int rcuckoo_secondary_location_independent(Key key, unsigned int table_size){
     XXH64_hash_t hash = h2(key);
-    unsigned int location = ((hash % (table_size / 2)) * 2) + 1;
-    return location;
+    if (hash % 2 == 1) {
+        hash +=1;
+    }
+    return hash % table_size;
 }
 
 // unsigned int get_table_id_from_index(unsigned int index){
