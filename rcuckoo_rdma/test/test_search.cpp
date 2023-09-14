@@ -559,7 +559,7 @@ void run_bfs_insert_context() {
     auto duration_1 = duration_cast<milliseconds>( t1 - t0 ).count();
     cout << "fill time " << duration_1 << endl;
 
-    // cout << " fill " << i << "/" << total_inserts << " " << i/total_inserts << "\%" << "final fill: " << context.table->get_fill_percentage() << endl;
+    cout << " fill " << i << "/" << total_inserts << " " << i/total_inserts << "\%" << "final fill: " << context.table->get_fill_percentage() << endl;
 }
 
 int main() {
