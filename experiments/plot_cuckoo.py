@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib
+import json
 
 
 def multi_plot_runs(runs, plot_names, directory=""):
@@ -642,13 +643,27 @@ def fill_factor_decoration(ax, x_axis):
     ax.set_title('Max Load Factor vs ' + x_axis)
     ax.legend()
 
+def clean_stats(stats):
+    i=0
+    while i < len(stats):
+        if len(stats[i]) == 0:
+            stats.pop(i)
+        else:
+            i+=1
+    return stats
+
 def correct_stat_shape(stats):
     dim = np.shape(stats)
-    if len(dim) == 1:
+    print("dim", dim, "len", len(dim))
+    str_dim = str(dim)
+    #count the commas in the string
+    commas = str_dim.count(',')
+    commas += 1
+    if commas == 1:
         stats = [[stats]]
-    elif len(dim) == 2:
+    elif commas == 2:
         stats = [stats]
-    elif len(dim) == 3:
+    elif commas == 3:
         pass
     return stats
 
@@ -720,16 +735,25 @@ def throughput_approximation(ax, stats, x_axis='clients', decoration=True):
 
 
 def single_run_throughput(stat):
+    # if isinstance(stat, list):
+    #     tputs = []
+    #     for s in stat:
+    #         tputs.append(single_run_throughput(s))
+    #     return np.mean(tputs)
     total_operations_mop = 0
-    for client in stat['clients']:
-        read_operations = int(client['stats']['completed_read_count'])
-        # print("read_operations: ", read_operations)
-        read_operations_mop =read_operations/1000000
-        insert_operations = int(client['stats']['completed_insert_count'])
-        # print("insert_operations: ", insert_operations)
-        insert_operations_mop = insert_operations/1000000
-        total_operations_mop += read_operations_mop + insert_operations_mop
-        # print("total_operations_mop: ", total_operations_mop)
+    try:
+        for client in stat['clients']:
+            read_operations = int(client['stats']['completed_read_count'])
+            # print("read_operations: ", read_operations)
+            read_operations_mop =read_operations/1000000
+            insert_operations = int(client['stats']['completed_insert_count'])
+            # print("insert_operations: ", insert_operations)
+            insert_operations_mop = insert_operations/1000000
+            total_operations_mop += read_operations_mop + insert_operations_mop
+            # print("total_operations_mop: ", total_operations_mop)
+    except:
+        # print("error in stat: ", stat)
+        exit(1)
 
     execution_time_ms = int(stat['system']['runtime_ms'])
     execution_time_s = execution_time_ms / 1000.0
@@ -739,6 +763,8 @@ def single_run_throughput(stat):
 def throughput_line(ax,stats,label,x_axis="clients"):
     throughputs = []
     std_errs = []
+    # print(json.dumps(stats, indent=4))
+    # exit(0)
     x_axis_vals = get_x_axis(stats, x_axis)
     for stat in stats:
         single_run_throughputs=[]
@@ -754,17 +780,41 @@ def throughput_line(ax,stats,label,x_axis="clients"):
     print("tput errs  : ", std_errs)
     ax.errorbar(x_axis_vals,throughputs,yerr=std_errs,label=label, marker='o', capsize=3)
 
+def throughput_line_trials(ax,stats,label,x_axis="clients"):
+    throughputs = []
+    std_errs = []
+    # print(json.dumps(stats, indent=4))
+    # exit(0)
+    # x_axis_vals = get_x_axis(stats, x_axis)
+    print(len(stats))
+    for stat in stats:
+        for trial in stat:
+            single_run_throughputs=[]
+            for run in trial:
+                s = single_run_throughput(run)
+                single_run_throughputs.append(s)
+            print("single_run_throughput: ", single_run_throughputs)
+            throughputs.append(np.mean(single_run_throughputs))
+            std_errs.append(np.std(single_run_throughputs))
+        print(throughputs)
+
+
 def throughput_decoration(ax, x_axis):
     ax.set_xlabel(x_axis)
     ax.set_ylabel('Throughput MOPS')
     ax.set_title('Throughput vs ' + x_axis)
     ax.legend()
 
-def throughput(ax, stats, x_axis='clients', decoration=True):
+def throughput(ax, stats, x_axis='clients', decoration=True, label=None):
+    stats = clean_stats(stats)
     stats = correct_stat_shape(stats)
     for stat in stats:
-        state_machine_label = stat[0][0]['config']['state_machine']
-        throughput_line(ax, stat, label=state_machine_label, x_axis=x_axis)
+        if label is None:
+            label = stat[0][0]['config']['state_machine']
+            # label = "cuckoo (double check though)"
+        # throughput_line(ax, stat[0], label=label, x_axis=x_axis)
+        throughput_line(ax, stat, label=label, x_axis=x_axis)
+        # throughput_line_trials(ax, stat, label=label, x_axis=x_axis)
     if decoration:
         throughput_decoration(ax, x_axis)
 
@@ -1027,7 +1077,10 @@ def get_config_axis(stats,name):
     stats = get_flattened_stats(stats)
     axis = []
     for stat in stats:
-        axis.append(stat['config'][name])
+        try:
+            axis.append(stat['config'][name])
+        except:
+            axis.append(stat[0]['config'][name])
     return axis
 
 

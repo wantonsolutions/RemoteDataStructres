@@ -113,8 +113,8 @@ class Orchestrator:
     'yeti-03.sysnet.ucsd.edu',
     'yeti-04.sysnet.ucsd.edu', 
     'yeti-05.sysnet.ucsd.edu', 
-    'yeti-06.sysnet.ucsd.edu', 
-    'yeti-07.sysnet.ucsd.edu', 
+    # 'yeti-06.sysnet.ucsd.edu', 
+    # 'yeti-07.sysnet.ucsd.edu', 
     'yeti-08.sysnet.ucsd.edu',
     'yeti-09.sysnet.ucsd.edu', 
     ]
@@ -229,7 +229,7 @@ class Orchestrator:
             print("Starting client")
             command=("cd " + self.project_directory + ";"
             "cd build;" 
-            "./benchmark "+str(node_count)+ " " + str(read_percentage) + " " + str(clients_per_node) + " > client_node.log"
+            "stdbuf -oL ./benchmark "+str(node_count)+ " " + str(read_percentage) + " " + str(clients_per_node) + " > client_node.log"
             )
             print(command)
 
@@ -237,7 +237,7 @@ class Orchestrator:
             thr2.start()
             threads.append(thr2)
 
-        sleeptime=120
+        sleeptime=60
         print("Sleeping for ",sleeptime," seconds to let the test run")
         for i in tqdm(range(sleeptime)):
             time.sleep(1)
@@ -286,6 +286,7 @@ def result_array_to_dict(results):
 def run_ycsb_trial(datadir="data/sherman_ycsb"):
     orch = Orchestrator()
     config = dict()
+    # orch.kill()
     orch.sync()
 
     # clients = [2,4,8]
@@ -293,7 +294,13 @@ def run_ycsb_trial(datadir="data/sherman_ycsb"):
 
     # clients = [4,8,16,32,64,128,200]
     # clients = [5,10,20,40,80,160,200]
-    clients = [250, 300, 400]
+    # clients = [250, 300, 400]
+    # clients = [280]
+
+    client_count = 8
+    multiple = 40
+    client_count = client_count * multiple
+    clients = [client_count]
     workloads = ["workloada"]
 
     all_results= dict()

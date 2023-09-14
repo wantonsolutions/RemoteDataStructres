@@ -21,8 +21,8 @@ def cdf(data):
     return x, y
 
 def mops(data):
-    # return [x / 1000000 if x is not None else 0 for x in data]
-    return [float(x) if x is not None else 0 for x in data]
+    return [x / 1000000 if x is not None else 0 for x in data]
+    # return [float(x) if x is not None else 0 for x in data]
 
 def plot_latency():
     fig, ax = plt.subplots(1, 1, figsize=(5, 3))
@@ -165,5 +165,5 @@ def plot_ycsb_multi_run():
     plt.savefig("FUSEE-ycsb-throughput-multi.pdf")
 
 # def __main__():
-plot_ycsb_multi_run()
+# plot_ycsb_multi_run()
 
