@@ -12,8 +12,13 @@ using namespace std;
 
 namespace cuckoo_tables {
 
+    #ifndef KEY_SIZE
     #define KEY_SIZE 4
+    #endif
+
+    #ifndef VALUE_SIZE
     #define VALUE_SIZE 4
+    #endif
 
     // std::vector<char> HexToBytes(const std::string& hex) {
     //     std::vector<char> bytes;
