@@ -945,31 +945,109 @@ namespace cuckoo_search {
     }
 
 
-    #define MAX_BFS_DEPTH 10000
-    void bfs_search(search_context & context) {
+    // #define MAX_BFS_DEPTH 10000
+    // void bfs_search(search_context & context) {
 
-        context.visited_buckets.clear();
-        // printf("inside bfs search\n");
-        context.bfs_queue.clear();
-        int bfs_pointer_index=0;
+    //     context.visited_buckets.clear();
+    //     // printf("inside bfs search\n");
+    //     context.bfs_queue.clear();
+    //     int bfs_pointer_index=0;
         
 
-        path_element starting_pe = path_element(context.key, -1, -1, -1);
-        bfs_pe starting_bfs_pe = bfs_pe(starting_pe, NULL);
-        context.bfs_queue.push_back(starting_bfs_pe);
-        context.found=false;
-        int queue_front = 0;
+    //     path_element starting_pe = path_element(context.key, -1, -1, -1);
+    //     bfs_pe starting_bfs_pe = bfs_pe(starting_pe, NULL);
+    //     context.bfs_queue.push_back(starting_bfs_pe);
+    //     context.found=false;
+    //     int queue_front = 0;
 
-        while(context.bfs_queue.size() > 0){
+    //     while(context.bfs_queue.size() > 0){
+    //         //pop off the first element
+    //         bfs_pe current = context.bfs_queue.front();
+    //         // bfs_pe current = context.bfs_queue[queue_front];
+    //         // queue_front++;
+    //         bfs_pe *current_ptr;
+    //         context.closed_list_bfs_addressable[bfs_pointer_index] = current;
+    //         current_ptr = &context.closed_list_bfs_addressable[bfs_pointer_index];
+    //         bfs_pointer_index++;
+    //         context.bfs_queue.erase(context.bfs_queue.begin());
+
+
+
+    //         int index = next_search_index(current.pe, context.location_func, *context.table);
+    //         int table_index = next_table_index(current.pe.table_index);
+
+    //         //Move on if we cant search this bucket
+    //         if (context.open_buckets.size() > 0)[[unlikely]]{
+    //             if (std::find(context.open_buckets.begin(), context.open_buckets.end(), index) == context.open_buckets.end()){
+    //                 continue;
+    //             }
+    //         }
+
+    //         //move on if this bucket is allready visited
+    //         if (std::find(context.visited_buckets.begin(), context.visited_buckets.end(), index) != context.visited_buckets.end())[[unlikely]]{
+    //             continue;
+    //         } 
+    //         context.visited_buckets.push_back(index);
+
+
+    //         if (context.table->bucket_has_empty(index)){
+    //             int bucket_index = context.table->get_first_empty_index(index);
+    //             path_element open_pe = path_element(context.table->get_entry_pointer(index,bucket_index)->key, table_index, index, bucket_index);
+    //             bfs_pe final_pe = bfs_pe(open_pe, current_ptr);
+
+    //             context.closed_list_bfs_addressable[bfs_pointer_index] = final_pe;
+    //             context.found = true;
+    //             break;
+    //         }
+
+    //         for (int i = 0; i < context.table->get_buckets_per_row(); i++){
+    //             // printf("appending keys\n");
+    //             int bucket_index = i;
+    //             Key * child_key = &(context.table->get_entry_pointer(index, bucket_index)->key);
+    //             path_element child_pe = path_element(*child_key, table_index, index, bucket_index);
+    //             bfs_pe chile_bfs_pe = bfs_pe(child_pe, current_ptr);
+    //             context.closed_list_bfs_addressable[bfs_pointer_index] = chile_bfs_pe;
+    //             bfs_pointer_index++;
+    //             context.bfs_queue.push_back(chile_bfs_pe);
+    //         }
+
+
+
+    //     }
+
+    //     //reconstruct the path
+    //     if (context.found){
+    //         context.path.clear();
+    //         bfs_pe *current = &context.closed_list_bfs_addressable[bfs_pointer_index];
+    //         while(current != NULL){
+    //             context.path.push_back(current->pe);
+    //             current = current->prior;
+    //         }
+    //     }
+    //     // print_path(context.path);
+    //     return;
+
+
+    // }
+
+        #define MAX_BFS_DEPTH 10000
+    void bfs_search(search_context & context) {
+        // printf("inside bfs search\n");
+        vector<bfs_pe> bfs_queue;
+        int bfs_pointer_index=0;
+        
+        bfs_pe starting_bfs_pe = bfs_pe(context.path[0], NULL);
+        bfs_queue.push_back(starting_bfs_pe);
+        context.found=false;
+
+        while(bfs_queue.size() > 0){
             //pop off the first element
-            // bfs_pe current = context.bfs_queue.front();
-            bfs_pe current = context.bfs_queue[queue_front];
-            queue_front++;
+            bfs_pe current = bfs_queue.front();
             bfs_pe *current_ptr;
             context.closed_list_bfs_addressable[bfs_pointer_index] = current;
             current_ptr = &context.closed_list_bfs_addressable[bfs_pointer_index];
             bfs_pointer_index++;
-            // context.bfs_queue.erase(context.bfs_queue.begin());
+            bfs_queue.erase(bfs_queue.begin());
 
 
 
@@ -977,14 +1055,14 @@ namespace cuckoo_search {
             int table_index = next_table_index(current.pe.table_index);
 
             //Move on if we cant search this bucket
-            if (context.open_buckets.size() > 0)[[unlikely]]{
+            if (context.open_buckets.size() > 0){
                 if (std::find(context.open_buckets.begin(), context.open_buckets.end(), index) == context.open_buckets.end()){
                     continue;
                 }
             }
 
             //move on if this bucket is allready visited
-            if (std::find(context.visited_buckets.begin(), context.visited_buckets.end(), index) != context.visited_buckets.end())[[unlikely]]{
+            if (std::find(context.visited_buckets.begin(), context.visited_buckets.end(), index) != context.visited_buckets.end()){
                 continue;
             } 
             context.visited_buckets.push_back(index);
@@ -1008,7 +1086,7 @@ namespace cuckoo_search {
                 bfs_pe chile_bfs_pe = bfs_pe(child_pe, current_ptr);
                 context.closed_list_bfs_addressable[bfs_pointer_index] = chile_bfs_pe;
                 bfs_pointer_index++;
-                context.bfs_queue.push_back(chile_bfs_pe);
+                bfs_queue.push_back(chile_bfs_pe);
             }
 
 
@@ -1044,6 +1122,10 @@ namespace cuckoo_search {
     }
 
     void bfs_search_fast_context(search_context &context) {
+        context.path.clear();
+        path_element starting_pe = path_element(context.key, -1, -1, -1);
+        context.path.push_back(starting_pe);
+        context.visited_buckets.clear();
         bfs_search(context);
         if (!context.found){
             context.path.clear();
