@@ -169,7 +169,7 @@ namespace cuckoo_rcuckoo {
             throw logic_error("ERROR: RCuckoo config missing required field");
         }
         assert(_read_threshold_bytes > 0);
-        assert(_read_threshold_bytes > _table.row_size_bytes());
+        assert(_read_threshold_bytes >= _table.row_size_bytes());
 
         set_search_function(config);
         set_location_function(config);

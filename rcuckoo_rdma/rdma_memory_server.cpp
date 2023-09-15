@@ -343,8 +343,8 @@ static int start_rdma_server(struct sockaddr_in *server_addr, int qp_num, int po
                 -errno);
         return -errno;
     }
-    printf("Server is listening successfully at: %s , port: %d for QP %d \n",
-        inet_ntoa(server_addr->sin_addr), ntohs(server_addr->sin_port), qp_num);
+    // printf("Server is listening successfully at: %s , port: %d for QP %d \n",
+    //     inet_ntoa(server_addr->sin_addr), ntohs(server_addr->sin_port), qp_num);
 
     /*now, we expect a client to connect and generate a RDMA_CM_EVNET_CONNECT_REQUEST 
     * We wait (block) on the connection management event channel for 
@@ -876,19 +876,19 @@ typedef struct rdma_connection_setup_args {
 void *connection_setup(void* void_args){
     rdma_connection_setup_args args = *((rdma_connection_setup_args *)void_args);
     /* Each QP will bind to port numbers starting from base port */
-    ALERT("RDMA memory server", "Starting RDMA server thread %d port %d\n", args.index, args.port);
+    // ALERT("RDMA memory server", "Starting RDMA server thread %d port %d\n", args.index, args.port);
     int ret = start_rdma_server(args.server_sockaddr, args.index, args.port);
     if (ret) {
         rdma_error("RDMA server failed to start cleanly, ret = %d \n", ret);
         exit(1);
     }
-    ALERT("RDMA memory server", "RDMA server thread %d setting up resources\n", args.index);
+    // ALERT("RDMA memory server", "RDMA server thread %d setting up resources\n", args.index);
     ret = setup_client_qp(args.index);
     if (ret) { 
         rdma_error("Failed to setup client resources, ret = %d \n", ret);
         exit(1);
     }
-    ALERT("RDMA memory server", "RDMA server thread %d accepting client connections\n", args.index);
+    // ALERT("RDMA memory server", "RDMA server thread %d accepting client connections\n", args.index);
     ret = accept_client_connection(args.index);
     if (ret) {
         rdma_error("Failed to handle client cleanly, ret = %d \n", ret);
@@ -962,7 +962,7 @@ int main(int argc, char **argv)
     pthread_create(&connection_event_manager, NULL, &connection_event_manager_loop, NULL);
 
     for (i = 0; i < num_qps; i++) {
-        ALERT("RDMA memory server", "FORKING %d\n", i);
+        // ALERT("RDMA memory server", "FORKING %d\n", i);
         args[i].server_sockaddr = &server_sockaddr;
         args[i].index = i;
         args[i].port = base_port + i;
