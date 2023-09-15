@@ -195,9 +195,74 @@ executing many hash compuations. We evaluate our A* search
 alorithm abolute performacne on various hash functions and
 show how this values effect our overall fill factors.}
 
-\subsection{Read Threshold Performance} 
+\begin{figure*}[t]
+    \centering
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/entry_size.pdf}
+    \end{subfigure}
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/read_size.pdf}
+        % \label{fig:hash_factor}
+        % \caption{}
+    \end{subfigure}
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/factor.pdf}
+        % \label{fig:hash_fill}
+        % \caption{}
+    \end{subfigure}.
+    \vspace{-1em}
+    \caption{
+    \textbf{(a)} \todo{replace with masked cas}.
+    \textbf{(b)} Read threshold vs throughput.
+    \textbf{(c)} Exponential factor relation to max fill in cuckoo hash.
+    }
+    \label{fig:performance_breakdown}
 
-\todo{Show how it reduces messages per operation. This is not that
-important of an experiment as I can't show the latency
-overhead of two batched messages vs one at the moment.}
-%%
+\end{figure*}
+
+\subsection{Hash Function Factor $f$}
+
+\todo{we vary f to show the tradeoff between maximum fill factor and throughput}
+
+\subsection{Read Threshold Performance}
+
+
+
+As described in section ~\ref{sec:reading} rcuckoo uses a
+read threshold to capture both hash locations if the
+locations are within a defined read threshold.
+Figure~\ref{fig:read_threshold} shows the performance gains
+from increasing the read threshold. Here each row is 64
+bytes so our minimum threshold of 64 ensures two packets are
+issued for each read request. Higher read thresholds trade
+off network bandwidth for operation latency. When bandwidth
+is plentiful large windows can improve throughput but up to
+8\%.
+
+% \begin{figure}[ht]
+%     \includegraphics[width=0.99\linewidth]{fig/read_size.pdf}
+%     \caption{Read Threshold vs Throughput}
+%     \label{fig:read_threshold}
+% \end{figure}
+
+
+\subsection{Entry Size}
+
+Key value pairs embedded directly in the index enable single
+round trip reads, at the cost of inflating write bandwidth.
+Large row sizes increase the size of reads during locking
+and search. Figure~\cite{fig:entry_size} shows the effect of
+key value pair size on operation throughput. YCSB-A
+workloads saturate network bandwidth and thus decrease in
+throughput as a function of entry size. In contrast YCSB-C
+is largely unaffected by entry size. \sg{We suggest that
+pairs larger than 64 bytes use extents rather than embedding
+directly in the index.}
+
+
+\begin{figure}[ht]
+    \includegraphics[width=0.99\linewidth]{fig/entry_size.pdf}
+    \caption{Throughput vs KV entry size}
+    \label{fig:entry_size}
+\end{figure}
+

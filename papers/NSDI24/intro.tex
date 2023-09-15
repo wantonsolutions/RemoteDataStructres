@@ -1,44 +1,72 @@
 \section{Introduction}
 \label{sec:intro}
 
-DRAM capacity is scaling at an ever decreasing rate. As such
-the demand in data centers for high efficiency memory
-systems grows every year to improve memory utilization and
-sharing. Memory disaggregation i.e separating compute and
-memory into large pools is a promising approach to increase
-a CPU's per core memory access beyond what is available in a
-single machine while simultaneously decreasing per machine
-memory stranding.
 
-Designing a fully disaggregated system is challenging.
-Access latencies to remote memory are approximately 20x that
-of local DRAM (50ns to 1us) which severely increases the
-cost of synchronizing shared data structures among many
-CPU's across multiple machines. Traditional and partially
-disaggregated key-value serialize updates with a CPU
-colocated with
-memory~\cite{memcached,herd,erpc,pilaf,cell,clover}(\todo{check
-sherman}). This approach does not meet the requirements of
-full disaggregation in which memory is a passive resource.
-In the fully disaggregated setting serialization is achieved
-entirely with a client based protocol. 
+DRAM has become a scarce resource. As CPU core counts
+continue to rise, per-core capacity has dropped in the past
+decade. In response data center architects have proposed
+resource disaggregation to improve resource scalability, and
+utilization. In the disaggregated model, resources (compute,
+memory, storage) are physically distant, and interconnected
+by a high speed network. In a fully disaggregated model
+distinct servers house resources such as memory servers
+which contain only memory, and no colocated CPU for
+processing.
+
+% DRAM capacity is scaling at an ever decreasing rate. As such
+% the demand in data centers for high efficiency memory
+% systems grows every year to improve memory utilization and
+% sharing. Memory disaggregation i.e separating compute and
+% memory into large pools is a promising approach to increase
+% a CPU's per core memory access beyond what is available in a
+% single machine while simultaneously decreasing per machine
+% memory stranding.
+
+Full disaggregation is challenging as it requires new system
+designs to cope with the additional network latency.  For
+example accessing intra-rack remote DRAM has a 20x (50ns to
+1us) overhead in relation to local memory. Cores sharing
+remote memory must suffer a proportionally high cost for
+synchronization when sharing pools of memory. Many prior
+disaggregated systems have eschewed sharing for static
+partitioning to avoid the high overheads~\cite{legoos,
+blade-server, remote-reigions}.  Some projects have opted
+for a partially disaggregated model, in which a CPU core is
+colocated with memory to provide
+serialization~\cite{clover}, sharing a close design with
+RDMA key-value stores optimized with one-sided RDMA
+operations ~\cite{herd,erpc,pilaf,cell,clover}. While highly
+performant these approaches do not conform to fully
+disaggregated designs.
+
+% to remote memory are approximately 20x that
+% of local DRAM (50ns to 1us) which severely increases the
+% cost of synchronizing shared data structures among many
+% CPU's across multiple machines. Traditional and partially
+% disaggregated key-value serialize updates with a CPU
+% colocated with
+% memory~\cite{memcached,herd,erpc,pilaf,cell,clover}(\todo{check
+% sherman}). This approach does not meet the requirements of
+% full disaggregation in which memory is a passive resource.
+% In the fully disaggregated setting serialization is achieved
+% entirely with a client based protocol. 
 
 Some prior work has examined the design of fully
-disaggregated indexes~\cite{sherman, race, fusee, rolex}.
-These approaches either use optimistic concurrency, or
-assume that most clients are colocated and can resolve their
-lock acquisitions in local memory. Optimistic approaches
-using RDMA atomics are limited by the width of the atomic
-instruction (64 bits for compare and swap). This update size
-is too encapsulate a key-value update, and is often too
-small to store a key. The result is that optimistic
-approaches require more round trips to remote memory to
-complete their operations. These approaches have dismissed
-lock based approaches outright as the size of their critical
-sections can bottleneck performance, and  the cost of
-acquiring and releasing locks (at minimum two round trips)
-is often higher than the optimistic approach (two or three
-round trips).
+disaggregated hash table indexes~\cite{sherman, race, fusee,
+rolex}.  These approaches either use optimistic concurrency,
+or assume that most clients are colocated and can resolve
+their lock acquisitions in local memory. Optimistic
+approaches using RDMA atomics are limited by the width of
+the atomic instruction (64 bits for compare and swap). This
+update size is too encapsulate a key-value update, and is
+often too small to store a key. The result is that
+optimistic approaches require more round trips to remote
+memory to complete their operations. These approaches have
+dismissed lock based approaches outright as the size of
+their critical sections can bottleneck performance, and  the
+cost of acquiring and releasing locks (at minimum two round
+trips) is often higher than the optimistic approach (two or
+three round trips).
 
 % %concurrent data structures round trips
 % Concurrent data structure design for remote memory is hard.

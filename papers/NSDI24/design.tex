@@ -324,6 +324,28 @@ illustrates our table design.  Each entry includes an extent
 bit to indicate if the entry is inlined or stored in an
 extent. 
 
+\subsubsection{Memory Allocation}
+
+Prior work has focused on different memory allocation and
+hash table resizing schemes. Sherman~\cite{sherman} uses an
+allocated thread located on the memory node,
+Fusee~\cite{fusee} uses a two tired memory allocation in
+which large blocks of memory are allocated on the memory
+nodes and fine grained allocation is performed on the
+clients. Clover~\cite{clover} statically partitions memory
+into large client regions prior to execution and hash
+clients entirely manage the space themselves. Network based
+allocators such as MIND and Clio~\cite{mind,clio} have
+demonstrated the feasibility of high performance
+disaggregated allocators, while some have called for
+allocators to be built into RDMA~\cite{prism}. We allocate
+memory using the same scheme as Clover, as it is simple to
+implement and adds no additional overhead. We view memory
+allocation as a hard orthogonal problem to the design of
+disaggregated indexes and have designed our system
+acrostically to the allocator.
+
+
 
 
 \begin{figure}[t]
@@ -351,7 +373,9 @@ inserting, and performing updates and deletes to an rcuckoo
 hash table. Figure~\ref{fig:message_diagram} visualizes our
 protocol.
 
-\subsubsection{Reading} All reads are performed locklessly.
+\subsubsection{Reading} 
+\label{sec:reading}
+All reads are performed locklessly.
 If keys and values are inlined clients complete reads in a
 single round trip, otherwise a second round trip is required
 to resolve a pointer and read the extent. 
