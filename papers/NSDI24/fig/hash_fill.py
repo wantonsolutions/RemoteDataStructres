@@ -127,7 +127,29 @@ def plot_hash_fill():
     plt.tight_layout()
     plt.savefig("hash_fill.pdf")
 
+def plot_static_hash_fill():
+    # max_fill = [(1.7, 53.5),(1.9,79.5),(2.1, 93.1),(2.3,96.6),(2.5,97.3), (2.7, 97.5), (2.9, 97.7), (3.1, 97.9), (3.3, 98.2)]
+    max_fill = [(1.7, 53.5),(1.9,79.5),(2.1, 93.1),(2.3,96.6),(2.5,97.3)]
+    fig, ax = plt.subplots(1,1,figsize=(4,2.5))
+    x_labels = [str(f[0]) for f in max_fill]
+    x = [ v[0] for v in max_fill]
+    y = [ v[1] for v in max_fill]
+    ax.bar(x,y,width=0.15, edgecolor='black')
+    # fill = ax.plot(x,y, label="max fill", color="black", linestyle="--")
+    ax.set_xticks(x, x_labels)
+    ax.grid(True, axis='y', linestyle=':')
+    ax.axhline(y=90, color='r', linestyle=':')
 
-run_fill_factor_experiment()
-plot_hash_fill()
+    ax.set_xlabel('factor')
+    ax.set_ylabel('max fill')
+
+    # ax.legend()
+    plt.tight_layout()
+    plt.savefig("hash_fill.pdf")
+
+
+
+# run_fill_factor_experiment()
+# plot_hash_fill()
+plot_static_hash_fill()
 

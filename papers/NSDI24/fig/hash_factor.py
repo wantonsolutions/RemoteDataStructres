@@ -4,8 +4,8 @@ from experiments import plot_cuckoo as pc
 from experiments import data_management as dm
 import matplotlib.pyplot as plt
 
-# from simulator import hash
-import chash as hash
+from simulator import hash
+# import chash as hash
 
 # factors = [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
 factors = [1.9, 2.1, 2.3]
@@ -40,18 +40,24 @@ def plot_hash_factor_distance_cdf():
 
     for i in range(len(factors)):
         distances = all_distances[i]
+        distances = [(v/64) for v in distances]
+        print(distances)
         f = factors[i]
         x, y = pc.cdf(distances)
         ax.plot(x,y, label="f="+str(f))
 
-    x = [32, 64, 128, 256, 512, 1024, 2048, 4096]
-    x_str = ["32", "64", "128", "256", "512", "1K", "2K", "4K"]
+    # x = [1,2,4,8,16,32,64, 128, 256, 512, 1024, 2048, 4096] 
+    # x = [2,8,32,128,512,2048]
+    x = [1,4,16,64,256,1024]
+    # rows = [ int(v / 32) for v in x]
+    x_str = [str(v) for v in x]
+    # x_str = ["32", "64", "128", "256", "512", "1K", "2K", "4K"]
     # x_str = [ str(i) for i in x]
 
-    ax.set_xlabel('Distance (Bytes)')
+    ax.set_xlabel('distance (table rows)')
     ax.set_ylabel('CDF')
     # ax.set_title('Exponetial Hash Factor Distance')
-    ax.set_xlim(32,5000)
+    ax.set_xlim(0.5,1000)
     ax.set_ylim(0,1.01)
     ax.set_xscale('log')
     ax.minorticks_off()
@@ -62,5 +68,5 @@ def plot_hash_factor_distance_cdf():
     plt.tight_layout()
     plt.savefig("hash_factor.pdf")
 
-gen_hash_factor_distance_cdf()
+# gen_hash_factor_distance_cdf()
 plot_hash_factor_distance_cdf()
