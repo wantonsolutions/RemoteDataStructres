@@ -43,7 +43,7 @@ designed to minimize network round trips.
     \caption{
     \textbf{(a)} Dependent hashing for factor $f$.
     \textbf{(b)} CDF of distances between cuckoo locations dependent hashing on different exponential factors.
-    \textbf{(c)} Exponential factor relation to max fill in cuckoo hash.
+    \textbf{(c)} Exponential factor relation to max fill in cuckoo hash. 90\% fill marked in red.
     }
     \label{fig:locality-hashing}
 
@@ -400,24 +400,32 @@ locks can be acquired in a single round trip.
 \subsection{Table Design}
 
 \sg{@alex I've left the proposed table design in}
-We design our table with flexibility in mind. Our goal is to
-support inlining fixed sized keys and values in the index
-for high performance, while simultaneously supporting
-variable sized values. As table updates are guarded by locks
-index entries need not fit into 64 bit words (RDMA atomic
-width)~\cite{race,fusee}. This fact enable us to support
-variables sized inlined key-value entries saving a round
-trip for small keys. This flexibility enables the
-simultaneous use of an extent system for larger key-value
-pairs. 
 
-Users can specify the size of their index entries at
+We design our hash table for fast reads as most data center
+key-value workload are read heavy~\cite{facebook-workloads}.
+Prior disaggregated indexes such as
+~\cite{clover,race,fusee} require two round trips minimum
+for first time reads as their indexes do not support
+inlining. In the case of RACE and FUSEE index entries are
+fixed to 64 bits to support RDMA CAS width operations. This
+fact prevents both projects from inlining key value data and
+requires them to make a second round trip to an extent to
+retrieve data, and check if a key is present in the table.
+
+In our table users can specify the size of their index entries at
 initialization time. Key value pairs which are small enough
 to fit within the index are inlined, otherwise they are
 stored in an extent. Figure~\ref{fig:table-diagram}
-illustrates our table design.  Each entry includes an extent
+illustrates our table design. Each entry includes an extent
 bit to indicate if the entry is inlined or stored in an
-extent. 
+extent.
+
+\subsubsection{Client Caching}
+
+\todo{expand} Clients cache duplicates of the remote index
+to improve the performance of operations. In the case of
+insertions clients search their locally cached indexes to
+determine a cuckoo path prior to acquiring locks. 
 
 \subsubsection{Memory Allocation}
 
@@ -686,3 +694,24 @@ distance of our locality hash function. This approach does
 not guarantee that we find the shortest path, however it
 does find short paths in the common case, and results in
 very short search times.
+
+\subsection{Replication, and scalability} 
+
+\todo{no real replication probabily delete} At the time of
+writing RCuckoo does not support replication although
+replication is in no way a complication for our existing
+algorithms. On inserts clients aquire locks from a master
+memory node as described in section~\ref{sec:insert}, after
+locks are acquired on the master node updates, deletes, or
+cuckoo paths are broadcast to replicas. Replication requires
+a clients to wait for responses from replicas before issuing
+unlock messages as the client can not rely on RDMA RC
+connection in order delivery across the multiple replica
+connections.
+
+\todo{We don't span multiple memory nodes} When using
+multiple memory machines each machine is initialized with an
+equal portion of the cuckoo index and lock table. Clients
+calculate which machine to issue their requests to when
+generating requests.
+
