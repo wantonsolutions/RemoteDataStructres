@@ -86,7 +86,7 @@ means that a keys second location is in the row immediately
 after it's first location. In the case of $f$=2.3 20\% of
 keys have a distance of 1 bucket. Small values of $f$ have
 high locality. However, locality is not free. Independent%%
-hash functions enable cuckoo hashes to read high fill rates (>95\%).
+hash functions enable cuckoo hashes to read high fill rates (95\% and higher).
 %%
 Removing independence increase the probability of
 hotspots which cause insert operations to fail. A cuckoo
@@ -199,40 +199,109 @@ hashes~\cite{memc3,cuckoo-improvements,pilaf}.
 
 \end{figure*}
 
-To guard access to the table when performing modifications
-we use locks. Our lock table is an array of contiguous bits
-where each bit is a lock, and each lock guards one or more
-sequential buckets.
+Rcuckoo uses locks rather than optimistic operations
+(compare-and-swap) so table entries can be larger than 64
+bits. This enables fast reads, as both keys, and values can
+reside directly in the table index. Locking can be
+expensive, as a naive deadlock free aquire and release
+protocol can incur many round trips.  in this section we
+describe our lock table, and locking protocol designed to
+achieve fast locking in an average of two round trips.
 
-We use RDMA device memory for our lock table. To aquire
-locks clients locally determine which locks they require for
-their operation, and then issue RDMA masked CAS operations
-to the device memory. This approach enable clients to aquire
-up to 64 contiguous locks with a single RDMA operation and
-enable clients to aquire locks without synchronizing the
-state of the lock table prior to acquisition (non masked CAS
-would need the state of all locks prior to issuing the
-request.).
+Our lock table is an array of contiguous bits where each bit
+is a lock, and each lock guards one or more sequential
+buckets. The size of the lock table in bytes equals the
+number of hash table rows, divided by the number of rows
+each lock guards (rows per lock). The size of a lock table
+for a cuckoo table with 100M entries, 8 entries per row, and
+16 rows per lock is 102KB.  Lock table size, and rows per
+lock are important variables as they enable us to utilize
+two features of modern RDMA NICs, mainly device mapped
+memory, and masked compare and
+swap~\cite{rdma-masked-cas,sherman}.
 
-Using this locking scheme locality hashing greatly improves
-locking performance. With independent hashing the locks for
-a cuckoo path are scattered randomly throughout the table.
-Therefore, a round trip is required for each lock, and each
-lock must be acquired in order to avoid deadlock. With
-locality, and the ability to lock up to 64 sequential locks
-most insertions can be performed with a single round trip
-for locking. In both cases lock release can be batched in a
-single round trip.
+Device mapped memory is a small reigon of on NIC memory,
+typically on the order of 256KB. This memory executes
+one-sided RDMA operations faster than host memory as the
+operations need not make a PCIe round trip. This memory is
+especially performant for atomic operations as the NIC would
+otherwise have to queue dependent atomic request to host
+memory. Figure~\ref{fig:rdma-benchmarks}(c) shows the
+performance boost from device over host memory for atomic
+operations.
 
-Figure~\ref{fig:cuckoo-problems}(b) shows the insert span in
-buckets using both dependent and independent hashing on a
-table with 500K entries and an associativity of 8. A span is
-calculated as the distance between the lowest index and the
-highest index in a cuckoo path. Past 50\% independent
-hashing spans a random range in the table (whenever a
-displacement occurs on insert). With dependent locality
-based hashing 95\% of inserts span less than 32 buckets, and
-99\% less than 256.
+The second NIC feature we exploit is masked compare and swap
+operations ~\ref{fig:rdma-masked-cas}. Masked cas operations
+enable clients to set individual bits rather than 64 bit
+spans. As our lock table is tightly packed this enables
+clients to aquire locks without any additional knowledge
+about the lock table as would be required for unmasked cas.
+
+Together with locality hashing these features enable the
+following fast locking protocol. When a client requires
+locks it calculates all lock indexes locally. Lock indexes
+are the row the client must lock divided by the number of
+rows per lock. Once the set of locks is calculated the
+client breaks the set of locks into separate locking
+requests. If the locks are within 64 entries of each other
+all locks are packed into a single masked compare and swap
+packet. If the span of locks is greater than 64 a second
+packet is generated with all locks in the next range of 64
+packed together into a single packet. To avoid deadlocks
+lock request are issued one at a time. Clients repeatedly
+request the same locks until they are acquired. Lock
+releases are done in a single batch.
+
+% We use RDMA device memory for our lock
+% table~\cite{rdma-masked-cas}. To aquire locks clients
+% locally determine which locks they require for their
+% operation, and then issue RDMA masked CAS operations to the
+% device memory. This approach enable clients to aquire up to
+% 64 contiguous locks with a single RDMA operation and enable
+% clients to aquire locks without synchronizing the state of
+% the lock table prior to acquisition (non masked CAS would
+% need the state of all locks prior to issuing the request.).
+
+This locking scheme in conjunction with dependent hashing
+enables most client operations to aquire locks in a singe
+round trip. Update and insert operations require at most two
+locks, one for each key location. Using $f$ of 2.3 90\% of
+key pairs are within 64 rows of each other so even with row
+per lock 90\% of updates and deletes can be completed in two
+round trips. In practice we use 16 rows per lock which
+results in 99.7\% of updates and deletes resulting in two
+round trips.
+
+Inserts can span arbitrary regions of the table and are a
+harder case than updates and deletes.
+Figure~\ref{fig:cuckoo-problems}(b) shows the span in rows
+of cuckoo paths for a table with 100K rows. These spans are
+the difference between the highest and lowest row locked
+during insertion. Using dependent hashing 95\% of insertions
+span 32 rows or less, and 99\% of insertions span 256 rows
+or less. Using 16 rows per lock each masked cas can cover
+1024 rows of the table ensuring that 99.5\% of insertion
+locks can be acquired in a single round trip.
+
+% Using this locking scheme locality hashing greatly improves
+% locking performance. With independent hashing the locks for
+% a cuckoo path are scattered randomly throughout the table.
+% Therefore, a round trip is required for each lock, and each
+% lock must be acquired in order to avoid deadlock. With
+% locality, and the ability to lock up to 64 sequential locks
+% most insertions can be performed with a single round trip
+% for locking. In both cases lock release can be batched in a
+% single round trip.
+
+% Figure~\ref{fig:cuckoo-problems}(b) shows the insert span in
+% buckets using both dependent and independent hashing on a
+% table with 500K entries and an associativity of 8. A span is
+% calculated as the distance between the lowest index and the
+% highest index in a cuckoo path. Past 50\% independent
+% hashing spans a random range in the table (whenever a
+% displacement occurs on insert). With dependent locality
+% based hashing 95\% of inserts span less than 32 buckets, and
+% 99\% less than 256.
 
 
 % Traditional wisdom would suggest that because cuckoo hashing
@@ -313,20 +382,20 @@ based hashing 95\% of inserts span less than 32 buckets, and
 % atomic operations in turn reduces the effect of the RDMA
 % atomic bottleneck.  \textbf{Hard to see 3; the figure only shows 2 or 4.}
 
-Our lock table is small in comparison to the true hash
-table. At its most fine-grained each lock corresponds to
-one bucket (8 entries). Each lock is 1 bit, a lock table for
-a 100 million entry hash table is ~160KB, with a lock
-granularity of 4 buckets this drops to 40KB. This tight
-layout enables us to use device-mapped memory to hold our
-lock table~\cite{design-guidelines,sherman}.
-%We make use of
-Device-mapped memory on recent RDMA NIC's (ConnectX-5+) avoids an
-expensive PCIe round trip, reducing lock acquisition latency.
-This enables up
-to 3$\times$ better throughput on contested locks (see
-Figure~\ref{fig:rdma-benchmarks}(c)), and reduces latency
-for locking.
+% Our lock table is small in comparison to the true hash
+% table. At its most fine-grained each lock corresponds to
+% one bucket (8 entries). Each lock is 1 bit, a lock table for
+% a 100 million entry hash table is ~160KB, with a lock
+% granularity of 4 buckets this drops to 40KB. This tight
+% layout enables us to use device-mapped memory to hold our
+% lock table~\cite{design-guidelines,sherman}.
+% %We make use of
+% Device-mapped memory on recent RDMA NIC's (ConnectX-5+) avoids an
+% expensive PCIe round trip, reducing lock acquisition latency.
+% This enables up
+% to 3$\times$ better throughput on contested locks (see
+% Figure~\ref{fig:rdma-benchmarks}(c)), and reduces latency
+% for locking.
 
 \subsection{Table Design}
 
