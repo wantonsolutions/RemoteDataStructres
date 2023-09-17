@@ -517,25 +517,25 @@ client cache for future operations.
 To reduce bandwidth the size of the threshold can be tuned
 down, or turned off with no harm to correctness.
 
-\subsubsection{Locking and unlocking}
+% \subsubsection{Locking and unlocking}
 
-Update, delete and insertion operations all require locks to
-modify the index. Locks are acquired in incremental order
-from smallest to largest to avoid deadlocks. First the list
-of locks required for the operation is calculated. For
-updates and deletes two locks may be required. Inserts may
-required many locks. The client calculates which locks it
-requires and breaks the list into masked CAS operations
-spanning 64 locks and then issued the requests polling for a
-successful response before moving to the next lock.
+% Update, delete and insertion operations all require locks to
+% modify the index. Locks are acquired in incremental order
+% from smallest to largest to avoid deadlocks. First the list
+% of locks required for the operation is calculated. For
+% updates and deletes two locks may be required. Inserts may
+% required many locks. The client calculates which locks it
+% requires and breaks the list into masked CAS operations
+% spanning 64 locks and then issued the requests polling for a
+% successful response before moving to the next lock.
 
-To synchronize the client cache with remote memory we issue
-a \textit{covering read}. A covering read is an RDMA read
-which spans the range of buckets from the lowest lock in the
-masked CAS to the highest. The covering read is issued after
-the masked CAS and ensures the client receives synchronized
-data for the locked buckets while not consuming an
-additional round trip.
+% To synchronize the client cache with remote memory we issue
+% a \textit{covering read}. A covering read is an RDMA read
+% which spans the range of buckets from the lowest lock in the
+% masked CAS to the highest. The covering read is issued after
+% the masked CAS and ensures the client receives synchronized
+% data for the locked buckets while not consuming an
+% additional round trip.
 
 % Clients need their caches synchronized with remote memory
 % prior to modifying it with writes. We batch reads with lock
@@ -552,29 +552,31 @@ additional round trip.
 %Subsequent lock requests are issued prior to
 %blocking on reads.
 
-After locks are acquired the client can execute its critical
-section. Unlock requests are the inverse masked CAS operations of the
-lock requests. Clients issue their critical sections as a sequence of
-(asynchronous) writes followed immediately by unlock operations. RDMA
-in-order delivery ensures that the unlock operations are performed
-after the writes.
+% After locks are acquired the client can execute its critical
+% section. Unlock requests are the inverse masked CAS operations of the
+% lock requests. Clients issue their critical sections as a sequence of
+% (asynchronous) writes followed immediately by unlock operations. RDMA
+% in-order delivery ensures that the unlock operations are performed
+% after the writes.
 
 \subsubsection{Updates and Deletes}
 
-Updates and deletes are performed in a similar fashion.
-First the client acquires locks for both hash locations. If
-the key is present the client issues the update or delete.
-If the key is not present the delete fails, while the update
-will then perform an insert, as described in the following
-section. For updates the client updates the value and CRC of
-the entry, on deletes the entry is set to NULL, and all
-entries of the bucket are shuffled down to fill the hole.
-%%
-If extents are being used updates asynchronously write their
-extent data during lock acquisition. Both updates and
-deletes for extents remove the old extent data lazily.
-Regardless of if extents are turned on updates and deletes
-are performed in two round trips.
+Updates and deletes are similar operations as both require
+two locks. In the locking phase clients calculate and aquire
+both locks~\ref{sec:locking}. Updates to inlined entries
+issue a single entry sized update directly to the index.
+Updates to extents issue three messages first the new extent
+is written, the index is updated, and finally the old extend
+is set to invalid and marked for garbage collection. In both
+cases unlock messages are batched with the update. Similarly
+deletes lock both table entries. On deletes clients compact
+the row so open entries are always located at the end of the
+row~\footnote{Ensuring open entries are at the ends of rows
+improves search times for open buckets.}. Extent entries are
+marked as invalid in the same round trip. Both updates and
+deletes commonly execute in 2 round trips. 3 round trips are
+required only if both locks are too far apart to be set in a
+single masked cas operation.
 
 \subsubsection{Insert}
 
