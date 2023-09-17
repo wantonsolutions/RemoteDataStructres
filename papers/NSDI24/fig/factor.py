@@ -98,6 +98,57 @@ def plot_factor_exp():
     plt.savefig("factor.pdf")
 
 
+def plot_factor_exp_static():
+    fig, ax = plt.subplots(1,1, figsize=(5,3))
+    axt=ax.twinx()
+    dirname = "factor"
+    stats = dm.load_statistics(dirname=dirname)
+    stats=stats[0]
+    tputs = []
+    print(tputs)
+
+    throughputs = []
+    std_errs = []
+    for stat in stats:
+        single_run_throughputs=[]
+        for r in stat:
+            s = plot_cuckoo.single_run_throughput(r)
+            single_run_throughputs.append(s)
+        print("single_run_throughput: ", single_run_throughputs)
+        throughputs.append(np.mean(single_run_throughputs))
+        std_errs.append(np.std(single_run_throughputs))
+
+    x_axis = plot_cuckoo.get_x_axis(stats, "hash factor")
+    x_axis = [float(x) for x in x_axis]
+
+    throughputs = [8.549023247211482, 7.81310996563574, 7.389588069433427, 6.989896907216491, 6.494618803418798, 5.690631135531132, 4.734080341880341, 3.903198506566869, 3.509013793103447]
+    print(throughputs)
+    tput = ax.plot(x_axis, throughputs,  label="insert tput", marker="o")
+    ax.set_xlabel("hashing factor (f)")
+    ax.set_ylabel("MOPS")
+
+
+    max_fill = [(1.7, 53.5),(1.9,79.5),(2.1, 93.1),(2.3,96.6),(2.5,97.3), (2.7, 97.5), (2.9, 97.7), (3.1, 97.9), (3.3, 98.2)]
+
+    x = [ v[0] for v in max_fill]
+    y = [ v[1] for v in max_fill]
+    fill = axt.plot(x,y, label="max fill", color="black", linestyle="--")
+
+
+    ax.legend(tput+fill, ['throughput',"max fill"])
+
+    # ax.legend()
+    # axt.legend()
+    axt.set_ylim(50,100)
+    axt.set_ylabel("max fill (%)")
+
+
+    plt.tight_layout()
+    plt.savefig("factor.pdf")
+
+
 
 # factor_exp()
-plot_factor_exp()
+# plot_factor_exp()
+
+plot_factor_exp_static()

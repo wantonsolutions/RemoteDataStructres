@@ -635,6 +635,15 @@ valid search path is found path updates are made as a batch
 of sequential writes. Unlock operation are batched after the
 writes. Writes to the extent precede updates to the table.
 
+Insertions are the most expensive operation as they require
+computation, large reads, and writes. In our evaluation we
+find that insertions are limited by the network bandwidth of
+our CX5 NIC's not lock contention or failed searches. We
+consider this a desirable limitation as network bandwidths
+continue to increase and so additional operation throughput
+can be exchanged for additional bandwidth~\footnote{CX7
+NIC's currently support 400Gbps line rate.}.
+
 % Clients must first aquire
 % remote locks and then synchronize their cache before they
 % can calculate a guaranteed valid cuckoo path. Acquiring many
