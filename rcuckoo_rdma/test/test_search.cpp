@@ -510,6 +510,18 @@ void time_and_check_search_algorithms_3() {
 // }
 
 void run_bfs_insert_context() {
+
+    using std::chrono::high_resolution_clock;
+    using std::chrono::duration_cast;
+    using std::chrono::duration;
+    using std::chrono::milliseconds;
+    printf("starting search\n");
+
+
+    //The second table
+
+    auto t0 = high_resolution_clock::now();
+
     unsigned int indexes = 1024 * 1024;
     unsigned int buckets = 8;
     unsigned int memory = indexes * sizeof(Entry);
@@ -542,7 +554,10 @@ void run_bfs_insert_context() {
         inserted++;
         insert_cuckoo_path(table, context.path);
     }
-    context.table->print_table();
+    // context.table->print_table();
+    auto t1 = high_resolution_clock::now();
+    auto duration_1 = duration_cast<milliseconds>( t1 - t0 ).count();
+    cout << "fill time " << duration_1 << endl;
 
     cout << " fill " << i << "/" << total_inserts << " " << i/total_inserts << "\%" << "final fill: " << context.table->get_fill_percentage() << endl;
 }
@@ -553,8 +568,8 @@ int main() {
     // time_and_check_search_algorithms();
     // run_single_insert_context();
     // run_random_insert_context();
-    // run_bfs_insert_context();
+    run_bfs_insert_context();
     // time_and_check_search_algorithms_2();
-    time_and_check_search_algorithms_3();
+    // time_and_check_search_algorithms_3();
     // cout << "Hello Search Test!" << endl;
 }

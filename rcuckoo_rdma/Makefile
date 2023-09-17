@@ -7,7 +7,14 @@ INCLUDES := -I$(XXHASH_INC) -I$(MLX5_INC)
 # CFLAGS := -std=c++2a -g -O3 -Wall -Wall -Wextra -pedantic -fPIC
 
 # CFLAGS := -std=c++2a -g -O3 -Wall -Wall -Wextra -pedantic -fPIC
-CFLAGS := -std=c++2a -g -Wall -Wall -Wextra -pedantic -fPIC
+
+# DEFINE_MACROS := -DVALUE_SIZE=12
+DEFINE_MACROS := -DNOTHING
+ifdef VALUE_SIZE
+	DEFINE_MACROS := -DVALUE_SIZE=$(VALUE_SIZE)
+endif
+# -DVALUE_SIZE=28
+CFLAGS := -std=c++2a -g -Wall -Wall -Wextra -pedantic -fPIC  $(DEFINE_MACROS)
 # CFLAGS := -s -std=c++2a -O3 -Ofast -Wall -Wall -Wextra -pedantic -DNDEBUG -march=native
 # CFLAGS := -std=c++2a -g -Wall -Wall -Wextra -pedantic -fPIC
 # CFLAGS := -std=c++2a -g  -Wall -Wall -Wextra -pedantic -fPIC

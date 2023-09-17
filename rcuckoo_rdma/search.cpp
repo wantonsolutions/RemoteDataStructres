@@ -693,7 +693,6 @@ namespace cuckoo_search {
         const unsigned int table_rows = context.table->get_row_count();
         // Debugging print the list of targets
 
-        VERBOSE("DEBUG a_star search", "searching for target: %d\n", target);
         unsigned int closed_list_addressable_index = 0;
         fast_path_element starting_pe = fast_path_element(&(context.key), -1, -1, -1);
         search_element = fast_a_star_pe(starting_pe, NULL, 0, 0);
@@ -946,29 +945,31 @@ namespace cuckoo_search {
     }
 
 
+
     #define MAX_BFS_DEPTH 10000
     void bfs_search(search_context & context) {
-        // printf("inside bfs search\n");
-        vector<bfs_pe> bfs_queue;
-        int bfs_pointer_index=0;
+        context.path.clear();
+        context.visited_buckets.clear();
+
         
-        bfs_pe starting_bfs_pe = bfs_pe(context.path[0], NULL);
-        bfs_queue.push_back(starting_bfs_pe);
+        path_element starting_pe = path_element(context.key, -1, -1, -1);
+        bfs_pe starting_bfs_pe = bfs_pe(starting_pe, NULL);
+        // bfs_queue.push_back(starting_bfs_pe);
         context.found=false;
 
-        while(bfs_queue.size() > 0){
-            //pop off the first element
-            bfs_pe current = bfs_queue.front();
+        int front_index = 0;
+        int back_index = 1;
+
+        context.closed_list_bfs_addressable[front_index] = starting_bfs_pe;
+        // while(bfs_queue.size() > 0){
+        while(front_index < back_index){
+            //pop off the first
             bfs_pe *current_ptr;
-            context.closed_list_bfs_addressable[bfs_pointer_index] = current;
-            current_ptr = &context.closed_list_bfs_addressable[bfs_pointer_index];
-            bfs_pointer_index++;
-            bfs_queue.erase(bfs_queue.begin());
+            current_ptr = &context.closed_list_bfs_addressable[front_index];
+            front_index++;
 
-
-
-            int index = next_search_index(current.pe, context.location_func, *context.table);
-            int table_index = next_table_index(current.pe.table_index);
+            int index = next_search_index(current_ptr->pe, context.location_func, *context.table);
+            int table_index = next_table_index(current_ptr->pe.table_index);
 
             //Move on if we cant search this bucket
             if (context.open_buckets.size() > 0){
@@ -989,7 +990,7 @@ namespace cuckoo_search {
                 path_element open_pe = path_element(context.table->get_entry_pointer(index,bucket_index)->key, table_index, index, bucket_index);
                 bfs_pe final_pe = bfs_pe(open_pe, current_ptr);
 
-                context.closed_list_bfs_addressable[bfs_pointer_index] = final_pe;
+                context.closed_list_bfs_addressable[back_index] = final_pe;
                 context.found = true;
                 break;
             }
@@ -1000,9 +1001,8 @@ namespace cuckoo_search {
                 Key * child_key = &(context.table->get_entry_pointer(index, bucket_index)->key);
                 path_element child_pe = path_element(*child_key, table_index, index, bucket_index);
                 bfs_pe chile_bfs_pe = bfs_pe(child_pe, current_ptr);
-                context.closed_list_bfs_addressable[bfs_pointer_index] = chile_bfs_pe;
-                bfs_pointer_index++;
-                bfs_queue.push_back(chile_bfs_pe);
+                context.closed_list_bfs_addressable[back_index] = chile_bfs_pe;
+                back_index++;
             }
 
 
@@ -1012,7 +1012,7 @@ namespace cuckoo_search {
         //reconstruct the path
         if (context.found){
             context.path.clear();
-            bfs_pe *current = &context.closed_list_bfs_addressable[bfs_pointer_index];
+            bfs_pe *current = &context.closed_list_bfs_addressable[back_index];
             while(current != NULL){
                 context.path.push_back(current->pe);
                 current = current->prior;
@@ -1038,10 +1038,6 @@ namespace cuckoo_search {
     }
 
     void bfs_search_fast_context(search_context &context) {
-        context.path.clear();
-        path_element starting_pe = path_element(context.key, -1, -1, -1);
-        context.path.push_back(starting_pe);
-        context.visited_buckets.clear();
         bfs_search(context);
         if (!context.found){
             context.path.clear();

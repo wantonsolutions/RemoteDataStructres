@@ -116,6 +116,7 @@ namespace cuckoo_search {
         bfs_pe closed_list_bfs_addressable[MAX_SEARCH_ITEMS];
         vector<fast_a_star_pe> open_list;
         vector<fast_a_star_pe> closed_list;
+        vector<bfs_pe> bfs_queue;
         vector<unsigned int> targets;
         vector<unsigned int> visited_buckets;
         int max_search_depth;
