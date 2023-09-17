@@ -478,34 +478,44 @@ protocol.
 
 \subsubsection{Reading} 
 \label{sec:reading}
-All reads are performed locklessly.
-If keys and values are inlined clients complete reads in a
-single round trip, otherwise a second round trip is required
-to resolve a pointer and read the extent. 
+
+Client read request are closely similar to traditional
+cuckoo hashing with two additional performance
+optimizations. To read a key $k$ clients first locate both
+key locations. In default cuckoo hashing two reads are
+issued in parallel to both rows. We take advantage of
+dependent hashing locality and issue a single read which
+captures both rows if the distance between key locations is
+less than a predefined threshold. If key locations are in
+adjacent rows a single read saves packet processing time,
+network bandwidth due to header size, and waiting time as
+the client need not wait for a second read to return. Larger
+reads consume additional bandwidth but still provide some
+additional performance (see Section~\ref{sec:read-threshold}).
+
+If key-value entries are inlined reads complete in a single
+round trip. Larger key stored in extents require a second
+round trip as clients must first read the index, resolve the
+virtual address of the extent and then perform the extent
+read.
 %%
 ~\footnote{This design requires exactly one pointer
 resolution in expectation that future RDMA NICs may provide
 pointer resolution reads as a primitive~\cite{prism}}
 %%
-The index is modified concurrently by writes, clients must
-therefore validate their reads by computing a CRC post
-read~\cite{pilaf,cell}.
+As reads are lockless they can occur simultaneously with
+writes updating the table. Each entry contains a CRC which
+is checked on reads to validate that all writes have
+completed~\cite{pilaf,cell}.
 %%
-In the base case clients compute both hash locations for a
-key and issue two bucket sized RDMA read requests to the
-index. As an optimization clients can perform reads using a
-single packet. We define a read threshold of 512 bytes for
-our clients, if two hash locations are within 512 bytes we
-issue a single large read.  Approximately 60\% of keys for
-64-bit entries with a bucket size of 8 (see
-Figure~\ref{fig:locality-hashing}(b)) fall into this
-category. This has the advantage of updating the client
-cache for future operations.
-%, and reduces the header
-%processing required by the NIC.
-To reduce bandwidth the size
-of the threshold can be tuned down, or turned off with no
-harm to correctness.
+We define a read threshold of 512 bytes for our clients.
+Approximately 60\% of keys for 64-bit entries with a bucket
+size of 8 (see Figure~\ref{fig:locality-hashing}(b)) fall
+into this category. This has the advantage of updating the
+client cache for future operations.
+%, and reduces the header processing required by the NIC.
+To reduce bandwidth the size of the threshold can be tuned
+down, or turned off with no harm to correctness.
 
 \subsubsection{Locking and unlocking}
 
@@ -697,17 +707,17 @@ very short search times.
 
 \subsection{Replication, and scalability} 
 
-\todo{no real replication probabily delete} At the time of
-writing RCuckoo does not support replication although
-replication is in no way a complication for our existing
-algorithms. On inserts clients aquire locks from a master
-memory node as described in section~\ref{sec:insert}, after
-locks are acquired on the master node updates, deletes, or
-cuckoo paths are broadcast to replicas. Replication requires
-a clients to wait for responses from replicas before issuing
-unlock messages as the client can not rely on RDMA RC
-connection in order delivery across the multiple replica
-connections.
+\todo{no real replication probabily delete, consider moving
+to future work / limiations} At the time of writing RCuckoo
+does not support replication although replication is in no
+way a complication for our existing algorithms. On inserts
+clients aquire locks from a master memory node as described
+in section~\ref{sec:insert}, after locks are acquired on the
+master node updates, deletes, or cuckoo paths are broadcast
+to replicas. Replication requires a clients to wait for
+responses from replicas before issuing unlock messages as
+the client can not rely on RDMA RC connection in order
+delivery across the multiple replica connections.
 
 \todo{We don't span multiple memory nodes} When using
 multiple memory machines each machine is initialized with an
