@@ -402,7 +402,7 @@ locks can be acquired in a single round trip.
 \sg{@alex I've left the proposed table design in}
 
 We design our hash table for fast reads as most data center
-key-value workload are read heavy~\cite{facebook-workloads}.
+key-value workload are read heavy~\cite{facebook-memcached}.
 Prior disaggregated indexes such as
 ~\cite{clover,race,fusee} require two round trips minimum
 for first time reads as their indexes do not support

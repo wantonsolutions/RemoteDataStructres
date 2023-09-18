@@ -221,19 +221,6 @@ percentile and 4 rather than 5 round trips on average.
 % cuckoo paths that are both short, and clustered together.
 
 
-
-\subsection{Search Performance:}
-
-\todo{\textbf{A* search vs BFS:} We compare the performance of A*
-vs BFS for locally computed insertions. A* performance
-directly effects system throughput as this algorithm is run
-twice on every insert.}
-
-\todo{\textbf{Hashing Algoritms:} Rcuckoo hashing requires
-executing many hash compuations. We evaluate our A* search
-alorithm abolute performacne on various hash functions and
-show how this values effect our overall fill factors.}
-
 \begin{figure*}[t]
     \centering
     \begin{subfigure}{0.3\linewidth}
@@ -298,7 +285,7 @@ lock increase.
 As described in section ~\ref{sec:reading} rcuckoo uses a
 read threshold to capture both hash locations if the
 locations are within a defined read threshold.
-Figure~\ref{fig:read_threshold} shows the performance gains
+Figure~\ref{fig:performance_breakdown}(b) shows the performance gains
 from increasing the read threshold. Here each row is 64
 bytes so our minimum threshold of 64 ensures two packets are
 issued for each read request. Higher read thresholds trade

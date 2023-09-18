@@ -170,44 +170,6 @@ url = {https://www.usenix.org/conference/atc20/presentation/tsai},
 month = jul,
 }
 
-@inproceedings{storm,
-author = {Novakovic, Stanko and Shan, Yizhou and Kolli, Aasheesh and
-                  Cui, Michael and Zhang, Yiying and Eran, Haggai and
-                  Pismenny, Boris and Liss, Liran and Wei, Michael and
-                  Tsafrir, Dan and Aguilera, Marcos}, title = {Storm:
-                  A Fast Transactional Dataplane for Remote Data
-                  Structures}, year = {2019}, isbn = {9781450367493},
-                  publisher = {Association for Computing Machinery},
-                  address = {New York, NY, USA}, url =
-                  {https://doi.org/10.1145/3319647.3325827}, doi =
-                  {10.1145/3319647.3325827}, abstract = {RDMA
-                  technology enables a host to access the memory of a
-                  remote host without involving the remote CPU,
-                  improving the performance of distributed in-memory
-                  storage systems. Previous studies argued that RDMA
-                  suffers from scalability issues, because the NIC's
-                  limited resources are unable to simultaneously cache
-                  the state of all the concurrent network
-                  streams. These concerns led to various
-                  software-based proposals to reduce the size of this
-                  state by trading off performance.We revisit these
-                  proposals and show that they no longer apply when
-                  using newer RDMA NICs in rack-scale environments. In
-                  particular, we find that one-sided remote memory
-                  primitives lead to better performance as compared to
-                  the previously proposed unreliable datagram and
-                  kernel-based stacks. Based on this observation, we
-                  design and implement Storm, a transactional
-                  dataplane utilizing one-sided read and write-based
-                  RPC primitives. We show that Storm outperforms eRPC,
-                  FaRM, and LITE by 3.3x, 3.6x, and 17.1x,
-                  respectively, on an InfiniBand cluster with Mellanox
-                  ConnectX-4 NICs.}, booktitle = {Proceedings of the
-                  12th ACM International Conference on Systems and
-                  Storage}, pages = {97–108}, numpages = {12},
-                  keywords = {RPC, RDMA, data structures}, location =
-                  {Haifa, Israel}, series = {SYSTOR '19}}
- 
 
 
 @inproceedings{lite,
@@ -1207,16 +1169,6 @@ author	= {Michael Marty and Marc de Kruijf and Jacob Adriaens and Christopher Al
 year	= {2019},
 booktitle	= {In ACM SIGOPS 27th Symposium on Operating Systems Principles},
 address	= {New York, NY, USA}
-}
-
-@inproceedings{prism,
-author = {Dharanipragada, Sowmya and Joyner, Shannon and Burke, Matthew and Szekeres, Adriana and Nelson, Jacob and Zhang, Irene and Ports, Dan R. K.},
-title = {PRISM: Rethinking the RDMA Interface for Distributed Systems},
-booktitle = {SOSP 2021},
-year = {2021},
-month = {October},
-abstract = {Remote Direct Memory Access (RDMA) has been used to accelerate a variety of distributed systems, by providing low-latency, CPU-bypassing access to a remote host's memory. However, most of the distributed protocols used in these systems cannot easily be expressed in terms of the simple memory READs and WRITEs provided by RDMA. As a result, designers face a choice between introducing additional protocol complexity (e.g., additional round trips) or forgoing the benefits of RDMA entirely. This paper argues that an extension to the RDMA interface can resolve this dilemma. We introduce the PRISM interface, which extends the RDMA interface with four new primitives: indirection, allocation, enhanced compare-and-swap, and operation chaining. These increase the expressivity of the RDMA interface, while still being implementable using the same underlying hardware features. We show their utility by designing three new applications using PRISM primitives, that require little to no server-side CPU involvement: (1) PRISM-KV, a key-value store; (2) PRISM-RS a replicated block store; and (3) PRISM-TX, a distributed transaction protocol. Using a software-based implementation of the PRISM primitives, we show that these systems outperform prior RDMA-based equivalents.},
-url = {https://www.microsoft.com/en-us/research/publication/prism-rethinking-the-rdma-interface-for-distributed-systems/},
 }
 
 @inproceedings{mind,
