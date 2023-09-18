@@ -1,0 +1,25 @@
+\section{Limitations}
+\label{sec:limations}
+
+\subsection{replication and persistance}
+At the time of writing Rcuckoo does not support multiple
+memory nodes for replication and is not designed for
+persistance. No aspect of RCuckoo's algorithm prevents the
+use of multiple replicas. As Rcuckoo uses lock based
+protection, replicated updates can be broadcast by writes to
+each replica prior to releasing locks. Rcuckoo's index is
+not designed for persistance. As Rcuckoo is primarily an
+index, we see it as compatable with the persistance
+strategies of other disaggregated projects. For instance
+RCuckoo could easily make use of Clover's persistent extent
+algorithm with no changes to RCuckoo's index structure.
+
+\subsection{Client Scalability} RCuckoo's algorithm relies
+on the semantics of in order delivery for the correctness of
+it's locking and reading algorithms. RDMA NIC's have hard
+caps on the number of reliable connections they support
+~\todo{(~65k)} these limitations are fundamental to the
+cache size on the RDMA NIC~\cite{erpc,faast}, although cache
+sizes have steadily increased~\cite{storm}. RDMA unreliable
+connections currently do not support one-sided verbs making
+them unusable for disaggregated applications.

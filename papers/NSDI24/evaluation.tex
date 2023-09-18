@@ -1,6 +1,13 @@
 \section{Evaluation}
 \label{sec:eval}
 
+We evaluate our cuckoo hash by directly comparing it's
+performance in terms of latency and throughput with other
+state of the art disaggregated key value stores. We
+substantiate our design decisions through a series of
+micro-benchmarks. We measure throughput as a response to
+hashing factor, read threshold, and search algorithm.
+
 \begin{figure*}[ht]
     \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_throughput.pdf}
     \caption{race vs rcuckoo simulated throughput \todo{rerun ycsb-b numbers don't look quite right}}
@@ -33,10 +40,10 @@
 
 \subsection{Setup}
 
-Our setup runs on a 11 node cluster of dual socket Intel
-machines. Each CPU is an Intel Xeon(R) E5-2650 clocked at
-2.20GHz. Each machine has 256GB of RAM with 128GB per NUMA
-node. All machines have a single dual socket ConnectX-5
+Our evaluate setup is an 11 node cluster of dual socket
+Intel machines. Each CPU is an Intel Xeon(R) E5-2650 clocked
+at 2.20GHz. Each machine has 256GB of RAM with 128GB per
+NUMA node. All machines have a single dual socket ConnectX-5
 attached to a 100GBPs Mellanox Onyx switch. In our
 experiments for RCuckoo we use one sever as a memory server,
 and the rest a client machines spreading out client threads
@@ -47,13 +54,18 @@ evenly across machines.
 \subsubsection{FUSEE}
 
 FUSEE is a remote memory key-value store designed for full
-disaggregation.  It is built on top of RACE~\cite{race} with
-extensions to support replication in the face of contention.
-Currently RCuckoo does not support replication, our FUSEE
-setup uses a single memory node to effectively remove the
-overhead of replication. RACE is the most similar system in
-terms of assumptions to RCuckoo, however no open source
-implementation of RACE is available.
+disaggregation~\cite{fusee}.  It is built on top of
+RACE~\cite{race} with extensions to support replication in
+the face of contention.  Currently RCuckoo does not support
+replication, our FUSEE setup uses a single memory node to
+effectively remove the overhead of replication. RACE is the
+most similar system in terms of assumptions to RCuckoo,
+however no open source implementation of RACE is available.
+RACE hashing uses fixed sized 64 bit index entries to
+support RDMA compare and swap operation width. As such RACE
+based systems cannot store key value pairs in the index and
+must use a second round trip on reads to recover extent
+entries which contain full key value pairs.
 
 \subsubsection{Sherman}
 
@@ -198,7 +210,7 @@ show how this values effect our overall fill factors.}
 \begin{figure*}[t]
     \centering
     \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/entry_size.pdf}
+        \includegraphics[width=0.99\linewidth]{fig/masked_cas_lock_size.pdf}
     \end{subfigure}
     \begin{subfigure}{0.3\linewidth}
         \includegraphics[width=0.99\linewidth]{fig/read_size.pdf}
@@ -212,13 +224,41 @@ show how this values effect our overall fill factors.}
     \end{subfigure}.
     \vspace{-1em}
     \caption{
-    \textbf{(a)} \todo{replace with masked cas}.
+    \textbf{(a)} Masked CAS vs Unmasked CAS throughput.
     \textbf{(b)} Read threshold vs throughput.
     \textbf{(c)} Exponential factor relation to max fill in cuckoo hash.
     }
     \label{fig:performance_breakdown}
 
 \end{figure*}
+
+\subsubsection{Masked CAS}
+
+Under contention masked CAS operations provide a significant
+performance improvement. We measure their benefit in terms
+of throughput by comparing them with default CAS. In the
+default case, when acquiring locks clients set the lock bits
+for the locks they require and set all other bits in the cas
+to 0. If the cas fails the current state of the lock table
+over that range is returned as a result to the client and
+the client tries to aquire their locks again using the
+updated state of the lock table. Masked compare and swaps
+are issued with the minimal mask required to set the locks.
+
+We measure the performance improvement at high fill rates
+(85-90\%) on write only workloads and vary the number of
+rows per lock on each experiment.
+Figure~\ref{fig:performance_breakdown} shows the improvement
+gained by masked CAS. Default CAS operations perform better
+with fewer rows per lock, as the probability of a lock being
+set within the 64bit range is at its lowest. At higher rows
+per lock CAS suffers from failed lock acquisitions from both
+contested locks and due to a lack of synchronization. In
+contrast masked CAS sees an improvement when two rows per
+lock are used, as more second search attempts succeed, and
+only suffers from direct lock contention as the rows per
+lock increase.
+
 
 \subsection{Hash Function Factor $f$}
 

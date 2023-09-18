@@ -57,16 +57,15 @@ rolex}.  These approaches either use optimistic concurrency,
 or assume that most clients are colocated and can resolve
 their lock acquisitions in local memory. Optimistic
 approaches using RDMA atomics are limited by the width of
-the atomic instruction (64 bits for compare and swap). This
-update size is too encapsulate a key-value update, and is
-often too small to store a key. The result is that
-optimistic approaches require more round trips to remote
-memory to complete their operations. These approaches have
-dismissed lock based approaches outright as the size of
-their critical sections can bottleneck performance, and  the
-cost of acquiring and releasing locks (at minimum two round
-trips) is often higher than the optimistic approach (two or
-three round trips).
+the atomic instruction (64 bits for compare and swap). 64
+bits is often too small to encapsulate a full key-value
+update. The result is that optimistic approaches require
+more round trips to remote memory to complete their
+operations. These approaches have dismissed lock based
+approaches outright as the size of their critical sections
+can bottleneck performance, and  the cost of acquiring and
+releasing locks (at minimum two round trips) is often higher
+than the optimistic approach (two or three round trips).
 
 % %concurrent data structures round trips
 % Concurrent data structure design for remote memory is hard.
