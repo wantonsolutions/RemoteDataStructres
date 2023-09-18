@@ -29,11 +29,8 @@ hashing factor, read threshold, and search algorithm.
 \begin{figure}[ht]
     \includegraphics[width=0.99\linewidth]{fig/search_dependence.pdf}
 
-    \caption{Round trips per insert operation compared
-    across search functions and hash functions. Dependent
-    hash functions with A* have the shortest search
-    times.~\todo{latest numbers for A* are counter intuitive
-    - dig into}}
+    \caption{ Search function performance with independent
+    and dependent hashing.}
 
     \label{fig:search_dependence}
 \end{figure}
@@ -163,20 +160,50 @@ illustrate their relative performance.
 % reduce the number of messages at the cost of more
 % bandwidth.}
 
-\textbf{Locks per message and independence:}
-\todo{run this experiment with many machines}
+\subsection{Dependent hashing and search}
 
-% Hash function
-% locality hash a major impact in rcuckoo's performance.
-% Acquiring locks can only be done in a few round trips when
-% the locks are clustered together tightly in the lock table.
-% Furthermore, the search function used to determine the
-% cuckoo path has a large impact on the locality of the locks
-% necessary to lock the path. We evaluate dependent hashing
-% and independent hashing as well as random and a* search. We
-% measure the number of round trips required for each control
-% as a function of the number of locks which can be acquired
-% per round trip.
+Hash dependence and choice of search function have the
+highest impact on RCuckoo's performance. In the absence of
+hash locality, locks are scattered throughout the table
+reducing the ability of our locking scheme to combine lock
+requests. Cuckoo path length also directly affects the
+number of round trips required to insert an item. Depth
+first search produces much longer paths than breadth first
+search.  Figure ~\ref{fig:search_dependence} shows the
+relationship between search functions, hash dependence, and
+the number of locks which can be acquired per request. In
+this test we measure both the median and 99th percentile
+round trips per insert on a table with 10 million entries
+filling the table from 85-90\% full. Each lock protects a
+single row in this experiment.
+
+Depth first search with no hash dependence has extremely
+poor performance at it's tail, taking over 2K round trips to
+complete. Both at it's median and 99th percentile it sees
+only small benefits from setting multiple locks per request
+as the locks are scattered throughout the table. DFS with
+dependence has far lower tail latency, and improves the
+number of locks which can be acquired per message, however
+it still constructs long rather than minimum length paths.
+BFS with dependence provides the best performance and gains
+the most from setting more locks per request. At 64 locks
+per request it has 7.5x lower round trips at it's 99th
+percentile and 4 rather than 5 round trips on average.
+
+\todo{perhaps say something about astar?}
+
+
+
+% Hash function locality hash a major impact in rcuckoo's
+% performance.  Acquiring locks can only be done in a few
+% round trips when the locks are clustered together tightly in
+% the lock table.  Furthermore, the search function used to
+% determine the cuckoo path has a large impact on the locality
+% of the locks necessary to lock the path. We evaluate
+% dependent hashing and independent hashing as well as random
+% and a* search. We measure the number of round trips required
+% for each control as a function of the number of locks which
+% can be acquired per round trip.
 
 % Figure~\ref{fig:search_dependence} shows the performance
 % improvements gained by both locality hashing and A* search.
