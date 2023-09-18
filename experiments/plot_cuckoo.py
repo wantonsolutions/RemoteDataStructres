@@ -752,7 +752,7 @@ def single_run_throughput(stat):
             total_operations_mop += read_operations_mop + insert_operations_mop
             # print("total_operations_mop: ", total_operations_mop)
     except:
-        # print("error in stat: ", stat)
+        print("error in stat: ", stat)
         exit(1)
 
     execution_time_ms = int(stat['system']['runtime_ms'])
@@ -1017,6 +1017,7 @@ def detect_x_axis(stats):
         "bucket size",
         "state machine",
         "read threshold bytes",
+        "hash factor"
     ]
     for axis in x_axis:
         if len(set(get_x_axis(stats,axis))) > 1:
@@ -1042,6 +1043,8 @@ def get_x_axis(stats, name):
         return get_max_fill_x_axis(stats)
     elif name == "state machine":
         return get_state_machine_x_axis(stats)
+    elif name == "hash factor":
+        return get_hash_factor_x_axis(stats)
     else:
         print("unknown x axis: ", name)
         exit(1)
@@ -1108,6 +1111,9 @@ def get_bucket_size_x_axis(stats):
 
 def get_max_fill_x_axis(stats):
     return get_config_axis(stats,'max_fill')
+
+def get_hash_factor_x_axis(stats):
+    return get_config_axis(stats,'hash_factor')
 
 def calculate_total_runs(stats):
     s = np.array(stats).shape
