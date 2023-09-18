@@ -276,7 +276,16 @@ lock increase.
 
 \subsection{Hash Function Factor $f$}
 
-\todo{we vary f to show the tradeoff between maximum fill factor and throughput}
+Low hash factors $f$ have higher performance due to better
+locality at the tradeoff of their maximum fill factor. The
+relationship between $f$ and performance is nearly linear,
+while the relationship between $f$ and fill factor is
+exponential. Figure~\ref{fig:performance_breakdown}(c) shows
+the relationship between $f$, the max fill rate, and insert
+performance. These numbers were collected on an insert only
+workload with 100 million table entries. We choose an $f$ of
+2.3 in practice as it has the highest product of fill factor
+and throughput.
 
 \subsection{Read Threshold Performance}
 
