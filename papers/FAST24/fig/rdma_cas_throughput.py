@@ -30,7 +30,7 @@ width=0.4
 # plt.rcParams.update({'font.size': 16})
 #fig, ax = plt.subplots()
 factor=1.2
-fig, ax = plt.subplots(1,1, figsize=(3*factor,2*factor))
+fig, ax = plt.subplots(1,1, figsize=(4,2.5))
 
 ax.bar(x + width/2, device_memory, width, label="Device Memory", edgecolor='k')
 ax.bar(x - width/2, main_memory, width, label="Main Memory", edgecolor='k')

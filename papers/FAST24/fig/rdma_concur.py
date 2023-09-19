@@ -24,8 +24,8 @@ def div_million (list):
     return [val /1e6 for val in list]
 
 
-plt.rcParams.update({'font.size': 18})
-fig, axs = plt.subplots(1,1, figsize=(8,4))
+# plt.rcParams.update({'font.size': 10})
+fig, axs = plt.subplots(1,1, figsize=(4,2.5))
 
 def plot_data(ax,filename,title_text):
     df = pd.read_csv(filename)
