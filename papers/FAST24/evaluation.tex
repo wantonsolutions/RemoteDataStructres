@@ -15,16 +15,16 @@ hashing factor, read threshold, and search algorithm.
 \end{figure*}
 
 \begin{figure*}[ht]
-    \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill_latency.pdf}
-    \caption{race vs rcuckoo workload fill latency}
+    \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill.pdf}
+    \caption{Rcuckoo response to fill factor for YCSB-A workload}
     \label{fig:ycsb_fill_latency}
 \end{figure*}
 
-\begin{figure}[ht]
-    \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill_ops_bw.pdf}
-    \caption{YCSB-A workload messages and bandwidth per operation as a function of fill factor}
-    \label{fig:ycsb_fill_ops_bw}
-\end{figure}
+% \begin{figure}[ht]
+%     \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill_ops_bw.pdf}
+%     \caption{YCSB-A workload messages and bandwidth per operation as a function of fill factor}
+%     \label{fig:ycsb_fill_ops_bw}
+% \end{figure}
 
 \begin{figure}[ht]
     \includegraphics[width=0.99\linewidth]{fig/search_dependence.pdf}
@@ -108,12 +108,10 @@ and Sherman by 2x ~\todo{double check sherman, I feel like
 it should be able to get a better value for read only..}
 
 
-\textbf{Latency:} 
-
-RCuckoo Latency is shown across each YCSB workload in
-Figure~\ref{fig:ycsb_fill_latency}. In each of these
-experiments we fill the table to a given fill factor, and
-then run the workload for 100k operations. In each case
+\textbf{Latency:} RCuckoo Latency is shown across each YCSB
+workload in Figure~\ref{fig:ycsb_fill_latency}. In each of
+these experiments we fill the table to a given fill factor,
+and then run the workload for 100k operations. In each case
 RCuckoo holds a near constant latency. These experiments are
 run at low contention to illustrate only the response to
 fill factor not contention. Independent measurements from
@@ -310,11 +308,16 @@ is plentiful large windows can improve throughput but up to
 
 
 \subsection{Entry Size}
+\begin{figure}[ht]
+    \includegraphics[width=0.99\linewidth]{fig/entry_size.pdf}
+    \caption{Throughput vs KV entry size}
+    \label{fig:entry_size}
+\end{figure}
 
 Key value pairs embedded directly in the index enable single
 round trip reads, at the cost of inflating write bandwidth.
 Large row sizes increase the size of reads during locking
-and search. Figure~\cite{fig:entry_size} shows the effect of
+and search. Figure~\ref{fig:entry_size} shows the effect of
 key value pair size on operation throughput. YCSB-A
 workloads saturate network bandwidth and thus decrease in
 throughput as a function of entry size. In contrast YCSB-C
@@ -323,9 +326,4 @@ pairs larger than 64 bytes use extents rather than embedding
 directly in the index.}
 
 
-\begin{figure}[ht]
-    \includegraphics[width=0.99\linewidth]{fig/entry_size.pdf}
-    \caption{Throughput vs KV entry size}
-    \label{fig:entry_size}
-\end{figure}
 

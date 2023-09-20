@@ -171,6 +171,7 @@ hashes~\cite{memc3,cuckoo-improvements,pilaf}.
 
 
 \subsection{Locking}
+\label{sec:locking}
 
 \begin{figure*}[t]
     \centering
@@ -181,14 +182,14 @@ hashes~\cite{memc3,cuckoo-improvements,pilaf}.
     \end{subfigure}
     \begin{subfigure}{0.3\linewidth}
         \includegraphics[width=0.99\linewidth]{fig/insertion_span.pdf}
-        \label{fig:insertion_span}
+        % \label{fig:insertion_span}
         % \caption{}
-    \end{subfigure}.
+    \end{subfigure}
     \begin{subfigure}{0.3\linewidth}
         \includegraphics[width=0.99\linewidth]{fig/buckets_per_lock_vs_locks_per_message.pdf}
-        \label{fig:tbd}
+        % \label{fig:tbd}
         % \caption{}
-    \end{subfigure}.
+    \end{subfigure}
     \vspace{-1em}
     \caption{
     \textbf{(a)} Failure rate of optimistic cuckoo insertions.
@@ -231,11 +232,11 @@ performance boost from device over host memory for atomic
 operations.
 
 The second NIC feature we exploit is masked compare and swap
-operations ~\ref{fig:rdma-masked-cas}. Masked cas operations
-enable clients to set individual bits rather than 64 bit
-spans. As our lock table is tightly packed this enables
-clients to aquire locks without any additional knowledge
-about the lock table as would be required for unmasked cas.
+operations. Masked cas operations enable clients to set
+individual bits rather than 64 bit spans. As our lock table
+is tightly packed this enables clients to aquire locks
+without any additional knowledge about the lock table as
+would be required for unmasked cas.
 
 Together with locality hashing these features enable the
 following fast locking protocol. When a client requires
@@ -490,8 +491,8 @@ less than a predefined threshold. If key locations are in
 adjacent rows a single read saves packet processing time,
 network bandwidth due to header size, and waiting time as
 the client need not wait for a second read to return. Larger
-reads consume additional bandwidth but still provide some
-additional performance (see Section~\ref{sec:read-threshold}).
+reads consume additional bandwidth but very little
+additional latency (see Figure~\ref{fig:rdma-benchmarks}(a)).
 
 If key-value entries are inlined reads complete in a single
 round trip. Larger key stored in extents require a second
@@ -563,7 +564,7 @@ down, or turned off with no harm to correctness.
 
 Updates and deletes are similar operations as both require
 two locks. In the locking phase clients calculate and aquire
-both locks~\ref{sec:locking}. Updates to inlined entries
+both locks (Section ~\ref{sec:locking}). Updates to inlined entries
 issue a single entry sized update directly to the index.
 Updates to extents issue three messages first the new extent
 is written, the index is updated, and finally the old extend
@@ -579,6 +580,7 @@ required only if both locks are too far apart to be set in a
 single masked cas operation.
 
 \subsubsection{Insert}
+\label{sec:insert}
 
 Unlike updates and deletes, inserts may require modifying
 locations spread across remote memory and require many
@@ -601,7 +603,7 @@ insertions is a speculative local search. Clients calculate
 an cuckoo path by searching their unsynchronized local
 caches. While This may not produce a valid cuckoo path it
 constructs a speculative cuckoo path which is localized to
-the region of the table likely to contain a vaild path. When
+the region of the table likely to contain a valid path. When
 the table hash low fill, the speculative path is frequently
 correct. Using the speculative path, the client calculates
 the locks required for the speculative insertion aquire the
@@ -791,23 +793,4 @@ limitations.
 % does find short paths in the common case, and results in
 % very short search times.
 
-\subsection{Replication, and scalability} 
-
-\todo{no real replication probabily delete, consider moving
-to future work / limiations} At the time of writing RCuckoo
-does not support replication although replication is in no
-way a complication for our existing algorithms. On inserts
-clients aquire locks from a master memory node as described
-in section~\ref{sec:insert}, after locks are acquired on the
-master node updates, deletes, or cuckoo paths are broadcast
-to replicas. Replication requires a clients to wait for
-responses from replicas before issuing unlock messages as
-the client can not rely on RDMA RC connection in order
-delivery across the multiple replica connections.
-
-\todo{We don't span multiple memory nodes} When using
-multiple memory machines each machine is initialized with an
-equal portion of the cuckoo index and lock table. Clients
-calculate which machine to issue their requests to when
-generating requests.
 

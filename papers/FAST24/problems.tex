@@ -46,9 +46,9 @@ perform the insert. If one element along the path is updated
 the entire update will fail.
 Figure~\ref{fig:cuckoo-problems}(a) shows the path insertion
 failure rate as the number of concurrent clients grows using
-this approach \sg{on a table with 10k entries filled to
-90\%}. The failure rate of operation grows to over 80\% with
-each failure requiring the algorithm to restart.
+this approach on a table with 10k entries filled to 90\%.
+The failure rate of operation grows to over 80\% with each
+failure requiring the algorithm to restart.
 
 A naive lock based approach suffers from an inverse problem.
 Using a single global lock all updates will succeed however
@@ -159,9 +159,10 @@ date caches.~\cite{clover}.
 
 \textbf{Duplicate Keys:} Clients may issue concurrent
 inserts for the same key, given that keys may occupy
-multiple location detecting and dealing with duplicate keys
-is tricky while maintaining high performance. RACE requires
-an extra round trip after each insert to check if a
-duplicate key was inserted simultaneously~\cite{race}. An
-ideal algorithm would prevent key duplication without
-requiring additional overheads.
+multiple location detecting duplicate keys can require
+additional checks. RACE and FUSEE require an extra round
+trip after each insert to check if a duplicate key was
+inserted simultaneously~\cite{race,fusee}.  An ideal
+algorithm would prevent key duplication without requiring
+additional overheads.
+\todo{consider cutting despite us solving this}

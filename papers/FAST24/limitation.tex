@@ -14,6 +14,26 @@ strategies of other disaggregated projects. For instance
 RCuckoo could easily make use of Clover's persistent extent
 algorithm with no changes to RCuckoo's index structure.
 
+\subsection{Replication, and scalability} 
+\todo{no real replication probabily delete, consider moving
+to future work / limiations} At the time of writing RCuckoo
+does not support replication although replication is in no
+way a complication for our existing algorithms. On inserts
+clients aquire locks from a master memory node as described
+in section~\ref{sec:insert}, after locks are acquired on the
+master node updates, deletes, or cuckoo paths are broadcast
+to replicas. Replication requires a clients to wait for
+responses from replicas before issuing unlock messages as
+the client can not rely on RDMA RC connection in order
+delivery across the multiple replica connections.
+
+\todo{We don't span multiple memory nodes} When using
+multiple memory machines each machine is initialized with an
+equal portion of the cuckoo index and lock table. Clients
+calculate which machine to issue their requests to when
+generating requests.
+
+
 \subsection{Client Scalability} RCuckoo's algorithm relies
 on the semantics of in order delivery for the correctness of
 it's locking and reading algorithms. RDMA NIC's have hard

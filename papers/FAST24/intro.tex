@@ -109,22 +109,24 @@ Our algorithm makes use of multiple novel contributions
 which decrease round trips per operation. The first is a
 dependent hashing algorithm. Dependent hashing increases the
 likelihood that a key's hash locations will be spatially
-near one another. Locality improves the efficiency of both
-locking and reading. Inserting into a cuckoo hash table
-normally requires acquiring many locks randomly throughout
-the table, dependent hashing clusters lock acquisitions
-enabling many locks to be acquired in a single atomic
-request. Second, our algorithm uses speculative lock
-acquisition. Locks are acquired in bulk based on a local
-cache of the remote index. Once locks are held a second
-search on synchronized locked data is performed to ensure a
-correct insertion. Third we use optimized search for cuckoo
-hashing, prior approaches use random search (DFS), dependent
-hashing enables guided search (A*) as open entires in the
-table are more likely be be accessible in fewer hops.
+near one another. We find that locality increases the
+throughput of each table operation (insert, read). Inserting
+into a cuckoo hash table normally requires acquiring many
+locks randomly throughout the table, dependent hashing
+clusters lock acquisitions enabling many locks to be
+acquired in a single atomic request. Second, our algorithm
+uses speculative lock acquisition. Locks are acquired in
+bulk based on a local cache of the remote index. Once locks
+are held a second search on synchronized locked data is
+performed to ensure a correct insertion. Third we use
+locality to improve both read and search speeds. We find
+that using a single large read over two smaller reads
+improves throughput when key locations are known to be
+physically close.
 
-\sg{ It might be smart to mention using rare nic features,
-and how we trade off bandwidth for latency }
+\sg{Sherman uses masked compare and swap as well as device
+memory, we might use it better but it's hard to claim a
+contribution here.}
 
 We develop a prototype of our algorithm and evaluate it
 against two recent RDMA based key value stores. Our
