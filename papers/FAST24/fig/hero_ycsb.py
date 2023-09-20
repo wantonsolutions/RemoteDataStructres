@@ -35,10 +35,10 @@ def average_runs(runs, workload):
 
 
 def plot_fusee_ycsb_multi_run(axs):
-    runs = extract_multiple_fusee_ycsb_runs(5)
+    runs = extract_multiple_fusee_ycsb_runs(2)
 
-    workloads = ["workloada", "workloadb", "workloadc", "workloadd"]
-    workload_labels = ["ycsb-a", "ycsb-b", "ycsb-c", "ycsb-d"]
+    workloads = ["workloada", "workloadb", "workloadc", "workloadupd100"]
+    workload_labels = ["ycsb-a", "ycsb-b", "ycsb-c", "ycsb-w"]
 
     i=0
     for load, label in zip(workloads, workload_labels):
@@ -46,8 +46,8 @@ def plot_fusee_ycsb_multi_run(axs):
         avg = avg / 1000000
         err = err / 1000000
         print(label)
-        print("threads=", runs[0]["clients"])
-        print("avg_ops=", avg)
+        print("fusee_threads=", runs[0]["clients"])
+        print("fusee_avg_ops=", avg)
         # exit(0)
         # print(avg, err, runs[0]["clients"], label)
         axs[i].errorbar(runs[0]["clients"], avg, yerr=err, marker='x', label="fusee")
@@ -97,6 +97,7 @@ def run_hero_ycsb():
     config['trials'] = 1
     # config['deterministic'] = "true"
     workloads = ["ycsb-a", "ycsb-b","ycsb-c", "ycsb-w"]
+    workloads = ["ycsb-a", "ycsb-b", "ycsb-c"]
     # workloads = ["ycsb-a", "ycsb-b"]
     # workloads = ["ycsb-w"]
     # workloads = ["ycsb-a", "ycsb-a"]
@@ -121,6 +122,7 @@ def run_hero_ycsb():
 
 def plot_hero_ycsb_throughput():
     workloads = ["ycsb-a", "ycsb-b", "ycsb-c", "ycsb-w"]
+    workloads = ["ycsb-a", "ycsb-b", "ycsb-c"]
 
     #plot cuckoo
     fig, axs = plt.subplots(1,len(workloads), figsize=(15,3))
@@ -137,6 +139,61 @@ def plot_hero_ycsb_throughput():
 
     #plot fusee
     plot_fusee_ycsb_multi_run(axs)
+    plot_sherman_ycsb(axs)
+
+    axs[0].legend()
+    
+
+    plt.tight_layout()
+    plt.savefig("hero_ycsb_throughput.pdf")
+
+def plot_hero_ycsb_throughput_static():
+
+    #cuckoo
+    # workloads = ["ycsb-a", "ycsb-b", "ycsb-c", "ycsb-w"]
+    workloads = ["ycsb-a", "ycsb-b", "ycsb-c"]
+    cuck_a_tput=[0.9,1.8538780691615686, 3.1858278318625897, 5.158820844419218, 9.909487030189728, 13.036238839513999, 13.443520512176052]
+    cuck_b_tput=[1.8, 3.5, 8.67506880602754, 15.938655554644598, 29.301799386178676, 39.26305595324906, 39.53792829394712]
+    cuck_c_tput=[2.99,5.952564563617636, 11.493884402194366, 22.578766368166765, 39.36893367295243, 46.49349910889845, 46.3064643682979]
+    # cuck_w_tput=[0.5, 1.0992159380413737, 1.9709423507842736, 3.0512749083638777, 5.961405911330047, 6.9574283018867895, 7.115548453608248]
+    clients=[10,20, 40, 80, 160, 320, 400]
+    fig, axs = plt.subplots(1,len(workloads), figsize=(15,3))
+
+    axs[0].plot(clients,cuck_a_tput,label="cuckoo",marker="o")
+    axs[1].plot(clients,cuck_b_tput,label="cuckoo",marker="o")
+    axs[2].plot(clients,cuck_c_tput,label="cuckoo",marker="o")
+    # axs[3].plot(clients,cuck_w_tput,label="cuckoo",marker="o")
+
+    #fusee
+
+    fusee_a_tput=[ 0.0360255,0.145604,   1.0589075,  7.5669515, 11.9509565, 11.9186975]
+    fusee_b_tput=[ 0.049226,   0.190538,   1.4487765, 10.241494,  14.2780315, 14.2005985]
+    fusee_c_tput=[ 0.069183,   0.2876015,  2.2447135, 12.025642,  16.322664,  16.160061 ]
+    # fusee_w_tput=[0.03022,   0.123381,  0.868236,  6.1967235, 9.7452085, 9.7876635]
+    fusee_clients=[8, 16, 32, 64, 128, 256]
+
+    axs[0].plot(fusee_clients,fusee_a_tput,label="fusee",marker="s")
+    axs[1].plot(fusee_clients,fusee_b_tput,label="fusee",marker="s")
+    axs[2].plot(fusee_clients,fusee_c_tput,label="fusee",marker="s")
+    # axs[3].plot(fusee_clients,fusee_w_tput,label="fusee",marker="s")
+
+
+
+
+    #plot cuckoo
+    for i in range(len(workloads)):
+        # dirname="hero_ycsb/"+workloads[i]
+        ax = axs[i]
+        # stats = dm.load_statistics(dirname=dirname)
+        # stats=stats[0]
+        # plot_cuckoo.throughput(ax, stats, decoration=False)
+        ax.set_xlabel("clients")
+        ax.set_title(workloads[i])
+        ax.set_ylabel("MOPS")
+
+
+    #plot fusee
+    # plot_fusee_ycsb_multi_run(axs)
     plot_sherman_ycsb(axs)
 
     axs[0].legend()
@@ -169,4 +226,5 @@ def plot_hero_ycsb_throughput():
 
 
 # run_hero_ycsb()
-plot_hero_ycsb_throughput()
+# plot_hero_ycsb_throughput()
+plot_hero_ycsb_throughput_static()

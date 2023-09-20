@@ -10,13 +10,16 @@ hashing factor, read threshold, and search algorithm.
 
 \begin{figure*}[ht]
     \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_throughput.pdf}
-    \caption{race vs rcuckoo simulated throughput \todo{rerun ycsb-b numbers don't look quite right}}
+
+    \caption{Rcuckoo throughput vs workload. A) YCSB-A 50\%
+    read 50\% write. B) YCSB-B 95\% read 5\% write. C)
+    YCSB-C 100\% read}
     \label{fig:ycsb_throughput}
-\end{figure*}
+ \end{figure*}
 
 \begin{figure*}[ht]
     \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill.pdf}
-    \caption{Rcuckoo response to fill factor for YCSB-A workload}
+    \caption{Rcuckoo's performance as a function of fill factor. A) Workload throughput. B) Median operation latency. C) Average operation size. D) Average messages per operation.}
     \label{fig:ycsb_fill_latency}
 \end{figure*}
 
@@ -82,14 +85,14 @@ RCuckoo as it is the only other system to use locks in
 remote memory.
 
 
-\subsubsection{Clover}
-\todo{insert a short clover description}
+% \subsubsection{Clover}
+% \todo{insert a short clover description}
 
 \subsection{System Performance}
 
 \textbf{Throughput:} Figure~\ref{fig:ycsb_throughput} shows
 the throughput of FUSEE, Sherman and RCuckoo for YCSB
-workloads. YCSB-W is a 100\% write workload. YCSB-A is a
+workloads. YCSB-A is a
 50\% read 50\% write workload. YCSB-B is 95\% read and 5\%
 write, and YCSB-C is 100\% read.  In each experiment clients
 fill the hash table from empty to 50\% full on tables with
