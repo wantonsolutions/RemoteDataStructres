@@ -1,0 +1,168 @@
+\section{Problems}
+\label{sec:problems}
+
+Designing a fully disaggregated shared index is difficult
+because of high access latency. Operations which require
+synchronization or blocking are amplified by the latency. As
+a result minimizing round trips is critical to achieving low
+latency per operation. These challenges are most pronounced
+when synchronizing caches, and executing critical sections.
+
+
+\textbf{Caching:} Modifying a shared structure from remote
+clients requires cache synchronization. Opportunistic
+updates speculate on the state of the unified cache while
+pessimistic updates acquire locks then read, write, and
+unlock. Porting prior cuckoo hashing algorithms to remote
+memory directly would result in poor performance as clients
+iteratively read one bucket at a time during search and then
+aquire locks~\cite{cuckoo-improvements, memc3, pilaf}.
+Determining how to accumulate a clients cache to perform an
+insert in the fewest number of round trips is a key
+challenge in building a remote cuckoo hash table.
+
+% Accumulating a cache per operation is slow,
+% clients must aquire locks, read, then release potentially
+% many times to complete an operation if the locks are fine
+% grained. Alternatively clients can persist a cache across
+% requests in the hope that it will be valid for future
+% operations.  Clover (a remote memory key value store) caches
+% pointers to values on clients to enable fast reads when
+% values are looked up multiple times~\cite{clover}.
+% Optimistic caching threads a fine line as issuing optimistic
+% operations which commonly fail may be worse than acquiring
+% the correct locks.  An ideal caching strategy would enable
+% clients to succeed in their operations frequently while not
+% requiring much overhead to maintain. 
+
+
+\textbf{Critical Sections:} Designing a fast, and fine
+grained critical section for updates is a main challenge. As
+a strawman consider an opportunistic approach to cuckoo
+hashing. When a client wants to insert it iteratively reads
+the remote index constructing a cuckoo path. Once an open
+slot is found it executes a series of CAS operations to
+perform the insert. If one element along the path is updated
+the entire update will fail.
+Figure~\ref{fig:cuckoo-problems}(a) shows the path insertion
+failure rate as the number of concurrent clients grows using
+this approach on a table with 10k entries filled to 90\%.
+The failure rate of operation grows to over 80\% with each
+failure requiring the algorithm to restart.
+
+A naive lock based approach suffers from an inverse problem.
+Using a single global lock all updates will succeed however
+given a latency of 2us and two round trips to lock and
+unlock, the theoretical limit of such an approach is 250k
+operations per second, which in practice is much lower. As
+such any lock based approach must used fine grained locks.
+Acquiring multiple locks demands a deadlock free algorithm
+in which each atomic acquisition must be performed in order.
+This challenge makes is difficult to aquire many locks
+efficiently as acquiring many locks far apart in memory
+requires many round trips.
+
+% %cuckoo hashing optimistic vs locks
+% \textbf{Critical Sections:} Consider executing an insert
+% into a concurrent cuckoo hash stored in remote memory. A
+% client with a cached index may have little or very stale
+% information about the state of the hash table. To insert the
+% client must gather information by reading buckets to compute
+% a cuckoo path. With concurrent clients this leads to a
+% chicken and egg problem when acquiring locks vs making
+% reads.
+
+% %% optimistic inserts
+% A client can perform inserts opportunistically by executing
+% lockless read to learn about the hash table, calculating a
+% cuckoo path, and executing a sequence of dependent CAS
+% operations for each step in the path. This approach is
+% scalable as its critical section is only the length of a CAS
+% instruction and is only limited by RDMA atomic operation
+% throughput~\cite{design-guidelines}. However, Paths can
+% become invalid as other clients running concurrent inserts
+% invalidate the paths. Figure~\ref{fig:cuckoo-problems}(a) shows the
+% path insertion failure rate as the number of concurrent
+% clients grows. This approach minimizes round trips as
+% dependent CAS operations can be batched thanks to in order
+% delivery provided by RDMA reliable connections.
+% Unfortunately failed inserts require additional round trips
+% to both fix the state of the table, and retry the
+% insert.\sg{Further - Issuing CAS as a batch leads to complex
+% path failure cases such a single element in the path failing
+% while others further down the path succeed. Assesing and
+% fixing such insertion failures without locks is very hard.}
+
+% % lock based inserts
+% Alternatively to get synchronized information the client can
+% lock the table, then issue reads. However acquiring locks
+% without knowledge of the table is hard. A global lock
+% ensures that all reads are synchronized, but bottlenecks
+% hash table throughput. Alternatively per-bucket locks
+% enable high throughput but calculating which buckets to lock
+% requires knowledge of the table. A long cuckoo path may
+% require locking many buckets and many round trips to gather
+% information about the hash table.
+% %%
+% An ideal protocol would enable clients to perform inserts
+% without impeding insertions in other portions of the hash
+% table, while requiring the fewest round trips to construct
+% and execute the cuckoo path.
+
+% First, acquiring a lock means a round trip. If the table has
+% a single lock, then a client is guaranteed to be able to
+% gather all the locks it requires in a single round trip.
+% However a single lock does not scale as only a single writer
+% can write at a time. This matter is made worse by the fact
+% that the critical section of the lock is larger in remote
+% memory. Breaking the table up into subtables each with it's
+% own lock has it's own problems. An insertion with a long
+% path will potentially need to acquire many locks. Each of
+% which requires a round trip. Therefore using fine grained
+% locking increases the tables scalability but increases it's
+% base case insertion time.
+
+\textbf{Read Optimization:} Most data center key-value
+workloads are read heavy, therefore read operations should
+be the most highly
+optimized~\cite{datacenter-workloads,facebook-memcached}.
+Ideally we would be able to ensure that reads complete in a
+single round trip.
+
+Prior optimistic approaches require two round trips or more
+per read, because RDMA CAS operations are only 64 bits. Most
+key-value indexes are organized as both an index and an
+extent, where the index contains 64 bit entries which can be
+atomically modified. The extent contains both the key, and
+the value and it pointed to by the index. This is not ideal
+for small key value pairs which could be embedded in the
+index for fast reads if the atomic width were larger. Some
+approaches enable single round trips for repeat reads as the
+location of the extent can be cached, however they do not
+enable single round trip reads from clients without up to
+date caches.~\cite{clover}.
+
+% Prior approaches such as RACE require
+% two RDMA round trips per read. The first is a hash index
+% lookup, the second round trip reads the actual key-value
+% block. RACE must perform two round trips because entries in
+% the hash index are limited to 64 bits (CAS width). This is
+% commonly not enough to store both key and value so RACE can
+% not inline both keys and values in the index structure.
+% Clover~\cite{clover} enables single round trips reads.
+% However under contention Clovers reads require pointer
+% chasing which is known to be expensive due to each pointer
+% resolution requiring a round
+% trip~\cite{clio,clover,pointer-chaising}. 
+
+\sg{location for minor challeges}
+
+\textbf{Duplicate Keys:} Clients may issue concurrent
+inserts for the same key, given that keys may occupy
+multiple location detecting duplicate keys can require
+additional checks. RACE and FUSEE require an extra round
+trip after each insert to check if a duplicate key was
+inserted simultaneously~\cite{race,fusee}.  An ideal
+algorithm would prevent key duplication without requiring
+additional overheads.
+\todo{consider cutting despite us solving this}

@@ -1,0 +1,13 @@
+\section{Implementation}
+
+Our implementation of RCukcoo consists of a of 8.7k C++
+implementation and a 12k line Python implementation which
+simulates RDMA. Both implementations will be made available
+on Github.  All results reported in Section~\ref{sec:eval}
+are from the C++ implementation. At the time of writing only
+the python implementation includes support for update,
+delete, and extent entries. As such all C++ results are for
+inserts, reads, and inlined table operations.  RCuckoo is
+designed for ConnectX-5 NICs. It uses OFED-4.9 which
+supports experimental verbs for atomic masked CAS and device
+mapped memory. 

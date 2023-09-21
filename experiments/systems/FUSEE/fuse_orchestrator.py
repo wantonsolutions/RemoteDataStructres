@@ -302,7 +302,7 @@ class Orchestrator:
         thr = threading.Thread(target=self.server.run_cmd,args=(command,), kwargs={})
         thr.start()
 
-        for i in range(60):
+        for i in range(120):
             time.sleep(1)
 
         threads_per_client = self.get_threads_per_client(config)
@@ -619,9 +619,9 @@ def run_many_ycsb_trials(trials=5):
 
 # run ycsb throughput trial
 # run_ycsb_throughput_trial()
-pf.plot_ycsb()
 
-# run_many_ycsb_trials(10)
+run_many_ycsb_trials(10)
+pf.plot_ycsb()
 
 
     

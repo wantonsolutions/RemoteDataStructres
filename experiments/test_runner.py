@@ -70,7 +70,7 @@ config["locks_per_message"] = str(locks_per_message)
 config["deterministic"]="True"
 config["workload"]="ycsb-w"
 config["id"]=str(0)
-config["search_function"]="a_star"
+config["search_function"]="bfs"
 config["location_function"]="dependent"
 
 #Client State Machine Arguements
@@ -137,11 +137,11 @@ def client_fill_to_50_exp(config):
     # clients = [1, 2, 4, 8, 16, 24]
     # clients = [4, 8, 16, 32, 64, 128, 160]
     # clients = [10,20,40,80,160]
-    clients = [400]
+    # clients = [400]
     # clients = [4, 8]
     # clients = [16,32]
     # clients = [4]
-    # clients = [40]
+    clients = [16]
     # clients = [8]
     # clients = [160]
     table_size = 1024 * 1024 * 10
@@ -159,7 +159,7 @@ def client_fill_to_50_exp(config):
     config["prime"]="true"
     config["prime_fill"]="40"
     config["max_fill"]="50"
-    config["workload"]="ycsb-c"
+    config["workload"]="ycsb-w"
     orchestrator.boot(config.copy())
 
 
@@ -210,7 +210,7 @@ def run_hero_ycsb():
 
     config['trials'] = 3
     workloads = ["ycsb-a", "ycsb-b","ycsb-c", "ycsb-w"]
-    # workloads = ["ycsb-c"]
+    # workloads = ["ycsb-w"]
 
     orchestrator.boot(config.copy())
     for workload in workloads:
@@ -549,8 +549,315 @@ def plot_search_fill_tput():
     plt.savefig("search_fill_tput.pdf")
 
 
+def run_entry_size_exp():
+    # entry_sizes = [8,16,32,64]
+    table_size = 1024 * 1024 * 10
+    read_threshold_bytes=1024
+    entry_sizes = [8,16,32,64,128]
 
+
+    config["prime"]="true"
+    config["prime_fill"]="40"
+    config["max_fill"]="50"
+    config["search_function"]="bfs"
+
+    workloads = ["ycsb-a", "ycsb-c"]
+    value_sizes=[x-4 for x in entry_sizes]
+
+    clients=400
+    config["read_threshold_bytes"] = str(read_threshold_bytes)
+    for workload in workloads:
+        runs = []
+        for i in range(len(entry_sizes)):
+            lconfig = config.copy()
+            lconfig['workload'] = workload
+            if read_threshold_bytes < entry_sizes[i] * int(lconfig['bucket_size']):
+                print("WARNING READ THRESHOLD BEING CHANGED TO MAKE RUN WORK")
+                lconfig['read_threshold_bytes'] = entry_sizes[i] * int(lconfig['bucket_size'])
+
+            lconfig['entry_size'] = str(entry_sizes[i])
+            lconfig['value_size'] = str(value_sizes[i])
+
+            memory_size = entry_sizes[i] * table_size
+            lconfig["indexes"] = str(table_size)
+            lconfig["memory_size"] = str(memory_size)
+            lconfig['num_clients'] = str(clients)
+            orchestrator.build(lconfig)
+            orchestrator.boot(lconfig)
+            results = orchestrator.run_trials(lconfig)
+            if len(results) > 0:
+                runs.append(results)
+        dirname="data/entry_size_"+workload
+        dm.save_statistics(runs, dirname=dirname)
+
+def plot_entry_size_exp():
+    print("plotting entry size exp")
+    workloads = ["ycsb-a", "ycsb-c"]
+    entry_size_order=[]
+    entry_sizes = dict()
+
+    fig, ax = plt.subplots(1,1, figsize=(5,3))
+    for i in range(len(workloads)):
+        print("plotting workload", workloads[i])
+        dirname="data/entry_size_"+workloads[i]
+        stats = dm.load_statistics(dirname=dirname)
+        stats=stats[0]
+        # print(stats)
+        for run in stats:
+            run = run[0] #only do a single run
+            run_tput = plot_cuckoo.single_run_throughput(run)
+            run_tput = round(run_tput, 2)
+            entry_size = int(run['config']['entry_size'])
+            print(entry_size, run_tput)
+            if entry_size not in entry_sizes:
+                entry_sizes[entry_size] = []
+            entry_sizes[entry_size].append(run_tput)
+            if i==0:
+                entry_size_order.append(entry_size)
+    hatches = ['/', 'o', '\\', '.']
+    print(entry_size_order)
+    print(entry_sizes)
+    print(workloads)
+    width = 0.2
+    multiplier=0
+    x=np.arange(len(workloads))
+    for attribute, measurement in entry_sizes.items():
+        offset = width * multiplier
+        rects = ax.bar(x + offset, measurement, width,hatch=hatches[multiplier], label=str(attribute) + " KV", alpha=0.99, edgecolor="black", color="white")
+        # ax.bar_label(rects, padding=3 )
+        multiplier += 1
     
+    ax.set_ylabel("MOPS")
+    ax.set_title("Entry Size vs Throughput")
+
+    capitalized_workloads = [x.upper() for x in workloads]
+    size = len(entry_size_order)
+    visual_offset = (size-1) * width / 2
+    ax.set_xticks(x + visual_offset, capitalized_workloads)
+    # ax.set_xticks(x, workloads)
+    ax.set_ylim(0,50)
+    ax.legend()
+    ax.grid()
+    plt.tight_layout()
+    plt.savefig("entry_size.pdf")
+
+        
+def factor_exp():
+    #dont start lower than 1.7
+    # factors = [1.7,1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,3.0,3.1,3.2,3.3]
+    factors = [1.7,1.9,2.1,2.3,2.5,2.7,2.9,3.1,3.3]
+    # factors = [2.3, 2.5, 2.7]
+
+    # factors = [3.0]
+    clients = 400
+    config['num_clients'] = clients
+    config['workload'] = "ycsb-w"
+    config["prime"]="false"
+    config["prime_fill"]="40"
+    config["max_fill"]="100"
+    config["search_function"]="bfs"
+
+    table_size = 1024 * 1024 * 10
+    memory_size = entry_size * table_size
+    config["indexes"] = str(table_size)
+    config["memory_size"] = str(memory_size)
+    config["trials"] = 1
+
+
+    orchestrator.boot(config)
+    runs = []
+    for f in factors:
+        lconfig = config.copy()
+        print("running factor", f)
+        lconfig['hash_factor'] = str(f)
+        results = orchestrator.run_trials(lconfig)
+        if len(results) > 0:
+            runs.append(results)
+    directory = "data/factor"
+    dm.save_statistics(runs, dirname=directory)
+
+def plot_factor_exp():
+    fig, ax = plt.subplots(1,1, figsize=(12,3))
+    dirname = "data/factor"
+    stats = dm.load_statistics(dirname=dirname)
+    stats=stats[0]
+    plot_cuckoo.throughput(ax, stats, decoration=False, x_axis="hash factor", label="rcuckoo")
+
+    ax.legend()
+    ax.set_xlabel("fill_factor")
+    ax.set_ylabel("MOPS")
+    # ax.set_ylim(0,15)
+
+    plt.tight_layout()
+    plt.savefig("factor.pdf")
+
+
+def read_size_sensitivity():
+    read_sizes = [64,128,256,512,1024,2048,4096] #8192,16384,32768]
+    # read_sizes = [64, 12]
+    # read_sizes = [64, 128]
+    clients = 40
+    config['num_clients'] = clients
+    config['workload'] = "ycsb-c"
+    config["prime"]="true"
+    config["prime_fill"]="80"
+    config["max_fill"]="85"
+    config["search_function"]="bfs"
+    config["runtime"]="10"
+
+    table_size = 1024 * 1024 * 10
+    memory_size = entry_size * table_size
+    config["indexes"] = str(table_size)
+    config["memory_size"] = str(memory_size)
+    config["trials"] = 10
+
+
+    orchestrator.boot(config)
+    runs = []
+    for read_threshold in read_sizes:
+        lconfig = config.copy()
+        print("running read threshold", read_threshold)
+        lconfig["read_threshold_bytes"] = str(read_threshold)
+        results = orchestrator.run_trials(lconfig)
+        if len(results) > 0:
+            print("APPENDING RESULTS")
+            runs.append(results)
+    directory = "data/read_size"
+    dm.save_statistics(runs, dirname=directory)
+
+def plot_read_size_sensitivity():
+    fig, ax = plt.subplots(1,1, figsize=(5,3))
+    dirname = "data/read_size"
+    stats = dm.load_statistics(dirname=dirname)
+    stats=stats[0]
+    plot_cuckoo.throughput(ax, stats, decoration=False, x_axis="read threshold bytes", label="rcuckoo")
+
+    ax.legend()
+    ax.set_xlabel("read threshold bytes")
+    ax.set_ylabel("MOPS")
+    # ax.set_ylim(0,15)
+
+    plt.tight_layout()
+    plt.savefig("read_size.pdf")
+
+def masked_cas_sensitivity():
+    use_masked_cas = ["true", "false"]
+    table_size = 1024 * 1024 * 1
+    memory_size = entry_size * table_size
+    config["indexes"] = str(table_size)
+    config["memory_size"] = str(memory_size)
+
+    config["prime"]="true"
+    # config["prime_fill"]="88"
+    # config["max_fill"]="91"
+
+    clients = 400
+    config['num_clients'] = clients
+    config['workload'] = "ycsb-w"
+    fills = [10,20,30,40,50,60,70,80,90]
+
+    orchestrator.boot(config)
+    for use_mask in use_masked_cas:
+        runs = []
+        for fill in fills:
+            lconfig = config.copy()
+            lconfig["max_fill"] = str(fill)
+            lconfig["prime_fill"] = str(fill-8)
+            lconfig["use_mask"] = str(use_mask)
+            results = orchestrator.run_trials(lconfig)
+            if len(results) > 0:
+                runs.append(results)
+
+        directory = "data/masked_cas_"+use_mask
+        dm.save_statistics(runs, dirname=directory)
+    
+
+
+def plot_masked_cas_sensitivity():
+    fig, ax = plt.subplots(1,1, figsize=(5,3))
+    use_masked_cas = ["true", "false"]
+
+    for use_mask in use_masked_cas:
+        dirname = "data/masked_cas_"+use_mask
+        stats = dm.load_statistics(dirname=dirname)
+        stats=stats[0]
+        plot_cuckoo.throughput(ax, stats, decoration=False, x_axis="read threshold bytes", label="rcuckoo")
+
+        ax.legend()
+        ax.set_xlabel("read threshold bytes")
+        ax.set_ylabel("MOPS")
+        # ax.set_ylim(0,15)
+
+    plt.tight_layout()
+    plt.savefig("masked_cas.pdf")
+
+def masked_cas_vs_lock_size():
+    use_masked_cas = ["true", "false"]
+    table_size = 1024 * 1024 * 1
+    memory_size = entry_size * table_size
+    config["indexes"] = str(table_size)
+    config["memory_size"] = str(memory_size)
+
+    config["prime"]="true"
+    config["prime_fill"]="88"
+    config["max_fill"]="91"
+    config["trials"]=4
+
+    clients = 400
+    config['num_clients'] = clients
+    config['workload'] = "ycsb-w"
+    buckets_per_lock = [1,2,4,8,16,32,64,128]
+
+    orchestrator.boot(config)
+    for use_mask in use_masked_cas:
+        runs = []
+        for bps in buckets_per_lock:
+            lconfig = config.copy()
+            lconfig["use_mask"] = str(use_mask)
+            lconfig["buckets_per_lock"] = str(bps)
+            results = orchestrator.run_trials(lconfig)
+            if len(results) > 0:
+                runs.append(results)
+
+        directory = "data/lock_masked_cas_"+use_mask
+        dm.save_statistics(runs, dirname=directory)
+    
+
+
+def plot_masked_cas_vs_lock_size():
+    fig, ax = plt.subplots(1,1, figsize=(5,3))
+    use_masked_cas = ["true", "false"]
+
+    for use_mask in use_masked_cas:
+        dirname = "data/lock_masked_cas_"+use_mask
+        stats = dm.load_statistics(dirname=dirname)
+        stats=stats[0]
+        plot_cuckoo.throughput(ax, stats, decoration=False, x_axis="buckets per lock", label="rcuckoo")
+
+        ax.legend()
+        ax.set_xlabel("read threshold bytes")
+        ax.set_ylabel("MOPS")
+        # ax.set_ylim(0,15)
+
+    plt.tight_layout()
+    plt.savefig("masked_cas_lock_size.pdf")
+
+
+# masked_cas_vs_lock_size()
+plot_masked_cas_vs_lock_size()
+
+# masked_cas_sensitivity()
+# plot_masked_cas_sensitivity()
+
+
+# read_size_sensitivity()
+# plot_read_size_sensitivity()
+
+# factor_exp()
+# plot_factor_exp()
+
+# run_entry_size_exp()
+# plot_entry_size_exp()
 
 
 
@@ -561,7 +868,7 @@ def plot_search_fill_tput():
 # table_size_contention(config)
 # client_fill_to_50_exp(config)
 # run_hero_ycsb()
-plot_hero_ycsb()
+# plot_hero_ycsb()
 
 # run_hero_ycsb_fill()
 # plot_hero_ycsb_fill()

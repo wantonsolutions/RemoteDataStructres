@@ -26,7 +26,7 @@ class rcuckoo_ssh_wrapper:
         self.ssh = paramiko.SSHClient()
         self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         #ensure that we don't need a password to connect
-        print("connecting to ", hostname, "as", username)
+        # print("connecting to ", hostname, "as", username)
         self.ssh.connect(self.hostname, username=self.username)
         self.scp = SCPClient(self.ssh.get_transport())
         self.verbose = False
@@ -235,31 +235,43 @@ class Orchestrator:
             client.run_cmd('echo iwicbV15 | sudo -S killall ' + self.client_program_name)
 
 
-    def build(self, pull=False, clean=False):
+    def build(self, config):
         print("Starting Build on", self.build_location.hostname)
-
-        if pull:
-            print("Pulling from git")
-            self.build_location.pull()
-
-        if clean:
-            print("Cleaning First on", self.build_location.hostname)
-            self.build_location.run_cmd(
-                'cd ' + self.project_directory + ';'
-                'make clean;')
 
         threads = 30
         print("Building on ...", self.build_location.hostname, "with", threads, "threads")
+
+        define_string = ""
+
+        if "value_size" in config:
+            define_string += " export VALUE_SIZE=" + str(config["value_size"]) + ";"
+
         self.build_location.run_cmd(
             'cd ' + self.project_directory + ';'
-            'make -j ' + str(threads) + ';')
+            + define_string +
+            'make -B -j ;')
 
     def sync(self):
-        for dep in self.sync_dependents:
-            print("Syncing from", dep.hostname)
-            dep.run_cmd(
+        sync_command=(
                 'cd rcuckoo_rdma;'
                 'rsync -a ' + self.build_location.hostname + ':' + self.project_directory + '/* ./;')
+        
+        sync_threads=[]
+        for dep in self.sync_dependents:
+            sync_thread = threading.Thread(target=dep.run_cmd, args=(sync_command,))
+            sync_threads.append(sync_thread)
+        
+        for sync_thread in sync_threads:
+            # print("Syncing from", dep.hostname)
+            sync_thread.start()
+
+        for sync_thread in sync_threads:
+            sync_thread.join()
+
+        print("done syncing")
+            # dep.run_cmd(
+            #     'cd rcuckoo_rdma;'
+            #     'rsync -a ' + self.build_location.hostname + ':' + self.project_directory + '/* ./;')
 
     def sanity_check(self):
         for node in self.all_nodes:
@@ -268,11 +280,11 @@ class Orchestrator:
     def setup_huge(self):
         #do hugeppages on the server
         #200gb of 2mb pages
-        print("setting up huge pages on server")
+        # print("setting up huge pages on server")
         self.server.run_cmd('echo iwicbV15 | sudo -S hugeadm --pool-pages-min 2MB:102400')
         for client in self.clients:
             # client.run_cmd('echo iwicbV15 | sudo hugeadm --pool-pages-min 2MB:16384')
-            print("setting up huge pages on client", client.hostname)
+            # print("setting up huge pages on client", client.hostname)
             client.run_cmd('echo iwicbV15 | sudo -S hugeadm --pool-pages-min 2MB:65536')
 
     def run(self):
@@ -294,21 +306,22 @@ class Orchestrator:
                 'cat client.out;'
         )
         for client in self.clients:
-            # print("Preparing client on", client.hostname)
+            print("Starting experiment on:", client.hostname)
             client_thread = threading.Thread(target=client.run_cmd, args=(client_command,))
             client_threads.append(client_thread)
 
         # print("Starting all clients")
         for client_thread in client_threads:
-            print("starting client thread", client_thread)
+            # print("starting client thread", client_thread)
             client_thread.start()
             time.sleep(1)
         timeout = 30
         print("Waiting for all {} clients to finish..".format(len(client_threads)))
         for i, client_thread in enumerate(client_threads):
-            print("Waiting for client", i)
+            # print("Waiting for client", i)
             client_thread.join(timeout=timeout)
             timeout=5
+        print("All clients finished")
 
         self.kill()
 
@@ -337,6 +350,11 @@ def boot(config):
     boot_orch.sync()
     boot_orch.kill()
     del boot_orch
+
+def build(config):
+    build_orch = Orchestrator(config)
+    build_orch.build(config)
+    del build_orch
 
     
 def run_trials(config):

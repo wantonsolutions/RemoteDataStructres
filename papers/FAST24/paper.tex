@@ -1,0 +1,160 @@
+\documentclass[10pt,twocolumn]{article}
+
+\usepackage{times}
+\usepackage{fullpage}
+
+\usepackage{booktabs}  % for \midrule
+%\usepackage{subfigure}
+\usepackage{balance}
+\usepackage{graphicx}
+\usepackage{xspace}
+%\usepackage{pslatex}
+%\usepackage{pifont}
+%\usepackage{multirow}
+%\usepackage{array}
+%\usepackage{booktabs}
+%\usepackage{cite}
+\usepackage{url}
+%\usepackage{cancel}
+\usepackage{color,colortbl}
+%\usepackage{microtype}
+%\usepackage{textcomp}% http://ctan.org/pkg/textcomp
+\usepackage{tabularx}
+\usepackage{framed}
+\usepackage[]{algorithm2e}
+\SetAlFnt{\small}
+\SetAlCapFnt{\small}
+\usepackage{algorithmic}
+
+\usepackage{listings}
+%\usepackage{scrextend}
+%\usepackage{mathtools}
+\usepackage{pbox}
+\usepackage{amsmath}
+
+\let\labelindent\relax
+\usepackage{enumitem}
+
+\usepackage{tikz}
+\usetikzlibrary{arrows,automata}
+\usetikzlibrary{calc,positioning}
+\usepackage{lipsum,adjustbox}
+
+
+%\usepackage{tikz}
+%\usepackage{decorations.pathmorphing}
+%\usepackage{assymb}
+
+\usepackage[labelfont=bf]{caption}
+
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{cleveref}
+\captionsetup[subfigure]{subrefformat=simple,labelformat=simple}
+
+%\theoremstyle{plain}
+\newtheorem{theorem}{\bf{Theorem}}%[section]
+\newtheorem{lemma}[theorem]{\bf{Lemma}}
+\newtheorem{corollary}[theorem]{\bf{Corollary}}
+\newtheorem{proofl}[theorem]{\bf{Proof}}
+\newtheorem{proposition}[theorem]{\bf{Proposition}}
+
+%\theoremstyle{definition}
+\newtheorem{definition}{\bf{Definition}}%[section]
+\newtheorem{observation}{\bf{Observation}}%[section] 
+
+%\theoremstyle{remark}
+\newtheorem{example}{\bf{Example}}
+\newtheorem{notation}{\bf{Notation}}
+\newtheorem{fact}{\bf{Fact}}
+
+\usepackage{listings}
+%%\usepackage{listings-golang}
+\usepackage{color}
+
+%\usepackage{sectsty}
+%\sectionfont{\fontsize{12}{15}\selectfont}
+
+
+\newcommand\mypara[1]{\vspace{.3em}\noindent\textbf{#1}}
+\newcommand{\urlwofont}[1]{\urlstyle{same}\url{#1}}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Useful reviewing/feedback annotations
+\input{annotations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\begin{document}
+
+\title{Remote Memory Cuckoo Hashing}
+%\author{WORDS '21 Submission \#3}
+\author{Stewart Grant and Alex C. Snoeren\\ UC San Diego}
+\date{}
+
+\maketitle
+
+\section*{Abstract}
+
+Memory disaggregation promises high resource utilization,
+and efficient resource sharing. However designing fully
+disaggregated systems remains challenging due to the high
+latency of remote memory. Key-value store indexes often
+adopt a ~\textit{partially disaggregated} approach where
+updates to the index are routed through a CPU for
+serialization, while reads
+ are made directly to memory.
+Fully disaggregated indexes assume no such CPU and must
+serialize updates entirely with remote clients.
+
+This paper focuses on the design of a
+ fully
+ disaggregated
+lock-based key-value index based on cuckoo
+ hashing. Prior
+work avoids locks in favor of optimistic concurrency as
+locks can have large critical sections and quickly
+bottleneck performance. However, optimistic approaches
+require multiple round trips for each operation, as atomic
+updates are limited to 64 bits with RDMA atomics. 
+
+In this work we show that
+with careful data structure and protocol design, as well as
+the architecture of modern RDMA NICs traditional locking
+strategies can perform better than state of the art
+optimistic concurrency algorithms. We demonstrate this
+through the design of a remote memory key value store based
+on cuckoo hashing. Our cuckoo hashing algorithm (rcuckoo)uses dependent,
+rather than independent hash functions to increase the
+probability that both hashes of a key will be
+close in the hash table. This locality enables fast lock
+acquisition and release. We demonstrate that rcuckoo
+outperforms optimistic concurrency algorithms by 2x in
+terms of throughput and up to a 2x improvement on read
+latency.
+
+\input{intro}
+\input{background}
+\input{body}
+\input{problems}
+\input{design}
+\input{implementation}
+\input{evaluation}
+\input{limitation}
+\input{conclusion}
+
+\section*{Acknowledgments}
+
+Thanks for everyone that supported me. Thanks to Pengfei Zuo
+for assistance in replicating results from the original RACE
+paper.
+
+
+\balance
+\vspace{-0.3cm}
+{\footnotesize \bibliographystyle{acm}
+\bibliography{paper}}
+\vspace{-0.5cm}
+
+\end{document}
