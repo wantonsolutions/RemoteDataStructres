@@ -19,8 +19,14 @@ hashing factor, read threshold, and search algorithm.
 
 \begin{figure*}[ht]
     \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill.pdf}
-    \caption{Rcuckoo's performance as a function of fill factor. A) Workload throughput. B) Median operation latency. C) Average operation size. D) Average messages per operation. Figures B through D are YCSB-A }
-    \label{fig:ycsb_fill_latency}
+
+    \caption{Rcuckoo's insert and read performance as a
+    function of fill factor. A) Workload throughput. B)
+    Median operation latency. C) Average operation size. D)
+    Average messages per operation. Figures B through D are
+    YCSB-A }
+
+    \label{fig:ycsb_fill}
 \end{figure*}
 
 % \begin{figure}[ht]
@@ -67,22 +73,45 @@ based systems cannot store key value pairs in the index and
 must use a second round trip on reads to recover extent
 entries which contain full key value pairs.
 
+\subsubsection{Clover}
+
+Clover is a remote memory key-value store designed for
+persistent memory. It does not support full disaggregation,
+it's index structure is managed by CPU cores on a metadata
+server. However, it's persistence safe updates are managed
+by one sided operations. Clover uses index caching to
+optimize reads. Clover reads are self verifying unlike FUSEE
+as clover entries contain a NULL terminating pointer if the
+entry is valid. When re-reading key-value entires clover can
+achieve close to RDMA line rate as it directly reads the
+entry without negotiating with the index. In contrast to
+prior work which has compared with Clover~\cite{fusee} we do
+not force clients to read from the index on each read and
+allow it to take advantage of it's caching algorithm.
+
 \subsubsection{Sherman}
 
-Sherman is a remote memory b-tree designed for write
-optimization. Sherman clusters are not fully disaggregated.
-Each node in a sherman cluster has many CPU cores, and a
-single memory core. The memory core is responsible for
+Sherman is a B-tree designed for remote memory and high
+write throughput. Sherman clusters are not fully
+disaggregated.  Each node in a sherman cluster has many CPU
+cores, and a single memory core. Unlike the other systems
+Sherman is cluster based, and does not support a having
+isolated memory machines. All machines are equal nodes in a
+cluster and run both a memory controller and client threads.
+As such Sherman does not see bandwidth bottlenecks the other
+systems experience as the requests are partitioned across
+machines.  Sherman's memory core is responsible for
 servicing allocation RPC calls from clients. Sherman is
 similar to RCuckoo in that it uses locks to guard access.
 However, it assumes that colocated clients can resolve lock
-contention locally. These assumptions enable sherman to have
-high performance under contention, and enable fast reads as
-the B-tree leaf nodes can be right sized by the memory
-allocator. While Sherman does not meet the fully
-disaggregated model it does provide a good comparison for
-RCuckoo as it is the only other system to use locks in
-remote memory.
+contention locally and clients colocated with their segment
+of the B-Tree can perform local operations. These
+assumptions enable sherman to have high performance under
+contention even though it uses locks and manages a more
+complex data structure than the unordered key-value stores.
+While Sherman does not meet the fully disaggregated model it
+does provide a good comparison for RCuckoo as it is the only
+other system to use locks in remote memory.
 
 
 % \subsubsection{Clover}
@@ -90,76 +119,76 @@ remote memory.
 
 \subsection{System Performance}
 
-\textbf{Throughput:} Figure~\ref{fig:ycsb_throughput} shows
-the throughput of FUSEE, Sherman and RCuckoo for YCSB
-workloads. YCSB-A is a
-50\% read 50\% write workload. YCSB-B is 95\% read and 5\%
-write, and YCSB-C is 100\% read.  In each experiment clients
-fill the hash table from empty to 50\% full on tables with
-10M 32bit keys and 32bit values. For read only workloads the
-hash table is first filled to 50\% and then clients read
-from the table.  
+\textbf{YCSB Throughput:} Figure~\ref{fig:ycsb_throughput} shows
+the throughput of FUSEE, Sherman, Clover and RCuckoo for
+YCSB workloads on a zipf (0.99) distribution. YCSB-A is a
+50\% read 50\% update workload.  YCSB-B is 95\% read and 5\%
+update, and YCSB-C is 100\% read.  In each experiment
+clients fill the hash table from empty to 90\% full on
+tables with 100M 32bit keys and 32bit values.
 
-Rcuckoo is competitive on insert heavy workloads and is able
-to slightly outperform FUSEE on write only workloads.
-RCuckoo shines on read heavy workloads as each read requires
-only a single rounds trip, and approximately 60\% of reads
-only require a single RDMA packet. On each of these
-benchmarks our read threshold is set to a max of 256 bytes.
-On read only workloads RCuckoo is able to outperform FUSEE
-and Sherman by 2x ~\todo{double check sherman, I feel like
-it should be able to get a better value for read only..}
+On YCSB-A RCuckoo outperforms FUSEE largely due to it's
+requirement for one fewer round trips per operation. RCuckoo
+hit's a bottleneck on this skewed update workload at
+approximately 160 clients due to lock contention on hot
+keys. Sherman performs in-line with RCuckoo until ~5MOPS.
+Updates to Shermans B-Tree have larger critical sections
+than RCuckoo leading to the performance bottleneck. On
+uniform distributions Sherman and RCuckoo perform similarly
+on YCSB-A. Clover suffers the most on YCSB-A. Each update to
+a key causes other clients to re-read the key prior to
+updating.
+
+On read mostly and read only workloads (YCSB-B,C
+respectively) RCuckoo has a distinct advantage over FUSEE as
+it completes each read in a single round trip, rather than
+two, it sees a further benefit from summarizing most reads
+into a single packet (Section~\ref{sec:read_threshold}).
+Sherman has an advantage on read mostly workloads as it can
+directly read from the B-Tree in a single round trip rather
+than resolving a pointer. On YCSB-B it hits the same
+bottleneck as before due to hot keys. On YCSB-C it performs
+similarly to RCuckoo, however Sherman has a more complex
+read algorithm than RCuckoo leading to an earlier
+bottleneck. Clover performs similar to FUSEE on read mostly,
+and is the most competitive with RCuckoo on read only.
+Clovers reads are very similar to RCuckoo's when it can use
+it's cached index. We believe that with more aggressive
+tuning Clovers read only performance would be nearly
+identical to RCuckoo as the semantics are very similar.
 
 
-\textbf{Latency:} RCuckoo Latency is shown across each YCSB
-workload in Figure~\ref{fig:ycsb_fill_latency}. In each of
-these experiments we fill the table to a given fill factor,
-and then run the workload for 100k operations. In each case
-RCuckoo holds a near constant latency. These experiments are
-run at low contention to illustrate only the response to
-fill factor not contention. Independent measurements from
-Sherman and FUSEE show their minimum latencies for
-individual operations (not taken as part of the workload) to
-illustrate their relative performance.
-
+\textbf{Insert Performance:}
 %%
-% Figure~\ref{fig:ycsb_fill_latency}, shows the average
-% operation latency for each workload. Here average RTT is the
-% average between both reads and writes. RACE incurs
-% additional round trips from reading from its extent and
-% from verifying its successful inserts. RACE has very few
-% collisions as its critical section for insertion is the
-% duration of a single RDMA CAS. Few of RACE's inserts fail
-% and it retains near constant latency for read and writes
-% across all fill factors. The same is true for rcuckoo reads
-% which remain at a single round trip. Rcuckoo inserts are
-% subject to additional round trips as the table fills.  Most
-% additional round trips are caused by locks being spaced
-% further than the span of an RDMA CAS on the lock table. Some
-% are caused by contention. The small improvement of ycsb-a
-% and ycsb-b over ycsb-w inserts are due to reduced write
-% contention from the workload.
+By default YCSB-A,B,C use updates. RCuckoo's insert
+algorithm is it's most complex and bandwidth intensive
+component. In this section we evaluate RCuckoo's insert
+performance using modified YCSB. We run inserts rather than
+updates, so YCSB-A is 50\% read, 50\% insert. We add an
+additional benchmark \textit{YCSB-W} which is insert only.
+Figure~\cite{fig:ycsb_fill}(a) shows the throughput
+of each workload in response to the tables fill size with
+400 clients. As the cuckoo table fills, cuckoo paths are
+longer leading to more contention, and more bandwidth usage
+to perform covering reads. In each case (except YCSB-C)
+RCuckoo's performance drops with relation to fill factor. In
+the case of insert only (YCSB-W) RCuckoo's performance drops
+from 11.5 to 4.5 MOPS. We measured FUSEE's insert only
+performance at 9.1 MOPS which is invariant to fill factor.
+While RCuckoo is slower on insert only we note that insert
+only is an uncommon workload~\cite{facebook-memcached}.
 
-\textbf{Bandwidth, and messages:} 
-\todo{todo}
-% Rcuckoo design trades off
-% bandwidth for latency by increases the size of reads for all
-% operations. We measure the effect of fill factor on the
-% bandwidth and messages required per operation with the same
-% experiment used to measure latency.
-% Figure~\ref{fig:ycsb_fill_ops_bw} shows how rcuckoo and
-% RACE's messages and bandwidth respond to fill factor. At low
-% fill rates (less than 50\%) rcuckoo uses less bandwidth per
-% operation and less messages per operation than RACE. Above
-% 50\% collisions in the hash table increase the cost of
-% insertions. While the size of the cuckoo path does not
-% directly relate to the number of round trips, it does
-% directly relate to messages. High fill factors nearly double
-% the number of insert messages required to perform insertions
-% with rcuckoo, and bandwidth can increase by up to a factor of
-% 4. \todo{In the future we could perform very large writes to
-% reduce the number of messages at the cost of more
-% bandwidth.}
+We additionally measure latency, operation size, and
+messages (rdma packets) per operation
+(Figure~\ref{fig:ycsb_fill_latency}(b-d)). In all cases
+inserts are more expensive as the table fills, but have
+little impact on read performance. As the table fills,
+cuckoo paths grow in length causing an increase both in
+bandwidth consumption per operation but also latency as
+additional round trips are required to find valid cuckoo
+paths. In all cases we use a lock size of 16 rows, and BFS
+search. Both of reduce the cost of inserts significantly as
+described in the following sections.
 
 \subsection{Dependent hashing and search}
 
@@ -289,16 +318,16 @@ workload with 100 million table entries. We choose an $f$ of
 and throughput.
 
 \subsection{Read Threshold Performance}
-
-
-
+\label{sec:read_threshold}
 As described in section ~\ref{sec:reading} rcuckoo uses a
 read threshold to capture both hash locations if the
 locations are within a defined read threshold.
-Figure~\ref{fig:performance_breakdown}(b) shows the performance gains
-from increasing the read threshold. Here each row is 64
-bytes so our minimum threshold of 64 ensures two packets are
-issued for each read request. Higher read thresholds trade
+Figure~\ref{fig:performance_breakdown}(b) shows the
+performance gains from increasing the read threshold. Here
+each row is 64 bytes so our minimum threshold of 64 ensures
+two packets are issued for each read request. We limit the
+number of clients to 40 so that their is plenty of bandwidth
+to support the inflated reads. Higher read thresholds trade
 off network bandwidth for operation latency. When bandwidth
 is plentiful large windows can improve throughput but up to
 8\%.
