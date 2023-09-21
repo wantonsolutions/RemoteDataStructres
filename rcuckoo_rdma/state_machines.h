@@ -57,6 +57,7 @@ namespace cuckoo_state_machines {
 
             void complete_read_stats(bool success, Key read_key);
             void complete_insert_stats(bool success);
+            void complete_update_stats(bool success);
             unordered_map<string, string> get_stats();
 
             vector<VRMessage> fsm(VRMessage messages);
@@ -68,6 +69,7 @@ namespace cuckoo_state_machines {
             bool _complete;
             bool _inserting;
             bool _reading;
+            bool _updating;
 
             //State Machine Statistics
             uint64_t _total_bytes;
@@ -84,6 +86,7 @@ namespace cuckoo_state_machines {
             uint32_t _total_masked_cas_failures=0;
 
             Key _current_insert_key;
+            Key _current_update_key;
 
             vector<int> _insert_path_lengths;
             vector<int> _index_range_per_insert;
@@ -98,6 +101,10 @@ namespace cuckoo_state_machines {
             uint32_t _failed_lock_aquisition_count;
             uint32_t _failed_lock_aquisition_this_insert;
 
+            uint32_t _failed_insert_first_search_this_insert;
+            uint32_t _failed_insert_first_search_count;
+            vector<int> _failed_inserts_first_search;
+
 
             uint32_t _completed_insert_count;
             uint64_t _insert_operation_bytes;
@@ -106,6 +113,16 @@ namespace cuckoo_state_machines {
             uint32_t _current_insert_rtt;
             vector<int> _insert_rtt;
             uint64_t _insert_rtt_count;
+
+
+            vector<Key>_completed_updates;
+            vector<int> _messages_per_update;
+            vector<int> _update_rtt;
+            vector<int> _update_latency_ns;
+            uint32_t _completed_update_count;
+            uint32_t _current_update_messages;
+            uint32_t _current_update_rtt;
+            uint64_t _sum_update_latency_ns;
 
             //read stats
             uint32_t _current_read_messages;
@@ -169,8 +186,10 @@ namespace cuckoo_state_machines {
             void record_last_request();
             Key unique_insert(int insert_index, int client_id, int total_clients, int factor);
             Key unique_get(int get_index, int client_id, int total_clients, int factor);
+            Key unique_update(int get_index, int client_id, int total_clients, int factor);
             Request next_put();
             Request next_get();
+            Request next_update();
             operation gen_next_operation();
 
     };

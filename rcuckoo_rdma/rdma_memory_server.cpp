@@ -928,7 +928,7 @@ int main(int argc, char **argv)
 
     string workload = config["workload"];
     int runtime = 0;
-    bool use_runtime = false;
+    bool use_runtime = true;
 
     if (workload == "ycsb-c") {
         runtime = stoi(config["runtime"]);
