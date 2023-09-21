@@ -56,8 +56,8 @@ def plot_fusee_ycsb_multi_run(axs):
 
 
 def plot_sherman_ycsb(axs):
-    data, dir = dm.load_statistics("../../../experiments/systems/Sherman/data/sherman_ycsb_uniform")
-    # data, dir = dm.load_statistics("data/sherman_ycsb_zipf")
+    # data, dir = dm.load_statistics("../../../experiments/systems/Sherman/data/sherman_ycsb_uniform")
+    data, dir = dm.load_statistics("data/sherman_ycsb_zipf")
     # data = json.loads(data)
 
     workloads = ["workloada", "workloadb", "workloadc", "workloadupd100"]
@@ -152,8 +152,12 @@ def plot_hero_ycsb_throughput_static():
     #cuckoo
     # workloads = ["ycsb-a", "ycsb-b", "ycsb-c", "ycsb-w"]
     workloads = ["ycsb-a", "ycsb-b", "ycsb-c"]
-    cuck_a_tput=[0.9,1.8538780691615686, 3.1858278318625897, 5.158820844419218, 9.909487030189728, 13.036238839513999, 13.443520512176052]
-    cuck_b_tput=[1.8, 3.5, 8.67506880602754, 15.938655554644598, 29.301799386178676, 39.26305595324906, 39.53792829394712]
+    # cuck_a_tput=[0.9,1.8538780691615686, 3.1858278318625897, 5.158820844419218, 9.909487030189728, 13.036238839513999, 13.443520512176052]
+
+    # cuck_a_tput_uniform=[1.612634436401241, 3.1367891119939872, 6.300519374146803, 11.693492896979897, 21.28665615631139, 27.622141263157907, 28.08823142406725]
+    cuck_a_tput=[1.6169309908198795, 3.138653032153032, 5.261143450921882, 8.62887432024169, 15.765564428889595, 16.967970969414202, 16.028986495948775]
+    # cuck_b_tput_uniform=[1.8, 3.5, 8.67506880602754, 15.938655554644598, 29.301799386178676, 39.26305595324906, 39.53792829394712]
+    cuck_b_tput=[2.7958561727143727, 5.432706901824854, 10.433385985247629, 19.842081785937822, 33.81278853084588, 34.72034606011372, 33.79788928103255]
     cuck_c_tput=[2.99,5.952564563617636, 11.493884402194366, 22.578766368166765, 39.36893367295243, 46.49349910889845, 46.3064643682979]
     # cuck_w_tput=[0.5, 1.0992159380413737, 1.9709423507842736, 3.0512749083638777, 5.961405911330047, 6.9574283018867895, 7.115548453608248]
     clients=[10,20, 40, 80, 160, 320, 400]
@@ -166,16 +170,30 @@ def plot_hero_ycsb_throughput_static():
 
     #fusee
 
-    fusee_a_tput=[ 0.0360255,0.145604,   1.0589075,  7.5669515, 11.9509565, 11.9186975]
-    fusee_b_tput=[ 0.049226,   0.190538,   1.4487765, 10.241494,  14.2780315, 14.2005985]
-    fusee_c_tput=[ 0.069183,   0.2876015,  2.2447135, 12.025642,  16.322664,  16.160061 ]
+    fusee_a_tput_zipf=[ 0.0360255, 0.145604,   1.0589075,  7.5669515, 11.9509565, 11.9186975]
+    fusee_b_tput_zipf=[ 0.049226,   0.190538,   1.4487765, 10.241494,  14.2780315, 14.2005985]
+    fusee_c_tput_zipf=[ 0.069183,   0.2876015,  2.2447135, 12.025642,  16.322664,  16.160061 ]
     # fusee_w_tput=[0.03022,   0.123381,  0.868236,  6.1967235, 9.7452085, 9.7876635]
-    fusee_clients=[8, 16, 32, 64, 128, 256]
+    fusee_clients = [8, 16, 32, 64, 128, 256]
 
-    axs[0].plot(fusee_clients,fusee_a_tput,label="fusee",marker="s")
-    axs[1].plot(fusee_clients,fusee_b_tput,label="fusee",marker="s")
-    axs[2].plot(fusee_clients,fusee_c_tput,label="fusee",marker="s")
+    axs[0].plot(fusee_clients,fusee_a_tput_zipf,label="fusee",marker="s")
+    axs[1].plot(fusee_clients,fusee_b_tput_zipf,label="fusee",marker="s")
+    axs[2].plot(fusee_clients,fusee_c_tput_zipf,label="fusee",marker="s")
     # axs[3].plot(fusee_clients,fusee_w_tput,label="fusee",marker="s")
+
+    clover_c_tput=[1836632,3572209,7003510,13673092,25654763,34857976,39180515,39757292,39917704,40295512,]
+    clover_b_tput=[1500840,2680607,4929508,7935485,12774234,14548308,14439633,14124372,13402903,13402903,]
+    clover_a_tput=[815460,1331156,1858488,2343504,2639795,2386740,2098574,1471908,1830812,1602349,]
+    clover_w_tput=[866916,1639656,3114720,5418308,9386624,12991886,14967071,17022698,17165892,17432716,] 
+    clover_clients=[7,14,28,56,112,168,224,280,336,392,]
+
+    clover_c_tput = [x / 1000000 for x in clover_c_tput]
+    clover_b_tput = [x / 1000000 for x in clover_b_tput]
+    clover_a_tput = [x / 1000000 for x in clover_a_tput]
+
+    axs[0].plot(clover_clients,clover_a_tput,label="clover",marker="^")
+    axs[1].plot(clover_clients,clover_b_tput,label="clover",marker="^")
+    axs[2].plot(clover_clients,clover_c_tput,label="clover",marker="^")
 
 
 
