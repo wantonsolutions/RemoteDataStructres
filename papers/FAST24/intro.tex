@@ -1,17 +1,17 @@
 \section{Introduction}
 \label{sec:intro}
 
-
-DRAM has become a scarce resource. As CPU core counts
-continue to rise, per-core capacity has dropped in the past
-decade. In response data center architects have proposed
-resource disaggregation to improve resource scalability, and
-utilization. In the disaggregated model, resources (compute,
-memory, storage) are physically distant, and interconnected
-by a high speed network. In a fully disaggregated model
-distinct servers house resources such as memory servers
-which contain only memory, and no colocated CPU for
-processing.
+Increases in CPU core counts and stagnating DRAM density has
+made DRAM a scarce resource. In response data center
+architects have proposed resource disaggregation to improve
+resource utilization, scalability and efficiency as well as
+increase per-core access to memory. Disaggregation calls for
+the partitioning of a servers resources into distinct pools
+(compute, memory, storage, accelerators), which are
+interconnected by a high speed network.  In a fully
+disaggregated model distinct servers house resources such as
+memory servers which contain only memory, and no colocated
+CPU for processing.
 
 % DRAM capacity is scaling at an ever decreasing rate. As such
 % the demand in data centers for high efficiency memory
@@ -29,15 +29,19 @@ example accessing intra-rack remote DRAM has a 20x (50ns to
 remote memory must suffer a proportionally high cost for
 synchronization when sharing pools of memory. Many prior
 disaggregated systems have eschewed sharing for static
-partitioning to avoid the high overheads~\cite{legoos,
-blade-server, reigons}.  Some projects have opted
-for a partially disaggregated model, in which a CPU core is
+partitioning to avoid the high overheads~\cite{
+reigons,blade-server,legoos}.  Some projects have opted for
+a partially disaggregated model, in which a CPU core is
 colocated with memory to provide
-serialization~\cite{clover}, sharing a close design with
-RDMA key-value stores optimized with one-sided RDMA
-operations ~\cite{herd,erpc,pilaf,cell,clover}. While highly
-performant these approaches do not conform to fully
-disaggregated designs.
+serialization~\cite{clover}. These designs are conceptually
+close to prior work on RDMA key value stores which gain
+performance benefits from having some operations use
+one-sided RDMA verbs\footnote{one-sided verbs are
+disaggregation compliant as they do not require a CPU on the
+receiver side during operation}~\cite{erpc,herd,pilaf,cell,clover}.
+%% %
+While highly performant these approaches do not conform to
+fully disaggregated designs.
 
 % to remote memory are approximately 20x that
 % of local DRAM (50ns to 1us) which severely increases the
@@ -52,15 +56,15 @@ disaggregated designs.
 % entirely with a client based protocol. 
 
 Some prior work has examined the design of fully
-disaggregated hash table indexes~\cite{sherman, race, fusee,
-rolex}.  These approaches either use optimistic concurrency,
-or assume that most clients are colocated and can resolve
-their lock acquisitions in local memory. Optimistic
-approaches using RDMA atomics are limited by the width of
-the atomic instruction (64 bits for compare and swap). 64
-bits is often too small to encapsulate a full key-value
-update. The result is that optimistic approaches require
-more round trips to remote memory to complete their
+disaggregated hash table indexes~\cite{rolex,fusee,sherman,
+race}.  These approaches either use optimistic
+concurrency, or assume that most clients are colocated and
+can resolve their lock acquisitions in local memory.
+Optimistic approaches using RDMA atomics are limited by the
+width of the atomic instruction (64 bits for compare and
+swap). 64 bits is often too small to encapsulate a full
+key-value update. The result is that optimistic approaches
+require more round trips to remote memory to complete their
 operations. These approaches have dismissed lock based
 approaches outright as the size of their critical sections
 can bottleneck performance, and  the cost of acquiring and
@@ -98,37 +102,68 @@ than the optimistic approach (two or three round trips).
 %rdma and cuckoo hashing
 In this work we examine the tradeoffs between optimistic and
 lock based data structures for full disaggregation. Our
-contribution is a new concurrent hash table design which
-uses a novel cuckoo hashing algorithm. Our algorithm
-(rcuckoo) is designed to enable locking and unlocking
-efficiently using one-sided RDMA. In the common case our
-reads execute in a single round trip, and updates to the
-table are performed in two round trips. 
+contribution is a concurrent hash table design which uses a
+novel cuckoo hashing algorithm. Our algorithm (RCuckoo) is
+designed to enable locking and unlocking efficiently using
+one-sided RDMA. In the common case our reads execute in a
+single round trip, and updates to the table are performed in
+two round trips, and inserts have a median of two round
+trips.
 
 Our algorithm makes use of multiple novel contributions
 which decrease round trips per operation. The first is a
-dependent hashing algorithm. Dependent hashing increases the
-likelihood that a key's hash locations will be spatially
-near one another. We find that locality increases the
-throughput of each table operation (insert, read). Inserting
-into a cuckoo hash table normally requires acquiring many
-locks randomly throughout the table, dependent hashing
-clusters lock acquisitions enabling many locks to be
-acquired in a single atomic request. Second, our algorithm
-uses speculative lock acquisition. Locks are acquired in
-bulk based on a local cache of the remote index. Once locks
-are held a second search on synchronized locked data is
-performed to ensure a correct insertion. Third we use
-locality to improve both read and search speeds. We find
-that using a single large read over two smaller reads
-improves throughput when key locations are known to be
-physically close.
+dependent hashing algorithm. Cuckoo hashes use two (or more)
+hash locations per key to resolve collisions. Dependent
+hashing increases the likelihood that a key's hash locations
+will be spatially near one another. Increasing locality
+effects the maximum number of elements which can be inserted
+into the table (fill factor) we explore the space of
+locality algorithms to find a balance point between
+performance and fill factor. Using this locality we design a
+dense lock table which can fit into RDMA NIC device memory
+as it provides up to 3x higher performance for contested
+atomic access. Our locking protocol acquires and releases
+locks in bulk using the fewest round trips possible. We use
+Masked Compare and Swap to remove unessisary contention from
+out lock table.
 
-\sg{Sherman uses masked compare and swap as well as device
-memory, we might use it better but it's hard to claim a
-contribution here.}
+Using locks rather than CAS to modify our index allows our
+index to support variable sized entries, and allows us to
+inline keys and values directly into the index. Inlining
+entries significantly reduces operation latency. We highly
+optimize inserts into our hash table. Locality between
+key-pairs improves insert locality enabling RCuckoo to both
+find valid cuckoo paths efficiently and aquire all locks for
+insertion in few round trips. We achieve this with a mixture
+of smart caching, searching, and a two stage cuckoo path
+finding algorithm. Finally locality improves reads by using
+single larger reads when key pairs are close, rather than
+multiple smaller reads.
 
-We develop a prototype of our algorithm and evaluate it
-against two recent RDMA based key value stores. Our
+% Inserting into a cuckoo hash table normally requires
+% acquiring many locks randomly throughout the table,
+% dependent hashing clusters lock acquisitions enabling many
+% locks to be acquired in a single atomic request. Second, our
+% algorithm uses speculative lock acquisition. Locks are
+% acquired in bulk based on a local cache of the remote index.
+% Once locks are held a second search on synchronized locked
+% data is performed to ensure a correct insertion. Third we
+% use locality to improve both read and search speeds. We find
+% that using a single large read over two smaller reads
+% improves throughput when key locations are known to be
+% physically close.
+
+% \sg{Sherman uses masked compare and swap as well as device
+% memory, we might use it better but it's hard to claim a
+% contribution here.}
+
+We develop a prototype of our algorithm in C++ and evaluate
+it against three recent RDMA based key value stores. Our
+evaluation shows that we achive better performance than all
+prior approaches. On YCSB benchmarks we We gain between 1.4x
+to 10x on write heavy workloads and 1.3x to 2.2x on read
+heavy workloads
+
+Our
 evaluation shows that we can achieve ~\todo{2x faster reads
 and 1.5x faster writes on a multitude of ycsb workloads.}

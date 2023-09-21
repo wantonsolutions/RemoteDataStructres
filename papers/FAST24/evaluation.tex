@@ -12,7 +12,7 @@ hashing factor, read threshold, and search algorithm.
     \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_throughput.pdf}
 
     \caption{Rcuckoo throughput vs workload (Zipf $\theta$=0.99). A) YCSB-A 50\%
-    read 50\% write. B) YCSB-B 95\% read 5\% write. C)
+    read 50\% update. B) YCSB-B 95\% read 5\% update. C)
     YCSB-C 100\% read}
     \label{fig:ycsb_throughput}
  \end{figure*}
@@ -180,15 +180,19 @@ only is an uncommon workload~\cite{facebook-memcached}.
 
 We additionally measure latency, operation size, and
 messages (rdma packets) per operation
-(Figure~\ref{fig:ycsb_fill_latency}(b-d)). In all cases
-inserts are more expensive as the table fills, but have
-little impact on read performance. As the table fills,
-cuckoo paths grow in length causing an increase both in
-bandwidth consumption per operation but also latency as
-additional round trips are required to find valid cuckoo
-paths. In all cases we use a lock size of 16 rows, and BFS
-search. Both of reduce the cost of inserts significantly as
-described in the following sections.
+(Figure~\ref{fig:ycsb_fill}(b-d)). In all cases inserts are
+more expensive as the table fills, but have little impact on
+read performance. As the table fills, cuckoo paths grow in
+length causing an increase both in bandwidth consumption per
+operation but also latency as additional round trips are
+required to find valid cuckoo paths. We report latency
+values for insert and read for each project. These values
+were not collected under load and represent near min values.
+For all projects except FUSEE read latency is nearly the
+same (single rdma round trip). Insert times vary. Clover and
+Sherman use two sided RDMA RPC's for insert, both perform
+allocations and set up metadata for the requesting client.
+FUSEE has the lowest fully disaggregated latency.
 
 \subsection{Dependent hashing and search}
 
@@ -354,9 +358,9 @@ and search. Figure~\ref{fig:entry_size} shows the effect of
 key value pair size on operation throughput. YCSB-A
 workloads saturate network bandwidth and thus decrease in
 throughput as a function of entry size. In contrast YCSB-C
-is largely unaffected by entry size. \sg{We suggest that
-pairs larger than 64 bytes use extents rather than embedding
-directly in the index.}
+is largely unaffected by entry size. We suggest that pairs
+larger than 64 bytes use extents rather than embedding
+directly in the index.
 
 \subsection{Search Success}
 \begin{figure}[ht]
