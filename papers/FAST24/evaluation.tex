@@ -11,7 +11,7 @@ hashing factor, read threshold, and search algorithm.
 \begin{figure*}[ht]
     \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_throughput.pdf}
 
-    \caption{Rcuckoo throughput vs workload. A) YCSB-A 50\%
+    \caption{Rcuckoo throughput vs workload (Zipf $\theta$=0.99). A) YCSB-A 50\%
     read 50\% write. B) YCSB-B 95\% read 5\% write. C)
     YCSB-C 100\% read}
     \label{fig:ycsb_throughput}
@@ -192,35 +192,39 @@ described in the following sections.
 
 \subsection{Dependent hashing and search}
 
-Hash dependence and choice of search function have the
-highest impact on RCuckoo's performance. In the absence of
-hash locality, locks are scattered throughout the table
-reducing the ability of our locking scheme to combine lock
-requests. Cuckoo path length also directly affects the
-number of round trips required to insert an item. Depth
-first search produces much longer paths than breadth first
-search.  Figure ~\ref{fig:search_dependence} shows the
-relationship between search functions, hash dependence, and
-the number of locks which can be acquired per request. In
-this test we measure both the median and 99th percentile
-round trips per insert on a table with 10 million entries
-filling the table from 85-90\% full. Each lock protects a
-single row in this experiment.
+Hash dependence and search function choice have the highest
+impact on RCuckoo's performance. Dependent hashing reduces
+the probability locks are scattered throughout the table
+which enables RCuckoo to combine lock requests into a few
+masked CAS messages. Simultaneously search function choice
+dramatically affects the length of cuckoo paths. BFS
+produces much shorter paths than
+DFS~\cite{cuckoo-improvements,pilaf,cuckoo}.
+Figure~\ref{fig:search_dependence} illustrates the effect of
+search function and dependent hashing on RCuckoo's inserts.
+We vary the number of locks per message to demonstrate the
+effect of path length and show why masked cas plays an
+important role in RCuckoo's performance. We measured both
+the median, and 99th percentile round trips per request on a
+table with 100M entries. We fille the table to 85\% and then
+executed insert operations to 95\%.
 
-Depth first search with no hash dependence has extremely
-poor performance at it's tail, taking over 2K round trips to
-complete. Both at it's median and 99th percentile it sees
-only small benefits from setting multiple locks per request
-as the locks are scattered throughout the table. DFS with
+DFS with no hash dependence has extremely poor performance
+at it's tail, taking over 2K round trips to complete. Both
+at it's median and 99th percentile it sees only small
+benefits from setting multiple locks per request as the
+locks are scattered throughout the table. DFS with
 dependence has far lower tail latency, and improves the
 number of locks which can be acquired per message, however
 it still constructs long rather than minimum length paths.
 BFS with dependence provides the best performance and gains
 the most from setting more locks per request. At 64 locks
 per request it has 7.5x lower round trips at it's 99th
-percentile and 4 rather than 5 round trips on average.
-
-\todo{perhaps say something about astar?}
+percentile and 4 rather than 5 round trips on average. We
+found that A* search provided the same minimal path length
+as DFS with slightly better locality. It's performance
+against BFS was only superior at fill factors above 95\% and
+lower elsewhere due to a higher runtime cost on short paths.
 
 
 
@@ -279,8 +283,8 @@ percentile and 4 rather than 5 round trips on average.
 \subsubsection{Masked CAS}
 
 Under contention masked CAS operations provide a significant
-performance improvement. We measure their benefit in terms
-of throughput by comparing them with default CAS. In the
+performance improvement. We measure it's benefit in terms of
+throughput by comparing it with default CAS. In the
 default case, when acquiring locks clients set the lock bits
 for the locks they require and set all other bits in the cas
 to 0. If the cas fails the current state of the lock table
@@ -289,9 +293,6 @@ the client tries to aquire their locks again using the
 updated state of the lock table. Masked compare and swaps
 are issued with the minimal mask required to set the locks.
 
-We measure the performance improvement at high fill rates
-(85-90\%) on write only workloads and vary the number of
-rows per lock on each experiment.
 Figure~\ref{fig:performance_breakdown} shows the improvement
 gained by masked CAS. Default CAS operations perform better
 with fewer rows per lock, as the probability of a lock being

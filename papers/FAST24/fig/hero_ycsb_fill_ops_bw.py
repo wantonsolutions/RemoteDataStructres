@@ -9,6 +9,7 @@ import experiments.data_management as dm
 import simulator.cuckoo as cuckoo
 import matplotlib.pyplot as plt
 import numpy as np
+import json
 from tqdm import tqdm
 
 def run_hero_ycsb_fill_latency():
@@ -82,7 +83,7 @@ def sherman_client_count_index(data, index):
             return i
     
 
-def plot_sherman_latency(axs):
+def plot_sherman_latency(ax):
 
     # data, dir = dm.load_statistics("data/sherman_ycsb_uniform")
     data, dir = dm.load_statistics("../../../experiments/systems/Sherman/data/sherman_ycsb_uniform")
@@ -93,17 +94,19 @@ def plot_sherman_latency(axs):
     # clients = data["clients"]
 
     i=0
-    clients=5
+    clients=8
 
     index = sherman_client_count_index(data, clients)
     sherman_read_latency = lib.tofloat(data["workloadc"]['th50'])[index]
     sherman_write_latency = lib.tofloat(data["workloadupd100"]['th50'])[index]
 
-    for ax in axs:
-        ax.axhline(y=sherman_read_latency, color='r', linestyle='-', label="Sherman Read Latency "+str(clients)+" threads")
-        ax.axhline(y=sherman_write_latency, color='b', linestyle='-', label="Sherman Write Latency "+str(clients)+" threads")
+    print("sherman_read_latency", sherman_read_latency)
+    print("sherman_write_latency", sherman_write_latency)
 
-def plot_fusee_latency(axs):
+    ax.axhline(y=sherman_read_latency, color='r', linestyle='-', label="Sherman Read Latency "+str(clients)+" threads")
+    ax.axhline(y=sherman_write_latency, color='b', linestyle='-', label="Sherman Write Latency "+str(clients)+" threads")
+
+def plot_fusee_latency(ax):
     data, dir = dm.load_statistics("../../../experiments/systems/FUSEE/data/fusee_latency")
     data = json.loads(data)
     for k in data:
@@ -115,9 +118,11 @@ def plot_fusee_latency(axs):
     avg_read_latency = np.mean(read_latencies)
     avg_insert_latency = np.mean(insert_latencies)
 
-    for ax in axs:
-        ax.axhline(y=avg_read_latency, color='r', linestyle=':', label="FUSEE Read Latency 1 thread")
-        ax.axhline(y=avg_insert_latency, color='b', linestyle=':', label="FUSEE Insert Latency 1 thread")
+    print("avg_read_latency", avg_read_latency)
+    print("avg_insert_latency", avg_insert_latency)
+
+    ax.axhline(y=avg_read_latency, color='r', linestyle=':', label="FUSEE Read Latency 1 thread")
+    ax.axhline(y=avg_insert_latency, color='b', linestyle=':', label="FUSEE Insert Latency 1 thread")
 
 
 # def run_hero_ycsb_fill():
@@ -214,9 +219,40 @@ def plot_hero_ycsb_fill_static():
     ax1.set_ylabel("MOPS")
     ax1.set_xlabel("fill factor")
 
-    ax2.plot(fill_factors, write_latency, label="insert", color="black", linestyle="solid", marker="o")
+    fusee_read_latency  = 5.02
+    fusee_insert_latency = 10.5
+    ax2.axhline(y=fusee_read_latency, color='r', linestyle=':', label="FUSEE Read")
+    fusee = ax2.axhline(y=fusee_insert_latency, color='r', linestyle='-', label="FUSEE")
+
+    from matplotlib.lines import Line2D
+    sherman_read_latency=3.4
+    sherman_write_latency=9.4
+    ax2.axhline(y=sherman_read_latency, color='b', linestyle=':', label="Sherman")
+    sherman = ax2.axhline(y=sherman_write_latency, color='b', linestyle='-', label="Sherman")
+
+    clover_read_latency=2.9
+    clover_insert_latency=8.5
+    ax2.axhline(y=clover_read_latency, color='g', linestyle=':', label="Clover")
+    clover = ax2.axhline(y=clover_insert_latency, color='g', linestyle='-', label="Clover")
+    ax2.axhline()
+
+    cuckoo = Line2D([0], [0], label='RCuckoo', color='black')
+    read = Line2D([0], [0], label='Read', color='grey', linestyle='dashed')
+    insert = Line2D([0], [0], label='Insert', color='grey', linestyle='solid')
+
+    ax2.plot(fill_factors, write_latency, label="RCuckoo", color="black", linestyle="solid", marker="o")
     ax2.plot(fill_factors, read_latency, label="read", color="black", linestyle="dashed", marker="s")
-    ax2.legend(fontsize=8)
+
+    ax2.legend(handles=[read, insert, fusee, sherman, clover, cuckoo], fontsize=8, ncol=2, loc="upper center")
+
+
+    # plot_fusee_latency(ax2)
+    # plot_sherman_latency(ax2)
+    # ax.axhline(y=avg_read_latency, color='r', linestyle=':', label="FUSEE Read Latency 1 thread")
+    # ax.axhline(y=avg_insert_latency, color='b', linestyle=':', label="FUSEE Insert Latency 1 thread")
+
+
+    # ax2.legend(fontsize=8)
     ax2.set_ylim(bottom=0,top=40)
     ax2.set_ylabel("us")
     ax2.set_xlabel("fill factor")

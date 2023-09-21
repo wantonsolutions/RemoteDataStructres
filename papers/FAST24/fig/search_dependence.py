@@ -6,7 +6,9 @@ import matplotlib.pyplot as plt
 import lib
 
 
-def independent_search(config):
+def independent_search():
+
+    config=lib.get_config()
     # clients = [1, 2, 4, 8, 16, 24]
     # clients = [4, 8, 16, 32, 64, 128, 160]
     locks_per_message = [1,2,4,8,16,32,64]
@@ -15,11 +17,12 @@ def independent_search(config):
     buckets_per_lock = 1
     configs = [
         ("independent", "random", "ind_random"),
+        ("independent", "bfs", "ind_bfs"),
         ("dependent", "random", "dep_random"),
         ("dependent", "bfs", "dep_bfs"),
     ]
     entry_size=8
-    table_size = 1024 * 1024 * 10
+    table_size = 1024 * 1024 * 100
     memory_size = entry_size * table_size
     config["indexes"] = str(table_size)
     config["memory_size"] = str(memory_size)
@@ -179,5 +182,5 @@ def plot_round_trips_per_insert_operation():
     plt.tight_layout()
     plt.savefig("search_dependence.pdf")
 
-# independent_search()
-plot_round_trips_per_insert_operation()
+independent_search()
+# plot_round_trips_per_insert_operation()
