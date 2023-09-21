@@ -18,6 +18,7 @@ namespace cuckoo_virtual_rdma {
         GET,
         PUT,
         DELETE,
+        UPDATE,
         NO_OP
     };
 

@@ -349,6 +349,11 @@ namespace cuckoo_rcuckoo {
         return;
     }
 
+    void RCuckoo::complete_update_stats(bool success) {
+        Client_State_Machine::complete_update_stats(success);
+        return;
+    }
+
     void RCuckoo::complete_insert(){
         SUCCESS(log_id(), "[complete_insert] key %s\n", _current_insert_key.to_string().c_str());
         _state = IDLE;
@@ -373,6 +378,16 @@ namespace cuckoo_rcuckoo {
         _operation_end_time = get_current_ns();
         complete_read_stats(success);
         return;
+    }
+
+    void RCuckoo::complete_update(bool success) {
+        INFO(log_id(), "[complete_update] key %s\n", _current_read_key.to_string().c_str());
+        _state = IDLE;
+        _reading = false;
+        _operation_end_time = get_current_ns();
+        complete_update_stats(success);
+        return;
+
     }
 
     void RCuckoo::insert_cas_fsm(VRMessage message) {
@@ -1130,6 +1145,128 @@ namespace cuckoo_rcuckoo {
         
     }
 
+    //Precondition _locking_context.buckets contains the locks we want to get
+    void RCuckoo::top_level_aquire_locks() {
+        get_lock_list_fast_context(_locking_context);
+        INFO(log_id(), "[aquire_locks] gathering locks for buckets %s\n", vector_to_string(_locking_context.buckets).c_str());
+        //TODO make this one thing
+        _lock_list = _locking_context.lock_list;
+        get_covering_reads_from_lock_list(_locking_context.lock_list, _covering_reads ,_buckets_per_lock, _table.row_size_bytes());
+
+        for (unsigned int i = 0; i < _lock_list.size(); i++) {
+            INFO(log_id(), "[aquire_locks] lock %d -> [lock %s] [read %s]\n", i, _lock_list[i].to_string().c_str(), _covering_reads[i].to_string().c_str());
+        }
+
+        assert(_lock_list.size() == _covering_reads.size());
+
+        bool locking_complete = false;
+        bool failed_last_request = false;
+
+        hash_locations both_buckets =(_location_function)(_current_insert_key, _table.get_row_count());
+
+        unsigned int message_index = 0;
+        while (!locking_complete) {
+
+            assert(message_index < _lock_list.size());
+
+            VRMaskedCasData lock = _lock_list[message_index];
+            VRReadData read = _covering_reads[message_index];
+
+            //This is for testing the benifit of locks only
+            if (!_use_mask) {
+                lock.mask = 0xFFFFFFFFFFFFFFFF;
+            }
+
+
+            _wr_id++;
+            int outstanding_cas_wr_id = _wr_id;
+            _wr_id++;
+            int outstanding_read_wr_id = _wr_id;
+
+
+            // using std::chrono::high_resolution_clock;
+            // using std::chrono::duration_cast;
+            // using std::chrono::duration;
+            // using std::chrono::nanoseconds;
+
+            send_lock_and_cover_message(lock, read, outstanding_cas_wr_id);
+            // auto t1 = high_resolution_clock::now();
+            int outstanding_messages = 1; //It's two because we send the read and CAS
+            int n = bulk_poll(_completion_queue, outstanding_messages, _wc);
+            // auto t2 = high_resolution_clock::now();
+            // auto duration_0 = duration_cast<nanoseconds>( t2 - t1 ).count();
+            // printf("1) %6lu ns req %d\n", duration_0,_completed_insert_count);
+
+            while (n < outstanding_messages) {
+                VERBOSE(log_id(), "first poll missed the read, polling again\n");
+                assert(_wc);
+                assert(_completion_queue);
+                assert(_wc + n);
+                assert(outstanding_messages - n > 0);
+                n += bulk_poll(_completion_queue, outstanding_messages - n, _wc + n);
+            }
+
+            _outstanding_read_requests--;
+            assert(n == outstanding_messages); //This is just a safty for now.
+            if (_wc[0].status != IBV_WC_SUCCESS) [[unlikely]] {
+                ALERT("lock aquire", " masked cas failed somehow\n");
+                ALERT("lock aquire", " masked cas %s\n", lock.to_string().c_str());
+                exit(1);
+            }
+
+            if (_wc[1].status != IBV_WC_SUCCESS) [[unlikely]] {
+                ALERT(log_id(), " [lock aquire] spanning read failed somehow\n");
+
+                ALERT(log_id(), " errno: %d \n", -errno);
+                ALERT(log_id(), " [lock aquire] read %s\n", read.to_string().c_str());
+                ALERT(log_id(), " [lock aquire] table size %d\n", _table.get_row_count());
+                exit(1);
+            }
+
+            uint64_t old_value = lock.old;
+            uint64_t mask = lock.mask;
+            int lock_index = lock.min_lock_index;
+
+            if (!(lock_index >= 0 && lock_index < _table.get_underlying_lock_table_size_bytes())) {
+                WARNING(log_id(), "assert about to fail, lock_index = %d, lock_table_size = %d\n", lock_index, _table.get_underlying_lock_table_size_bytes());
+            }
+            assert(lock_index >= 0 && lock_index < _table.get_underlying_lock_table_size_bytes());
+            assert(get_lock_pointer(lock_index));
+
+            uint64_t received_locks = *((uint64_t*) get_lock_pointer(lock_index));
+
+            //?? bswap the DMA'd value?
+            received_locks = __builtin_bswap64(received_locks);
+            *((uint64_t*) get_lock_pointer(lock_index)) = received_locks;
+
+
+            if ((received_locks & mask) == old_value) {
+                // ALERT(log_id(), "we got the lock!\n");
+                // receive_successful_locking_message(lock);
+                receive_successful_locking_message(message_index);
+                message_index++;
+                if (failed_last_request) {
+                    failed_last_request = false;
+                }
+            } else {
+                // printf("%2d [fail lock]   r%016" PRIx64 ", m%016" PRIx64 ", o%016" PRIx64 "\n", _id, received_locks, mask, old_value);
+                #ifdef MEASURE_ESSENTIAL
+                _total_masked_cas_failures++;
+                _failed_lock_aquisition_count++;
+                _failed_lock_aquisition_this_insert++;
+                #endif
+                failed_last_request = true;
+            }
+
+            if (_lock_list.size() == message_index) {
+                locking_complete = true;
+                INFO(log_id(), " [put-direct] we got all the locks!\n");
+                break;
+            }
+        }
+
+    }
+
 
     void RCuckoo::insert_direct() {
 
@@ -1292,6 +1429,7 @@ namespace cuckoo_rcuckoo {
 
     }
 
+
     void RCuckoo::put_direct() {
 
         /* copied from the search function */ 
@@ -1317,123 +1455,7 @@ namespace cuckoo_rcuckoo {
 
         search_path_to_buckets_fast(_search_context.path, _locking_context.buckets);
         // assert(_locking_context.buckets.size() < 64);
-        get_lock_list_fast_context(_locking_context);
-        INFO(log_id(), "[aquire_locks] gathering locks for buckets %s\n", vector_to_string(_locking_context.buckets).c_str());
-        //TODO make this one thing
-        _lock_list = _locking_context.lock_list;
-        get_covering_reads_from_lock_list(_locking_context.lock_list, _covering_reads ,_buckets_per_lock, _table.row_size_bytes());
-
-        for (unsigned int i = 0; i < _lock_list.size(); i++) {
-            INFO(log_id(), "[aquire_locks] lock %d -> [lock %s] [read %s]\n", i, _lock_list[i].to_string().c_str(), _covering_reads[i].to_string().c_str());
-        }
-
-        assert(_lock_list.size() == _covering_reads.size());
-
-        bool locking_complete = false;
-        bool failed_last_request = false;
-
-        hash_locations both_buckets =(_location_function)(_current_insert_key, _table.get_row_count());
-
-        unsigned int message_index = 0;
-        while (!locking_complete) {
-
-            assert(message_index < _lock_list.size());
-
-            VRMaskedCasData lock = _lock_list[message_index];
-            VRReadData read = _covering_reads[message_index];
-
-            //This is for testing the benifit of locks only
-            if (!_use_mask) {
-                lock.mask = 0xFFFFFFFFFFFFFFFF;
-            }
-
-
-            _wr_id++;
-            int outstanding_cas_wr_id = _wr_id;
-            _wr_id++;
-            int outstanding_read_wr_id = _wr_id;
-
-
-            // using std::chrono::high_resolution_clock;
-            // using std::chrono::duration_cast;
-            // using std::chrono::duration;
-            // using std::chrono::nanoseconds;
-
-            send_lock_and_cover_message(lock, read, outstanding_cas_wr_id);
-            // auto t1 = high_resolution_clock::now();
-            int outstanding_messages = 1; //It's two because we send the read and CAS
-            int n = bulk_poll(_completion_queue, outstanding_messages, _wc);
-            // auto t2 = high_resolution_clock::now();
-            // auto duration_0 = duration_cast<nanoseconds>( t2 - t1 ).count();
-            // printf("1) %6lu ns req %d\n", duration_0,_completed_insert_count);
-
-            while (n < outstanding_messages) {
-                VERBOSE(log_id(), "first poll missed the read, polling again\n");
-                assert(_wc);
-                assert(_completion_queue);
-                assert(_wc + n);
-                assert(outstanding_messages - n > 0);
-                n += bulk_poll(_completion_queue, outstanding_messages - n, _wc + n);
-            }
-
-            _outstanding_read_requests--;
-            assert(n == outstanding_messages); //This is just a safty for now.
-            if (_wc[0].status != IBV_WC_SUCCESS) [[unlikely]] {
-                ALERT("lock aquire", " masked cas failed somehow\n");
-                ALERT("lock aquire", " masked cas %s\n", lock.to_string().c_str());
-                exit(1);
-            }
-
-            if (_wc[1].status != IBV_WC_SUCCESS) [[unlikely]] {
-                ALERT(log_id(), " [lock aquire] spanning read failed somehow\n");
-
-                ALERT(log_id(), " errno: %d \n", -errno);
-                ALERT(log_id(), " [lock aquire] read %s\n", read.to_string().c_str());
-                ALERT(log_id(), " [lock aquire] table size %d\n", _table.get_row_count());
-                exit(1);
-            }
-
-            uint64_t old_value = lock.old;
-            uint64_t mask = lock.mask;
-            int lock_index = lock.min_lock_index;
-
-            if (!(lock_index >= 0 && lock_index < _table.get_underlying_lock_table_size_bytes())) {
-                WARNING(log_id(), "assert about to fail, lock_index = %d, lock_table_size = %d\n", lock_index, _table.get_underlying_lock_table_size_bytes());
-            }
-            assert(lock_index >= 0 && lock_index < _table.get_underlying_lock_table_size_bytes());
-            assert(get_lock_pointer(lock_index));
-
-            uint64_t received_locks = *((uint64_t*) get_lock_pointer(lock_index));
-
-            //?? bswap the DMA'd value?
-            received_locks = __builtin_bswap64(received_locks);
-            *((uint64_t*) get_lock_pointer(lock_index)) = received_locks;
-
-
-            if ((received_locks & mask) == old_value) {
-                // ALERT(log_id(), "we got the lock!\n");
-                // receive_successful_locking_message(lock);
-                receive_successful_locking_message(message_index);
-                message_index++;
-                if (failed_last_request) {
-                    failed_last_request = false;
-                }
-            } else {
-                // printf("%2d [fail lock]   r%016" PRIx64 ", m%016" PRIx64 ", o%016" PRIx64 "\n", _id, received_locks, mask, old_value);
-                #ifdef MEASURE_ESSENTIAL
-                _total_masked_cas_failures++;
-                _failed_lock_aquisition_count++;
-                _failed_lock_aquisition_this_insert++;
-                #endif
-                failed_last_request = true;
-            }
-
-            if (_lock_list.size() == message_index) {
-                locking_complete = true;
-                INFO(log_id(), " [put-direct] we got all the locks!\n");
-                break;
-            }
-        }
+        top_level_aquire_locks();
 
         return insert_direct();
     }
@@ -1467,8 +1489,58 @@ namespace cuckoo_rcuckoo {
         }
         complete_read(success);
         INFO("[get-direct]", "read completed");
-
         
+        return;
+    }
+
+    void RCuckoo::update_direct(void) {
+        // assert(_locking_context.buckets.size() < 64);
+        hash_locations buckets = _location_function(_current_update_key, _table.get_row_count());
+        _locking_context.buckets.clear();
+        _locking_context.buckets.push_back(buckets.primary);
+        _locking_context.buckets.push_back(buckets.secondary);
+        top_level_aquire_locks();
+
+        bool b1 = _table.bucket_contains(buckets.primary, _current_update_key);
+        bool b2 = _table.bucket_contains(buckets.secondary, _current_update_key);
+        bool success = b1 || b2;
+        if  (success) {
+            //We found the key
+            SUCCESS("[update-direct]", "%2d found key %s \n", _id, _current_update_key.to_string().c_str());
+            // receive_successful_get_messege(_current_read_key);
+        } else {
+            ALERT("[update-direct]", "%2d did not find key %s \n", _id, _current_update_key.to_string().c_str());
+            ALERT("[update-direct]", "primany,seconday [%d,%d]\n", buckets.primary, buckets.secondary);
+            // _table.print_table();
+            // receive_failed_get_message(_current_read_key);
+        }
+
+        _locking_message_index = 0;
+        fill_current_unlock_list();
+
+        INFO("update direct", "about to unlock a total of %d lock messages\n", _lock_list.size());
+        unsigned int total_messages = _lock_list.size();
+        if (success) {
+            printf("TODO here is where we make a packet that actually does the update");
+            _insert_messages.clear();
+            printf("TODO add the update message to the insert messages");
+            total_messages += _insert_messages.size();
+        } else {
+            _insert_messages.clear();
+        }
+
+
+        send_insert_and_unlock_messages(_insert_messages, _lock_list, _wr_id);
+        _wr_id += total_messages;
+
+        // pause_for_an_rtt();
+
+        //Bulk poll to receive all messages
+        int n=0;
+        bulk_poll(_completion_queue, 1, _wc + 1);
+        _locks_held.clear();
+        complete_update(success);
+
         return;
     }
 
@@ -1520,6 +1592,12 @@ namespace cuckoo_rcuckoo {
                         // ALERT("[gen key]","trying to read %s\n", _current_read_key.to_string().c_str());
                         // throw logic_error("ERROR: GET not implemented");
                         get_direct();
+                    } else if (next_request.op == UPDATE) {
+                        _operation_start_time = get_current_ns();
+                        _current_update_key = next_request.key;
+                        // ALERT("[gen key]","trying to read %s\n", _current_read_key.to_string().c_str());
+                        // throw logic_error("ERROR: GET not implemented");
+                        update_direct();
                     } else {
                         printf("ERROR: unknown operation\n");
                         throw logic_error("ERROR: unknown operation");

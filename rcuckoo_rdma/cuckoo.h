@@ -101,9 +101,11 @@ namespace cuckoo_rcuckoo {
 
             void rdma_fsm(void);
             void init_rdma_structures(rcuckoo_rdma_info info);
+            void top_level_aquire_locks();
             void put_direct();
             void get_direct(void);
             void insert_direct();
+            void update_direct(void);
 
             void set_global_start_flag(volatile bool * flag);
             void set_global_end_flag(volatile bool * flag);
@@ -113,6 +115,9 @@ namespace cuckoo_rcuckoo {
 
             void complete_read_stats(bool success);
             void complete_read(bool success);
+            void complete_update(bool success);
+            void complete_update_stats(bool success);
+
 
 
             vector<VRMaskedCasData> get_current_unlock_list();

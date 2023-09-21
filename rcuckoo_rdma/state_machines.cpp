@@ -74,6 +74,7 @@ namespace cuckoo_state_machines {
         _total_masked_cas_failures=0;
 
         _current_insert_key = Key();
+        _current_update_key = Key();
 
 
         _insert_path_lengths = vector<int>();
@@ -204,6 +205,24 @@ namespace cuckoo_state_machines {
         _sum_insert_latency_ns += latency;
 
     }
+
+    void State_Machine::complete_update_stats(bool success) {
+        uint64_t latency = (_operation_end_time - _operation_start_time).count();
+        #ifdef MEASURE_MOST
+        _completed_updates.push_back(_current_update_key);
+
+        _failed_lock_aquisitions.push_back(_failed_lock_aquisition_this_insert);
+        _messages_per_update.push_back(_current_update_messages);
+        _update_rtt.push_back(_current_update_rtt);
+        _update_latency_ns.push_back(latency);
+        #endif
+        #ifdef MEASURE_ESSENTIAL
+        _completed_update_count++;
+        #endif
+        _current_update_messages = 0;
+        _current_update_rtt = 0;
+        _sum_update_latency_ns += latency;
+    }
     unordered_map<string, string> State_Machine::get_stats(){
         unordered_map<string, string> stats;
         stats["total_bytes"] = to_string(_total_bytes);
@@ -243,6 +262,16 @@ namespace cuckoo_state_machines {
         stats["read_operation_messages"] = to_string(_read_operation_messages);
         stats["read_rtt"] = array_to_string(_read_rtt);
         stats["read_rtt_count"] = to_string(_read_rtt_count);
+
+        stats["messages_per_update"] = array_to_string(_messages_per_update);
+        stats["completed_updates"] = key_array_to_string(_completed_updates);
+        stats["completed_update_count"] = to_string(_completed_update_count);
+        // stats["failed_updates"] = key_array_to_string(_failed_updates);
+        // stats["failed_update_count"] = to_string(_failed_update_count);
+        // stats["update_operation_bytes"] = to_string(_update_operation_bytes);
+        // stats["update_operation_messages"] = to_string(_update_operation_messages);
+        stats["update_rtt"] = array_to_string(_update_rtt);
+        // stats["update_rtt_count"] = to_string(_update_rtt_count);
 
         stats["sum_insert_latency_ns"] = to_string(_sum_insert_latency_ns);
         stats["sum_read_latency_ns"] = to_string(_sum_read_latency_ns);
@@ -465,6 +494,23 @@ namespace cuckoo_state_machines {
         return req;
     }
 
+    Request Client_Workload_Driver::next_update() {
+        uint32_t next_key_index;
+        if (_deterministic){
+            next_key_index =  BASE_KEY + (_completed_puts - 2);
+        } else {
+            if (_completed_puts <=1 ) {
+                next_key_index = 0;
+            } else {
+                next_key_index = rand_r(&_time_seed) % (_completed_puts - 1);
+            }
+        }
+        Key key = unique_get(next_key_index, _client_id, _global_clients, _random_factor);
+        Request req = Request{UPDATE, key, Value()};
+        _last_request = req;
+        return req;
+    }
+
     operation Client_Workload_Driver::gen_next_operation() {
         if (_workload == A) {
             return (rand_r(&_time_seed) % 100) < 50 ? GET : PUT;
@@ -493,6 +539,8 @@ namespace cuckoo_state_machines {
             return next_put();
         } else if (op == GET) {
             return next_get();
+        } else if (op == UPDATE) {
+            return next_update();
         } else {
             printf("ERROR: unknown operation\n");
             throw logic_error("ERROR: unknown operation");
