@@ -19,7 +19,7 @@ hashing factor, read threshold, and search algorithm.
 
 \begin{figure*}[ht]
     \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill.pdf}
-    \caption{Rcuckoo's performance as a function of fill factor. A) Workload throughput. B) Median operation latency. C) Average operation size. D) Average messages per operation.}
+    \caption{Rcuckoo's performance as a function of fill factor. A) Workload throughput. B) Median operation latency. C) Average operation size. D) Average messages per operation. Figures B through D are YCSB-A }
     \label{fig:ycsb_fill_latency}
 \end{figure*}
 
@@ -327,6 +327,34 @@ throughput as a function of entry size. In contrast YCSB-C
 is largely unaffected by entry size. \sg{We suggest that
 pairs larger than 64 bytes use extents rather than embedding
 directly in the index.}
+
+\subsection{Search Success}
+\begin{figure}[ht]
+    \includegraphics[width=0.99\linewidth]{fig/search_success_lock_size.pdf}
+    \caption{Failure rate of search algorithms vs lock size under high contention}
+    \label{fig:search_success}
+\end{figure}
+
+RCuckoo's two stage search algorithm is designed to improve
+the probability that an insert will be successful given that
+a clients local cache is out of sync. To demonstrate the
+effectiveness of our two stage search strategy we measure
+the success rate of our searches under high contention. With
+400 concurrent clients we fill a small table (10M entries)
+up to 85\% prior to measuring success rate in order to
+maximize cuckoo path length. Figure~\ref{fig:search_success}
+shows the failure rate of both search stages. The first
+search is the success rate of a search based entirely on
+cached information. The second search is the success rate of
+our restricted search performed after acquiring locks. We
+measure the response of both as a function of lock size.
+Given 1 row per lock the failure rate of both searches is
+over 4 as the local cache is almost always out of sync, and
+retries are not guaranteed to be synchronized. As lock
+granularity grows the frequency of second search success
+drops dramatically. At 64 rows per lock our second search
+succeeds 95\% of the time even when the cached search fails
+at a rate of 99\% per insert.
 
 
 
