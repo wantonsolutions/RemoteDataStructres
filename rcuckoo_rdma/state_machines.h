@@ -98,6 +98,10 @@ namespace cuckoo_state_machines {
             uint32_t _failed_lock_aquisition_count;
             uint32_t _failed_lock_aquisition_this_insert;
 
+            uint32_t _failed_insert_first_search_this_insert;
+            uint32_t _failed_insert_first_search_count;
+            vector<int> _failed_inserts_first_search;
+
 
             uint32_t _completed_insert_count;
             uint64_t _insert_operation_bytes;

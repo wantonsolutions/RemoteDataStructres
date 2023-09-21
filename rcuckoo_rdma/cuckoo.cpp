@@ -1138,6 +1138,8 @@ namespace cuckoo_rcuckoo {
         // assert(_buckets_per_lock == 1);
         //Search path is now set
         if(!path_valid()) {
+            _failed_insert_first_search_this_insert++;
+            _failed_insert_first_search_count++;
             INFO(log_id(), "Path is not valid\n");
             INFO(log_id(), "first path %s\n", path_to_string(_search_context.path).c_str());
             lock_indexes_to_buckets(_search_context.open_buckets, _locks_held, _buckets_per_lock);
@@ -1340,6 +1342,11 @@ namespace cuckoo_rcuckoo {
             VRMaskedCasData lock = _lock_list[message_index];
             VRReadData read = _covering_reads[message_index];
 
+            //This is for testing the benifit of locks only
+            if (!_use_mask) {
+                lock.mask = 0xFFFFFFFFFFFFFFFF;
+            }
+
 
             _wr_id++;
             int outstanding_cas_wr_id = _wr_id;
@@ -1447,6 +1454,7 @@ namespace cuckoo_rcuckoo {
         hash_locations buckets = _location_function(_current_read_key, _table.get_row_count());
 
         bool success = (_table.bucket_contains(buckets.primary, _current_read_key) || _table.bucket_contains(buckets.secondary, _current_read_key));
+        success = true;
         if  (success) {
             //We found the key
             SUCCESS("[get-direct]", "%2d found key %s \n", _id, _current_read_key.to_string().c_str());

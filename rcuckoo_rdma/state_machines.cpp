@@ -87,6 +87,11 @@ namespace cuckoo_state_machines {
         _insert_operation_bytes = 0;
         _insert_operation_messages = 0;
 
+
+        _failed_insert_first_search_this_insert=0;
+        _failed_insert_first_search_count=0;
+        _failed_inserts_first_search = vector<int>();
+
         _failed_lock_aquisitions = vector<int>();
         _failed_lock_aquisition_this_insert = 0;
 
@@ -148,18 +153,18 @@ namespace cuckoo_state_machines {
             _failed_read_count++;
             #endif
         }
+        uint64_t latency = (_operation_end_time - _operation_start_time).count();
         #ifdef MEASURE_MOST
-        _messages_per_read.push_back(_read_operation_messages);
+        _messages_per_read.push_back(_current_read_messages);
         _read_rtt.push_back(_current_read_rtt);
+        _read_latency_ns.push_back(latency);
         #endif
 
         #ifdef MEASURE_ESSENTIAL    
-        uint64_t latency = (_operation_end_time - _operation_start_time).count();
         _sum_read_latency_ns += latency;
         _read_rtt_count += _current_read_rtt;
         _current_read_messages = 0;
         _current_read_rtt = 0;
-        _read_operation_messages = 0;
         #endif
 
     }
@@ -181,6 +186,8 @@ namespace cuckoo_state_machines {
         #ifdef MEASURE_MOST
         _completed_inserts.push_back(_current_insert_key);
         _failed_inserts_second_search.push_back(_failed_insert_second_search_this_insert);
+        _failed_inserts_first_search.push_back(_failed_insert_first_search_this_insert);
+
         _failed_lock_aquisitions.push_back(_failed_lock_aquisition_this_insert);
         _messages_per_insert.push_back(_current_insert_messages);
         _insert_rtt.push_back(_current_insert_rtt);
@@ -192,6 +199,7 @@ namespace cuckoo_state_machines {
         _current_insert_messages = 0;
         _current_insert_rtt = 0;
         _failed_insert_second_search_this_insert = 0;
+        _failed_insert_first_search_this_insert = 0;
         _failed_lock_aquisition_this_insert=0;
         _sum_insert_latency_ns += latency;
 
@@ -215,6 +223,9 @@ namespace cuckoo_state_machines {
         stats["completed_insert_count"] = to_string(_completed_insert_count);
         stats["failed_inserts_second_search"] = array_to_string(_failed_inserts_second_search);
         stats["failed_insert_second_search_count"] = to_string(_failed_insert_second_search_count);
+        stats["failed_inserts_first_search"] = array_to_string(_failed_inserts_first_search);
+        stats["failed_insert_first_search_count"] = to_string(_failed_insert_first_search_count);
+
         stats["insert_operation_bytes"] = to_string(_insert_operation_bytes);
         stats["insert_operation_messages"] = to_string(_insert_operation_messages);
         stats["failed_lock_aquisitions"] = array_to_string(_failed_lock_aquisitions);
