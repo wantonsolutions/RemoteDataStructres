@@ -32,8 +32,9 @@
 RDMA is an enabling technology for memory disaggregation. It
 allows client machines to directly access the memory of a
 remote server without the involvement of a remote CPU (save
-for initialization).  Using RDMA a client can read, write, or
-atomically modify remote memory using a verb api.
+for initialization).  Using RDMA a client can use verbs
+(operation types) to read, write, or atomically modify
+remote memory.
 
 In the past decade the bandwidth capabilities of RDMA NICs
 have increased disproportionately to their latency
@@ -42,14 +43,14 @@ NICs is 10$\times$ and yet intra-rack round trips of small
 RDMA packets has only shrunk by around 1.5$\times$.
 Comparatively bandwidth is cheaper than latency.
 Figure~\ref{fig:rdma-benchmarks}(a) shows the tradeoff
-between NIC to NIC round trips times on CX5 RDMA NICs for
+between NIC-to-NIC round trips times on CX5 RDMA NICs for
 write operations. All packets up to 128 bytes have
 comparable round trip latencies, and packet sizes must grow
 to above 1K before the latency cost of a large packet
 exceeds the cost of two round trips for smaller packets.
-\textbf{In a network with surplus bandwidth if single large
-messages can be used to achieve the work of two dependent
-smaller messages system latency can be improved.}
+\textbf{If there is surplus bandwidth a single large message
+can have much lower latency than two dependent smaller
+messages}
 
 RDMA verbs do not all have the same performance. Atomic
 operations such as compare-and-swap (CAS) and fetch-and-add
@@ -58,10 +59,12 @@ writes~\cite{design-guidelines,sherman}.
 Figure~\ref{fig:rdma-benchmarks}(b) shows the scalability of
 these operations on CX5 NICs for 64 bit operations.
 %%
-Atomic operations bottleneck due to PCIe round trips. Each
-operation issued from nic to host memory requires a PCIe
-round trip during which time data dependent operations must
-queue. Vendors have recently provided a small region (256KB)
+Atomic operations bottleneck due to PCIe round trips. 
+Each operation issued from NIC to host memory requires a
+PCIe round trip. Data dependent operations must queue until
+the atomic operation completes.
+%%
+Vendors have recently provided a small region (256KB)
 of device mapped memory which avoids the round trip on
 atomic operations~\cite{device-memory}.
 Figure~\ref{fig:rdma-benchmarks}(c) shows the relative
@@ -70,18 +73,17 @@ memory. Lock request on a single address are 3x higher
 throughput, and independent lock requests scale at nearly
 the same rate as read and write requests.
 
-Additionally Mellanox provides a 64-bit masked
-compare-and-swap verb which allows for specific bits of a
-64bit word to be set independently~\cite{rdma-masked-cas}.
-This is useful for setting multiple independent locks,
-assuming locks are close together, as the state of all locks
-need not be known.
+Additionally Mellanox provides non-standard verbs such as
+64-bit masked compare-and-swap which sets individual bits in
+a 64 bit word independently of unmasked
+bits~\cite{rdma-masked-cas} This is useful for setting
+multiple independent locks, assuming locks are close
+together, as the state of all locks need not be known.
 
 
 \subsection{RDMA Key-Value Stores}
-
 Many projects have used RDMA to accelerate key-value
-stores~\cite{farm,erpc,herd,mica,pilaf,cell,faast,storm,memc3}.
+stores~\cite{farm,memc3,erpc,herd,faast,mica,pilaf,cell,storm}.
 RDMA verb use is a matter of contention among these systems.
 Typically reads are lock-free and made directly to remote
 memory, while writes use two-sided verbs and are coordinated
@@ -99,31 +101,54 @@ structure.
 far-memory key value stores has a large impact on the
 system's performance. To perform fast reads CPU colocated
 systems have used cuckoo and hopscotch
-hashing~\cite{pilaf,herd,cuckoo,hopscotch}. While these
+hashing~\cite{hopscotch,herd,pilaf,cuckoo}. While these
 structures have fast predictable reads, they have a large
 number of updates required for insertions. These large
 critical sections are amplified by far memory access times
 and lead to performance bottlenecks when acquiring locks.
 Recent work on remote memory data structures have opted for
-optimistic concurrency~\cite{clover,race,ford,rolex,fusee}.
+optimistic concurrency~\cite{rolex,fusee,clover,ford,race}.
 This strategy comes at the cost of additional round trips to
 first learn up-to-date information about the remote
 structure, and to ensure that the optimistic operation
 completed successfully.
 
-\textbf{Cuckoo hashing} is a hash table which delivers
-constant-time reads. It uses two hash functions to determine
-two possible locations at which any hashed item can reside.
-When reading both locations are queried. If the item is not
-found, it is not in the table. On insert, the item is placed
-in the first location it hashes to. If that location is full
-the item in that location is evicted and kicked to it's
-second location.  This process happens iteratively for many
-items. The sequence of displaced keys on an insert is called
-a ~\textit{cuckoo-path}~\cite{cuckoo-improvements}. When a
-loop occurs in a cuckoo path the insert fails and the table
-is resized. Fill factors for cuckoo hashes can be improved
-by using associative buckets for each hash index, and
-shortening cuckoo paths by using BFS rather than radom
-search~\cite{cuckoo-improvements}. ~\todo{consider adding a
-cuckoo search figure}.
+\textbf{Cuckoo hashing} Uses two hash functions as a means
+to resolve collisions when entries hash to the same
+location. Because entries have at most two locations, cuckoo
+hashing has constant time reads as only two locations need
+be checked to determine an entries existence, or location.
+Cuckoo tables use row associative to improve their maximum
+fill factor. Each hash location can house up to $n$
+associated elements. When locating an entry all entries in
+the row must be read.  Cuckoo inserts use the first hash
+functions location as an entry's insert row. If the row is
+full an element is chosen for from that row. The evicted
+element is hashed using it's second hash function, and is
+placed in it's alterative row. If the alternative row is
+also full, the process repeats. The sequence of evicted
+elements is known as a~\textit{cuckoo
+path}~\cite{cuckoo,memc3,cuckoo-improvements}. The search
+algorithm used to find a cuckoo path on an associative
+cuckoo table has a large impact on the length of the
+path~\cite{cuckoo-improvements}. When a path can not be
+found the table has reached it's max fill factor and the
+table will no longer accept new inserted entries. The table
+can be resized and rehashed to continue operation.
+
+% is a hash table which delivers
+% constant-time reads. It uses two hash functions to determine
+% two possible locations at which any hashed item can reside.
+% When reading both locations are queried. If the item is not
+% found, it is not in the table. On insert, the item is placed
+% in the first location it hashes to. If that location is full
+% the item in that location is evicted and kicked to it's
+% second location.  This process happens iteratively for many
+% items. The sequence of displaced keys on an insert is called
+% a ~\textit{cuckoo-path}~\cite{cuckoo-improvements}. When a
+% loop occurs in a cuckoo path the insert fails and the table
+% is resized. Fill factors for cuckoo hashes can be improved
+% by using associative buckets for each hash index, and
+% shortening cuckoo paths by using BFS rather than radom
+% search~\cite{cuckoo-improvements}. ~\todo{consider adding a
+% cuckoo search figure}.
