@@ -1,7 +1,7 @@
 \section{Limitations}
 \label{sec:limations}
 
-\subsection{replication and persistance} At the time of
+\textbf{replication and persistance} At the time of
 writing Rcuckoo does not support multiple memory nodes for
 replication and is not designed for persistance. No aspect
 of RCuckoo's algorithm prevents the use of multiple
@@ -14,7 +14,6 @@ other disaggregated projects~\cite{clover}. For instance
 RCuckoo could easily make use of Clover's persistent extent
 algorithm with no changes to RCuckoo's index structure.
 
-\subsection{scalability} 
 \textbf{Memory Scalability} Currently RCuckoo's memory index
 is limited to a single machine. Multiple memory machines
 could be incorporated by partitioning the table across
@@ -26,12 +25,20 @@ delivery. Therefore inserts, updates and deletes spanning
 multiple machines would require additional delays to ensure
 in order locking.
 
-\textbf{Client Scalability} RCuckoo's algorithm relies
-on the semantics of in order delivery for the correctness of
+\textbf{Client Scalability} RCuckoo's algorithm relies on
+the semantics of in order delivery for the correctness of
 it's locking and reading algorithms. RDMA NIC's have hard
 caps on the number of reliable connections they support
-~\todo{(~65k)} these limitations are fundamental to the
-cache size on the RDMA NIC~\cite{erpc,faast}, although cache
-sizes have steadily increased~\cite{storm}. RDMA unreliable
-connections currently do not support one-sided verbs making
-them unusable for disaggregated applications.
+before inducing cache thrashing. these limitations are
+fundamental to the cache size on the RDMA
+NIC~\cite{erpc,faast,one-rma}, although cache sizes have
+steadily increased~\cite{storm}. RDMA unreliable connections
+currently do not support one-sided verbs making them
+unusable for disaggregated applications.
+
+\textbf{Range Queries} Our currently implementation does
+not support efficient range queries like other ordered
+key-value stores~\cite{sherman,rolex}. Dependent hashing
+spreads keys randomly throughout the table relative to one
+another. We don't consider RCuckoo's index structure to be
+compatible with range queries.

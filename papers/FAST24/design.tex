@@ -2,20 +2,14 @@
 
 In this section we describe our design for a fully
 disaggregated lock-based cuckoo hash. First we describe a
-new dependent hashing algorithm which increases the
-probability that two cuckoo hash locations will be near one
-another. We design a new locality aware locking scheme,
-designed to minimize network round trips.
+new dependent hashing algorithm which controls the
+probability distribution between hash locations. Next we
+describe our RDMA lock table, and locking protocol. We build
+on our locking protocol and describe each operation read,
+update, delete and insert. Finally we describe our two stage
+search algorithm and the implications of search algorithms
+on our locking protocol.
 
-\todo{syncronize with the rest of the section}
-
-
-
-% Next
-% we describe a locality aware search algorithm (A*) which
-% produces short insertion paths in the cuckoo hash. Finally
-% we outline a protocol for insert, read, update and delete to
-% the cuckoo hash which uses our locking and search schemes.
 
 \label{sec:design}
 
