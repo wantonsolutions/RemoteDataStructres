@@ -107,11 +107,11 @@ def plot_buckets_per_lock_vs_locks_per_message_experiment():
     # ax.colorbar()
     # plt.yticks(np.arange(len(y_axis_locks_per_message)), y_axis_locks_per_message)
     # plt.xticks(np.arange(len(x_axis_buckets_per_lock)), x_axis_buckets_per_lock)
-    ax.set_xlabel("Buckets per lock")
+    ax.set_xlabel("Rows per lock")
     ax.set_ylabel("Locks per message")
     fig.tight_layout()
     plt.tight_layout()
     plt.savefig("buckets_per_lock_vs_locks_per_message.pdf")
 
-buckets_per_lock_vs_locks_per_message_experiment()
+# buckets_per_lock_vs_locks_per_message_experiment()
 plot_buckets_per_lock_vs_locks_per_message_experiment()

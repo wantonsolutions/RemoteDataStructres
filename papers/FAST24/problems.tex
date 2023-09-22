@@ -47,8 +47,8 @@ the entire update will fail.
 Figure~\ref{fig:cuckoo-problems}(a) shows the path insertion
 failure rate as the number of concurrent clients grows using
 this approach on a table with 10k entries filled to 90\%.
-The failure rate of operation grows to over 80\% with each
-failure requiring the algorithm to restart.
+The failure rate of operations grows to over 80\% and with each
+failure the algorithm must restart.
 
 A naive lock based approach suffers from an inverse problem.
 Using a single global lock all updates will succeed however
@@ -56,11 +56,19 @@ given a latency of 2us and two round trips to lock and
 unlock, the theoretical limit of such an approach is 250k
 operations per second, which in practice is much lower. As
 such any lock based approach must used fine grained locks.
-Acquiring multiple locks demands a deadlock free algorithm
-in which each atomic acquisition must be performed in order.
-This challenge makes is difficult to aquire many locks
-efficiently as acquiring many locks far apart in memory
-requires many round trips.
+Figure~\ref{fig:cuckoo-problems}(c) illustrates the extent
+of the problem. Using an insertion algorithm described later
+in the paper, we measure the round trips per insert for
+various lock sizes and locks we can set per message. A
+single lock per message requires 55 round trips per insert
+at the 99th percentile when each row in the table has an
+independent lock. Simultaneously locks protecting large
+chunks of the table bottleneck quickly due to lock
+contention.  Acquiring multiple locks demands a deadlock
+free algorithm in which each atomic acquisition must be
+performed in order.  This challenge makes is difficult to
+aquire many locks efficiently as acquiring many locks far
+apart in memory requires many round trips.
 
 % %cuckoo hashing optimistic vs locks
 % \textbf{Critical Sections:} Consider executing an insert
@@ -155,7 +163,6 @@ date caches.~\cite{clover}.
 % resolution requiring a round
 % trip~\cite{clio,clover,pointer-chaising}. 
 
-\sg{location for minor challeges}
 
 \textbf{Duplicate Keys:} Clients may issue concurrent
 inserts for the same key, given that keys may occupy
@@ -165,4 +172,3 @@ trip after each insert to check if a duplicate key was
 inserted simultaneously~\cite{race,fusee}.  An ideal
 algorithm would prevent key duplication without requiring
 additional overheads.
-\todo{consider cutting despite us solving this}

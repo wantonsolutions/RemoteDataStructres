@@ -188,8 +188,10 @@ hashes~\cite{memc3,cuckoo-improvements,pilaf}.
     \caption{
     \textbf{(a)} Failure rate of optimistic cuckoo insertions.
     \textbf{(b)} CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path.
-    \textbf{(c)} Round trips (99th percentile) required per insert while filling a table to 100\% while varying the lock per message, and buckets per lock. \todo{subtract one from each current values include unlocks}
-    }
+    \textbf{(c)} Round trips (99th percentile) on a table
+    with 512 rows required per insert while filling a table
+    to 95\%. 512 buckets per lock is a single global lock.}
+
     \label{fig:cuckoo-problems}
 
 \end{figure*}
