@@ -394,26 +394,36 @@ locks can be acquired in a single round trip.
 
 \subsection{Table Design}
 
-\sg{@alex I've left the proposed table design in}
 
 We design our hash table for fast reads as most data center
 key-value workload are read heavy~\cite{facebook-memcached}.
-Prior disaggregated indexes such as
-~\cite{clover,race,fusee} require two round trips minimum
-for first time reads as their indexes do not support
-inlining. In the case of RACE and FUSEE index entries are
-fixed to 64 bits to support RDMA CAS width operations. This
-fact prevents both projects from inlining key value data and
-requires them to make a second round trip to an extent to
-retrieve data, and check if a key is present in the table.
+Figure~\ref{fig:table-diagram} shows our table design in the
+context of an insert. The table is split into two parts, an
+on NIC lock table, and a main memory, index and extent. The
+lock table is a contiguous array of bits where each bit is a
+lock. Each lock corresponds to one or more rows in the
+index. In the figure an insert with a cuckoo path of length
+2 is shown. $K$ is inserted into the table, and $D$ is
+displaced. Two one bit entries in the lock table are set to
+lock the rows for $K$ and $D$. Each lock protects two rows,
+so a total of four rows are locked. In this example the bits
+for $K$ and $D$ are set with a single masked CAS with the
+two required bits set. During the insert a covering read is
+made on both locked buckets. The client making the insertion
+reads all 24 entries between the range of the two locks.
 
-In our table users can specify the size of their index entries at
-initialization time. Key value pairs which are small enough
-to fit within the index are inlined, otherwise they are
-stored in an extent. Figure~\ref{fig:table-diagram}
-illustrates our table design. Each entry includes an extent
-bit to indicate if the entry is inlined or stored in an
-extent.
+Prior disaggregated indexes have fixed size 64bit entires to
+support atomic updates from RDMA
+CAS~\cite{fusee,race,rolex}. Our table supports variable
+sized entries at initialization time. Key-value pairs which
+fit within the index are inlined. Otherwise they are stored
+in an extent. A bit at the front of each entry determines if
+the entry is inlined. Inlining entries reduced the round
+trips required for reads by 1. It also reduces the number of
+round trips to detect if a key is present in the table, as
+the key, rather than a digest of the key is stored in the
+index. In the alternative case a trip to an extent is
+required.
 
 \subsubsection{Client Caching}
 
@@ -448,7 +458,7 @@ acrostically to the allocator.
 
 \begin{figure}[t]
     \includegraphics[width=0.99\linewidth]{fig/table-diagram.pdf}
-    \caption{Rcuckoo's table design ~\todo{remove extents for this submission}}
+    \caption{Rcuckoo's table design showing an insert of the key $K$ as it displaces $D$.}
     \label{fig:table-diagram}
 \end{figure}
 
