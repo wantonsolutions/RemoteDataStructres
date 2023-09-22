@@ -427,10 +427,16 @@ required.
 
 \subsubsection{Client Caching}
 
-\todo{expand} Clients cache duplicates of the remote index
-to improve the performance of operations. In the case of
-insertions clients search their locally cached indexes to
-determine a cuckoo path prior to acquiring locks. 
+Clients cache local duplicates of the remote index to
+improve the performance of operations. Indexes are small in
+relation to the entire volume of extent data and can assist
+in search during mixed workloads. If memory on clients is
+small RCuckoo can flush local caches between operations.
+When inserting clients search their local caches to estimate
+which locks they will need to aquire~\ref{sec:insert}. Under
+high churn local caches are quickly invalidated, see
+Section~\ref{sec:search_success}.
+
 
 \subsubsection{Memory Allocation}
 
