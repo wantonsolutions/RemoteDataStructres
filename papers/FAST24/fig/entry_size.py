@@ -87,9 +87,10 @@ def plot_entry_size_exp():
     # ax.set_title("Entry Size vs Throughput")
 
     capitalized_workloads = [x.upper() for x in workloads]
+    labels = ["50% insert, 50% read", "read only"]
     size = len(entry_size_order)
     visual_offset = (size-1) * width / 2
-    ax.set_xticks(x + visual_offset, capitalized_workloads)
+    ax.set_xticks(x + visual_offset, labels)
     # ax.set_xticks(x, workloads)
     ax.set_ylim(0,50)
     ax.legend()

@@ -217,7 +217,7 @@ two features of modern RDMA NICs, mainly device mapped
 memory, and masked compare and
 swap~\cite{rdma-masked-cas,sherman}.
 
-Device mapped memory is a small reigon of on NIC memory,
+Device mapped memory is a small region of on NIC memory,
 typically on the order of 256KB. This memory executes
 one-sided RDMA operations faster than host memory as the
 operations need not make a PCIe round trip. This memory is
@@ -595,8 +595,8 @@ single masked cas operation.
 \label{sec:insert}
 
 Unlike updates and deletes, inserts may require modifying
-locations spread across remote memory and require many
-locks. The main challenge in performing an insert is
+many locations spread across remote memory and thus require
+many locks. The main challenge in performing an insert is
 determining which locks to aquire. A naive approach would
 use a global lock, or incrementally aquire locks during
 search. These approaches are known to throttle throughput,
@@ -604,30 +604,42 @@ and require many round trips to
 complete~\cite{cuckoo-improvements}. Unlike prior work,
 issuing reads to the remote index while searching is
 untenable as it will frequently require many round trips to
-build a cuckoo path.
-
-We design a novel two stage search approach to minimize
-round trips while producing valid cuckoo paths with high
-probability.
+build a cuckoo path.  We design a novel two stage search
+approach to minimize round trips while producing valid
+cuckoo paths with high probability.
 
 \textbf{Speculative Local Search:} The first stage of
 insertions is a speculative local search. Clients calculate
 an cuckoo path by searching their unsynchronized local
 caches. While This may not produce a valid cuckoo path it
-constructs a speculative cuckoo path which is localized to
-the region of the table likely to contain a valid path. When
-the table hash low fill, the speculative path is frequently
-correct. Using the speculative path, the client calculates
-the locks required for the speculative insertion aquire the
+constructs a speculative path which is localized to the
+region of the table likely to contain a valid path. When the
+table hash low fill, the speculative path is frequently
+correct. Tables with lower than 50\% fill are likely to have
+a free associative entry in the row a key initially hashes
+to.  Using the speculative path, the client calculates the
+locks required for the speculative insertion aquire the
 unessisary locks.
 
-Clients synchronize their caches during lock acquisition.
-Using the speculative path, clients use a \textit{covering
-read} which spans the locked rows. As covering reads can be
-large we limit them to the same size as the read threshold.
-Covering reads are batched together with lock requests but
-are sequenced after. As such the values returned by the read
-after a successful lock aquire are fully synchronized.
+\textbf{Covering Read:} Clients synchronize their caches
+during lock acquisition.  Using the speculative path,
+clients use a \textit{covering read} which spans the locked
+rows. The covering read synchronizes the clients cache on
+the locked rows, and on the rows near the locked rows.
+Because of dependent hashing there is a high probability
+that a valid path with be found in the locality of the first
+hash location, or in the local of a distant row found by the
+search. The covering read is batched together on the same
+reliable connection as the lock request, but is ordered
+after. If the lock request is successful locked rows are
+fully synchronized. Rows which are read but not locked are
+not guaranteed to be synchronized, but can aid in future
+searches if the speculative path found to be invalid after
+the read returns. Covering reads are sensitive to the number
+of rows per lock. Locking a larger number of rows increases
+the size of each covering read and can consume a lot of
+bandwidth. In our design we set the limit of our covering
+reads to 512 bytes.
 
 \textbf{Second Search:} The speculative path may not be
 valid after clients have acquired locks and synchronized
@@ -642,13 +654,12 @@ locks and tries again. Subsequent searches have a high
 likely hood of success as clients retain their caches across
 requests. We measure the success rate of second searches in
 response to the number of rows per lock in our evaluation
-section~\ref{sec:second-search}.
+(Section~\ref{sec:search_success}).
 
 Cuckoo paths and updates are issued in a single batch. If a
 valid search path is found path updates are made as a batch
 of sequential writes. Unlock operation are batched after the
 writes. Writes to the extent precede updates to the table.
-
 Insertions are the most expensive operation as they require
 computation, large reads, and writes. In our evaluation we
 find that insertions are limited by the network bandwidth of

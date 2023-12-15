@@ -24,7 +24,7 @@ hashing factor, read threshold, and search algorithm.
     function of fill factor. A) Workload throughput. B)
     Median operation latency. C) Average operation size. D)
     Average messages per operation. Figures B through D are
-    YCSB-A }
+    YCSB-A.}
 
     \label{fig:ycsb_fill}
 \end{figure*}
@@ -166,7 +166,7 @@ component. In this section we evaluate RCuckoo's insert
 performance using modified YCSB. We run inserts rather than
 updates, so YCSB-A is 50\% read, 50\% insert. We add an
 additional benchmark \textit{YCSB-W} which is insert only.
-Figure~\cite{fig:ycsb_fill}(a) shows the throughput
+Figure~\ref{fig:ycsb_fill}(a) shows the throughput
 of each workload in response to the tables fill size with
 400 clients. As the cuckoo table fills, cuckoo paths are
 longer leading to more contention, and more bandwidth usage
@@ -352,15 +352,24 @@ is plentiful large windows can improve throughput but up to
 \end{figure}
 
 Key value pairs embedded directly in the index enable single
-round trip reads, at the cost of inflating write bandwidth.
-Large row sizes increase the size of reads during locking
-and search. Figure~\ref{fig:entry_size} shows the effect of
-key value pair size on operation throughput. YCSB-A
-workloads saturate network bandwidth and thus decrease in
-throughput as a function of entry size. In contrast YCSB-C
-is largely unaffected by entry size. We suggest that pairs
-larger than 64 bytes use extents rather than embedding
-directly in the index.
+round trip reads, at the cost of inflating the bandwidth of
+operations. We run a 50\% read 50\% insert and a read only
+workload to illustrate the overhead of larger entries.
+Figure~\ref{fig:entry_size} shows the effect of key value
+pair size on operation throughput. Insert quickly saturates
+the network bandwidth. At 16 byte KV entries the network
+bandwidth is fully absorbed at 8MOPS. Reads which have lower
+bandwidth requirements see very little chance in throughput
+across entry sizes. We suggest that known read heavy
+workloads should use inlined entries as reads see a large
+boost in performance. Update operations are similarly
+unaffected by entry size up to 64 bytes. 
+
+% Our design choice
+% in embedding KV pairs is motivated by networking trends
+% which suggest that 800 GBPS and higher network speeds will
+% be available in the coming years. While round trip latency
+% is expected to remain largely the same.
 
 \subsection{Search Success}
 \label{sec:search_success}

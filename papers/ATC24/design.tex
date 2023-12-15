@@ -534,10 +534,11 @@ read.
 resolution in expectation that future RDMA NICs may provide
 pointer resolution reads as a primitive~\cite{prism}}
 %%
-As reads are lockless they can occur simultaneously with
-writes updating the table. Each entry contains a CRC which
-is checked on reads to validate that all writes have
-completed~\cite{pilaf,cell}.
+Reads are lockless and can see partially completed writes.
+We use a 64 bit CRC to check read
+validity~\cite{pilaf,cell}. Unlike prior approach we use a
+single 64bit CRC per table row, rather than per entry. This
+approach reduces per entry CRC overhead in the index.
 %%
 We define a read threshold of 512 bytes for our clients.
 Approximately 60\% of keys for 64-bit entries with a bucket
@@ -594,11 +595,13 @@ down, or turned off with no harm to correctness.
 
 Updates and deletes are similar operations as both require
 two locks. In the locking phase clients calculate and aquire
-both locks (Section ~\ref{sec:locking}). Updates to inlined entries
-issue a single entry sized update directly to the index.
-Updates to extents issue three messages first the new extent
-is written, the index is updated, and finally the old extend
-is set to invalid and marked for garbage collection. In both
+both locks (Section ~\ref{sec:locking}). Updates to inlined
+entries issue a single entry sized update directly to the
+index. A new CRC is calculated for the updated row and
+issued in the same batch as the update or delete.  Updates
+to extents issue three messages first the new extent is
+written, the index is updated, and finally the old extend is
+set to invalid and marked for garbage collection. In both
 cases unlock messages are batched with the update. Similarly
 deletes lock both table entries. On deletes clients compact
 the row so open entries are always located at the end of the
@@ -687,83 +690,6 @@ continue to increase and so additional operation throughput
 can be exchanged for additional bandwidth~\footnote{CX7
 NIC's currently support 400Gbps line rate.}.
 
-% Clients must first aquire
-% remote locks and then synchronize their cache before they
-% can calculate a guaranteed valid cuckoo path. Acquiring many
-% locks speculatively can decrease throughput by blocking
-% concurrent clients. Simultaneously performing huge
-% synchronizing reads can absorb unessisary bandwidth.
-
-
-% Determining which locks to aquire is hard as clients
-% may have stale caches and many options for potential
-% insertions paths.  We use a speculative two-phase search
-% strategy to find and execute insertions with high
-% probability in two rounds trips. First the client searches
-% it's local cache for a potential cuckoo path. Once a path is
-% found the client calculates the set of locks it requires and
-% attempts to aquire the locks for the speculative cuckoo
-% path. As locks are speculative reads synchronize the client
-% cache.
-
-% After the speculative locks are acquired the client performs
-% a second search only using the locked buckets in the table.
-% If no such path can be found, the client releases the locks
-% and tries again. If a new path can be found using the locked
-% buckets that path is executed and the lock is released.
-% This search strategy benefits greatly from course grained
-% locks. We have found in practice that setting each lock to
-% cover 8 buckets yields the highest performance. Given the
-% distribution of the locality hash function there is high
-% probability that an insertion path can be found within the
-% 64 locked buckets. In the common case this means that
-% inserts take only two round trips. On failures the client
-% maintains the cache it built during the first search to
-% improve its chances of finding a path on the next attempt.
-
-
-% We use a two-phase search
-% strategy to find insertion paths. First the client
-% constructs a potential cuckoo path using its cached index.
-% The client then attempts to acquire the locks necessary for
-% its cuckoo path. Thanks to the spanning reads, once a client
-% succeeds in acquring the necessary locks its cache has been
-% fully synchronized with the relevant portions of remote
-% memory. A second search is then performed using only the
-% buckets the client succeeded in locking---which may be the
-% same if the client's cache was completely up to date. If
-% this search is successful the client calculates the updates
-% to the cuckoo path batches them as a series of writes and
-% issues them along with it's unlock requests.
-
-% If the first search fails the client performs a read and
-% tries again. If this fails the table must be resized. The
-% second search may fail because the clients cache was stale
-% and the list of locked buckets was insufficient to perform
-% the insert. In this case the client releases the locks and
-% performs the insertion from the start again by performing an
-% unrestricted search on its local cache. In the common case
-% insertions take two round trips: We find that when the table is less
-% than 50\% full the probability that a cuckoo path has
-% length greater than one is low. If extents are
-% used the client batches the extent write during its locking
-% phase.
-
-% \textbf{Key Duplication:} Unlike RACE our algorithm can
-% prevent duplicate keys easily on insert~\cite{race}. RACE
-% requires three round trips for inserts, the third re-reads
-% the index to ensure no duplicates were inserted
-% concurrently.  Alternatively Cuckoo hashing inserts to
-% exactly one bucket, which is read during the lock
-% acquisition phase. If a duplicate key is found the client
-% can abort. If the bucket is full, a duplicate key may exist
-% in itts alternative bucket. Our clients issue a read to the
-% inserted keys alternative bucket during lock acquisition. If
-% the lock returns successfully and no duplicate exists in
-% either bucket then no duplicates exist as the successful
-% lock ensures that no other client is currently moving the
-% key to another location as part of a concurrent insert.
-
 
 \subsubsection{Search Algorithm} 
 
@@ -780,6 +706,154 @@ short paths using locality information. We found that A*'s
 performance only improves on BFS at fill rates about 95\%
 which are rarely found in practice due to max fill rate
 limitations.
+
+\subsection{Fault Tolerance}
+
+Prior disaggregated data structures have achieved client
+based fault tolerance by committing changes to data
+structures with a single atomic CAS~\cite{clover,race},
+while lock bases systems have not handled client
+failures~\cite{sherman}. The key challenge in handling
+client failures is recovering when a client dies while
+holding one or more locks. A failed client with a lock may
+have incomplete writes leaving the table in an inconsistent
+state. Furthermore, detecting client failure and
+relinquishing locks is hard as a failed client may have
+issued writes which could be delivered to memory after the
+lock has been revoked. In this section we describe our
+failure detection method, how we protect memory from errant
+writes, and how we recover from partially completed operations.
+
+\subsubsection{Failure Detection} We detect client failures
+using timeouts. Clients start timers when they either fail
+to complete a read due to an inconsistent CRC or when they
+fail to aquire a lock. Once a client starts a timer it
+repeats its request continuously until it's failure timeout
+fires. Failure to read an entry, or obtain a lock may be the
+result of contention. A heavily contested lock may take a
+long time to aquire via attempted CAS requests.
+Simultaneously reads may fail due to seeing different
+partial updates to the table. We enable clients to
+differentiate between contention and failure by adding an 8
+bit version counter to each row in addition to the 64 bit
+CRC. When clients update a bucket they increment the rows
+version number prior to calculating the CRC64 of the row.
+Version numbers cause the CRC to change on each update. When
+clients note that a rows CRC has changed they reset their
+fault detection timer. Only when a client has attempted to
+aquire a lock or read for the full duration of the fault
+timer and the table has not changed does the client flag the
+fault as valid.
+
+During insertions clients can require many locks, and
+therefore hold locks for arbitrary time during their
+acquisition. We bound lock acquisition time so clients can
+detect failures. Clients which take too long to aquire their
+locks release all their locks, and recalculate their
+insertion paths.  We set our failure timeout to \todo{2x
+(ora constant multiple of)} our lock acquisition timer.
+
+\subsubsection{Lock Reclamation} Once a client has detected
+a failure it reclaims the stranded lock and if unessisary
+repairs the table. The most basic failure condition is that
+a client fails prior to releasing the lock but has left the
+table in a valid state. In this case the repair client
+acquires a repair lease for the table, and then issues a
+masked cas to unlock the timed out lock. Repair leases are
+separate locks from the lock table. When a client aquire a
+repair lease it set it with a lock bit, it's queue pair id,
+and a counter. The counter is incremented each time the
+lease is acquired or released. The purpose of the repair
+lease is to ensure that no more than one client attempts to
+repair the table at the same time. Failure timeouts on
+repair leases are similar to table based timeouts, except
+that clients can determine if the lease has changed hands
+simply by reading it. Rcuckoo supports multiple repair
+leases so that table repairs can be run in parallel. Each
+lease spans a range of physical locks. Clients calculate
+which lease or leases they require based on the locks they
+are reclaiming. Once a client has repaired the table and
+reclaimed the lock in question it releases the lease.
+
+\subsection{Table Repair} Cuckoo updates occur along a path
+and client failures could occur at any point along an
+insertion path. Updates and Deletes are a special case where
+the path length is 1. If a client fails mid modification it
+can leave the table in 3 distinct states based on where in
+the update it fails. Cuckoo insertions migrate an open slot
+back to the bucket the insertion must occur in. When
+propagating along a path. Clients write a duplicate entry,
+then update that duplicates CRC, then move on to the next
+entry removing the duplicate by overwriting the next entry
+on the path. The three distinct incorrect states are as
+follows 1) The table contains a duplicate entry, and one of
+those entries has an incorrect row CRC. 2) The table
+contains a duplicate entry and both entries have correct
+CRCs. 3) The table does not contain duplicates but one row
+has a bad CRC. Repairing clients must detect which state the
+table is in and then repair the table in a deterministic way
+so that if they fail during repair subsequent clients can
+repair their failed attempts.
+
+Prior to acquiring repair leases a client first performs a
+series of reads. First it reads all buckets protected by the
+lock it timed out on. Then it iterates through each entry in
+every bucket checking the table for duplicates on each
+entry. The repair client can detect which state the table is
+in by detecting duplicates and checking the CRC on each row.
+If duplicates exist, and a row has a bad CRC the table is in
+state 1) if a duplicate exists and the CRC's are good the
+table is in state 2) and if a row only has a bad CRC the
+table is in state 3). Once the client has determine which
+state the table is in it aquire a repair lease for those
+rows. After acquiring the lease the client rereads the rows
+to ensure they were not corrected by another client before
+proceeding. 
+
+The repair is performed by issuing a deterministic set of
+writes to transition the broken rows through each state. To
+transition from state 1) to state 2) the client recalculates
+the CRC of the row with a broken CRC and issues the write
+placing the table in state 2). To transition the table from
+state 2 to 3 the client must make a deterministic choice.
+The repair client has no knowledge of the original operation
+so it complete the operation by simply removing one
+duplicate. In this case it always removes the duplicate in
+the secondary cuckoo location. By writing an empty entry to
+the second entry location the table is transitioned into
+state 3). State 3 is repaired by recalculating and writing
+the CRC for the inconsistent row. Post repair only locks
+need to be released. This method enable any client to repair
+the table and to fail during any stage of the repair while
+allowing other clients to finish the repair.
+
+\subsubsection{Preventing Stale Writes}
+
+Revoking a lock does not prevent writes from being issued
+directly to memory. If a client issues a write an fails we
+must ensure that the write will not land in memory after a
+client acquires a repair lease. At the time of writing we
+use long timeouts to prevent writes from landing. We assume
+a maximum transit time equal to the maximum queue depth of
+each network hop multiplied by the line rate of the network.
+We assume bounded TTL on each RoCE packet. We bound RDMA
+retry to a constant $r$ and multiply our timeout by the max
+number of retries.
+
+Ideally a memory side CPU would teardown the queue pair of a
+failed client thus preventing all future writes. Given our
+disaggregated assumptions we cannot use this technique.
+Alternatively repairing clients could remove the write
+permissions for the failed client. The current infiniband
+specification supports Type II memory windows which allow
+clients to remove their own permission to a memory region.
+Unfortunately, the specification does not allow for clients
+to remote the permissions of other queue pairs. We
+experimented with an error state based solution where repair
+clients craft bad packets (writes with negative sizes or to
+illegal address ranges) and issue them as isolated UDP
+messages to transition the queue pairs of failed clients to
+an error state~\cite{redmark}.
 
 % Locality based hashing provides us opportunities for better
 % search than traditional cuckoo hashing. Cuckoo hashing

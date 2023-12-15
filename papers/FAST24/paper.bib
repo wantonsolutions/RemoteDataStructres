@@ -639,7 +639,8 @@ series = {EuroSys '20}
 @misc{device-memory,
   title="Device memory programming",
   author="NVIDIA",
-  howpublished="https://docs.nvidia.com/networking/display/OFEDv502180/Programming\#Programming-DeviceMemoryProgramming"
+  howpublished="https://docs.nvidia.com/networking/display/
+  OFEDv502180/Programming\#Programming-DeviceMemoryProgramming"
 }
 
 @InProceedings{kv-direct,
@@ -1416,4 +1417,22 @@ numpages = {14},
 keywords = {Remote Memory Access, Connection Free, Congestion Control},
 location = {Virtual Event, USA},
 series = {SIGCOMM '20}
+}
+
+@inproceedings{nonb-binary,
+author = {Ellen, Faith and Fatourou, Panagiota and Ruppert, Eric and van Breugel, Franck},
+title = {Non-Blocking Binary Search Trees},
+year = {2010},
+isbn = {9781605588889},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/1835698.1835736},
+doi = {10.1145/1835698.1835736},
+abstract = {This paper describes the first complete implementation of a non-blocking binary search tree in an asynchronous shared-memory system using single-word compare-and-swap operations. The implementation is linearizable and tolerates any number of crash failures. Insert and Delete operations that modify different parts of the tree do not interfere with one another, so they can run completely concurrently. Find operations only perform reads of shared memory.},
+booktitle = {Proceedings of the 29th ACM SIGACT-SIGOPS Symposium on Principles of Distributed Computing},
+pages = {131–140},
+numpages = {10},
+keywords = {binary search tree, cas, non-blocking, shared memory},
+location = {Zurich, Switzerland},
+series = {PODC '10}
 }
