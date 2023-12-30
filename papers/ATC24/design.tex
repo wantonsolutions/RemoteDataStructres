@@ -48,47 +48,79 @@ on our locking protocol.
 
 \subsection{Dependent Hashing}
 
-Cuckoo and hopscotch hashes are optimized for
-reads~\cite{cuckoo,hopscotch} and have been used extensively
-in RDMA key value
-stores~\cite{memc3,cuckoo-improvements,pilaf,farm}. Both
-hashes are read optimized, cuckoo hashing ensures at most
-two reads are required (both can be done in parallel), while
-hopscotch hashing ensures the locality of a read to a
-specific location.
+Our hashing algorithm borrows from both cuckoo and hopscotch
+hashing to achieve constant time reads and a high degree of
+locality. The distance between two hash locations is
+determined by probabilistically \textit{dependent} rather
+than independent hash functions. Dependence makes locality a
+tunable parameter. High locality increases the probability
+that a single RDMA read can capture both hash locations and
+decreases the number of locks required for updates. High
+locality increases the chance that an insertion operation
+will fail, decreasing the max fill of the table.
 
-Our approach aims to combine the constant time reads of
-cuckoo hashing with the locality properties of hopscotch
-hashing. Traditional cuckoo hashing requires two independent
-hash functions which set key locations uniformly at random.
-We use two ~\textit{dependent} hash functions to increase
-locality between key locations. The first hash function
-selects a row in the cuckoo table uniformly at random. The
-second second hash function selects a location randomly from
-the following $n$ rows after the first hash location. The
-value of $n$ is not constant. A third hash function $h_3(x)$
-generates values of $n$ according to an exponential
-distribution. We use a constant factor $f$ to control the
-exponential function.  Figure~\ref{fig:locality-hashing}(a)
-shows the formula for our dependent hash functions.
+Figure~\ref{fig:locality-hashing}(a) is the formula for dependent
+hashing. The first hash location is chosen uniformly at
+random, while second is chosen as an offset of the first.
+$f$ determines the max distance the second item can be
+placed. Higher values of $f$ decrease locality.
+Figure~\ref{fig:locality-hashing}(b) shows the distance between hash
+locations as a CDF for different values of $f$. Setting a
+constant bound on the distance between hash locations leads
+to bad fill factors (on the order of 10-15\%). Our function
+places exponentially few locations exponentially far apart
+using a third hash function $h_3(x)$ which generates a
+higher exponent at a logarithmic rate to determine which
+locations will have large distances between
+them~\footnote{The value of $h_3(x)$ is the sum of trailing
+zeros after calculating a keys 64bit hash value} These few,
+but far apart hash locations increase the max fill by
+alleviating hotspots in the table. During inserts these
+entries act as gateways for search to access less filled
+portions of the table. 
 
-The constant value $f$ determines the distribution of
-distances between key locations.
-Figure~\ref{fig:locality-hashing}(b) is a CDF of distances
-between key locations for 3 values of $f$. A distance of 1
-means that a keys second location is in the row immediately
-after it's first location. In the case of $f$=2.3 20\% of
-keys have a distance of 1 bucket. Small values of $f$ have
-high locality. However, locality is not free. Independent%%
-hash functions enable cuckoo hashes to read high fill rates (95\% and higher).
-%%
-Removing independence increase the probability of
-hotspots which cause insert operations to fail. A cuckoo
-insertion fails if no sequence of swaps exists which can
-produce a valid cuckoo path. Failed insertions require the
-table to be resized and directly effect memory utilization.
-Therefore $f$ is directly related to the maximum fill factor
-a table can achieve using dependent hashing.
+Figure~\ref{fig:locality-hashing}(c) shows how larger values of $f$
+enable higher fill factors for tables with 100M entries.  In
+our experiments we use $f$ of 2.1 and an associativity of 8
+as it provides a 90\% max fill an a 68\% probability that
+hash locations are located 3 or fewer buckets apart.
+
+
+% in a single RDMA read, and
+% that fewer locks are required while performing updates.
+
+% the constant time reads of
+% cuckoo hashing with the locality properties of hopscotch
+% hashing. Traditional cuckoo hashing requires two independent
+% hash functions which set key locations uniformly at random.
+% We use two ~\textit{dependent} hash functions to increase
+% locality between key locations. The first hash function
+% selects a row in the cuckoo table uniformly at random. The
+% second second hash function selects a location randomly from
+% the following $n$ rows after the first hash location. The
+% value of $n$ is not constant. A third hash function $h_3(x)$
+% generates values of $n$ according to an exponential
+% distribution. We use a constant factor $f$ to control the
+% exponential function.  Figure~\ref{fig:locality-hashing}(a)
+% shows the formula for our dependent hash functions.
+
+% The constant value $f$ determines the distribution of
+% distances between key locations.
+% Figure~\ref{fig:locality-hashing}(b) is a CDF of distances
+% between key locations for 3 values of $f$. A distance of 1
+% means that a keys second location is in the row immediately
+% after it's first location. In the case of $f$=2.3 20\% of
+% keys have a distance of 1 bucket. Small values of $f$ have
+% high locality. However, locality is not free. Independent%%
+% hash functions enable cuckoo hashes to read high fill rates (95\% and higher).
+% %%
+% Removing independence increase the probability of
+% hotspots which cause insert operations to fail. A cuckoo
+% insertion fails if no sequence of swaps exists which can
+% produce a valid cuckoo path. Failed insertions require the
+% table to be resized and directly effect memory utilization.
+% Therefore $f$ is directly related to the maximum fill factor
+% a table can achieve using dependent hashing.
 
 % An over
 % filled region of the table can quickly lead to deadlocks
@@ -97,15 +129,15 @@ a table can achieve using dependent hashing.
 % $f$ values increase the max fill factor, while decreasing
 % locality.  
 
-Figure~\ref{fig:locality-hashing}(c) shows the relationship
-between $f$ and a tables maximum fill. These values were
-generated by inserting into a cuckoo table with 100M entries
-until an insertion failed. Table associativity directly
-effects fill rate. The higher the degree of associativity
-the more likely a valid path will exist. The table used in
-Figure~\ref{fig:locality-hashing} has an associativity of 8
-similar to prior cuckoo
-hashes~\cite{memc3,cuckoo-improvements,pilaf}.
+% Figure~\ref{fig:locality-hashing}(c) shows the relationship
+% between $f$ and a tables maximum fill. These values were
+% generated by inserting into a cuckoo table with 100M entries
+% until an insertion failed. Table associativity directly
+% effects fill rate. The higher the degree of associativity
+% the more likely a valid path will exist. The table used in
+% Figure~\ref{fig:locality-hashing} has an associativity of 8
+% similar to prior cuckoo
+% hashes~\cite{memc3,cuckoo-improvements,pilaf}.
 
 
 % The associativity of the
@@ -853,7 +885,10 @@ experimented with an error state based solution where repair
 clients craft bad packets (writes with negative sizes or to
 illegal address ranges) and issue them as isolated UDP
 messages to transition the queue pairs of failed clients to
-an error state~\cite{redmark}.
+an error state~\cite{redmark}. While this approach
+guarantees that no stale writes will corrupt memory we hope
+that future RDMA specifications will enable cleaner ways to
+protect memory from failed clients.
 
 % Locality based hashing provides us opportunities for better
 % search than traditional cuckoo hashing. Cuckoo hashing
