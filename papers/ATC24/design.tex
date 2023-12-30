@@ -228,76 +228,137 @@ hash locations are located 3 or fewer buckets apart.
 
 \end{figure*}
 
-Rcuckoo uses locks rather than optimistic operations
-(compare-and-swap) so table entries can be larger than 64
-bits. This enables fast reads, as both keys, and values can
-reside directly in the table index. Locking can be
-expensive, as a naive deadlock free aquire and release
-protocol can incur many round trips.  in this section we
-describe our lock table, and locking protocol designed to
-achieve fast locking in an average of two round trips.
+Using locks rather than opportunistic concurrency halves the
+latency of reads from two to one round trip. Opportunistic
+updates commit changes by atomically updating a pointer
+(with CAS) in the hash index to point to a new value. Both
+the index, then the value must be read for each operation.
+Values can not be inlined in the index as they are limited
+to the 64bit width of CAS. Rcuckoo uses locks to enable
+inlined entries which can be read in a single round trip.
+Locks introduce multiple challenges such as scalability,
+throughput, deadlocks and fault tolerance each of which is
+discussed below.
 
-Our lock table is an array of contiguous bits where each bit
-is a lock, and each lock guards one or more sequential
-buckets. The size of the lock table in bytes equals the
-number of hash table rows, divided by the number of rows
-each lock guards (rows per lock). The size of a lock table
-for a cuckoo table with 100M entries, 8 entries per row, and
-16 rows per lock is 102KB.  Lock table size, and rows per
-lock are important variables as they enable us to utilize
-two features of modern RDMA NICs, mainly device mapped
-memory, and masked compare and
-swap~\cite{rdma-masked-cas,sherman}.
+RCuckoo uses hardware NIC hardware features and lock
+virtualization to achieve scalability, low contention and
+high performance. The lock table is a linear array of bits
+where 1 is locked, and 0 is unlocked. Each bit locks one or
+more contiguous rows in the table. In our experiments we use
+16 rows per lock as it has a negligible effect on contention
+and requires a single lock to be acquired for \todo{85\%
+double check} of insertions.
 
-Device mapped memory is a small region of on NIC memory,
-typically on the order of 256KB. This memory executes
-one-sided RDMA operations faster than host memory as the
-operations need not make a PCIe round trip. This memory is
-especially performant for atomic operations as the NIC would
-otherwise have to queue dependent atomic request to host
-memory. Figure~\ref{fig:rdma-benchmarks}(c) shows the
-performance boost from device over host memory for atomic
-operations.
+We use two RDMA NIC features to accelerate lock
+acquisition. First the lock table is placed in NIC device
+memory which allows atomic operations (CAS) to
+scale linearly with reads and writes and is 3x higher
+throughput on contented addresses than host memory (see
+Figure~\ref{fig:rdma-benchmarks}). It is also lower latency
+as operations to device memory avoid a PCIe round trip.
+Second, RDMA Masked Compare and Swaps (MCAS) are used rather
+than CAS~\cite{rdma-masked-cas,sherman}. CAS requires an
+exact 64 bit match to execute, while MCAS uses a mask to
+only set the required bits. MCAS therefore reduces
+contention while enabling locks to be as tightly packed.
 
-Disaggregated indexes may be very large, and require more
-than 256KB of device mapped memory to store an entire lock
-table. To enable lock tables larger than device device
-memory can hold by default we implement a \textit{virtual
-lock} table. Multiple virtual locks map to a single physical
-lock. We use modulo arithmetic to map virtual locks onto
-physical lock to support arbitrarily large lock tables.
+Packing locks densely is important as NIC device memory is
+limited to 256KB which by default limits table size. We use
+a \textit{virtual lock table} to avoid limiting table size
+by device memory.  Multiple virtual locks map to a single
+physical lock. We use modulo arithmetic to map virtual locks
+onto physical lock to support arbitrarily large tables.
 Mapping multiple virtual to a single physical lock leads to
-false sharing, clients can be blocked unessisary on a
-lock. In Section~\todo{TODO} we show that on large lock
-tables the performance degradation due to false sharing is
-low, and that lock locality is maintained on virtual locks.
+false sharing, clients can be blocked unessisary on a lock.
+In Section~\todo{TODO} we show that on large lock tables the
+performance degradation due to false sharing is low, and
+that lock locality is maintained on virtual locks.
 
-The second NIC feature we exploit is masked compare and swap
-operations. Masked cas operations enable clients to set
-individual bits rather than 64 bit spans. As our lock table
-is tightly packed this enables clients to aquire locks
-without any additional knowledge about the lock table as
-would be required for unmasked cas.
+% Our lock table is an array of contiguous bits where each bit
+% is a lock, and each lock guards one or more sequential
+% buckets. The size of the lock table in bytes equals the
+% number of hash table rows, divided by the number of rows
+% each lock guards (rows per lock). The size of a lock table
+% for a cuckoo table with 100M entries, 8 entries per row, and
+% 16 rows per lock is 102KB.  Lock table size, and rows per
+% lock are important variables as they enable us to utilize
+% two features of modern RDMA NICs, mainly device mapped
+% memory, and masked compare and
+% swap~\cite{rdma-masked-cas,sherman}.
 
-Together with locality hashing these features enable the
-following fast locking protocol. When a client requires
-locks it calculates all lock indexes locally by performing a
-local search. Lock indexes are the row the client must lock
-divided by the number of rows per lock modulo the size of
-the physical lock table. Once the set of locks is calculated
-the client breaks the set of locks into separate locking
-requests. If the locks are within 64 entries of each other
-all locks are packed into a single masked compare and swap
-packet. If the span of locks is greater than 64 a second
-packet is generated with all locks in the next range of 64
-packed together into a single packet.
+% Device mapped memory is a small region of on NIC memory,
+% typically on the order of 256KB. This memory executes
+% one-sided RDMA operations faster than host memory as the
+% operations need not make a PCIe round trip. This memory is
+% especially performant for atomic operations as the NIC would
+% otherwise have to queue dependent atomic request to host
+% memory. Figure~\ref{fig:rdma-benchmarks}(c) shows the
+% performance boost from device over host memory for atomic
+% operations.
 
-Deadlocks are avoided by acquiring locks in a global order
-from smallest to largest. This is done by sorting the locks
-after the virtual to physical mapping occurs. Locks are
-released in the same order. If the locks a client acquires
-are not sufficient to complete it's operation it releases
-the locks and tries again.
+% Disaggregated indexes may be very large, and require more
+% than 256KB of device mapped memory to store an entire lock
+% table. To enable lock tables larger than device device
+% memory can hold by default we implement a \textit{virtual
+% lock} table. 
+
+% Multiple virtual locks map to a single physical
+% lock. We use modulo arithmetic to map virtual locks onto
+% physical lock to support arbitrarily large lock tables.
+% Mapping multiple virtual to a single physical lock leads to
+% false sharing, clients can be blocked unessisary on a
+% lock. In Section~\todo{TODO} we show that on large lock
+% tables the performance degradation due to false sharing is
+% low, and that lock locality is maintained on virtual locks.
+
+% The second NIC feature we exploit is masked compare and swap
+% operations. Masked cas operations enable clients to set
+% individual bits rather than 64 bit spans. As our lock table
+% is tightly packed this enables clients to aquire locks
+% without any additional knowledge about the lock table as
+% would be required for unmasked cas.
+
+Our deadlock free locking protocol acquires and releases
+locks in order.  Given a list of virtual locks to aquire a
+client calculates their physical locations and sorts them.
+The sorted locks are broken into 64 bit chunks which are
+mapped to individual MCAS packets. As shown in
+Figure~\ref{fig:cuckoo-problems}(b) 99\% of insertions are
+within a 256 bucket range. Each MCAS covers 1024 buckets so
+the common case is a single chunk. Lock requests are issued
+in order. Clients continuously poll on lock requests and
+only move to the next request only after the prior has been
+successfully acquired.
+
+Clients may fail while holding locks leaving them set and
+stranded. Clients detect failed locks by timing out on them
+while acquiring them. To separate failures from clients
+acquiring a long list of contended locks clients are given a
+bounded time to aquire their locks. If a client takes longer
+than this time to aquire all of its locks it releases all
+held locks and starts the process again to prevent false
+failure detection. Our complete fault detection and recovery
+mechanism is described in Section~\ref{sec:fault-tolerance}.
+
+% Together with locality hashing these features enable the
+% following fast locking protocol. When a client requires
+% locks it calculates all lock indexes locally by performing a
+% local search. Lock indexes are the row the client must lock
+% divided by the number of rows per lock modulo the size of
+% the physical lock table. Once the set of locks is calculated
+% the client breaks the set of locks into separate locking
+% requests. If the locks are within 64 entries of each other
+% all locks are packed into a single masked compare and swap
+% packet. If the span of locks is greater than 64 a second
+% packet is generated with all locks in the next range of 64
+% packed together into a single packet.
+
+% Deadlocks are avoided by acquiring locks in a global order
+% from smallest to largest. This is done by sorting the locks
+% after the virtual to physical mapping occurs. Locks are
+% released in the same order. If the locks a client acquires
+% are not sufficient to complete it's operation it releases
+% the locks and tries again.
 
 % We use RDMA device memory for our lock
 % table~\cite{rdma-masked-cas}. To aquire locks clitnts
@@ -309,26 +370,26 @@ the locks and tries again.
 % the lock table prior to acquisition (non masked CAS would
 % need the state of all locks prior to issuing the request.).
 
-This locking scheme in conjunction with dependent hashing
-enables most client operations to aquire locks in a singe
-round trip. Update and insert operations require at most two
-locks, one for each key location. Using $f$ of 2.3 90\% of
-key pairs are within 64 rows of each other so even with row
-per lock 90\% of updates and deletes can be completed in two
-round trips. In practice we use 16 rows per lock which
-results in 99.7\% of updates and deletes resulting in two
-round trips.
+% This locking scheme in conjunction with dependent hashing
+% enables most client operations to aquire locks in a singe
+% round trip. Update and insert operations require at most two
+% locks, one for each key location. Using $f$ of 2.3 90\% of
+% key pairs are within 64 rows of each other so even with row
+% per lock 90\% of updates and deletes can be completed in two
+% round trips. In practice we use 16 rows per lock which
+% results in 99.7\% of updates and deletes resulting in two
+% round trips.
 
-Inserts can span arbitrary regions of the table and are a
-harder case than updates and deletes.
-Figure~\ref{fig:cuckoo-problems}(b) shows the span in rows
-of cuckoo paths for a table with 100K rows. These spans are
-the difference between the highest and lowest row locked
-during insertion. Using dependent hashing 95\% of insertions
-span 32 rows or less, and 99\% of insertions span 256 rows
-or less. Using 16 rows per lock each masked cas can cover
-1024 rows of the table ensuring that 99.5\% of insertion
-locks can be acquired in a single round trip.
+% Inserts can span arbitrary regions of the table and are a
+% harder case than updates and deletes.
+% Figure~\ref{fig:cuckoo-problems}(b) shows the span in rows
+% of cuckoo paths for a table with 100K rows. These spans are
+% the difference between the highest and lowest row locked
+% during insertion. Using dependent hashing 95\% of insertions
+% span 32 rows or less, and 99\% of insertions span 256 rows
+% or less. Using 16 rows per lock each masked cas can cover
+% 1024 rows of the table ensuring that 99.5\% of insertion
+% locks can be acquired in a single round trip.
 
 % Using this locking scheme locality hashing greatly improves
 % locking performance. With independent hashing the locks for
@@ -740,6 +801,7 @@ which are rarely found in practice due to max fill rate
 limitations.
 
 \subsection{Fault Tolerance}
+\label{sec:fault-tolerance}
 
 Prior disaggregated data structures have achieved client
 based fault tolerance by committing changes to data
