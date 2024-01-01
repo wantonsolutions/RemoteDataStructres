@@ -602,44 +602,51 @@ protocol.
 \subsubsection{Reading} 
 \label{sec:reading}
 
-Client read request are closely similar to traditional
-cuckoo hashing with two additional performance
-optimizations. To read a key $k$ clients first locate both
-key locations. In default cuckoo hashing two reads are
-issued in parallel to both rows. We take advantage of
-dependent hashing locality and issue a single read which
-captures both rows if the distance between key locations is
-less than a predefined threshold. If key locations are in
-adjacent rows a single read saves packet processing time,
-network bandwidth due to header size, and waiting time as
-the client need not wait for a second read to return. Larger
-reads consume additional bandwidth but very little
-additional latency (see Figure~\ref{fig:rdma-benchmarks}(a)).
+Read requests for key $K$ start by hashing $K$ to calculate
+both row locations. Reads are combined if both rows are
+within a read threshold to reduce tail latency. We use a
+read threshold of 128 bytes as it has a negligible increase
+in latency over smaller RDMA
+packets~\ref{fig:rdma-benchmarks}(a). If reading both
+locations as a single read is greater than 128 bytes, the
+read is issued as two parallel reads to individual rows
+similar to prior work without locality
+optimizations~\cite{pilaf, race}. Inlined entries are read
+in a single round trip, while extent entries require two
+(Figure~\ref{fig:message_diagram}).
 
-If key-value entries are inlined reads complete in a single
-round trip. Larger key stored in extents require a second
-round trip as clients must first read the index, resolve the
-virtual address of the extent and then perform the extent
-read.
-%%
-~\footnote{This design requires exactly one pointer
-resolution in expectation that future RDMA NICs may provide
-pointer resolution reads as a primitive~\cite{prism}}
-%%
-Reads are lockless and can see partially completed writes.
-We use a 64 bit CRC to check read
-validity~\cite{pilaf,cell}. Unlike prior approach we use a
-single 64bit CRC per table row, rather than per entry. This
-approach reduces per entry CRC overhead in the index.
-%%
-We define a read threshold of 512 bytes for our clients.
-Approximately 60\% of keys for 64-bit entries with a bucket
-size of 8 (see Figure~\ref{fig:locality-hashing}(b)) fall
-into this category. This has the advantage of updating the
-client cache for future operations.
+Reads are performed locklessly. Readers recalculate and
+check the rows CRC to validate the read. Clients reissue the
+read if the CRC is invalid as it is likely due to the read
+encountering a torn write. Continuously invalid CRC's can be
+the result of a client failure mid write. Our algorithm for
+detecting and repairing the table from partially completed
+writes is described in Section~\ref{sec:table-repair}.
+
+% If key-value entries are inlined reads complete in a single
+% round trip. Larger key stored in extents require a second
+% round trip as clients must first read the index, resolve the
+% virtual address of the extent and then perform the extent
+% read.
+% %%
+% ~\footnote{This design requires exactly one pointer
+% resolution in expectation that future RDMA NICs may provide
+% pointer resolution reads as a primitive~\cite{prism}}
+% %%
+% Reads are lockless and can see partially completed writes.
+% We use a 64 bit CRC to check read
+% validity~\cite{pilaf,cell}. Unlike prior approach we use a
+% single 64bit CRC per table row, rather than per entry. This
+% approach reduces per entry CRC overhead in the index.
+% %%
+% We define a read threshold of 512 bytes for our clients.
+% Approximately 60\% of keys for 64-bit entries with a bucket
+% size of 8 (see Figure~\ref{fig:locality-hashing}(b)) fall
+% into this category. This has the advantage of updating the
+% client cache for future operations.
 %, and reduces the header processing required by the NIC.
-To reduce bandwidth the size of the threshold can be tuned
-down, or turned off with no harm to correctness.
+% To reduce bandwidth the size of the threshold can be tuned
+% down, or turned off with no harm to correctness.
 
 % \subsubsection{Locking and unlocking}
 
@@ -685,28 +692,38 @@ down, or turned off with no harm to correctness.
 
 \subsubsection{Updates and Deletes}
 
-Updates and deletes are similar operations as both require
-two locks. In the locking phase clients calculate and aquire
-both locks (Section ~\ref{sec:locking}). Updates to inlined
-entries issue a single entry sized update directly to the
-index. A new CRC is calculated for the updated row and
-issued in the same batch as the update or delete.  Updates
-to extents issue three messages first the new extent is
-written, the index is updated, and finally the old extend is
-set to invalid and marked for garbage collection. In both
-cases unlock messages are batched with the update. Similarly
-deletes lock both table entries. On deletes clients compact
-the row so open entries are always located at the end of the
-row~\footnote{Ensuring open entries are at the ends of rows
-improves search times for open buckets.}. Extent entries are
-marked as invalid in the same round trip. Both updates and
-deletes commonly execute in 2 round trips. 3 round trips are
-required only if both locks are too far apart to be set in a
-single masked cas operation.
+Updates and deletes use an identical message protocol. They
+first get both locks for key $K$ while issuing covering
+reads (Section~\ref{sec:locking}). If the key is present the
+entry is either updated or deleted the version number for
+the row is updated and a new CRC is calculated. Both
+modifications are issued as separate RDMA writes. For extent
+updates new values are batched along with lock requests
+preventing an additional round trip. Extent deletes mark the
+extent entry for garbage collection.
+
+% are similar operations as both require
+% two locks. In the locking phase clients calculate and aquire
+% both locks (Section ~\ref{sec:locking}). Updates to inlined
+% entries issue a single entry sized update directly to the
+% index. The row version number is incremented and a new CRC
+% is calculated for the updated row and bached along side the
+% update or delete.  Updates to extents issue three messages
+% first the new extent is written, the index is updated, and
+% finally the old extend is set to invalid and marked for
+% garbage collection. In both cases unlock messages are
+% batched with the update. Similarly deletes lock both table
+% entries. On deletes clients compact the row so open entries
+% are always located at the end of the row~\footnote{Ensuring
+% open entries are at the ends of rows improves search times
+% for open buckets.}. Extent entries are marked as invalid in
+% the same round trip. Both updates and deletes commonly
+% execute in 2 round trips. 3 round trips are required only if
+% both locks are too far apart to be set in a single masked
+% cas operation.
 
 \subsubsection{Insert}
 \label{sec:insert}
-
 
 In the figure an insert with a cuckoo path of length
 2 is shown. $K$ is inserted into the table, and $D$ is
@@ -879,7 +896,9 @@ which lease or leases they require based on the locks they
 are reclaiming. Once a client has repaired the table and
 reclaimed the lock in question it releases the lease.
 
-\subsection{Table Repair} Cuckoo updates occur along a path
+\subsection{Table Repair} 
+\label{sec:table-repair}
+Cuckoo updates occur along a path
 and client failures could occur at any point along an
 insertion path. Updates and Deletes are a special case where
 the path length is 1. If a client fails mid modification it
