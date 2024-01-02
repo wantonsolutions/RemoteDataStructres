@@ -506,7 +506,7 @@ mechanism is described in Section~\ref{sec:fault-tolerance}.
 % for locking.
 
 \subsection{Table Design}
-
+\label{sec:table-design}
 Our table is designed to facility fast reads as they are the
 dominant operation for key value stores in data
 centers~\cite{facebook-memcached}.
@@ -576,7 +576,7 @@ acrostically to the allocator.
 
 \begin{figure}[t]
     \includegraphics[width=0.99\linewidth]{fig/table-diagram.pdf}
-    \caption{Rcuckoo's table design showing an insert of the key $K$ as it displaces $D$.}
+    \caption{Rcuckoo's table design showing an insert of the key $K$ as it displaces $D$.~\todo{add lease table}}
     \label{fig:table-diagram}
 \end{figure}
 
@@ -835,51 +835,90 @@ most paths are short.
 \subsection{Fault Tolerance}
 \label{sec:fault-tolerance}
 
-Prior disaggregated data structures have achieved client
-based fault tolerance by committing changes to data
-structures with a single atomic CAS~\cite{clover,race},
-while lock bases systems have not handled client
-failures~\cite{sherman}. The key challenge in handling
-client failures is recovering when a client dies while
-holding one or more locks. A failed client with a lock may
-have incomplete writes leaving the table in an inconsistent
-state. Furthermore, detecting client failure and
-relinquishing locks is hard as a failed client may have
-issued writes which could be delivered to memory after the
-lock has been revoked. In this section we describe our
-failure detection method, how we protect memory from errant
-writes, and how we recover from partially completed operations.
+% Prior disaggregated data structures have achieved client
+% based fault tolerance by committing changes to data
+% structures with a single atomic CAS~\cite{clover,race},
+% while lock bases systems have not handled client
+% failures~\cite{sherman}. 
 
-\subsubsection{Failure Detection} We detect client failures
-using timeouts. Clients start timers when they either fail
-to complete a read due to an inconsistent CRC or when they
-fail to aquire a lock. Once a client starts a timer it
-repeats its request continuously until it's failure timeout
-fires. Failure to read an entry, or obtain a lock may be the
-result of contention. A heavily contested lock may take a
-long time to aquire via attempted CAS requests.
-Simultaneously reads may fail due to seeing different
-partial updates to the table. We enable clients to
-differentiate between contention and failure by adding an 8
-bit version counter to each row in addition to the 64 bit
-CRC. When clients update a bucket they increment the rows
-version number prior to calculating the CRC64 of the row.
-Version numbers cause the CRC to change on each update. When
-clients note that a rows CRC has changed they reset their
-fault detection timer. Only when a client has attempted to
-aquire a lock or read for the full duration of the fault
-timer and the table has not changed does the client flag the
-fault as valid.
+The table must be repaired if a client fails while holding a
+lock. In our fault recovery algorithm non-failed clients
+aquire repair leases to reclaim the locks of failed clients
+and then perform the operations required to return the table
+to a valid state. In this section we describe how RCuckoo
+clients detect faults, repair the table, and prevent stray
+RDMA writes from failed clients from corrupting the table.
 
-During insertions clients can require many locks, and
-therefore hold locks for arbitrary time during their
-acquisition. We bound lock acquisition time so clients can
-detect failures. Clients which take too long to aquire their
-locks release all their locks, and recalculate their
-insertion paths.  We set our failure timeout to \todo{2x
-(ora constant multiple of)} our lock acquisition timer.
+% The key challenge in handling
+% client failures is recovering when a client dies while
+% holding one or more locks. A failed client with a lock may
+% have incomplete writes leaving the table in an inconsistent
+% state. Furthermore, detecting client failure and
+% relinquishing locks is hard as a failed client may have
+% issued writes which could be delivered to memory after the
+% lock has been revoked. In this section we describe our
+% failure detection method, how we protect memory from errant
+% writes, and how we recover from partially completed operations.
 
-\subsubsection{Lock Reclamation} Once a client has detected
+\subsubsection{Failure Detection} 
+\todo{note that we don't know who has the lock or when they got it}
+
+Clients detect failures with timeouts triggered when lock
+acquisitions or reads continuously fail and the state of the
+table does not change. Reads and lock acquires may fail
+continuously if a row or lock is frequently updated. Clients
+identify true failures from frequent updates by checking row
+CRCs which are updated on each operation via row version
+counters (Section~\ref{sec:table-design}). Clients reset
+their failure timers whenever a CRC changes between
+requests. 
+
+\todo{talk about the actual timeout value} We view failures
+as a rare but essential component of our protocol. As such
+our fault timers are set conservativly. Failure timers for
+locks must include locking time, second search time, and
+update transit time. We bound locking time (Section
+~\ref{sec:locking}), search, and message propagation is
+measured in single digit microseconds. We additionally want
+to ensure that network conditions are not causing continual
+RDMA retries. We set the max RDMA operation retry number to
+3 for all our experiments. We set our failure timeout to
+100ms as it is orders of magnitude above our 99th percentile
+insert time (50us) and above the RDMA retry limit.
+
+% We detect client failures
+% using timeouts. Clients start timers when they either fail
+% to complete a read due to an inconsistent CRC or when they
+% fail to aquire a lock. Once a client starts a timer it
+% repeats its request continuously until it's failure timeout
+% fires. Failure to read an entry, or obtain a lock may be the
+% result of contention. A heavily contested lock may take a
+% long time to aquire via attempted CAS requests.
+% Simultaneously reads may fail due to seeing different
+% partial updates to the table. We enable clients to
+% differentiate between contention and failure by adding an 8
+% bit version counter to each row in addition to the 64 bit
+% CRC. When clients update a bucket they increment the rows
+% version number prior to calculating the CRC64 of the row.
+% Version numbers cause the CRC to change on each update. When
+% clients note that a rows CRC has changed they reset their
+% fault detection timer. Only when a client has attempted to
+% aquire a lock or read for the full duration of the fault
+% timer and the table has not changed does the client flag the
+% fault as valid.
+
+% During insertions clients can require many locks, and
+% therefore hold locks for arbitrary time during their
+% acquisition. We bound lock acquisition time so clients can
+% detect failures. Clients which take too long to aquire their
+% locks release all their locks, and recalculate their
+% insertion paths.  We set our failure timeout to \todo{2x
+% (ora constant multiple of)} our lock acquisition timer.
+
+\subsubsection{Lock Reclamation}
+\todo{mention repair lease table}
+
+Once a client has detected
 a failure it reclaims the stranded lock and if unessisary
 repairs the table. The most basic failure condition is that
 a client fails prior to releasing the lock but has left the
@@ -903,6 +942,8 @@ reclaimed the lock in question it releases the lease.
 
 \subsection{Table Repair} 
 \label{sec:table-repair}
+
+\todo{add a small diagram to show the error states}
 Cuckoo updates occur along a path
 and client failures could occur at any point along an
 insertion path. Updates and Deletes are a special case where
