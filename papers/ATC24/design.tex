@@ -725,107 +725,112 @@ extent entry for garbage collection.
 \subsubsection{Insert}
 \label{sec:insert}
 
-In the figure an insert with a cuckoo path of length
-2 is shown. $K$ is inserted into the table, and $D$ is
-displaced. Two one bit entries in the lock table are set to
-lock the rows for $K$ and $D$. Each lock protects two rows,
-so a total of four rows are locked. In this example the bits
-for $K$ and $D$ are set with a single masked CAS with the
-two required bits set. During the insert a covering read is
-made on both locked buckets. The client making the insertion
-reads all 24 entries between the range of the two locks.
+Insertions are the highest complexity operation because
+client caches are not synced with remote memory. Without
+knowing the state of remote memory clients can neither
+calculate valid cuckoo paths locally and nor determine which
+locks they will require to perform an insertion. We uses a
+speculative local search to predict a sufficient set of
+locks to complete the insertion and then lock and
+synchronize the predicted rows. A second search on the
+locked and synchronized rows determines if a valid insertion
+path can be found on the locked rows.
 
-Unlike updates and deletes, inserts may require modifying
-many locations spread across remote memory and thus require
-many locks. The main challenge in performing an insert is
-determining which locks to aquire. A naive approach would
-use a global lock, or incrementally aquire locks during
-search. These approaches are known to throttle throughput,
-and require many round trips to
-complete~\cite{cuckoo-improvements}. Unlike prior work,
-issuing reads to the remote index while searching is
-untenable as it will frequently require many round trips to
-build a cuckoo path.  We design a novel two stage search
-approach to minimize round trips while producing valid
-cuckoo paths with high probability.
+\textbf{Speculative Local Search:} The first stage of an
+insertion is a speculative local search on the clients
+cache. If the client cache is empty a lock for both of the
+insertion keys hash locations are made. Otherwise, locks for
+each row on the speculative path are acquired. Because of
+locality hashing there is a high probability that a valid
+insertion path can be found in buckets near a speculative
+path, even if the clients cache is stale.
 
-\textbf{Speculative Local Search:} The first stage of
-insertions is a speculative local search. Clients calculate
-an cuckoo path by searching their unsynchronized local
-caches. While This may not produce a valid cuckoo path it
-constructs a speculative path which is localized to the
-region of the table likely to contain a valid path. When the
-table hash low fill, the speculative path is frequently
-correct. Tables with lower than 50\% fill are likely to have
-a free associative entry in the row a key initially hashes
-to.  Using the speculative path, the client calculates the
-locks required for the speculative insertion aquire the
-unessisary locks.
+\textbf{Covering Read:} Clients synchronize their local
+caches while acquiring speculative locks by reading the rows
+the lock protects. These reads are issued in a batch
+alongside the MCAS lock request. Speculative locks may not
+be sufficient to complete an insertion. However, due to
+locality hashing there is a high probability that a valid
+path does exist in the neighborhood of the speculative
+locks. If two speculatively locked rows are close enough
+together clients issus a single \textit{covering read}
+spanning both rows. Covering reads populate a clients cache
+and dramatically increase the probability that if the first
+speculative search fails, a subsequent search will succeed.
+We set the max threshold for covering reads to 512 bytes in
+all our experiments.  Figure~\ref{fig:table-diagram}
+illustrates an insertion of key $K$ displacing key $C$. Here
+the speculative search marked the rows for $C$ and $K$ to be
+locked. A covering read (red) spans the rows between both
+entries.
 
-\textbf{Covering Read:} Clients synchronize their caches
-during lock acquisition.  Using the speculative path,
-clients use a \textit{covering read} which spans the locked
-rows. The covering read synchronizes the clients cache on
-the locked rows, and on the rows near the locked rows.
-Because of dependent hashing there is a high probability
-that a valid path with be found in the locality of the first
-hash location, or in the local of a distant row found by the
-search. The covering read is batched together on the same
-reliable connection as the lock request, but is ordered
-after. If the lock request is successful locked rows are
-fully synchronized. Rows which are read but not locked are
-not guaranteed to be synchronized, but can aid in future
-searches if the speculative path found to be invalid after
-the read returns. Covering reads are sensitive to the number
-of rows per lock. Locking a larger number of rows increases
-the size of each covering read and can consume a lot of
-bandwidth. In our design we set the limit of our covering
-reads to 512 bytes.
-
-\textbf{Second Search:} The speculative path may not be
-valid after clients have acquired locks and synchronized
-their caches. If the speculative path is not valid clients
-perform a second search restricted to the rows locked by the
-client. Due to dependent hashing cuckoo paths are highly
-localized. If locks cover 8 or more rows clients have a high
-probability of constructing a valid cuckoo path using the
-rows locked by their first search. If clients can not find a
-valid path with their second search the client releases it's
-locks and tries again. Subsequent searches have a high
-likely hood of success as clients retain their caches across
-requests. We measure the success rate of second searches in
-response to the number of rows per lock in our evaluation
+\textbf{Second Search:} A speculative cuckoo path may be
+invalid due to churn in the index. However, as noted their
+is high probability that a valid path can be found within
+the locked rows due to hash locality. Clients perform a
+second search only on the synchronized rows that they have
+locked. We use BFS similar to prior work, as it produces
+short paths which minimize bandwidth and locking
+overhead~\cite{cuckoo-improvements}. If a valid cuckoo path
+is found during second search each update and CRC along the
+path along with unlock messages are batched together. If no
+valid path exists the client releases its locks but retains
+its cache. Another speculative search on the fresh cache is
+performed. This algorithm is run itteratitivly until a valid
+path is found. Our evaluation measures the success rate of
+insertions as a factor of lock size
 (Section~\ref{sec:search_success}).
 
-Cuckoo paths and updates are issued in a single batch. If a
-valid search path is found path updates are made as a batch
-of sequential writes. Unlock operation are batched after the
-writes. Writes to the extent precede updates to the table.
-Insertions are the most expensive operation as they require
-computation, large reads, and writes. In our evaluation we
-find that insertions are limited by the network bandwidth of
-our CX5 NIC's not lock contention or failed searches. We
-consider this a desirable limitation as network bandwidths
-continue to increase and so additional operation throughput
-can be exchanged for additional bandwidth~\footnote{CX7
-NIC's currently support 400Gbps line rate.}.
+During development we
+experimented heavily with guided A* search but found that it
+only offered improvements over BFS when the table was over
+95\% full due to the setup overhead of A* and the fact that
+most paths are short.
+
+% The speculative path may not be
+% valid after clients have acquired locks and synchronized
+% their caches. If the speculative path is not valid clients
+% perform a second search restricted to the rows locked by the
+% client. Due to dependent hashing cuckoo paths are highly
+% localized. If locks cover 8 or more rows clients have a high
+% probability of constructing a valid cuckoo path using the
+% rows locked by their first search. If clients can not find a
+% valid path with their second search the client releases it's
+% locks and tries again. Subsequent searches have a high
+% likely hood of success as clients retain their caches across
+% requests. We measure the success rate of second searches in
+% response to the number of rows per lock in our evaluation
+% (Section~\ref{sec:search_success}).
+
+% Cuckoo paths and updates are issued in a single batch. If a
+% valid search path is found path updates are made as a batch
+% of sequential writes. Unlock operation are batched after the
+% writes. Writes to the extent precede updates to the table.
+% Insertions are the most expensive operation as they require
+% computation, large reads, and writes. In our evaluation we
+% find that insertions are limited by the network bandwidth of
+% our CX5 NIC's not lock contention or failed searches. We
+% consider this a desirable limitation as network bandwidths
+% continue to increase and so additional operation throughput
+% can be exchanged for additional bandwidth~\footnote{CX7
+% NIC's currently support 400Gbps line rate.}.
 
 
-\subsubsection{Search Algorithm} 
+% \subsubsection{Search Algorithm} 
 
-Cuckoo paths are highly influenced by the search algorithm 
-used to find them. Prior work has used DFS to construct 
-cuckoo paths~\cite{pilaf,memc3}. We follow prior work and 
-use BFS as it produces the shortest 
-paths~\cite{cuckoo-improvements}. Short paths reduce the 
-number of locks required. Dependent hashing opens new 
-opportunities for search optimization as open slots are more
-likely to be close to an initial hash location. As part of
-our work we investigated using guided search A* to construct
-short paths using locality information. We found that A*'s
-performance only improves on BFS at fill rates about 95\%
-which are rarely found in practice due to max fill rate
-limitations.
+% Cuckoo paths are highly influenced by the search algorithm 
+% used to find them. Prior work has used DFS to construct 
+% cuckoo paths~\cite{pilaf,memc3}. We follow prior work and 
+% use BFS as it produces the shortest 
+% paths~\cite{cuckoo-improvements}. Short paths reduce the 
+% number of locks required. Dependent hashing opens new 
+% opportunities for search optimization as open slots are more
+% likely to be close to an initial hash location. As part of
+% our work we investigated using guided search A* to construct
+% short paths using locality information. We found that A*'s
+% performance only improves on BFS at fill rates about 95\%
+% which are rarely found in practice due to max fill rate
+% limitations.
 
 \subsection{Fault Tolerance}
 \label{sec:fault-tolerance}
