@@ -863,15 +863,15 @@ RDMA writes from failed clients from corrupting the table.
 \subsubsection{Failure Detection} 
 \todo{note that we don't know who has the lock or when they got it}
 
-Clients detect failures with timeouts triggered when lock
-acquisitions or reads continuously fail and the state of the
-table does not change. Reads and lock acquires may fail
-continuously if a row or lock is frequently updated. Clients
-identify true failures from frequent updates by checking row
-CRCs which are updated on each operation via row version
-counters (Section~\ref{sec:table-design}). Clients reset
-their failure timers whenever a CRC changes between
-requests. 
+Clients detect failures with timeouts triggered when a lock
+acquisition or read fails repeatedly and the state of the
+locked or read rows is unaltered by other clients.  True
+failures are distinguished from frequently accessed rows by
+checking CRCs which are modified on every row update due to
+row version numbers (Section~\ref{sec:table-design}).
+Clients reset their failure timers whenever a CRC changes
+between requests.
+
 
 \todo{talk about the actual timeout value} We view failures
 as a rare but essential component of our protocol. As such
@@ -915,30 +915,45 @@ insert time (50us) and above the RDMA retry limit.
 % insertion paths.  We set our failure timeout to \todo{2x
 % (ora constant multiple of)} our lock acquisition timer.
 
-\subsubsection{Lock Reclamation}
+\subsubsection{Repair Leases}
 \todo{mention repair lease table}
 
-Once a client has detected
-a failure it reclaims the stranded lock and if unessisary
-repairs the table. The most basic failure condition is that
-a client fails prior to releasing the lock but has left the
-table in a valid state. In this case the repair client
-acquires a repair lease for the table, and then issues a
-masked cas to unlock the timed out lock. Repair leases are
-separate locks from the lock table. When a client aquire a
-repair lease it set it with a lock bit, it's queue pair id,
-and a counter. The counter is incremented each time the
-lease is acquired or released. The purpose of the repair
-lease is to ensure that no more than one client attempts to
-repair the table at the same time. Failure timeouts on
-repair leases are similar to table based timeouts, except
-that clients can determine if the lease has changed hands
-simply by reading it. Rcuckoo supports multiple repair
-leases so that table repairs can be run in parallel. Each
-lease spans a range of physical locks. Clients calculate
-which lease or leases they require based on the locks they
-are reclaiming. Once a client has repaired the table and
-reclaimed the lock in question it releases the lease.
+Repair leases provide clients with exclusive permission to
+reclaim locks on a region of the table. The table is broken
+into $n$ regions so repairs can be executed in parallel (see
+Figure~\ref{fig:table-diagram}). Leases are set with 64 bit
+CAS and track the lease holders QP id, a set bit, and a
+counter (incremented on each acquisition).  Failures while
+holding a lease are easier to detect than normal locks as a
+leases owner and liveness are tracked within it.  Leases are
+revoked using a similar timeout to normal locks. When a
+client times out on a lease it claims it for itself and
+marks the lease holder as failed (see
+Section~\ref{sec:stale-writes}).  A lock is reclaimed once a
+client both times out on a lock and acquires the locks
+repair lease. 
+
+% Once a client has detected
+% a failure it reclaims the stranded lock and if unessisary
+% repairs the table. The most basic failure condition is that
+% a client fails prior to releasing the lock but has left the
+% table in a valid state. In this case the repair client
+% acquires a repair lease for the table, and then issues a
+% masked cas to unlock the timed out lock. Repair leases are
+% separate locks from the lock table. When a client aquire a
+% repair lease it set it with a lock bit, it's queue pair id,
+% and a counter. The counter is incremented each time the
+% lease is acquired or released. The purpose of the repair
+% lease is to ensure that no more than one client attempts to
+% repair the table at the same time. Failure timeouts on
+% repair leases are similar to table based timeouts, except
+% that clients can determine if the lease has changed hands
+% simply by reading it. Rcuckoo supports multiple repair
+% leases so that table repairs can be run in parallel. Each
+% lease spans a range of physical locks. Clients calculate
+% which lease or leases they require based on the locks they
+% are reclaiming. Once a client has repaired the table and
+% reclaimed the lock in question it releases the lease.
 
 \subsection{Table Repair} 
 \label{sec:table-repair}
@@ -949,17 +964,31 @@ and client failures could occur at any point along an
 insertion path. Updates and Deletes are a special case where
 the path length is 1. If a client fails mid modification it
 can leave the table in 3 distinct states based on where in
-the update it fails. Cuckoo insertions migrate an open slot
-back to the bucket the insertion must occur in. When
-propagating along a path. Clients write a duplicate entry,
-then update that duplicates CRC, then move on to the next
-entry removing the duplicate by overwriting the next entry
-on the path. The three distinct incorrect states are as
-follows 1) The table contains a duplicate entry, and one of
-those entries has an incorrect row CRC. 2) The table
-contains a duplicate entry and both entries have correct
-CRCs. 3) The table does not contain duplicates but one row
-has a bad CRC. Repairing clients must detect which state the
+the update it fails. 
+
+Our table design ensures that clients can perform repairs
+and recover from all states a failed client may have
+created. Recovery is simple if a client with locks fails
+prior to issuing its updates or if it fails before releasing
+its locks. A client with a repair lease can simply set
+unlock the stranded lock in this case. Failures during
+modifications require special care to recover from. All
+modification operations Update, Delete, and Insert write new
+entries as a cuckoo path~\footnote{updates and deletes are a
+cuckoo path of length 1}. As described in
+Section~\ref{sec:insert} cuckoo paths are executed by first
+setting an open entry to claim it and migrating entries
+backwards along the path until a new entry is written. If
+partially executed this algorithm can produce 3 distinct
+states.
+
+\begin{enumerate}
+    \item{A duplicate entry exists and one has a bad CRC}
+    \item{A duplicate entry exists and both have correct CRCs} 
+    \item{No duplicate exists but one row has a bad CRC}
+\end{enumerate}
+
+Repairing clients must detect which state the
 table is in and then repair the table in a deterministic way
 so that if they fail during repair subsequent clients can
 repair their failed attempts.
@@ -997,7 +1026,7 @@ the table and to fail during any stage of the repair while
 allowing other clients to finish the repair.
 
 \subsubsection{Preventing Stale Writes}
-
+\label{sec:stale-writes}
 Revoking a lock does not prevent writes from being issued
 directly to memory. If a client issues a write an fails we
 must ensure that the write will not land in memory after a
