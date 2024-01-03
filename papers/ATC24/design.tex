@@ -958,7 +958,6 @@ repair lease.
 \subsection{Table Repair} 
 \label{sec:table-repair}
 
-\todo{add a small diagram to show the error states}
 Cuckoo updates occur along a path
 and client failures could occur at any point along an
 insertion path. Updates and Deletes are a special case where
@@ -1008,35 +1007,64 @@ lease.
 
 
 \subsubsection{Preventing Stale Writes}
+%%
 \label{sec:stale-writes}
-Revoking a lock does not prevent writes from being issued
-directly to memory. If a client issues a write an fails we
-must ensure that the write will not land in memory after a
-client acquires a repair lease. At the time of writing we
-use long timeouts to prevent writes from landing. We assume
-a maximum transit time equal to the maximum queue depth of
-each network hop multiplied by the line rate of the network.
-We assume bounded TTL on each RoCE packet. We bound RDMA
-retry to a constant $r$ and multiply our timeout by the max
-number of retries.
+%%
 
-Ideally a memory side CPU would teardown the queue pair of a
-failed client thus preventing all future writes. Given our
-disaggregated assumptions we cannot use this technique.
-Alternatively repairing clients could remove the write
-permissions for the failed client. The current infiniband
-specification supports Type II memory windows which allow
-clients to remove their own permission to a memory region.
-Unfortunately, the specification does not allow for clients
-to remote the permissions of other queue pairs. We
-experimented with an error state based solution where repair
-clients craft bad packets (writes with negative sizes or to
-illegal address ranges) and issue them as isolated UDP
-messages to transition the queue pairs of failed clients to
-an error state~\cite{redmark}. While this approach
-guarantees that no stale writes will corrupt memory we hope
-that future RDMA specifications will enable cleaner ways to
-protect memory from failed clients.
+An RDMA connection must be closed, transitioned to an error
+state, or have it's permissions revoked to prevent its
+operations from being executed on memory. Because we assume
+remote memory is passive (it will not tear down connections)
+and that faulty clients will not tear down their connections
+it is possible that the connection of a failed client will
+stay open and stale writes may be delivered to memory after
+a faulty clients lock is revoked. We use conservative
+timeouts to out-wait network delays and RDMA retransmissions
+at the cost of recovery latency. 
+
+At the time of writing the infiniband specification does not
+enable clients to modify each others permissions. Type II
+memory windows enable clients to remove their own
+permissions using the \textit{send with invalidate} verb. If
+the specification were extended to allow a client with
+elevated privileges to revoke the permissions of a faulty
+client it would provide a clean means of handling client
+failure in the disaggregated setting. Given the current
+specification a client can corrupt the QP's of another by
+sending a crafting an invalid packet and sending to their
+queue pair pair~\cite{redmark}[attack 2]. For this attack to
+work the packet sequence number of the shutdown packet must
+match the sequence number of the receiver so $2^{24}$
+packets must be sent to ensure a connection is corrupted
+successfully.
+
+% If a client issues a write and fails we
+% must ensure that the write will not land in memory after a
+% client acquires a repair lease. At the time of writing we
+% use long timeouts to prevent writes from landing. We assume
+% a maximum transit time equal to the maximum queue depth of
+% each network hop multiplied by the line rate of the network.
+% We assume bounded TTL on each RoCE packet. We bound RDMA
+% retry to a constant $r$ and multiply our timeout by the max
+% number of retries.
+
+% Ideally a memory side CPU would teardown the queue pair of a
+% failed client thus preventing all future writes. Given our
+% disaggregated assumptions we cannot use this technique.
+% Alternatively repairing clients could remove the write
+% permissions for the failed client. The current infiniband
+% specification supports Type II memory windows which allow
+% clients to remove their own permission to a memory region.
+% Unfortunately, the specification does not allow for clients
+% to remote the permissions of other queue pairs. We
+% experimented with an error state based solution where repair
+% clients craft bad packets (writes with negative sizes or to
+% illegal address ranges) and issue them as isolated UDP
+% messages to transition the queue pairs of failed clients to
+% an error state~\cite{redmark}. While this approach
+% guarantees that no stale writes will corrupt memory we hope
+% that future RDMA specifications will enable cleaner ways to
+% protect memory from failed clients.
 
 % Locality based hashing provides us opportunities for better
 % search than traditional cuckoo hashing. Cuckoo hashing
