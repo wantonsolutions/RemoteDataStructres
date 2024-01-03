@@ -988,42 +988,24 @@ states.
     \item{No duplicate exists but one row has a bad CRC}
 \end{enumerate}
 
-Repairing clients must detect which state the
-table is in and then repair the table in a deterministic way
-so that if they fail during repair subsequent clients can
-repair their failed attempts.
+To repair the table a client first detects which state the
+table is in and then transitions the table forward through
+the states with a deterministic sequence of operations so
+that failures during recovery can be continued by any other
+client. A client detects the state issuing reads to all rows
+protected by the stranded lock. Then all entries within the
+rows have both hash locations read individually to check for
+duplicates. The error state can be detected by the presence
+of duplicates in these rows and the existence of bad CRCs.
 
-Prior to acquiring repair leases a client first performs a
-series of reads. First it reads all buckets protected by the
-lock it timed out on. Then it iterates through each entry in
-every bucket checking the table for duplicates on each
-entry. The repair client can detect which state the table is
-in by detecting duplicates and checking the CRC on each row.
-If duplicates exist, and a row has a bad CRC the table is in
-state 1) if a duplicate exists and the CRC's are good the
-table is in state 2) and if a row only has a bad CRC the
-table is in state 3). Once the client has determine which
-state the table is in it aquire a repair lease for those
-rows. After acquiring the lease the client rereads the rows
-to ensure they were not corrected by another client before
-proceeding. 
+Table corrections are issued as a batched sequence of 3 or
+fewer writes as follow: $1 \rightarrow 2$ - write a new CRC
+for the bad duplicate.  $2->3$ - Set the duplicate in the
+second hash location to empty. $3\rightarrow$ - recalculate
+and write a new CRC. After a client has issued its repair
+sequence it unlocks the reclaimed lock and returns its
+lease.
 
-The repair is performed by issuing a deterministic set of
-writes to transition the broken rows through each state. To
-transition from state 1) to state 2) the client recalculates
-the CRC of the row with a broken CRC and issues the write
-placing the table in state 2). To transition the table from
-state 2 to 3 the client must make a deterministic choice.
-The repair client has no knowledge of the original operation
-so it complete the operation by simply removing one
-duplicate. In this case it always removes the duplicate in
-the secondary cuckoo location. By writing an empty entry to
-the second entry location the table is transitioned into
-state 3). State 3 is repaired by recalculating and writing
-the CRC for the inconsistent row. Post repair only locks
-need to be released. This method enable any client to repair
-the table and to fail during any stage of the repair while
-allowing other clients to finish the repair.
 
 \subsubsection{Preventing Stale Writes}
 \label{sec:stale-writes}
