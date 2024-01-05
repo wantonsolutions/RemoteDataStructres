@@ -31,20 +31,18 @@
 
 RDMA is an enabling technology for memory disaggregation. It
 allows client machines to directly access the memory of a
-remote server without the involvement of a remote CPU (save
-for initialization).  Using RDMA a client can use verbs
-(operation types) to read, write, or atomically modify
-remote memory.
-
-In the past decade the bandwidth capabilities of RDMA NICs
-have increased disproportionately to their latency
-improvement. The bandwidth difference between CX3 and CX7
-NICs is 10$\times$ and yet intra-rack round trips of small
-RDMA packets has only shrunk by around 1.5$\times$.
-Comparatively bandwidth is cheaper than latency.
-Figure~\ref{fig:rdma-benchmarks}(a) shows the tradeoff
-between NIC-to-NIC round trips times on CX5 RDMA NICs for
-write operations. All packets up to 128 bytes have
+remote server with operations like read, write and atomic
+update, without the involvement of a remote CPU (save for
+initialization).  
+%%
+In the past decade the bandwidth
+capabilities of RDMA NICs have increased disproportionately
+to their latency improvement. The bandwidth difference
+between CX3 and CX7 NICs is 10$\times$ and yet intra-rack
+round trips of small RDMA packets has only shrunk by around
+1.5$\times$.  Figure~\ref{fig:rdma-benchmarks}(a) shows the
+tradeoff between NIC-to-NIC round trips times on CX5 RDMA
+NICs for write operations. All packets up to 128 bytes have
 comparable round trip latencies, and packet sizes must grow
 to above 1K before the latency cost of a large packet
 exceeds the cost of two round trips for smaller packets.

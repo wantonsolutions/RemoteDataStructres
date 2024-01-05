@@ -1,14 +1,13 @@
 \section{Design}
 
 In this section we describe our design for a fully
-disaggregated lock-based cuckoo hash. First we describe a
-new dependent hashing algorithm which controls the
-probability distribution between hash locations. Next we
-describe our RDMA lock table, and locking protocol. We build
-on our locking protocol and describe each operation read,
-update, delete and insert. Finally we describe our two stage
-search algorithm and the implications of search algorithms
-on our locking protocol.
+disaggregated lock-based cuckoo hash. We first describe our
+locality tunable hash function followed by an efficient
+locking protocol which benefits from locality. Next we
+describe the design of the hash table itself and the
+protocols for read, update, delete, and insert. Finally we
+describe how we detect and recover from the failure of a
+client holding locks.
 
 
 \label{sec:design}
@@ -53,13 +52,13 @@ hashing to achieve constant time reads and a high degree of
 locality. The distance between two hash locations is
 determined by probabilistically \textit{dependent} rather
 than independent hash functions. Dependence makes locality a
-tunable parameter. High locality increases the probability
-that a single RDMA read can capture both hash locations and
-decreases the number of locks required for updates. High
-locality increases the chance that an insertion operation
-will fail, decreasing the max fill of the table.
+tunable parameter. Locality between hash entries reduces the
+span of cuckoo paths and increases the probability that both
+entries can be read with a single RDMA message. However,
+high locality increases the probability of hotspots in the
+table which decreases its maximum fill factor.
 
-Figure~\ref{fig:locality-hashing}(a) is the formula for dependent
+Figure~\ref{fig:locality-hashing}(a) is our formula for dependent
 hashing. The first hash location is chosen uniformly at
 random, while second is chosen as an offset of the first.
 $f$ determines the max distance the second item can be
@@ -955,7 +954,7 @@ repair lease.
 % are reclaiming. Once a client has repaired the table and
 % reclaimed the lock in question it releases the lease.
 
-\subsection{Table Repair} 
+\subsubsection{Table Repair} 
 \label{sec:table-repair}
 
 Cuckoo updates occur along a path
