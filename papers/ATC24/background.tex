@@ -103,18 +103,27 @@ clients~\cite{rolex,fusee,clover,sherman,ford,race}. With
 the exception of Sherman these systems use systems commit
 writes optimistically using 64 bit RDMA CAS. 
 %%
-These writes have the advantage that updates are atomically
-visible, no critical sections exist, and client failures do
-not leave the table in an inconsistent state. However,
-opportunistic concurrency comes at a cost. Contention leads
-to frequently failed operations and high tail
-latencies~\cite{clover}, CAS operations don't scale
+Opportunistic writes have the advantage that updates are
+atomically visible, no critical sections exist, and client
+failures do not leave the table in an inconsistent state.
+However, opportunistic concurrency comes at a cost.
+Contention leads to frequently failed operations and high
+tail latencies~\cite{clover}, CAS operations don't scale
 well~\cite{design-guidelines}(Figure~\ref{fig:rdma-benchmarks}(b))
-and 64 bit width CAS forces tables to entries to be pointers
-to keys and values rather than values
-themselves~\cite{race}. Using pointers in a key-value index
-rather than directly inlining key-value pairs requires two round trips for
-reads, rather than one.
+and 64 bit width CAS constrain the size of updates to the
+table.
+
+CAS width in particular effects system design.  Because
+key-value pairs can rarely fit into 64 bits, indexes updated
+with CAS must reference keys values indirectly with a
+pointer. At minimum resolving a remote pointer requires an
+additional round trip for every read~\cite{race,clover}.
+%%
+As we will show in the following section data structures
+like cuckoo and hopscotch hashes are difficult implement with
+optimistic CAS updates because they require multiple updates
+to execute atomically.
+
 
 \subsection{Cuckoo Hashing}
 Cuckoo hashing Uses two hash functions as a means
