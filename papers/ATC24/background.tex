@@ -125,31 +125,67 @@ optimistic CAS updates because they require multiple updates
 to execute atomically.
 
 
-\subsection{Cuckoo Hashing}
-Cuckoo hashing Uses two hash functions as a means
-to resolve collisions when entries hash to the same
-location. Because entries have at most two locations, cuckoo
-hashing has constant time reads as only two locations need
-be checked to determine an entries existence, or location.
-Cuckoo tables use row associative to improve their maximum
-fill factor. Each hash location can house up to $n$
-associated elements. When locating an entry all entries in
-the row must be read.  Cuckoo inserts use the first hash
-functions location as an entry's insert row. If the row is
-full an element is chosen for from that row. The evicted
-element is hashed using it's second hash function, and is
-placed in it's alterative row. If the alternative row is
-also full, the process repeats. The sequence of evicted
-elements is known as a~\textit{cuckoo
-path}~\cite{cuckoo,memc3,cuckoo-improvements}. The search
-algorithm used to find a cuckoo path on an associative
-cuckoo table has a large impact on the length of the
-path~\cite{cuckoo-improvements}. When a path can not be
-found the table has reached it's max fill factor and the
-table will no longer accept new inserted entries. The table
-can be resized and rehashed to continue operation.
+\subsection{Cuckoo Hashing} 
 
-\textbf{Hopscotch Hashing}: is another candidate hash table
+Cuckoo hashing uses two independent hash functions to give
+keys a primary and secondary location in the table. When an
+insert collides with an existing key, the existing key is
+evicted to its alternate location. If the eviction also
+causes a collision the process iterates. The path of
+evictions is known as a~\textit{cuckoo path}. Cuckoo hashes
+use associative rows to improve fill factors. In associative
+hashes multiple clients can be chosen as eviction candidates
+and breadth-first-search (BFS) has been shown to minimize
+both path length and critical section time~\cite{memc3,
+cuckoo-improvements}. While insertions require large
+critical sections to perform search and execute updates
+along the cuckoo path reads are executed in constant time by
+reading both of a keys buckets~\cite{pilaf}.
+
+%%now I want to explain why cuckoo hashing and disaggregation don't work well together.
+
+Fast parallel reads make Cuckoo hashing a desireable
+candidate for a disaggregated index, however, long
+unpredictable cuckoo paths and RDMA CAS limitations make
+insertions difficult in the disaggregated setting. We
+designed an RDMA based cuckoo hash to illustrate the
+difficulties of performing opportunistic insertions. On
+inserts this system makes a sequence of reads to calculate a
+valid cuckoo path and then itteratitivly issues CAS
+operations to swap value along the path. If any value on the
+path is concurrently modified by another client the
+insertions will fail and must restart.
+Figure~\ref{fig:cuckoo-problems}(a) shows how the failure
+rate of insertions filling a table from 80-90\% full.
+
+
+% Cuckoo hashing Uses two hash functions as a means
+% to resolve collisions when entries hash to the same
+% location. Because entries have at most two locations, cuckoo
+% hashing has constant time reads as only two locations need
+% be checked to determine an entries existence, or location.
+% Cuckoo tables use row associative to improve their maximum
+% fill factor. Each hash location can house up to $n$
+% associated elements. When locating an entry all entries in
+% the row must be read.  Cuckoo inserts use the first hash
+% functions location as an entry's insert row. If the row is
+% full an element is chosen for from that row. The evicted
+% element is hashed using it's second hash function, and is
+% placed in it's alterative row. If the alternative row is
+% also full, the process repeats. The sequence of evicted
+% elements is known as a~\textit{cuckoo
+% path}~\cite{cuckoo,memc3,cuckoo-improvements}. The search
+% algorithm used to find a cuckoo path on an associative
+% cuckoo table has a large impact on the length of the
+% path~\cite{cuckoo-improvements}. When a path can not be
+% found the table has reached it's max fill factor and the
+% table will no longer accept new inserted entries. The table
+% can be resized and rehashed to continue operation.
+
+\textbf{Hopscotch Hashing}:
+\todo{This section needs to be compacted and integrated with the other text}
+\todo{Add Reno hash as a counter example for disaggregation}
+is another candidate hash table
 we considered for disaggregation. Hopscotch hashing uses a
 hybrid if linear probing and swapping to ensure that hash
 entries are within a constant bound of their original
