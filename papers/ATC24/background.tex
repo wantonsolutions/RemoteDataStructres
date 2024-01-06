@@ -80,38 +80,44 @@ together, as the state of all locks need not be known.
 
 
 \subsection{RDMA Key-Value Stores}
-Many projects have used RDMA to accelerate key-value
-stores~\cite{farm,memc3,erpc,herd,faast,mica,pilaf,cell,storm}.
-RDMA verb use is a matter of contention among these systems.
-Typically reads are lock-free and made directly to remote
-memory, while writes use two-sided verbs and are coordinated
-by the server side CPU.
+
+%% %Describe existing key value stores relation to rdma and
+%serialization %
+Many non-disaggregated key-value stores have used RDMA to
+accelerate their
+performance~\cite{farm,memc3,erpc,herd,faast,mica,pilaf,cell,storm}.
 %%
-Far memory key-value stores have no server side CPU and must
-therefore use client side synchronization to achieve
-serializablity~\cite{rolex,fusee,clover,sherman,ford,race}.
-These systems make use of RDMA atomic verbs for
-serialization. However, the use of the atomics is highly
-dependent on the key-value stores under lying data
-structure.
+These systems strike a careful balance between directly
+accessing memory with client side RDMA and serializing
+requests with a server side CPU.
+%%
+Cuckoo and Hopscotch hashes have flourished in this space
+because clients can locally calculate the location of keys
+and perform lockless $O(1)$ reads with
+RDMA~\cite{hopscotch,farm,pilaf,cuckoo}.
+%%
+Disaggregated key-value in contrast assume that a memory
+server cannot provide serialization and orchestrate their
+writes solely using
+clients~\cite{rolex,fusee,clover,sherman,ford,race}. With
+the exception of Sherman these systems use systems commit
+writes optimistically using 64 bit RDMA CAS. 
+%%
+These writes have the advantage that updates are atomically
+visible, no critical sections exist, and client failures do
+not leave the table in an inconsistent state. However,
+opportunistic concurrency comes at a cost. Contention leads
+to frequently failed operations and high tail
+latencies~\cite{clover}, CAS operations don't scale
+well~\cite{design-guidelines}(Figure~\ref{fig:rdma-benchmarks}(b))
+and 64 bit width CAS forces tables to entries to be pointers
+to keys and values rather than values
+themselves~\cite{race}. Using pointers in a key-value index
+rather than directly inlining key-value pairs requires two round trips for
+reads, rather than one.
 
-\textbf{Data Structures} The underlying data structures of
-far-memory key value stores has a large impact on the
-system's performance. To perform fast reads CPU colocated
-systems have used cuckoo and hopscotch
-hashing~\cite{hopscotch,herd,pilaf,cuckoo}. While these
-structures have fast predictable reads, they have a large
-number of updates required for insertions. These large
-critical sections are amplified by far memory access times
-and lead to performance bottlenecks when acquiring locks.
-Recent work on remote memory data structures have opted for
-optimistic concurrency~\cite{rolex,fusee,clover,ford,race}.
-This strategy comes at the cost of additional round trips to
-first learn up-to-date information about the remote
-structure, and to ensure that the optimistic operation
-completed successfully.
-
-\textbf{Cuckoo hashing} Uses two hash functions as a means
+\subsection{Cuckoo Hashing}
+Cuckoo hashing Uses two hash functions as a means
 to resolve collisions when entries hash to the same
 location. Because entries have at most two locations, cuckoo
 hashing has constant time reads as only two locations need
