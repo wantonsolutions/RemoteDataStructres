@@ -18,8 +18,8 @@ failures.
 Figure~\ref{fig:table-diagram} shows RCuckoos index and lock
 table during an insertion of key $K$. The primary row for
 $K$ is full and key $C$ is evicted to its alternate
-location. Locks for $K$ and $C$ are set in lock table both
-of which span two rows.
+location. Locks for $K$ and $C$ are set in lock table. Here
+locks protect two rows each.
 %%
 The table index (right) is a single region of RDMA
 registered main memory with fixed width entries.  Each row
@@ -58,34 +58,34 @@ index lock granularity paired with read strategy
 (Section~\ref{sec:insert}) has a far higher impact on search
 success over caching (Section~\ref{sec:search_success}).
 
-\textbf{Memory Allocation:}
-%%
-\sg{Help alex, I need to remove this section but I don't
-quite know how to talk about memory allocation or extent
-memory}
-%%
-Prior work has focused on different memory allocation and
-hash table resizing schemes. Sherman~\cite{sherman} uses an
-allocated thread located on the memory node,
-Fusee~\cite{fusee} uses a two tired memory allocation in
-which large blocks of memory are allocated on the memory
-nodes and fine grained allocation is performed on the
-clients. Clover~\cite{clover} statically partitions memory
-into large client regions prior to execution and hash
-clients entirely manage the space themselves. Network based
-allocators such as MIND and Clio~\cite{mind,clio} have
-demonstrated the feasibility of high performance
-disaggregated allocators, while some have called for
-allocators to be built into RDMA~\cite{prism}. We allocate
-memory using the same scheme as Clover, as it is simple to
-implement and adds no additional overhead. We view memory
-allocation as a hard orthogonal problem to the design of
-disaggregated indexes and have designed our system
-acrostically to the allocator.
+% \textbf{Memory Allocation:}
+% %%
+% \sg{Help alex, I need to remove this section but I don't
+% quite know how to talk about memory allocation or extent
+% memory}
+% %%
+% Prior work has focused on different memory allocation and
+% hash table resizing schemes. Sherman~\cite{sherman} uses an
+% allocated thread located on the memory node,
+% Fusee~\cite{fusee} uses a two tired memory allocation in
+% which large blocks of memory are allocated on the memory
+% nodes and fine grained allocation is performed on the
+% clients. Clover~\cite{clover} statically partitions memory
+% into large client regions prior to execution and hash
+% clients entirely manage the space themselves. Network based
+% allocators such as MIND and Clio~\cite{mind,clio} have
+% demonstrated the feasibility of high performance
+% disaggregated allocators, while some have called for
+% allocators to be built into RDMA~\cite{prism}. We allocate
+% memory using the same scheme as Clover, as it is simple to
+% implement and adds no additional overhead. We view memory
+% allocation as a hard orthogonal problem to the design of
+% disaggregated indexes and have designed our system
+% acrostically to the allocator.
 
 \begin{figure}[t]
     \includegraphics[width=0.99\linewidth]{fig/table-diagram.pdf}
-    \caption{Rcuckoo's table design showing an insert of the key $K$ as it displaces $D$.~\todo{add lease table}}
+    \caption{Rcuckoo's table design showing an insert of the key $K$ as it displaces $C$.~\todo{add lease table}}
     \label{fig:table-diagram}
 \end{figure}
 
@@ -145,56 +145,90 @@ synchronize the predicted rows. A second search on the
 locked and synchronized rows determines if a valid insertion
 path can be found on the locked rows.
 
-\textbf{Speculative Local Search:} The first stage of an
-insertion is a speculative local search on the clients
-cache. If the client cache is empty a lock for both of the
-insertion keys hash locations are made. Otherwise, locks for
-each row on the speculative path are acquired. Because of
-locality hashing there is a high probability that a valid
-insertion path can be found in buckets near a speculative
-path, even if the clients cache is stale.
+\textbf{Speculative Local Search:} As noted in
+Section~\ref{sec:cuckoo-back} building a valid cuckoo path
+is expensive because it requires iterative dependent reads.
+We use a speculative local search to shortcut the iterations
+if possible. Prior to synchronizing with reads clients
+search the contents of their local caches to build a
+speculative path. If the client cache is empty a lock for
+both of the insertion keys hash locations are made.
+Otherwise, locks for each row on the speculative path are
+acquired. Speculative cuckoo paths can be over on under
+approximations of a valid path and are most useful when
+caches are fresh due to a prior insert attempt failing.
 
-\textbf{Covering Read:} Clients synchronize their local
-caches while acquiring speculative locks by reading the rows
-the lock protects. These reads are issued in a batch
-alongside the MCAS lock request. Speculative locks may not
-be sufficient to complete an insertion. However, due to
-locality hashing there is a high probability that a valid
-path does exist in the neighborhood of the speculative
-locks. If two speculatively locked rows are close enough
-together clients issus a single \textit{covering read}
-spanning both rows. Covering reads populate a clients cache
-and dramatically increase the probability that if the first
-speculative search fails, a subsequent search will succeed.
-We set the max threshold for covering reads to 512 bytes in
-all our experiments.  Figure~\ref{fig:table-diagram}
-illustrates an insertion of key $K$ displacing key $C$. Here
-the speculative search marked the rows for $C$ and $K$ to be
-locked. A covering read (red) spans the rows between both
-entries.
+% Because of
+% locality hashing there is a high probability that a valid
+% insertion path can be found in buckets near a speculative
+% path, even if the clients cache is stale.
 
-\textbf{Second Search:} A speculative cuckoo path may be
-invalid due to churn in the index. However, as noted their
-is high probability that a valid path can be found within
-the locked rows due to hash locality. Clients perform a
-second search only on the synchronized rows that they have
-locked. We use BFS similar to prior work, as it produces
-short paths which minimize bandwidth and locking
-overhead~\cite{cuckoo-improvements}. If a valid cuckoo path
-is found during second search each update and CRC along the
-path along with unlock messages are batched together. If no
-valid path exists the client releases its locks but retains
-its cache. Another speculative search on the fresh cache is
-performed. This algorithm is run itteratitivly until a valid
-path is found. Our evaluation measures the success rate of
-insertions as a factor of lock size
-(Section~\ref{sec:search_success}).
+\textbf{Cache Synchronization:} Clients synchronize their
+local caches while acquiring locks by reading the rows each
+lock protects. These reads are issued in a batch alongside
+the lock request. If the lock is acquired the values of the
+read will remain synchronized until the lock is released.
+After locking clients check if their speculative paths are
+valid by checking their caches.
 
-During development we
-experimented heavily with guided A* search but found that it
-only offered improvements over BFS when the table was over
-95\% full due to the setup overhead of A* and the fact that
-most paths are short.
+% Speculative locks may not be sufficient to complete an
+% insertion.  However, due to locality hashing there is a high
+% probability that a valid path does exist in the neighborhood
+% of the speculative locks. 
+% If two speculatively locked rows
+% are close enough together clients issus a single
+% \textit{covering read} spanning both rows. Covering reads
+% populate a clients cache and dramatically increase the
+% probability that if the first speculative search fails, a
+% subsequent search will succeed.  We set the max threshold
+% for covering reads to 512 bytes in all our experiments.
+% Figure~\ref{fig:table-diagram} illustrates an insertion of
+% key $K$ displacing key $C$. Here the speculative search
+% marked the rows for $C$ and $K$ to be locked. A covering
+% read (red) spans the rows between both entries.
+
+\textbf{Second Search:} Speculative cuckoo paths may not be
+valid. However, a valid cuckoo path may exist within the
+locked rows. Clients perform a second search only on the
+synchronized rows that they have locked. We use BFS similar
+to prior work, as it produces short paths which minimize
+bandwidth and locking overhead~\cite{cuckoo-improvements}.
+If a valid path is found the series of swaps and CRC updates
+are calculated and issued as a single batch of sequential
+writes. Unlock MCAS messages are piggybacked in the same
+batch.  If no valid path exists the client releases its
+locks but retains its cache. Another speculative search on
+the fresh cache is performed. This algorithm is run
+itteratitivly until a valid path is found. Our evaluation
+measures the success rate of insertions as a factor of lock
+size (Section~\ref{sec:search_success}).
+
+% During development we
+% experimented heavily with guided A* search but found that it
+% only offered improvements over BFS when the table was over
+% 95\% full due to the setup overhead of A* and the fact that
+% most paths are short.
+
+Given that cuckoo paths randomly span the table it is
+unlikely that a new valid path exists within the locked
+rows. As we will show in the next section by localizing
+cuckoo paths the probability that a valid insertion path can
+be found on the second search increases dramatically.
+
+
+% However, as noted
+% there is high probability that a valid path can be found
+% within the locked rows due to hash locality. 
+%  during second search each update and CRC along the
+% path along with unlock messages are batched together. 
+
+
+
+
+
+
+
+
 
 \subsubsection{Updates and Deletes}
 
