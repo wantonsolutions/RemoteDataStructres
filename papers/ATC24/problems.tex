@@ -11,15 +11,15 @@ fully disaggregated cuckoo hash.
 \textbf{Synchronization:} Clients must synchronize their
 local caches prior to directly modifying a shared table in
 remote memory. Cuckoo paths locations are uniformly
-distributed so searching for a valid cuckoo path naively
-requires iterative random reads to be made throughout the
-table. As section~\ref{sec:cuckoo-back} shows the path
-constructed by these expensive reads are also quickly
+distributed so typical searches for a valid cuckoo path
+require executing random reads itteratitivly throughout the
+table. As section~\ref{sec:cuckoo-back} shows the paths
+constructed by these expensive reads are quickly
 invalidated by contention from other insertions.
 Proactively acquiring locks on each read can ensure caches
 remain synchronized until a valid cuckoo path is found.
 However, acquiring locks one at a time randomly throughout
-the table is both expensive and prone to deadlock and course
+the table is both expensive and prone to deadlock, and course
 grain locking (as shown in the following section) quickly
 throttles performance as more clients are added. An ideal
 synchronization scheme would simultaneously read and lock a
@@ -50,42 +50,132 @@ a solution close to this ideal is a key challenge.
 % operations which commonly fail may be worse than acquiring
 % the correct locks.  An ideal caching strategy would enable
 % clients to succeed in their operations frequently while not
-% requiring much overhead to maintain. 
+% requiring much overhead to maintain.
+
+\textbf{Acquiring Locks:} Acquiring fine grained locks for a
+cuckoo path is slow if each lock requires a separate round
+trip. If fine grained locks are scattered across a uniformly
+distributed rows this is necessary as any two locks are
+unlikely to be near enough to each other to set with a
+single CAS and locks must be set in order to avoid
+deadlocks. If cuckoo paths exhibited row locality their
+locks could be clustered together and multiple locks could
+be set simultaneously with a single message.
+
+Sherman demonstrated that a scalable lock table can be
+achieved with RDMA device memory, masked CAS (MCAS), and
+lock virtualization~\cite{sherman}. CX5 NICs expose a 2MB
+region of RDMAable on-NIC device memory which (due to
+avoiding a PCIe round trip) scales 3x better on atomic
+operations than host-memory. And Masked-CAS operation enable
+contention free locking for locks smaller than 64bits. 
+%%
+A device memory lock table can support the locking
+requirements of cuckoo insertions in terms of atomic
+throughput. A necessary challenge not explored by prior work
+is how to increase lock locality so a single atomic can set
+multiple locks and reduce the round trip cost of acquiring
+locks.
+
+\textbf{Fault Tolerance:} RDMA Client failures during
+critical sections are difficult to recover from. Held locks
+will remain set and incomplete operations may leave the
+table in an inconsistent state. Without server side compute
+clients must detect and recover from the failures of other
+clients. Additionally RoCEv2 does not provide a clean
+mechanism to revoke write privileges from a failed client
+with a running client on a different QP. As such recovery
+mechanisms must be careful to ensure true failures and
+network drainage or old writes may be executed post recovery
+and corrupt the table.
+
+Prior work on disaggregation has either used optimistic
+concurrency to hide updates until they fully complete or
+avoided handling client failures with locks~\cite{sherman}.
+The key challenge of designing a fault-tolerant
+disaggregated cuckoo hash is ensuring that each RDMA message
+of each operation leaves the table in a state which other
+clients can repair. As well as designing a fast detection
+and repair algorithm for each state.
 
 
-\textbf{Critical Sections:} Designing a fast, and fine
-grained critical section for updates is a main challenge. As
-a strawman consider an opportunistic approach to cuckoo
-hashing. When a client wants to insert it iteratively reads
-the remote index constructing a cuckoo path. Once an open
-slot is found it executes a series of CAS operations to
-perform the insert. If one element along the path is updated
-the entire update will fail.
-Figure~\ref{fig:cuckoo-problems}(a) shows the path insertion
-failure rate as the number of concurrent clients grows using
-this approach on a table with 10k entries filled to 90\%.
-The failure rate of operations grows to over 80\% and with each
-failure the algorithm must restart.
+% Masked-CAS sets individual bits independently
+% reducing contention, and enabling dense lock tables.
 
-A naive lock based approach suffers from an inverse problem.
-Using a single global lock all updates will succeed however
-given a latency of 2us and two round trips to lock and
-unlock, the theoretical limit of such an approach is 250k
-operations per second, which in practice is much lower. As
-such any lock based approach must used fine grained locks.
-Figure~\ref{fig:cuckoo-problems}(c) illustrates the extent
-of the problem. Using an insertion algorithm described later
-in the paper, we measure the round trips per insert for
-various lock sizes and locks we can set per message. A
-single lock per message requires 55 round trips per insert
-at the 99th percentile when each row in the table has an
-independent lock. Simultaneously locks protecting large
-chunks of the table bottleneck quickly due to lock
-contention.  Acquiring multiple locks demands a deadlock
-free algorithm in which each atomic acquisition must be
-performed in order.  This challenge makes is difficult to
-aquire many locks efficiently as acquiring many locks far
-apart in memory requires many round trips.
+% Because locks are physically far apart and
+% must me acquired in order to avoid deadlocks each lock
+% acquire must be issued as a separate dependent RDMA atomic
+% (CAS or MCAS).
+
+% Because cuckoo paths randomly span a table efficiently
+% acquiring locks is difficult. If the paths exhibited
+% locality a dense lock table could enable many locks to be
+% set with a single round CAS operation.
+
+% Acquiring locks efficiently is the key challenge in
+% designing a disaggregated cuckoo hash. The locks required
+% for a cuckoo path are difficult to determine without
+% performing a lot of random reads. This means that locks have
+% no locality between them. If we want to avoid deadlocks each
+% lock needs to be acquired in order one at a time. If the
+% locks required for an insertion were physically close to one
+% another we could set multiple locks at the same time with a
+% single CAS or Masked CAS. Unlike Sherman we want each lock
+% to take up a single bit so that we have the highest
+% probability of capturing all the locks we need in a single
+% CAS.
+
+
+%% We need a lot of locks sherman only needed one.
+%% Course grained locks quickly lead to performance degredation.
+
+% Utilizing a the benefit of a device memory lock table for
+% cuckoo hashing is challenging. Unlike Sherman's B-Tree
+% cuckoo hashing requires more than one lock for most
+% insertions so virutalization leads to higher degree
+
+% Sherman used 
+
+%per row locks
+%round trips for each aquire?
+%We don't want locks for reads?
+%lock scalability?
+%How do we tolerate failure with locks?
+
+
+% \textbf{Critical Sections:} Designing a fast, and fine
+% grained critical section for updates is a main challenge. As
+% a strawman consider an opportunistic approach to cuckoo
+% hashing. When a client wants to insert it iteratively reads
+% the remote index constructing a cuckoo path. Once an open
+% slot is found it executes a series of CAS operations to
+% perform the insert. If one element along the path is updated
+% the entire update will fail.
+% Figure~\ref{fig:cuckoo-problems}(a) shows the path insertion
+% failure rate as the number of concurrent clients grows using
+% this approach on a table with 10k entries filled to 90\%.
+% The failure rate of operations grows to over 80\% and with each
+% failure the algorithm must restart.
+
+% A naive lock based approach suffers from an inverse problem.
+% Using a single global lock all updates will succeed however
+% given a latency of 2us and two round trips to lock and
+% unlock, the theoretical limit of such an approach is 250k
+% operations per second, which in practice is much lower. As
+% such any lock based approach must used fine grained locks.
+% Figure~\ref{fig:cuckoo-problems}(c) illustrates the extent
+% of the problem. Using an insertion algorithm described later
+% in the paper, we measure the round trips per insert for
+% various lock sizes and locks we can set per message. A
+% single lock per message requires 55 round trips per insert
+% at the 99th percentile when each row in the table has an
+% independent lock. Simultaneously locks protecting large
+% chunks of the table bottleneck quickly due to lock
+% contention.  Acquiring multiple locks demands a deadlock
+% free algorithm in which each atomic acquisition must be
+% performed in order.  This challenge makes is difficult to
+% aquire many locks efficiently as acquiring many locks far
+% apart in memory requires many round trips.
 
 % %cuckoo hashing optimistic vs locks
 % \textbf{Critical Sections:} Consider executing an insert
@@ -147,25 +237,25 @@ apart in memory requires many round trips.
 % locking increases the tables scalability but increases it's
 % base case insertion time.
 
-\textbf{Read Optimization:} Most data center key-value
-workloads are read heavy, therefore read operations should
-be the most highly
-optimized~\cite{datacenter-workloads,facebook-memcached}.
-Ideally we would be able to ensure that reads complete in a
-single round trip.
+% \textbf{Read Optimization:} Most data center key-value
+% workloads are read heavy, therefore read operations should
+% be the most highly
+% optimized~\cite{datacenter-workloads,facebook-memcached}.
+% Ideally we would be able to ensure that reads complete in a
+% single round trip.
 
-Prior optimistic approaches require two round trips or more
-per read, because RDMA CAS operations are only 64 bits. Most
-key-value indexes are organized as both an index and an
-extent, where the index contains 64 bit entries which can be
-atomically modified. The extent contains both the key, and
-the value and it pointed to by the index. This is not ideal
-for small key value pairs which could be embedded in the
-index for fast reads if the atomic width were larger. Some
-approaches enable single round trips for repeat reads as the
-location of the extent can be cached, however they do not
-enable single round trip reads from clients without up to
-date caches.~\cite{clover}.
+% Prior optimistic approaches require two round trips or more
+% per read, because RDMA CAS operations are only 64 bits. Most
+% key-value indexes are organized as both an index and an
+% extent, where the index contains 64 bit entries which can be
+% atomically modified. The extent contains both the key, and
+% the value and it pointed to by the index. This is not ideal
+% for small key value pairs which could be embedded in the
+% index for fast reads if the atomic width were larger. Some
+% approaches enable single round trips for repeat reads as the
+% location of the extent can be cached, however they do not
+% enable single round trip reads from clients without up to
+% date caches.~\cite{clover}.
 
 % Prior approaches such as RACE require
 % two RDMA round trips per read. The first is a hash index
@@ -181,11 +271,11 @@ date caches.~\cite{clover}.
 % trip~\cite{clio,clover,pointer-chaising}. 
 
 
-\textbf{Duplicate Keys:} Clients may issue concurrent
-inserts for the same key, given that keys may occupy
-multiple location detecting duplicate keys can require
-additional checks. RACE and FUSEE require an extra round
-trip after each insert to check if a duplicate key was
-inserted simultaneously~\cite{race,fusee}.  An ideal
-algorithm would prevent key duplication without requiring
-additional overheads.
+% \textbf{Duplicate Keys:} Clients may issue concurrent
+% inserts for the same key, given that keys may occupy
+% multiple location detecting duplicate keys can require
+% additional checks. RACE and FUSEE require an extra round
+% trip after each insert to check if a duplicate key was
+% inserted simultaneously~\cite{race,fusee}.  An ideal
+% algorithm would prevent key duplication without requiring
+% additional overheads.
