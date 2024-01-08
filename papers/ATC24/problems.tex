@@ -1,27 +1,42 @@
-\section{Problems}
+\section{Challenges}
 \label{sec:problems}
 
-\todo{rewrite with the assumption that we have motivated locks}
+High access latency and failures are the root cause of
+difficulty in designing a fully disaggregated index. Each
+operation must be crafted to minimize the round trips and
+ensure the table never reach an unrecoverable state. This
+section describes the challenges of designing a lock-based
+fully disaggregated cuckoo hash.
 
-Designing a fully disaggregated shared index is difficult
-because of high access latency. Operations which require
-synchronization or blocking are amplified by the latency. As
-a result minimizing round trips is critical to achieving low
-latency per operation. These challenges are most pronounced
-when synchronizing caches, and executing critical sections.
+\textbf{Synchronization:} Clients must synchronize their
+local caches prior to directly modifying a shared table in
+remote memory. Cuckoo paths locations are uniformly
+distributed so searching for a valid cuckoo path naively
+requires iterative random reads to be made throughout the
+table. As section~\ref{sec:cuckoo-back} shows the path
+constructed by these expensive reads are also quickly
+invalidated by contention from other insertions.
+Proactively acquiring locks on each read can ensure caches
+remain synchronized until a valid cuckoo path is found.
+However, acquiring locks one at a time randomly throughout
+the table is both expensive and prone to deadlock and course
+grain locking (as shown in the following section) quickly
+throttles performance as more clients are added. An ideal
+synchronization scheme would simultaneously read and lock a
+minimal set of table rows in a single round trip. Designing
+a solution close to this ideal is a key challenge.
 
-
-\textbf{Caching:} Modifying a shared structure from remote
-clients requires cache synchronization. Opportunistic
-updates speculate on the state of the unified cache while
-pessimistic updates acquire locks then read, write, and
-unlock. Porting prior cuckoo hashing algorithms to remote
-memory directly would result in poor performance as clients
-iteratively read one bucket at a time during search and then
-aquire locks~\cite{cuckoo-improvements, memc3, pilaf}.
-Determining how to accumulate a clients cache to perform an
-insert in the fewest number of round trips is a key
-challenge in building a remote cuckoo hash table.
+% \textbf{Caching:} Modifying a shared structure from remote
+% clients requires cache synchronization. Opportunistic
+% updates speculate on the state of the unified cache while
+% pessimistic updates acquire locks then read, write, and
+% unlock. Porting prior cuckoo hashing algorithms to remote
+% memory directly would result in poor performance as clients
+% iteratively read one bucket at a time during search and then
+% aquire locks~\cite{cuckoo-improvements, memc3, pilaf}.
+% Determining how to accumulate a clients cache to perform an
+% insert in the fewest number of round trips is a key
+% challenge in building a remote cuckoo hash table.
 
 % Accumulating a cache per operation is slow,
 % clients must aquire locks, read, then release potentially

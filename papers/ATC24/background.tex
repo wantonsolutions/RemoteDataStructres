@@ -102,20 +102,20 @@ Disaggregated key-value in contrast assume that a memory
 server cannot provide serialization and orchestrate their
 writes solely using
 clients~\cite{rolex,fusee,clover,sherman,ford,race}. With
-the exception of Sherman these systems use systems commit
-writes optimistically using 64 bit RDMA CAS. 
+the exception of Sherman~\cite{sherman} these systems use
+systems commit writes optimistically using 64 bit RDMA CAS. 
 %%
 Opportunistic writes have the advantage that updates are
 atomically visible, no critical sections exist, and client
 failures do not leave the table in an inconsistent state.
-However, opportunistic concurrency comes at a cost.
-Contention leads to frequently failed operations and high
-tail latencies~\cite{clover}, CAS operations don't scale
-well~\cite{design-guidelines}(Figure~\ref{fig:rdma-benchmarks}(b))
-and 64 bit width CAS constrain the size of updates to the
-table.
+Unfortunately CAS based opportunistic writes perform poorly
+under contention leading to high tail latencies
+~\cite{clover}. Additionally RDMA CAS does not scale
+well~\cite{design-guidelines}(Figure~\ref{fig:rdma-benchmarks}(b)),
+and their small word width and lack of multi-CAS support
+constrain the size and types of updates they can perform.
 
-CAS width in particular effects system design.  Because
+CAS width in particular effects system design because
 key-value pairs can rarely fit into 64 bits, indexes updated
 with CAS must reference keys values indirectly with a
 pointer. At minimum resolving a remote pointer requires an
@@ -128,35 +128,36 @@ to execute atomically.
 
 
 \subsection{Cuckoo Hashing} 
-
-Cuckoo hashing uses two independent hash functions to give
-keys a primary and secondary location in the table. When an
-insert collides with an existing key, the existing key is
-evicted to its alternate location. If the eviction also
-causes a collision the process iterates. The path of
-evictions is known as a~\textit{cuckoo path}. Cuckoo hashes
-use associative rows to improve fill factors. In associative
-hashes multiple clients can be chosen as eviction candidates
-and breadth-first-search (BFS) has been shown to minimize
-both path length and critical section time~\cite{memc3,
-cuckoo-improvements}. While insertions require large
+\label{sec:cuckoo-back}
+Cuckoo hashing uses two independent hash functions to assign
+keys a primary and secondary table location. When a key is
+inserted if its primary location is occupied the existing
+key is evicted to its alternative location. If the eviction
+causes another collision the process iterates until an open
+location is found. The path of evictions is known as
+a~\textit{cuckoo path}. Cuckoo hashes use associative rows
+to improve their maximum fill factors. In associative hashes
+multiple clients can be chosen as eviction candidates and
+breadth-first-search (BFS) has been shown to minimize both
+cuckoo path length and critical section time~\cite{memc3,
+cuckoo-improvements}.  While insertions require large
 critical sections to perform search and execute updates
 along the cuckoo path reads are executed in constant time by
 reading both of a keys buckets~\cite{pilaf}.
 
 %%now I want to explain why cuckoo hashing and disaggregation don't work well together.
 
-Fast parallel reads make Cuckoo hashing a desireable
-candidate for a disaggregated index, however, long
+Lockless $O(1)$ reads make Cuckoo hashing a desireable
+candidate for a disaggregated index. However, long
 unpredictable cuckoo paths and RDMA CAS limitations make
-insertions difficult in the disaggregated setting. We
-designed an RDMA based cuckoo hash to illustrate the
-difficulties of performing opportunistic insertions. On
-inserts this system makes a sequence of reads to calculate a
-valid cuckoo path and then itteratitivly issues CAS
-operations to swap value along the path. If any value on the
-path is concurrently modified by another client the
-insertions will fail and must restart.
+performing insertions without locks difficult in the
+disaggregated setting. We designed an RDMA based cuckoo hash
+to illustrate the difficulties of performing opportunistic
+insertions. On inserts this system makes a sequence of reads
+to calculate a valid cuckoo path and then itteratitivly
+issues CAS operations to swap value along the path. If any
+value on the path is concurrently modified by another client
+the insertions will fail and must restart.
 Figure~\ref{fig:cuckoo-problems}(a) shows how the failure
 rate of insertions filling a table from 80-90\% full.
 
