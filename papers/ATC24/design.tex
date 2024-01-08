@@ -96,7 +96,7 @@ success over caching (Section~\ref{sec:search_success}).
 % hash table. Figure~\ref{fig:message_diagram} visualizes our
 % protocol.
 
-\subsubsection{Reading} 
+\subsubsection{Reads, Updates, and Deletes} 
 \label{sec:reading}
 
 Our table is designed to facility lockless single round trip
@@ -114,6 +114,16 @@ keys locations are close to one another in the table to
 reduce tail latency. We use a read threshold of 128 bytes as
 it has a negligible increase in latency over smaller RDMA
 packets Figure~\ref{fig:rdma-benchmarks}(a). 
+
+Updates and deletes, like reads, are straightforward.
+Clients aquire locks for both of a keys locations while
+simultaneously reading their rows. If the key is present its
+entry is either updated or deleted and the rows CRC and
+version number are updated with two writes that are batched
+with unlocks. For extent updates new values are batched
+along with lock requests preventing an additional round
+trip.  Extent deletes mark the extent entry for garbage
+collection.
 
 % If reading both
 % locations as a single read is greater than 128 bytes, the
@@ -215,32 +225,12 @@ rows. As we will show in the next section by localizing
 cuckoo paths the probability that a valid insertion path can
 be found on the second search increases dramatically.
 
-
 % However, as noted
 % there is high probability that a valid path can be found
 % within the locked rows due to hash locality. 
 %  during second search each update and CRC along the
 % path along with unlock messages are batched together. 
 
-
-
-
-
-
-
-
-
-\subsubsection{Updates and Deletes}
-
-Updates and deletes use an identical message protocol. They
-first get both locks for key $K$ while issuing covering
-reads (Section~\ref{sec:locking}). If the key is present the
-entry is either updated or deleted the version number for
-the row is updated and a new CRC is calculated. Both
-modifications are issued as separate RDMA writes. For extent
-updates new values are batched along with lock requests
-preventing an additional round trip. Extent deletes mark the
-extent entry for garbage collection.
 
 
 \subsection{Locality}
