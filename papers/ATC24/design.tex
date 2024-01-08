@@ -174,28 +174,13 @@ caches are fresh due to a prior insert attempt failing.
 % path, even if the clients cache is stale.
 
 \textbf{Cache Synchronization:} Clients synchronize their
-local caches while acquiring locks by reading the rows each
-lock protects. These reads are issued in a batch alongside
-the lock request. If the lock is acquired the values of the
-read will remain synchronized until the lock is released.
-After locking clients check if their speculative paths are
-valid by checking their caches.
+local caches while itteratitivly acquiring locks by reading
+the rows each lock protects. These reads are issued in a
+batch alongside the lock request. If the lock is acquired
+the values of the read will remain synchronized until the
+lock is released.  After locking clients check if their
+speculative paths are valid by checking their caches.
 
-% Speculative locks may not be sufficient to complete an
-% insertion.  However, due to locality hashing there is a high
-% probability that a valid path does exist in the neighborhood
-% of the speculative locks. 
-% If two speculatively locked rows
-% are close enough together clients issus a single
-% \textit{covering read} spanning both rows. Covering reads
-% populate a clients cache and dramatically increase the
-% probability that if the first speculative search fails, a
-% subsequent search will succeed.  We set the max threshold
-% for covering reads to 512 bytes in all our experiments.
-% Figure~\ref{fig:table-diagram} illustrates an insertion of
-% key $K$ displacing key $C$. Here the speculative search
-% marked the rows for $C$ and $K$ to be locked. A covering
-% read (red) spans the rows between both entries.
 
 \textbf{Second Search:} Speculative cuckoo paths may not be
 valid. However, a valid cuckoo path may exist within the
@@ -234,6 +219,15 @@ be found on the second search increases dramatically.
 
 
 \subsection{Locality}
+
+Randomly spread cuckoo paths take many round trips to find
+and lock. In this section we describe a novel
+\textit{dependent} hashing algorithm which makes locality
+between hash location a tuneable parameter. We describe the
+tradeoffs of removing hash independence and demonstrate a
+dramatic improvement in the round trips required to perform
+insertions.
+
 
 \begin{figure*}[t]
     \centering
@@ -279,38 +273,38 @@ CAS, and curved dashed lines are writes.}
 \subsubsection{Dependent Hashing}
 
 Our hashing algorithm borrows from both cuckoo and hopscotch
-hashing to achieve constant time reads and a high degree of
-locality. The distance between two hash locations is
-determined by probabilistically \textit{dependent} rather
-than independent hash functions. Dependence makes locality a
-tunable parameter. Locality between hash entries reduces the
-span of cuckoo paths and increases the probability that both
-entries can be read with a single RDMA message. However,
-high locality increases the probability of hotspots in the
-table which decreases its maximum fill factor.
+hashing to achieve tunable locality. The distance between
+two hash locations is determined by probabilistically
+\textit{dependent} rather than independent hash functions.
+Locality between hash entries reduces the span of cuckoo
+paths and increases the probability that multiple locks can
+be set with a singe MCAS and both of a keys locations can be read
+with a single RDMA message. However, high locality increases
+the probability of hotspots in the table which decreases its
+maximum fill factor.
 
-Figure~\ref{fig:locality-hashing}(a) is our formula for dependent
-hashing. The first hash location is chosen uniformly at
-random, while second is chosen as an offset of the first.
-$f$ determines the max distance the second item can be
-placed. Higher values of $f$ decrease locality.
-Figure~\ref{fig:locality-hashing}(b) shows the distance between hash
-locations as a CDF for different values of $f$. Setting a
-constant bound on the distance between hash locations leads
-to bad fill factors (on the order of 10-15\%). Our function
-places exponentially few locations exponentially far apart
-using a third hash function $h_3(x)$ which generates a
-higher exponent at a logarithmic rate to determine which
-locations will have large distances between
-them~\footnote{The value of $h_3(x)$ is the sum of trailing
+Figure~\ref{fig:locality-hashing}(a) is our formula for
+dependent hashing. The first hash location is chosen
+uniformly at random, while second is chosen as an offset of
+the first.  $f$ determines the max distance the second item
+can be placed. Higher values of $f$ decrease locality.
+Figure~\ref{fig:locality-hashing}(b) shows the distance
+between hash locations as a CDF for different values of $f$.
+Setting a constant bound on the distance between hash
+locations leads to bad fill factors (on the order of
+10-15\%). Our function places exponentially few locations
+exponentially far apart using a third hash function $h_3(x)$
+which generates a higher exponent at a logarithmic rate to
+determine which locations will have large distances between
+them\footnote{The value of $h_3(x)$ is the sum of trailing
 zeros after calculating a keys 64bit hash value} These few,
 but far apart hash locations increase the max fill by
-alleviating hotspots in the table. During inserts these
-entries act as gateways for search to access less filled
-portions of the table. 
+alleviating hotspots in the table. While searching for
+cuckoo paths with BFS these entries act as gateways for
+paths to access less filled portions of the table. 
 
 Figure~\ref{fig:locality-hashing}(c) shows how larger values of $f$
-enable higher fill factors for tables with 100M entries.  In
+enable higher fill factors for tables with 100M entries. In
 our experiments we use $f$ of 2.1 and an associativity of 8
 as it provides a 90\% max fill an a 68\% probability that
 hash locations are located 3 or fewer buckets apart.
@@ -348,63 +342,103 @@ hash locations are located 3 or fewer buckets apart.
 
 \end{figure*}
 
-Using locks rather than opportunistic concurrency halves the
-latency of reads from two to one round trip. Opportunistic
-updates commit changes by atomically updating a pointer
-(with CAS) in the hash index to point to a new value. Both
-the index, then the value must be read for each operation.
-Values can not be inlined in the index as they are limited
-to the 64bit width of CAS. Rcuckoo uses locks to enable
-inlined entries which can be read in a single round trip.
-Locks introduce multiple challenges such as scalability,
-deadlocks and fault tolerance each of which is discussed
-below.
+Increased path locality dually increases lock locality. If
+multiple locks are within a 64 bit range of one another they
+can be set atomically with a masked CAS.
+Figure~\ref{fig:cuckoo-problems}(b) shows that 95\% of
+dependent insertions span 32 or fewer rows while nearly 99\%
+span 256 or fewer. If each lock protects 4 rows nearly 99\%
+of insertions can have their locks acquired with a single
+MCAS.
+
+Figure~\ref{fig:cuckoo-problems}(c) shows the effect of lock
+density (y-axis) and lock granularity (x-axis) on insert
+performance. The top row shows the 99th percentile round
+trips needed for inserts which aquire a single lock. In the
+top left fine grained locking with one lock per message
+results in 55 round trips. The far right colum shows how a
+single global lock results in high contention. Dense tables
+with a few rows per lock result in the fewest round trips.
+
+% Using locks rather than opportunistic concurrency halves the
+% latency of reads from two to one round trip. Opportunistic
+% updates commit changes by atomically updating a pointer
+% (with CAS) in the hash index to point to a new value. Both
+% the index, then the value must be read for each operation.
+% Values can not be inlined in the index as they are limited
+% to the 64bit width of CAS. Rcuckoo uses locks to enable
+% inlined entries which can be read in a single round trip.
+% Locks introduce multiple challenges such as scalability,
+% deadlocks and fault tolerance each of which is discussed
+% below.
 
 RCuckoo uses hardware NIC hardware features and lock
 virtualization to achieve scalability, low contention and
-high performance. The lock table is a linear array of bits
-where 1 is locked, and 0 is unlocked. Each bit locks one or
-more contiguous rows in the table. In our experiments we use
-16 rows per lock as it has a negligible effect on contention
-and requires a single lock to be acquired for \todo{85\%
-double check} of insertions.
-
-We use two RDMA NIC features to accelerate lock
-acquisition. First the lock table is placed in NIC device
-memory which allows atomic operations (CAS) to
-scale linearly with reads and writes and is 3x higher
-throughput on contented addresses than host memory (see
-Figure~\ref{fig:rdma-benchmarks}). It is also lower latency
-as operations to device memory avoid a PCIe round trip.
-Second, RDMA Masked Compare and Swaps (MCAS) are used rather
-than CAS~\cite{rdma-masked-cas,sherman}. CAS requires an
-exact 64 bit match to execute, while MCAS uses a mask to
-only set the required bits. MCAS therefore reduces
+high performance. The lock table is a linear array lock bits
+and each bit locks one or more table rows. In our
+experiments we use 16 rows per lock as it has a negligible
+effect on contention and requires a single lock to be
+acquired for vast majority of insertions.
+%%
+The lock table is located in NIC device memory which allows
+atomic operations to scale linearly with reads and writes
+and is 3x higher throughput on contented addresses than host
+memory (see Figure~\ref{fig:rdma-benchmarks}). It is also
+lower latency as operations to device memory avoid a PCIe
+round trip.  Second, RDMA Masked Compare and Swaps (MCAS)
+are used rather than CAS~\cite{rdma-masked-cas,sherman}. CAS
+requires an exact 64 bit match to execute, while MCAS uses a
+mask to only set the required bits. MCAS therefore reduces
 contention while enabling locks to be as tightly packed.
 
-Packing locks densely is important as NIC device memory is
-limited to 256KB which by default limits table size. We use
-a \textit{virtual lock table} to avoid limiting table size
-by device memory.  Multiple virtual locks map to a single
-physical lock. We use modulo arithmetic to map virtual locks
-onto physical lock to support arbitrarily large tables.
-Mapping multiple virtual to a single physical lock leads to
-false sharing, clients can be blocked unessisary on a lock.
-In Section~\todo{TODO} we show that on large lock tables the
-performance degradation due to false sharing is low, and
-that lock locality is maintained on virtual locks.
+Packing locks densely is important for reducing round trips
+and because  NIC device memory is limited to 256KB which by
+default limits table size. We use a \textit{virtual lock
+table} to avoid limiting table size by device memory.
+Multiple virtual locks map to a single physical lock. We use
+modulo arithmetic to map virtual locks onto physical lock to
+support arbitrarily large tables. Mapping multiple virtual
+to a single physical lock leads to false sharing, clients
+can be blocked unessisary on a lock.  In Section~\todo{TODO}
+we show that on large lock tables the performance
+degradation due to false sharing is low, and that lock
+locality is maintained on virtual locks.
 
-Our deadlock free locking protocol acquires and releases
-locks in order.  Given a list of virtual locks to aquire a
-client calculates their physical locations and sorts them.
-The sorted locks are broken into 64 bit chunks which are
-mapped to individual MCAS packets. As shown in
-Figure~\ref{fig:cuckoo-problems}(b) 99\% of insertions are
-within a 256 bucket range. Each MCAS covers 1024 buckets so
-the common case is a single chunk. Lock requests are issued
-in order. Clients continuously poll on lock requests and
-only move to the next request only after the prior has been
-successfully acquired.
+To avoid deadlock we aquire locks in incremental order.
+Given a cuckoo path the rows are translated to virtual
+locks, then to physical locks, then sorted. The sorted
+locks are broken into 64 bit chunks which are mapped to
+individual MCAS packets.  Lock requests are issued in order.
+Clients continuously poll on lock requests and only move to
+the next request only after the prior has been successfully
+acquired.
+
+Locality provides an additional opportunity to reduce round
+trips by reading additional buckets. If locks are close
+together but not contiguous clients issue a \textit{covering
+read} spanning all rows between each bucket. We use 512
+bytes as a max threshold. Covering reads synchronize a
+clients cache for non-locked rows. If the second search
+fails to find a valid cuckoo path the next iterations
+speculative search will benefit from the fresh read.
+Figure~\ref{fig:table-diagram} illustrates a covering read
+between keys $K$ and $C$.
+
+% Speculative locks may not be sufficient to complete an
+% insertion.  However, due to locality hashing there is a high
+% probability that a valid path does exist in the neighborhood
+% of the speculative locks. 
+% If two speculatively locked rows
+% are close enough together clients issus a single
+% \textit{covering read} spanning both rows. Covering reads
+% populate a clients cache and dramatically increase the
+% probability that if the first speculative search fails, a
+% subsequent search will succeed.  We set the max threshold
+% for covering reads to 512 bytes in all our experiments.
+% Figure~\ref{fig:table-diagram} illustrates an insertion of
+% key $K$ displacing key $C$. Here the speculative search
+% marked the rows for $C$ and $K$ to be locked. A covering
+% read (red) spans the rows between both entries.
 
 Clients may fail while holding locks leaving them set and
 stranded. Clients detect failed locks by timing out on them
