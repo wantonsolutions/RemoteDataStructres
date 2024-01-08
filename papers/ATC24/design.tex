@@ -1,58 +1,62 @@
 \section{Design}
+\label{sec:design}
 
 In this section we describe our design for a fully
 disaggregated lock-based cuckoo hash. We first describe our
-locality tunable hash function followed by an efficient
-locking protocol which benefits from locality. Next we
-describe the design of the hash table itself and the
-protocols for read, update, delete, and insert. Finally we
-describe how we detect and recover from the failure of a
-client holding locks.
+table design and protocol to read, insert, update and delete
+entries from the table. Next we describe a novel locality
+based hashing algorithm and how it enables our protocol to
+perform most operations in two round trips or less. To close
+we detail how RCuckoo detects and recovers from client
+failures.
 
-\label{sec:design}
 
 
 \subsection{Table Design}
 \label{sec:table-design}
-Our table is designed to facility fast reads as they are the
-dominant operation for key value stores in data
-centers~\cite{facebook-memcached}.
-Figure~\ref{fig:table-diagram} illustrates our tables
-two-part design in the midst of an insertion for key $K$.
-~\todo{update diagram} The lock table
-(Section~\ref{sec:locking}) is shown on the left~\todo{add
-virtual table}. The table index (right) is a single
-contiguous array of bytes allocated at initialization time.
-Both the table size, and entry size are set
-statically~\todo{We leave resizing to future work.}. 
 
-Each row contains $n$ entries and terminates with an 8 bit
-version number and 64 bit CRC. Inlined table entries begin
-with a 0 bit and keep all data in the index. RCuckoo also
-supports extent entries for large values~\footnote{Inlined
-entries perform better on small key value pairs} where table
-entries point to out of index extent values. On updates
-clients modify an index entry then increment the row version
-number and recalculate the rows CRC including the version
-number. CRC's enable lockless reads as each row can be self
-verified. Version numbers ensure clients polling for locks
-can differentiate between highly contested locks and clients
-that have failed while holding locks (Section
-~\ref{sec:fault-tolerance}).
-
-
-\textbf{Client Caching:}
+Figure~\ref{fig:table-diagram} shows RCuckoos index and lock
+table during an insertion of key $K$. The primary row for
+$K$ is full and key $C$ is evicted to its alternate
+location. Locks for $K$ and $C$ are set in lock table both
+of which span two rows.
 %%
-Rcuckoo clients keep caches of the
-remote index locally.  During insertions caches are used to
-perform local searches.  Caches can be purged between
-requests to save space on the client or persisted between
-requests to aid in predicting future search paths. Our
-experimentation shows that lock granularity paired with
-covering reads (Section~\ref{sec:insert}) has a far higher
-impact on search success over caching
-(Section~\ref{sec:search_success}) as index state changes
-rapidly under load.
+The table index (right) is a single region of RDMA
+registered main memory with fixed width entries.  Each row
+contains $n$ associative entries (3 in
+Figure~\ref{fig:table-diagram}) and terminates with an 8 bit
+version number and 64 bit CRC. Inlined table entries begin
+with a 0 bit and directly store both key and value. Extent
+entries for large values ~\footnote{Inlined entries perform
+better on small key value pairs} store pointers to kv pairs
+stored outside the index.
+%%
+When an entry is modified it's rows version number is
+incremented and its CRC is recalculated including the
+updated version number. CRC's enable lockless reads as each
+row can be self verified. Version numbers enable clients to
+detect if a row has been modified by polling CRCs which is
+used to detect if a client has failed while holding a lock
+(Section~\ref{sec:fault-tolerance}).
+
+% The lock table
+% (Section~\ref{sec:locking}) is shown on the left~\todo{add
+% virtual table}. 
+% ~\todo{We leave resizing to future work.}. 
+%%
+% \textbf{Client Caching:}
+%%
+
+Rcuckoo clients keep an RDMA registered cache of the index
+locally. Caches can be purged or persisted between requests
+depending on a clients available memory. Clients synchronize
+their caches during inserts to perform local searches when
+insertions require multiple retries. While theoretically
+these caches could be persisted to improve performance our
+experimentation shows that due to high churn in the cuckoo
+index lock granularity paired with read strategy
+(Section~\ref{sec:insert}) has a far higher impact on search
+success over caching (Section~\ref{sec:search_success}).
 
 \textbf{Memory Allocation:}
 %%
@@ -95,26 +99,37 @@ acrostically to the allocator.
 \subsubsection{Reading} 
 \label{sec:reading}
 
-Read requests for key $K$ start by hashing $K$ to calculate
-both row locations. Reads are combined if both rows are
-within a read threshold to reduce tail latency. We use a
-read threshold of 128 bytes as it has a negligible increase
-in latency over smaller RDMA
-packets~\ref{fig:rdma-benchmarks}(a). If reading both
-locations as a single read is greater than 128 bytes, the
-read is issued as two parallel reads to individual rows
-similar to prior work without locality
-optimizations~\cite{pilaf, race}. Inlined entries are read
-in a single round trip, while extent entries require two
-(Figure~\ref{fig:message_diagram}).
+Our table is designed to facility lockless single round trip
+reads as they are the dominant operation for key value
+stores in data centers~\cite{facebook-memcached}. To read a
+key clients first calculate both its potential rows then
+issue RDMA reads for both rows in parallel. The read is
+successful if either row contains the key and its CRC is
+valid. An invalid CRC indicates an ongoing or torn write, or
+rare failure case (Section~\ref{sec:table-repair}). Inlined
+reads are complete after one round trip, while extent reads
+resolve their pointer and perform a second read. A single
+large read rather than two small reads are issued if both a
+keys locations are close to one another in the table to
+reduce tail latency. We use a read threshold of 128 bytes as
+it has a negligible increase in latency over smaller RDMA
+packets Figure~\ref{fig:rdma-benchmarks}(a). 
 
-Reads are performed locklessly. Readers recalculate and
-check the rows CRC to validate the read. Clients reissue the
-read if the CRC is invalid as it is likely due to the read
-encountering a torn write. Continuously invalid CRC's can be
-the result of a client failure mid write. Our algorithm for
-detecting and repairing the table from partially completed
-writes is described in Section~\ref{sec:table-repair}.
+% If reading both
+% locations as a single read is greater than 128 bytes, the
+% read is issued as two parallel reads to individual rows
+% similar to prior work without locality
+% optimizations~\cite{pilaf, race}. Inlined entries are read
+% in a single round trip, while extent entries require two
+% (Figure~\ref{fig:message_diagram}).
+
+% Reads are performed locklessly. Readers recalculate and
+% check the rows CRC to validate the read. Clients reissue the
+% read if the CRC is invalid as it is likely due to the read
+% encountering a torn write. Continuously invalid CRC's can be
+% the result of a client failure mid write. Our algorithm for
+% detecting and repairing the table from partially completed
+% writes is described in Section~\ref{sec:table-repair}.
 
 \subsubsection{Insert}
 \label{sec:insert}
