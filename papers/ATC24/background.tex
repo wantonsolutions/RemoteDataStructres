@@ -186,9 +186,13 @@ rate of insertions filling a table from 80-90\% full.
 % can be resized and rehashed to continue operation.
 
 \textbf{Hopscotch Hashing}:
-\todo{This section needs to be compacted and integrated with the other text}
-\todo{Add Reno hash as a counter example for disaggregation}
-is another candidate hash table
+%%
+\todo{This section needs to be at most 2 paragraphs}
+\sg{Alex please skip this for now. Assume it convinces a
+reader that hopscotch hashing is a candidate with less
+obvious benifts compared to cuckoo hashing.}
+%%
+Hopscotch hashing is another candidate hash table
 we considered for disaggregation. Hopscotch hashing uses a
 hybrid if linear probing and swapping to ensure that hash
 entries are within a constant bound of their original
