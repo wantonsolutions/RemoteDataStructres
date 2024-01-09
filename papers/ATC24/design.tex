@@ -10,8 +10,6 @@ perform most operations in two round trips or less. To close
 we detail how RCuckoo detects and recovers from client
 failures.
 
-
-
 \subsection{Table Design}
 \label{sec:table-design}
 
@@ -82,6 +80,9 @@ success over caching (Section~\ref{sec:search_success}).
 % allocation as a hard orthogonal problem to the design of
 % disaggregated indexes and have designed our system
 % acrostically to the allocator.
+
+\todo{describe memory allocation}
+\todo{describe resizing}
 
 \begin{figure}[t]
     \includegraphics[width=0.99\linewidth]{fig/table-diagram.pdf}
@@ -302,11 +303,12 @@ alleviating hotspots in the table. While searching for
 cuckoo paths with BFS these entries act as gateways for
 paths to access less filled portions of the table. 
 
-Figure~\ref{fig:locality-hashing}(c) shows how larger values of $f$
-enable higher fill factors for tables with 100M entries. In
-our experiments we use $f$ of 2.1 and an associativity of 8
-as it provides a 90\% max fill an a 68\% probability that
-hash locations are located 3 or fewer buckets apart.
+Figure~\ref{fig:locality-hashing}(c) shows how larger values
+of $f$ enable higher fill factors for tables with 100M
+entries. In our experiments we use $f$ of 2.1 and an
+associativity of 8 as it provides a 90\% max fill an a 68\%
+probability that hash locations are located 3 or fewer
+buckets apart.
 
 
 \subsubsection{Locking}
@@ -332,7 +334,7 @@ hash locations are located 3 or fewer buckets apart.
     \vspace{-1em}
     \caption{
     \textbf{(a)} Failure rate of optimistic cuckoo insertions.
-    \textbf{(b)} CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path.
+    \textbf{(b)} CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path.~\todo{buckets to rows}
     \textbf{(c)} Round trips (99th percentile) on a table
     with 512 rows required per insert while filling a table
     to 95\%. 512 buckets per lock is a single global lock.}

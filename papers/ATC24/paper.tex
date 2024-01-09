@@ -91,7 +91,7 @@
 \title{Cuckoo for Clients: Disaggregated Cuckoo Hashing}
 %\author{WORDS '21 Submission \#3}
 % \author{Stewart Grant and Alex C. Snoeren\\ UC San Diego}
-\author{FAST '24 Submission \#44}
+\author{ATC '24 Submission \#820}
 \date{}
 
 \maketitle
@@ -101,31 +101,25 @@
 Memory disaggregation promises high resource utilization,
 and efficient resource sharing. However designing fully
 disaggregated systems remains challenging due to complex
-serialization and high latency. Key-value store indexes
-often adopt a ~\textit{partially disaggregated} approach
-where updates to the index are routed through a CPU for
+serialization, high latency, and failures. Key-value store 
+indexes often adopt a partially disaggregated approach
+where writes to the index are routed through a CPU for
 serialization, while reads are made directly to memory.
-Fully disaggregated indexes assume no such CPU and must
-serialize updates entirely with remote clients.
+Fully disaggregation assumes no such CPU and must serialize
+writes entirely with clients.
 
-This paper focuses on the design of a fully disaggregated
-lock-based key-value index based on cuckoo hashing. Prior
-work avoids locks in favor of optimistic concurrency as
-locks can have large critical sections and quickly
-bottleneck performance. We show that that with careful
-design locking schemes can enable higher performance than
-opportunistic schemes even under contention.
-
-To achieve efficient locking we develop a new cuckoo hashing
-scheme that increases locality of keys in the table. Using
-this locality we design a dense and efficient lock table which 
-uses NIC device memory. Locality also improves how search can
-find short insertion paths into the cuckoo table. We 
-demonstrate the performance benefit of our design by comparing 
-to both fully disaggregated and partially disaggregated key value 
-stores. We show performance gains on an YCSB benchmarks 
-against all systems achieving between 1.4x to 10x on write heavy 
-workloads and 1.3x to 2.2x on read heavy workloads.
+In this paper we describe the first fully disaggregated
+lock based cuckoo hash. Prior work avoids locks in favor of
+optimistic concurrency as locks can have large critical
+sections and complex failures. We show that that with
+careful design locks can have higher performance than
+opportunistic algorithms and recover from failures quickly.
+We develop a locality based hashing algorithm which enables
+fast reads, and efficient locking. We compare our
+performance against state of the art key value stores and
+show gains on an YCSB benchmarks against all systems
+achieving between 1.4x to 10x on write heavy workloads and
+1.3x to 2.2x on read heavy workloads.
 
 
 % with careful data structure and protocol design, as well as
