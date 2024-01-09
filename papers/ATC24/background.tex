@@ -63,7 +63,7 @@ operations. CX series NICs have a 256KB region of on-NIC
 RDMAable memory. Atomics to this region avoid the round trip
 and execute with lower latency and up to 3x higher
 throughput~\cite{device-memory}(Figure~\ref{fig:rdma-benchmarks}(c)).
-Masked compare and swap enables each bit to be set
+Masked CAS (MCAS) allows for each bit to be set
 independently thus enabling higher density locks while
 reducing contention~\cite{rdma-masked-cas}. While multi-CAS
 is not supported these features have been demonstrated to
