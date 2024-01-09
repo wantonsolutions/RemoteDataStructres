@@ -161,87 +161,28 @@ the insertions will fail and must restart.
 Figure~\ref{fig:cuckoo-problems}(a) shows how the failure
 rate of insertions filling a table from 80-90\% full.
 
-
-% Cuckoo hashing Uses two hash functions as a means
-% to resolve collisions when entries hash to the same
-% location. Because entries have at most two locations, cuckoo
-% hashing has constant time reads as only two locations need
-% be checked to determine an entries existence, or location.
-% Cuckoo tables use row associative to improve their maximum
-% fill factor. Each hash location can house up to $n$
-% associated elements. When locating an entry all entries in
-% the row must be read.  Cuckoo inserts use the first hash
-% functions location as an entry's insert row. If the row is
-% full an element is chosen for from that row. The evicted
-% element is hashed using it's second hash function, and is
-% placed in it's alterative row. If the alternative row is
-% also full, the process repeats. The sequence of evicted
-% elements is known as a~\textit{cuckoo
-% path}~\cite{cuckoo,memc3,cuckoo-improvements}. The search
-% algorithm used to find a cuckoo path on an associative
-% cuckoo table has a large impact on the length of the
-% path~\cite{cuckoo-improvements}. When a path can not be
-% found the table has reached it's max fill factor and the
-% table will no longer accept new inserted entries. The table
-% can be resized and rehashed to continue operation.
-
-\textbf{Hopscotch Hashing}:
+\textbf{Hopscotch Hashing} also enables fast reads by
+localizing entries to a bounded range of addresses and we
+considered using it as our core data structure. We believe
+that although hopscotch hashing can likely be disaggregated
+efficiently it is less straightforward than cuckoo hashing
+for the following reasons:
 %%
-\todo{This section needs to be at most 2 paragraphs}
-\sg{Alex please skip this for now. Assume it convinces a
-reader that hopscotch hashing is a candidate with less
-obvious benifts compared to cuckoo hashing.}
+First, cuckoo insertions update one location per moved key while
+hopscotch requires two. Hopscotch hashes keep a bitmask of
+collisions per bucket which must also be updated when an
+entry is relocated. Reno, a heavily one-sided RDMA hopscotch
+hash, uses one sided atomics to sloppily update the bitmask
+but requires a server side CPU to fix the bitmasks whenever
+concurrent inserts execute~\cite{reno}. Both Farm and Reno
+avoid ever executing long hopscotch chains because of their
+execution time and complexity~\cite{farm,reno}.
 %%
-Hopscotch hashing is another candidate hash table
-we considered for disaggregation. Hopscotch hashing uses a
-hybrid if linear probing and swapping to ensure that hash
-entries are within a constant bound of their original
-location. Farm~\cite{farm} demonstrated that this location
-bound is useful for RDMA as a single read can determine if
-an entry is in the table. We believe that with effort a
-highly performant hopscotch hash table could be built for
-disaggregated memory. However, a few challenges prevented us
-from pursuing hopscotch hashing. 
-%%
-Firstly, on insert hopscotch hashing must update at a
-minimum two locations, the location the entry is written to,
-and the bitmask in the location the entry hashes to. When
-the table is full insertions cause hopscotch chains, each
-hop of which requires two locks. As the state of the remote
-hash table can change between reads and locking time we see
-every additional modification as a barrier to predicting on
-a client which entries should be locked.
-%%
-Second, cuckoo hash locations can be predicted easily. In a
-bucket cuckoo hash the location of an entry can be
-determined exactly by it's key. This enables clients to
-predict which locations will need to be locked locally
-without needing to read from remote memory. As entries can
-take multiple locations in a hopscotch entry locks must be
-course grained in order to guarantee that they will be
-captured.
-%%
-Third, CRC coverage of hopscotch hashing is not obvious. As
-we will show, a CRC for a single bucket in cuckoo hashing
-can cover multiple entries as a single CRC can be calculated
-per row in the table. In Hopscotch hashing the location and
-spacing of CRC's is not obvious.
-%%
-
-
-% is a hash table which delivers
-% constant-time reads. It uses two hash functions to determine
-% two possible locations at which any hashed item can reside.
-% When reading both locations are queried. If the item is not
-% found, it is not in the table. On insert, the item is placed
-% in the first location it hashes to. If that location is full
-% the item in that location is evicted and kicked to it's
-% second location.  This process happens iteratively for many
-% items. The sequence of displaced keys on an insert is called
-% a ~\textit{cuckoo-path}~\cite{cuckoo-improvements}. When a
-% loop occurs in a cuckoo path the insert fails and the table
-% is resized. Fill factors for cuckoo hashes can be improved
-% by using associative buckets for each hash index, and
-% shortening cuckoo paths by using BFS rather than radom
-% search~\cite{cuckoo-improvements}. ~\todo{consider adding a
-% cuckoo search figure}.
+Second, an entries location in a cuckoo hash is easier to
+predict than in hopscotch hashing which simplifies locking.
+Cuckoo keys inhabit exactly one of two locations so locks
+are predictable, conversely hopscotch locations occur on a
+range so a locking strategy must lock the entire range
+conservatively. Because each lock acquisition is expensive
+this increases the fundamental difficulty of disaggregation
+a hopscotch hash.
