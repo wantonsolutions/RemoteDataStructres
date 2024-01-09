@@ -220,15 +220,6 @@ be found on the second search increases dramatically.
 
 \subsection{Locality}
 
-Randomly spread cuckoo paths take many round trips to find
-and lock. In this section we describe a novel
-\textit{dependent} hashing algorithm which makes locality
-between hash location a tuneable parameter. We describe the
-tradeoffs of removing hash independence and demonstrate a
-dramatic improvement in the round trips required to perform
-insertions.
-
-
 \begin{figure*}[t]
     \centering
     \begin{subfigure}{0.3\linewidth}
@@ -258,6 +249,14 @@ insertions.
     \label{fig:locality-hashing}
 
 \end{figure*}
+
+Randomly spread cuckoo paths take many round trips to find
+and lock. In this section we describe a novel
+\textit{dependent} hashing algorithm which makes locality
+between hash location a tuneable parameter. We describe the
+tradeoffs of removing hash independence and demonstrate a
+dramatic improvement in the round trips required to perform
+insertions.
 
 \begin{figure}[t]
 \includegraphics[width=0.99\linewidth]{fig/message_diagram.pdf}

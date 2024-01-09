@@ -8,23 +8,30 @@ ensure the table never reach an unrecoverable state. This
 section describes the challenges of designing a lock-based
 fully disaggregated cuckoo hash.
 
-\textbf{Synchronization:} Clients must synchronize their
-local caches prior to directly modifying a shared table in
-remote memory. Cuckoo paths locations are uniformly
-distributed so typical searches for a valid cuckoo path
-require executing random reads itteratitivly throughout the
-table. As section~\ref{sec:cuckoo-back} shows the paths
-constructed by these expensive reads are quickly
-invalidated by contention from other insertions.
-Proactively acquiring locks on each read can ensure caches
-remain synchronized until a valid cuckoo path is found.
-However, acquiring locks one at a time randomly throughout
-the table is both expensive and prone to deadlock, and course
-grain locking (as shown in the following section) quickly
-throttles performance as more clients are added. An ideal
-synchronization scheme would simultaneously read and lock a
-minimal set of table rows in a single round trip. Designing
-a solution close to this ideal is a key challenge.
+\textbf{Cache Synchronization} with RDMA reads is necessary
+before clients can directly modify shared memory. Reads are
+random and iterative when searching for a cuckoo path so
+long paths have high latency. Each additional read increases
+the probability that the path will become stale from the
+operations of other clients (Section~\ref{sec:cuckoo-back}).
+%% %
+Proactively pairing a read with a lock on the same rows
+keeps the read synchronized until the lock is released.
+Unfortunately, proactive locking implies false contention
+and randomly setting locks along a cuckoo path is prone to
+deadlock.  An ideal synchronization scheme would
+simultaneously read and lock a minimal set of table rows in
+a single round trip.  Designing a solution close to this
+ideal is a key challenge.
+
+% Proactively acquiring locks simultaneously with
+% read can ensure caches remain synchronized until a valid
+% cuckoo path is found.  However, acquiring locks one at a
+% time randomly throughout the table is both expensive and
+% prone to deadlock, and course grain locking (as shown in the
+% following section) quickly throttles performance as more
+% clients are added. 
+
 
 % \textbf{Caching:} Modifying a shared structure from remote
 % clients requires cache synchronization. Opportunistic
@@ -52,52 +59,57 @@ a solution close to this ideal is a key challenge.
 % clients to succeed in their operations frequently while not
 % requiring much overhead to maintain.
 
-\textbf{Acquiring Locks:} Acquiring fine grained locks for a
-cuckoo path is slow if each lock requires a separate round
-trip. If fine grained locks are scattered across a uniformly
-distributed rows this is necessary as any two locks are
-unlikely to be near enough to each other to set with a
-single CAS and locks must be set in order to avoid
-deadlocks. If cuckoo paths exhibited row locality their
-locks could be clustered together and multiple locks could
-be set simultaneously with a single message.
-
-Sherman demonstrated that a scalable lock table can be
-achieved with RDMA device memory, masked CAS (MCAS), and
-lock virtualization~\cite{sherman}. CX5 NICs expose a 2MB
-region of RDMAable on-NIC device memory which (due to
-avoiding a PCIe round trip) scales 3x better on atomic
-operations than host-memory. And Masked-CAS operation enable
-contention free locking for locks smaller than 64bits. 
+\textbf{Locking} should be fast and deadlock free, which is
+challenging when setting fine grained randomly scattered
+locks in a cuckoo path with RDMA. Atomic operations do not
+support multi-CAS, have limited (64 bit) width, don't scale
+well in terms of throughput or
+latency~\cite{design-guidelines}(Figure~\ref{fig:rdma-benchmarks}
+b \& c). Acquiring locks in parallel or without order causes
+deadlocks so without multi-CAS or the ability to localize
+multiple locks into a 64 bit range each lock acquisition
+requires an additional round trip.
 %%
-A device memory lock table can support the locking
-requirements of cuckoo insertions in terms of atomic
-throughput. A necessary challenge not explored by prior work
-is how to increase lock locality so a single atomic can set
-multiple locks and reduce the round trip cost of acquiring
-locks.
+Sherman demonstrated that device memory RDMA lock table can
+scale in terms of atomic throughput and lock density for
+large data structures by utilizing masked-CAS (MCAS) and
+lock virtualization~\cite{sherman}. Thus the key challenge
+in realizing a lock-based cuckoo hash is reducing the number
+of round trips needed to aquire locks.
 
-\textbf{Fault Tolerance:} RDMA Client failures during
-critical sections are difficult to recover from. Held locks
-will remain set and incomplete operations may leave the
-table in an inconsistent state. Without server side compute
-clients must detect and recover from the failures of other
-clients. Additionally RoCEv2 does not provide a clean
-mechanism to revoke write privileges from a failed client
-with a running client on a different QP. As such recovery
-mechanisms must be careful to ensure true failures and
-network drainage or old writes may be executed post recovery
-and corrupt the table.
+% achieved with RDMA device memory, masked CAS (MCAS), and
+% lock virtualization~\cite{sherman}. 
+% CX5 NICs expose a 2MB
+% region of RDMAable on-NIC device memory which (due to
+% avoiding a PCIe round trip) scales 3x better on atomic
+% operations than host-memory. And Masked-CAS operation enable
+% contention free locking for locks smaller than 64bits. 
+% %%
+% A device memory lock table can support the locking
+% requirements of cuckoo insertions in terms of atomic
+% throughput. A necessary challenge not explored by prior work
+% is how to increase lock locality so a single atomic can set
+% multiple locks and reduce the round trip cost of acquiring
+% locks.
 
+\textbf{Fault Tolerance} is hard to obtain when
+disaggregated clients can fail in their critical sections.
+Held locks remain set and partially executed operations put
+the table in an inconsistent state. Given that no server
+side CPU exists clients must detect and recover from these
+failures. The RoCEv2 specification does not provide a clean
+mechanism for one connection to revoke the write privileges
+of another. A recovery mechanism must ensure a client has
+truly failed and that the network is drained of old writes
+which may eventually arrive and corrupt memory.
+%%
 Prior work on disaggregation has either used optimistic
 concurrency to hide updates until they fully complete or
 avoided handling client failures with locks~\cite{sherman}.
-The key challenge of designing a fault-tolerant
-disaggregated cuckoo hash is ensuring that each RDMA message
-of each operation leaves the table in a state which other
-clients can repair. As well as designing a fast detection
-and repair algorithm for each state.
-
+The key challenge in achieving fault tolerance is designing
+operations so that each partial update leaves the table in a
+recoverable state and designing a fast detection and repair
+algorithm for each state.
 
 % Masked-CAS sets individual bits independently
 % reducing contention, and enabling dense lock tables.
