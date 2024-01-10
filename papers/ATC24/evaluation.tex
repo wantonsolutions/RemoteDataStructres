@@ -194,6 +194,37 @@ Sherman use two sided RDMA RPC's for insert, both perform
 allocations and set up metadata for the requesting client.
 FUSEE has the lowest fully disaggregated latency.
 
+\subsection{Fault Tolerance}
+\begin{figure}[ht]
+    \includegraphics[width=0.99\linewidth]{fig/failure_throughput.pdf}
+    \caption{Throughput vs Failure Rate}
+    \label{fig:failure_throughput}
+\end{figure}
+
+Failures in critical sections leave locks set and reduce
+overall system performance to lower until the lock is
+reclaimed and the table is repaired. We measure RCuckoo's
+performance in the face of failures by injecting. A
+\textit{Failure Client} emulates the failure of a client in a
+critical section by performing an insertion but only issuing
+a randomly truncated set of packets when updating and
+unlocking the table. This randomly leaves the table in one
+of the three recovery states and leaves some locks set. In
+our experiment the table is filled to 80\%, clients are set
+to a ycsb-a workload, and the failure client is given a
+maximum rate at which it will inject faults.
+
+Figure~\ref{fig:failure_throughput} Shows the degradation in
+throughput as the failures per second increases. The more
+rows a lock protects the larger the failures impact and time
+to triage and repair the failure. The performance impact of
+a few number of failures per second is low which is ideal
+considering that failures in RDMA clusters are relatively
+rare. Rcuckoo can still operate with thousands of failures
+per second while RDMA can only establish approximately 1.4K
+connections per second using state of the art
+techniques~\cite{xrdma}.
+
 \subsection{Dependent hashing and search}
 
 Hash dependence and search function choice have the highest

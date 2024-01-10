@@ -1,92 +1,98 @@
 \section{Introduction}
 \label{sec:intro}
 
-Key-value stores remain a fundamental building block of modern
-scale-out service architectures.  Recent trends in primary storage
-technologies, however, are pushing operators to consider ever-more
-disaggregated designs for their in-memory storage systms.  Concretely,
-increases in CPU core counts coupled with stagnating DRAM density has
-led to an increased interest in remote memory tiers, where some
+Key-value stores remain a fundamental building block of
+modern scale-out service architectures.  Recent trends in
+primary storage technologies, however, are pushing operators
+to consider ever-more disaggregated designs for their
+in-memory storage systems.  Concretely, increases in CPU
+core counts coupled with stagnating DRAM density has led to
+an increased interest in remote memory tiers, where some
 portion of memory is connected to the server over a network.
-Moreover, once deaggregated, memory can be pooled to achieve greater
-cost and power efficiencies.  The key challenge facing fully
-disaggregate memory pools, however, is managing concurrent updates in
-the face of high access latencies---e.g., 20$\times$ in the case of
+Moreover, once disaggregated, memory can be pooled to
+achieve greater cost and power efficiencies.  The key
+challenge facing fully disaggregated memory pools, however,
+is managing concurrent updates in the face of failures and
+high access latencies---e.g., 20$\times$ in the case of
 Ethernet-based RDMA.
 
-While
-cache-coherent technologies like CXL are beginning to become
-available, RDMA remains the commodity option for large-scale in-memory
-key-value stores.
-%% made DRAM a scarce resource. In response data center architects have
-%% proposed resource disaggregation to improve resource utilization,
-%% scalability and efficiency as well as increase per-core access to
-%% memory. Disaggregation calls for the partitioning of a servers
-%% resources into distinct pools (compute, memory, storage,
-%% accelerators), which are interconnected by a high speed network.  In a
-%% fully disaggregated model distinct servers house resources such as
-%% memory servers which contain only memory, and no colocated CPU for
-%% processing.
-% DRAM capacity is scaling at an ever decreasing rate. As such
-% the demand in data centers for high efficiency memory
-% systems grows every year to improve memory utilization and
-% sharing. Memory disaggregation i.e separating compute and
-% memory into large pools is a promising approach to increase
-% a CPU's per core memory access beyond what is available in a
-% single machine while simultaneously decreasing per machine
-% memory stranding.
+While cache-coherent technologies like CXL are beginning to
+become available, RDMA remains the commodity option for
+large-scale in-memory key-value stores.
+%% % made DRAM a scarce resource. In response data center
+%architects have % proposed resource disaggregation to
+%improve resource utilization, % scalability and efficiency
+%as well as increase per-core access to % memory.
+%Disaggregation calls for the partitioning of a servers %
+%resources into distinct pools (compute, memory, storage, %
+%accelerators), which are interconnected by a high speed
+%network.  In a % fully disaggregated model distinct servers
+%house resources such as % memory servers which contain only
+%memory, and no colocated CPU for % processing.  DRAM
+%capacity is scaling at an ever decreasing rate. As such the
+%demand in data centers for high efficiency memory systems
+%grows every year to improve memory utilization and sharing.
+%Memory disaggregation i.e separating compute and memory
+%into large pools is a promising approach to increase a
+%CPU's per core memory access beyond what is available in a
+%single machine while simultaneously decreasing per machine
+%memory stranding.
 %
-%% Full disaggregation is challenging as it requires new system
-%% designs to cope with the additional network latency.  For
-%% example accessing intra-rack remote DRAM has a 20x (50ns to
-%% 1us) overhead in relation to local memory. Cores sharing
-%% remote memory must suffer a proportionally high cost for
-%% synchronization when sharing pools of memory.
-%Many prior
-%disaggregated systems have eschewed sharing for static
-%partitioning to avoid the high overheads~\cite{
-%reigons,blade-server,legoos}.
-Many prior RDMA-based systems opt for
-a partially disaggregated model, in which a CPU core is
-colocated with remote memory to provide the needed
+%% Full disaggregation is challenging as it requires new
+%system % designs to cope with the additional network
+%latency.  For % example accessing intra-rack remote DRAM
+%has a 20x (50ns to % 1us) overhead in relation to local
+%memory. Cores sharing % remote memory must suffer a
+%proportionally high cost for % synchronization when sharing
+%pools of memory.  Many prior disaggregated systems have
+%eschewed sharing for static partitioning to avoid the high
+%overheads~\cite{ reigons,blade-server,legoos}.
+Many prior RDMA-based systems opt for a partially
+disaggregated model, in which a CPU core is colocated with
+remote memory to provide the needed
 serialization~\cite{erpc,herd,pilaf,cell,clover}.
-%%  ~\cite{clover}. These designs are conceptually
-%% close to prior work on RDMA key value stores which gain
-%% performance benefits from having some operations use
-%% one-sided RDMA verbs\footnote{one-sided verbs are
-%% disaggregation compliant as they do not require a CPU on the
-%% receiver side during operation}
-%% %% %
-%% While highly performant these approaches do not conform to
-%% fully disaggregated designs.
+%%  ~\cite{clover}. These designs are conceptually % close
+%to prior work on RDMA key value stores which gain %
+%performance benefits from having some operations use %
+%one-sided RDMA verbs\footnote{one-sided verbs are %
+%disaggregation compliant as they do not require a CPU on
+%the % receiver side during operation} % %% % % While highly
+%performant these approaches do not conform to % fully
+%disaggregated designs.
 %
-% to remote memory are approximately 20x that
-% of local DRAM (50ns to 1us) which severely increases the
-% cost of synchronizing shared data structures among many
-% CPU's across multiple machines. Traditional and partially
-% disaggregated key-value serialize updates with a CPU
-% colocated with
-% memory~\cite{memcached,herd,erpc,pilaf,cell,clover}(\todo{check
-% sherman}). This approach does not meet the requirements of
-% full disaggregation in which memory is a passive resource.
-% In the fully disaggregated setting serialization is achieved
-% entirely with a client based protocol. 
+%to remote memory are approximately 20x that of local DRAM
+%(50ns to 1us) which severely increases the cost of
+%synchronizing shared data structures among many CPU's
+%across multiple machines. Traditional and partially
+%disaggregated key-value serialize updates with a CPU
+%colocated with
+%memory~\cite{memcached,herd,erpc,pilaf,cell,clover}(\todo{check
+%sherman}). This approach does not meet the requirements of
+%full disaggregation in which memory is a passive resource.
+%In the fully disaggregated setting serialization is
+%achieved entirely with a client based protocol. 
 %
-The few proposals that leverage one-sided RDMA atomic operations
-(e.g., compare-and-swap) to implement fully disaggregated hash
-tables~\cite{rolex,fusee,sherman, race} suffer from the limited scope
-of such operations.  Specifically, RDMA atomic operations can only act
-upon 64 contiguous bits of memory at a time, forcing these systems to design
-multi-stage datastructures to support practical key and value sizes.
+The few proposals that leverage one-sided RDMA atomic
+operations (e.g., compare-and-swap) to implement fully
+disaggregated hash tables~\cite{rolex,fusee,sherman, race}
+suffer from the limited scope of such operations.
+Specifically, RDMA atomic operations can only act upon 64
+contiguous bits of memory at a time, forcing these systems
+to design multi-stage datastructures to support practical
+key and value sizes.
 
-In general, these key-value stores implement a high-performance index
-structure to localize contention, and then store the value separately,
-requiring multiple operations and network round trips.  Early
-systems~\cite{sherman} employed fine-grained lock tables, while more
-recent designs extract higher performance in read-heavy workloads
-through optimistic approaches to metadata management.  Unfortunately,
-optimistic approaches can perform worse under high contention,
-leading to an awkward trade space.
+In general, these key-value stores implement a
+high-performance index structure to localize contention, and
+then store the value separately, requiring multiple
+operations and network round trips. Most optimistically
+update the index to 
+
+Early systems~\cite{sherman} employed fine-grained lock
+tables, while more recent designs extract higher performance
+in read-heavy workloads through optimistic approaches to
+metadata management.  Unfortunately, optimistic approaches
+can perform worse under high contention, leading to an
+awkward trade space.
 
 
 %% These approaches either use optimistic
