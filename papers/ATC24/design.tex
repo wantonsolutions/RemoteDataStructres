@@ -28,11 +28,11 @@ Each row contains $n$ associative entries (3 in this figure) and
 terminates with an 8-bit version number and 64-bit CRC (that is
 computed over the entire row including version number).  Clients
 access the index table using 1-sided RDMA reads and writes; CRCs
-facilitate lockless reads as each row can be self-verified while
+facilitate lock-less reads as each row can be self-verified while
 version numbers enable clients to detect if a row has been modified.
 Locks (stored in a bit vector in NIC memory, shown on the left) each
 protect a tunable number (here, two) of index rows.  Clients perform
-lock acquistion and release with RDMA compare-and-swap (CAS)
+lock acquisition and release with RDMA compare-and-swap (CAS)
 operations.  Specifically, RCuckoo leverages masked CAS operations to
 avoid false sharing of single-bit locks.
 
@@ -66,7 +66,7 @@ memory to avoid contention on inserts.
 
 \subsection{Operations}
 
-We detail the operations supported by RCukoo below;
+We detail the operations supported by RCuckoo below;
 Figure~\ref{fig:message_diagram} visualizes the corresponding message
 exchanges. In the common case reads complete in one round trip while
 the other operations require two.
@@ -88,14 +88,14 @@ CAS, and curved dashed lines are writes.}
 \label{fig:message_diagram}
 \end{figure}
 
-RCuckoo is designed to facilitate lockless, single round-trip reads as
+RCuckoo is designed to facilitate lock-less, single round-trip reads as
 they are the dominant operation for key-value stores in data
 centers~\cite{facebook-memcached}. To read the value associated with a
 given key clients calculate the potential table locations for the
 key's entry (using the hash functions described in the next section)
 and issue RDMA reads for both rows simultaneously.  Because all
 operations between a client and a given server travel over a reliable
-connection, they are instrinsically ordered, but in our description we
+connection, they are intrinsically ordered, but in our description we
 will only call out when a particular ordering among a batch of
 messages is required.  Moreover, as we discuss below, if the rows are
 located sufficiently close together, it can be beneficial for the
@@ -154,13 +154,13 @@ client (Section~\ref{sec:table-repair}).
 Inserts are challenging because concurrent operations might result in
 cuckoo paths that collide.  Rather than face the prospect of having to
 unravel a partially completed insert upon collision, RCuckoo clients
-compute a complete cuckoo path ahead of time and then acqurie locks on
+compute a complete cuckoo path ahead of time and then acquire locks on
 all the relevant rows to ensure its success.  To facilitate
-cuckoo-path searches, Rcuckoo clients keep a local, RDMA-registered
-cache of the index table.  Clients validate---and, if necessary,
-update---their cache at each step of the insert operation as explained
-below, so stale cache entries do not impact correctness, only
-performance.
+cuckoo-path searches, RCuckoo clients keep a local, RDMA-registered
+cache of (relevant portions of) the index table.  Clients
+validate---and, if necessary, update---their cache at each step of the
+insert operation as explained below, so stale cache entries do not
+impact correctness, only performance.
 
 
 
@@ -197,43 +197,67 @@ performance.
 % disaggregated indexes and have designed our system
 % acrostically to the allocator.
 
+At a high level an insert operation proceeds in three phases.  RCuckoo
+clients start by identifying a potential cuckoo path using only the
+contents of their local table cache.  Clients then simultaneously
+attempt to acquire the locks for and update their cache of the rows
+that comprise the candidate path.  Using only the contents of their
+newly updated local cache, clients conduct a second search to confirm
+that a candidate path---either the initial guess or an alternative
+that similarly consists only of currently locked rows---exists.  If
+so, the insert is performed; if not, the client releases its locks and
+retries the operation.
 
-
-We uses a
-speculative local search to predict a sufficient set of
-locks to complete the insertion and then lock and
-synchronize the predicted rows. A second search on the
-locked and synchronized rows determines if a valid insertion
-path can be found on the locked rows.
-
-\textbf{Speculative Local Search:} As noted in
-Section~\ref{sec:cuckoo-back} building a valid cuckoo path
-is expensive because it requires iterative dependent reads.
-We use a speculative local search to shortcut the iterations
-if possible. Prior to synchronizing with reads clients
-search the contents of their local caches to build a
-speculative path. If the client cache is empty a lock for
-both of the insertion keys hash locations are made.
-Otherwise, locks for each row on the speculative path are
-acquired. Speculative cuckoo paths can be over on under
-approximations of a valid path and are most useful when
-caches are fresh due to a prior insert attempt failing.
+\textbf{Speculative local search:} As noted in
+Section~\ref{sec:cuckoo-back} identifying a viable cuckoo path for
+insertions requires multiple dependent reads.  RCuckoo attempts to
+limit the number of remote operations by first conducting a
+speculative local search. Prior to contacting the server, RCuckoo
+clients search the contents of their local table cache to build a
+speculative cuckoo path.  As with prior work, we use breadth-first
+search (BFS) to identify short paths in an attempt to minimize
+bandwidth and locking overhead~\cite{cuckoo-improvements}.  If the
+client cache is empty the degenerate path is presumed, i.e., that the
+key will be inserted into either its primary or backup location
+without the need for any cuckooing.  Obviously, speculative cuckoo
+paths are most useful when client caches are fresh---often due to a
+failed prior attempt to insert the same key.
 
 % Because of
 % locality hashing there is a high probability that a valid
 % insertion path can be found in buckets near a speculative
 % path, even if the clients cache is stale.
 
-\textbf{Cache Synchronization:} Clients synchronize their
-local caches while itteratitivly acquiring locks by reading
-the rows each lock protects. These reads are issued in a
-batch alongside the lock request. If the lock is acquired
-the values of the read will remain synchronized until the
-lock is released.  After locking clients check if their
-speculative paths are valid by checking their caches.
+\textbf{Cache synchronization:} Armed with a potential cuckoo path,
+clients identify the set of locks necessary to protect the relevant
+rows.  Immediately after, but in the same batch of RDMA operations as
+those that attempt to acquire (in order) the locks, clients
+synchronize their local cache by issuing reads for (at least) all of
+the rows covered by the locks.  (In general, locks cover multiple
+rows, so this will be a superset of the rows necessary for the
+identified path.)  Note that if lock acquisition is successful, the
+values returned by the read of the corresponding rows---and, thus, the
+client's local cache of those rows---will remain synchronized until
+the lock is released.
 
-In principle, the cache can be persisted across
-operations, but
+Figure~\ref{fig:table-diagram} shows an example insert operation where
+the client updated its cache of the section of the
+index table outlined by the dashed red line using a single covering read.
+Here, the primary row for $K$ is full and the entry for key $C$ is
+being evicted to the alternate location.  Hence, the client has
+acquired locks corresponding to the row where it hopes to insert the
+entry for key $K$ as well as the row into which it plans to cuckoo the
+existing entry for key $C$.  The rows shaded in gray are synchronized
+because they are covered by the acquired locks, while the intervening
+two (unshaded) rows are updated in the client's cache, but their
+contents cannot be depended upon without additional validation.
+Rather, they may increase the likelihood that a subsequent speculative
+search yields a valid result.
+% In this section we describe our protocol for reading,
+% inserting, and performing updates and deletes to an RCuckoo
+% hash table.
+In principle, the cache can be persisted not just across retries but also across
+insert operations for different keys, but
 %Caches can be purged or persisted between requests
 %depending on a clients available memory. 
 %While theoretically
@@ -244,44 +268,34 @@ experimentation shows that performance gains are minimal
 %search success over caching
 (Section~\ref{sec:search_success}).
 
+\textbf{Second search:} If all the lock acquisitions are successful,
+the client validates that the initial path remains valid.  Under an
+insert-heavy workload, however, speculative cuckoo paths are
+frequently stale.  Yet, a valid cuckoo path may still exist within the
+locked rows.  Hence, if the initial path is no longer viable, clients
+perform a second search restricted to only the synchronized part of
+its cache, i.e., rows for which they currently hold the lock.  In
+either case, if a valid path is found the series of swaps and CRC
+updates are calculated and issued as a single batch of RDMA writes
+followed by an (ordered set) of lock releases. If no valid path exists
+the client releases its locks and tries again, conducting another
+speculative search on the updated cache contents.
 
-\textbf{Second Search:} Speculative cuckoo paths may not be
-valid. However, a valid cuckoo path may exist within the
-locked rows. Clients perform a second search only on the
-synchronized rows that they have locked. We use BFS similar
-to prior work, as it produces short paths which minimize
-bandwidth and locking overhead~\cite{cuckoo-improvements}.
-If a valid path is found the series of swaps and CRC updates
-are calculated and issued as a single batch of sequential
-writes. Unlock MCAS messages are piggybacked in the same
-batch.  If no valid path exists the client releases its
-locks but retains its cache. Another speculative search on
-the fresh cache is performed. This algorithm is run
-itteratitivly until a valid path is found. Our evaluation
-measures the success rate of insertions as a factor of lock
-size (Section~\ref{sec:search_success}).
-
-In the figure, the client has acquired locks corresponding to both
-potential locations for $K$ as well as a current copy of the region of
-the index table shown in red (using a single \emph{covering read} as
-explained below).  Here, the primary row for $K$ is full and the entry
-for key $C$ is being evicted to the alternate location.
-% In this section we describe our protocol for reading,
-% inserting, and performing updates and deletes to an rcuckoo
-% hash table.
-
-
+This entire process repeats until success or a failed client is
+detected (due to repeated lock acquisition failures, see
+Section~\ref{sec:table-repair}.  Our evaluation measures the success
+rate of insertions as a function of lock granularity
+(Section~\ref{sec:search_success}).
 % During development we
 % experimented heavily with guided A* search but found that it
 % only offered improvements over BFS when the table was over
 % 95\% full due to the setup overhead of A* and the fact that
 % most paths are short.
-
-Given that cuckoo paths randomly span the table it is
-unlikely that a new valid path exists within the locked
-rows. As we will show in the next section by localizing
-cuckoo paths the probability that a valid insertion path can
-be found on the second search increases dramatically.
+However, if cuckoo paths randomly span the table it is unlikely that a
+new valid path exists within the locked rows.  In the next section we
+describe how we can use dependent hashing to dramatically increase the
+likelihood that an alternate cuckoo path exists using rows surrounding
+those identified by the speculative search.
 
 % However, as noted
 % there is high probability that a valid path can be found
@@ -334,7 +348,7 @@ Figure~\ref{fig:rdma-benchmarks}(a).
 
 In this section we describe a novel
 \textit{dependent} hashing algorithm which makes locality
-between hash location a tuneable parameter. We describe the
+between hash location a tunable parameter. We describe the
 tradeoffs of removing hash independence and demonstrate a
 dramatic improvement in the round trips required to perform
 insertions.
