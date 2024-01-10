@@ -79,20 +79,15 @@ suffer from the limited scope of such operations.
 Specifically, RDMA atomic operations can only act upon 64
 contiguous bits of memory at a time, forcing these systems
 to design multi-stage datastructures to support practical
-key and value sizes.
-
-In general, these key-value stores implement a
-high-performance index structure to localize contention, and
-then store the value separately, requiring multiple
-operations and network round trips. Most optimistically
-update the index to 
-
-Early systems~\cite{sherman} employed fine-grained lock
-tables, while more recent designs extract higher performance
-in read-heavy workloads through optimistic approaches to
-metadata management.  Unfortunately, optimistic approaches
-can perform worse under high contention, leading to an
-awkward trade space.
+key and value sizes.  In general, these key-value stores
+implement a high-performance index structure to localize
+contention, and then store the value separately, requiring
+multiple operations and network round trips. Most
+optimistically update the index with pointers to enable
+lockless reads avoid locking overheads and failures with
+visible partial writes.  Unfortunately, optimistic
+approaches can perform worse under high contention and
+demand indirect reads, leading to an awkward trade space.
 
 
 %% These approaches either use optimistic
@@ -138,44 +133,56 @@ awkward trade space.
 % sherman}.
 
 %rdma and cuckoo hashing
-In this work we consider designing an index datastructure specifically
-tailored for the constraints of current RDMA hardware.  Specicially,
-we seek to improve the performance of a lock-based approach by
-decreasing the number of RDMA operations required to acquire the locks
-necessary to perform updates.  Our contribution is a concurrent hash
-table that employs a novel form of Cuckoo hashing designed
-specifically to perform well with one-sided RDMA operations. In the
-common case our reads execute in a single round trip, and updates to
-the table require only two round trips; insert operations have a median
-of two round trips.
+In this work we consider designing an index datastructure
+tailored for the constraints of current RDMA hardware.
+Specifically, we seek to improve the performance of a
+lock-based approach by decreasing the number of round trips
+to acquire locks and perform operations. Our contribution is
+a concurrent hash table that employs a novel form of Cuckoo
+hashing designed specifically to perform well with one-sided
+RDMA operations.  In the common case our reads execute in a
+single round trip, and updates and deletes to the table
+require only two round trips; insert operations have a
+median of two round trips.  The core insight of our work is
+that round trips can be decreased by increasing locality in
+the table and the size of reads. We develop a
+\emph{dependent} hashing algorithm which makes locality a
+tunable parameter for cuckoo hashes.  Locality enables us to
+effectively predict the locks, and rows required to perform
+operations and to set multiple locks with a single atomic
+operation. We design and implement a fast fault tolerance
+algorithm which allows distributed clients to detect and
+repair failures in the table while still issuing millions of
+operations per second.
 
-Our design employs multiple distinct techniques to decrease the expected number of round trips required per operation.  The first is a
-\emph{dependent} hashing algorithm. Cuckoo hashes use two (or more)
-hash locations per key to resolve collisions. Dependent
-hashing increases the likelihood that a key's hash locations
-will be spatially near one another; if locations are close enough, a client can read them both with a single RDMA operation.  Of course, the increased locality
-leads to a higher degree of collisions, impacting the maximum number of elements which can be inserted
-into the table (i.e., fill factor).  We explore the trade space to find the best balance  between
-performance and fill factor. Using this locality we design a
-dense lock table which can fit into RDMA NIC device memory
-as it provides up to 3$\times$ higher performance for contested
-atomic access. Our locking protocol acquires and releases
-locks in bulk using the fewest round trips possible. We use
-Masked Compare and Swap to remove unessisary contention from
-out lock table.
+% Dependent hashing increases the likelihood that
+% a key's hash locations will be spatially near one another;
+% if locations are close enough, a client can read them both
+% with a single RDMA operation.  Of course, the increased
+% locality leads to a higher degree of collisions, impacting
+% the maximum number of elements which can be inserted into
+% the table (i.e., fill factor).  We explore the trade space
+% to find the best balance  between performance and fill
+% factor. Using this locality we design a dense lock table
+% which can fit into RDMA NIC device memory as it provides up
+% to 3$\times$ higher performance for contested atomic access.
+% Our locking protocol acquires and releases locks in bulk
+% using the fewest round trips possible. We use Masked Compare
+% and Swap to remove unessisary contention from out lock
+% table.
 
-Using locks rather than CAS to modify our index allows our
-index to support variable sized entries, and allows us to
-inline keys and values directly into the index. Inlining
-entries significantly reduces operation latency. We highly
-optimize inserts into our hash table. Locality between
-key-pairs improves insert locality enabling RCuckoo to both
-find valid cuckoo paths efficiently and aquire all locks for
-insertion in few round trips. We achieve this with a mixture
-of smart caching, searching, and a two stage cuckoo path
-finding algorithm. Finally locality improves reads by using
-single larger reads when key pairs are close, rather than
-multiple smaller reads.
+% Using locks rather than CAS to modify our index allows our
+% index to support variable sized entries, and allows us to
+% inline keys and values directly into the index. Inlining
+% entries significantly reduces operation latency. We highly
+% optimize inserts into our hash table. Locality between
+% key-pairs improves insert locality enabling RCuckoo to both
+% find valid cuckoo paths efficiently and aquire all locks for
+% insertion in few round trips. We achieve this with a mixture
+% of smart caching, searching, and a two stage cuckoo path
+% finding algorithm. Finally locality improves reads by using
+% single larger reads when key pairs are close, rather than
+% multiple smaller reads.
 
 % Inserting into a cuckoo hash table normally requires
 % acquiring many locks randomly throughout the table,
@@ -197,7 +204,7 @@ multiple smaller reads.
 We develop a prototype of our algorithm in C++ and evaluate
 it against three recent RDMA based key value stores. And
 provide microbenchmarks to analyze each of our design
-decisions. Our evaluation shows that we achive better
+decisions. Our evaluation shows that we achieve better
 performance than all prior approaches. On YCSB benchmarks we
 We gain between 1.4x to 10x on write heavy workloads and
 1.3x to 2.2x on read heavy workloads. 
