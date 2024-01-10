@@ -275,15 +275,15 @@ frequently stale.  Yet, a valid cuckoo path may still exist within the
 locked rows.  Hence, if the initial path is no longer viable, clients
 perform a second search restricted to only the synchronized part of
 its cache, i.e., rows for which they currently hold the lock.  In
-either case, if a valid path is found the series of swaps and CRC
-updates are calculated and issued as a single batch of RDMA writes
-followed by an (ordered set) of lock releases. If no valid path exists
-the client releases its locks and tries again, conducting another
-speculative search on the updated cache contents.
+either case, if a valid path is found the series of swaps and
+version/CRC updates are calculated and issued as a single batch of
+RDMA writes followed by (an ordered set of) lock releases. If no valid
+path exists the client releases its locks and tries again, conducting
+another speculative search on the updated cache contents.
 
 This entire process repeats until success or a failed client is
 detected (due to repeated lock acquisition failures, see
-Section~\ref{sec:table-repair}.  Our evaluation measures the success
+Section~\ref{sec:table-repair}).  Our evaluation measures the success
 rate of insertions as a function of lock granularity
 (Section~\ref{sec:search_success}).
 % During development we
