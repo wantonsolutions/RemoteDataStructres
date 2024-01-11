@@ -33,8 +33,9 @@ version numbers enable clients to detect if a row has been modified.
 Locks (stored in a bit vector in NIC memory, shown on the left) each
 protect a tunable number (here, two) of index rows.  Clients perform
 lock acquisition and release with RDMA compare-and-swap (CAS)
-operations.  Specifically, RCuckoo leverages masked CAS operations to
-avoid false sharing of single-bit locks.
+operations.  Specifically, RCuckoo leverages masked CAS (MCAS)
+operations to obtain multiple locks simultaneously while avoiding
+false sharing.
 
 %by polling CRCs which is used to detect if a client
 %has failed while holding a lock (Section~\ref{sec:fault-tolerance}).
@@ -97,11 +98,23 @@ and issue RDMA reads for both rows simultaneously.  Because all
 operations between a client and a given server travel over a reliable
 connection, they are intrinsically ordered, but in our description we
 will only call out when a particular ordering among a batch of
-messages is required.  Moreover, as we discuss below, if the rows are
+messages is required.
+
+Moreover, as we discuss below, if the rows are
 located sufficiently close together, it can be beneficial for the
 client to issue a single \emph{covering read} that returns the
 contents of both rows---as well as intervening and potentially
-surrounding ones---in a single request.  A read is successful if
+surrounding ones---in a single request.
+A single, large read rather than two small reads are issued
+if both locations are within
+%close to one another in the table to
+%reduce tail latency. We use
+128 bytes of each other as our experiments show it has a negligible
+increase in latency over smaller RDMA requests
+(Figure~\ref{fig:rdma-benchmarks}(a)) and provides substantial
+improvement for insert operations.
+
+A read is successful if
 either row contains an entry with the desired key and the row's CRC is
 valid. An invalid CRC indicates a torn write or rare
 failure case (Section~\ref{sec:table-repair}).  As shown in
@@ -208,6 +221,36 @@ that similarly consists only of currently locked rows---exists.  If
 so, the insert is performed; if not, the client releases its locks and
 retries the operation.
 
+\begin{figure*}[t]
+    \centering
+    \begin{subfigure}{0.3\linewidth}
+        \begin{align*}
+            L_1 &= h_1(k) \\
+            L_2 &= L_1 + (h_2(k)\mod f^{f + log_2(h_3(k))})
+        \end{align*}
+        % \caption{}
+        % \label{fig:hash_factor}
+    \end{subfigure}
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/hash_factor.pdf}
+        % \label{fig:hash_factor}
+        % \caption{}
+    \end{subfigure}
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/hash_fill.pdf}
+        % \label{fig:hash_fill}
+        % \caption{}
+    \end{subfigure}.
+    \vspace{-1em}
+    \caption{
+    \textbf{(a)} Dependent hashing for factor $f$.
+    \textbf{(b)} CDF of distances between cuckoo locations dependent hashing on different exponential factors.
+    \textbf{(c)} Exponential factor relation to max fill in cuckoo hash. 90\% fill marked in red.
+    }
+    \label{fig:locality-hashing}
+
+\end{figure*}
+
 \textbf{Speculative local search:} As noted in
 Section~\ref{sec:cuckoo-back} identifying a viable cuckoo path for
 insertions requires multiple dependent reads.  RCuckoo attempts to
@@ -307,96 +350,27 @@ those identified by the speculative search.
 
 \subsection{Locality}
 
-\begin{figure*}[t]
-    \centering
-    \begin{subfigure}{0.3\linewidth}
-        \begin{align*}
-            L_1 &= h_1(k) \\
-            L_2 &= L_1 + (h_2(k)\mod f^{f + log_2(h_3(k))})
-        \end{align*}
-        % \caption{}
-        % \label{fig:hash_factor}
-    \end{subfigure}
-    \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/hash_factor.pdf}
-        % \label{fig:hash_factor}
-        % \caption{}
-    \end{subfigure}
-    \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/hash_fill.pdf}
-        % \label{fig:hash_fill}
-        % \caption{}
-    \end{subfigure}.
-    \vspace{-1em}
-    \caption{
-    \textbf{(a)} Dependent hashing for factor $f$.
-    \textbf{(b)} CDF of distances between cuckoo locations dependent hashing on different exponential factors.
-    \textbf{(c)} Exponential factor relation to max fill in cuckoo hash. 90\% fill marked in red.
-    }
-    \label{fig:locality-hashing}
 
-\end{figure*}
+%% Randomly spread cuckoo paths take many round trips to find and lock.
+%% Similarly, reads require reads of both the potential locations for a
+%% given key.  
 
-Randomly spread cuckoo paths take many round trips to find and lock.
-Similarly, reads require reads of both the potential locations for a
-given key.  A single, large read rather than two small reads are issued
-if both a keys locations are close to one another in the table to
-reduce tail latency. We use a read threshold of 128 bytes as it has a
-negligible increase in latency over smaller RDMA packets
-Figure~\ref{fig:rdma-benchmarks}(a).
-
-
-In this section we describe a novel
-\textit{dependent} hashing algorithm which makes locality
-between hash location a tunable parameter. We describe the
-tradeoffs of removing hash independence and demonstrate a
-dramatic improvement in the round trips required to perform
-insertions.
+In this section we introduce our dependent hashing algorithm that
+makes the distance between keys' two cuckoo hash locations a tunable
+parameter.  Increased locality reduces the region of the index table likely
+to be spanned by cuckoo paths, which has two direct benefits for
+RCuckoo: it increases the probability that both of a keys' locations
+will be read with a single covering read---which updates more of a
+client's local cache, improving the liklihood that failed insert
+operations will succeed upon retry---and that all the necessary locks
+can be acquired with a singe MCAS operation.  Conversely, increased
+locality leads to hotspots that limit the table's expected maximum
+fill factor.  We show experimentally that an optimal locality setting
+can dramaticly decrease the number of round trips required to
+perform inserts in RCuckoo.
 
 
 \subsubsection{Dependent Hashing}
-
-Our hashing algorithm borrows from both cuckoo and hopscotch
-hashing to achieve tunable locality. The distance between
-two hash locations is determined by probabilistically
-\textit{dependent} rather than independent hash functions.
-Locality between hash entries reduces the span of cuckoo
-paths and increases the probability that multiple locks can
-be set with a singe MCAS and both of a keys locations can be read
-with a single RDMA message. However, high locality increases
-the probability of hotspots in the table which decreases its
-maximum fill factor.
-
-Figure~\ref{fig:locality-hashing}(a) is our formula for
-dependent hashing. The first hash location is chosen
-uniformly at random, while second is chosen as an offset of
-the first.  $f$ determines the max distance the second item
-can be placed. Higher values of $f$ decrease locality.
-Figure~\ref{fig:locality-hashing}(b) shows the distance
-between hash locations as a CDF for different values of $f$.
-Setting a constant bound on the distance between hash
-locations leads to bad fill factors (on the order of
-10-15\%). Our function places exponentially few locations
-exponentially far apart using a third hash function $h_3(x)$
-which generates a higher exponent at a logarithmic rate to
-determine which locations will have large distances between
-them\footnote{The value of $h_3(x)$ is the sum of trailing
-zeros after calculating a keys 64bit hash value} These few,
-but far apart hash locations increase the max fill by
-alleviating hotspots in the table. While searching for
-cuckoo paths with BFS these entries act as gateways for
-paths to access less filled portions of the table. 
-
-Figure~\ref{fig:locality-hashing}(c) shows how larger values
-of $f$ enable higher fill factors for tables with 100M
-entries. In our experiments we use $f$ of 2.1 and an
-associativity of 8 as it provides a 90\% max fill an a 68\%
-probability that hash locations are located 3 or fewer
-buckets apart.
-
-
-\subsubsection{Locking}
-\label{sec:locking}
 
 \begin{figure*}[t]
     \centering
@@ -426,6 +400,50 @@ buckets apart.
     \label{fig:cuckoo-problems}
 
 \end{figure*}
+
+Our hashing algorithm borrows from both cuckoo and hopscotch hashing
+to achieve tunable locality.   We start with a base
+hash\footnote{We use xxHash in our implementation.}, $h()$, and use it to
+implement three independent hash functions $h_1()$, $h_2()$, and $h_3()$.
+(In our implementation we use a different salt for each of the
+three functions.)  We compute the two locations $L_1$ and $L_2$
+for a key $K$ as
+\[ L_1(K) = h_1(K)\mod T, \]
+\[ L_2(K) = L_1 + (h_2(K)\mod f^{f+\mathcal{Z}(h_3(K))})\mod T, \]
+\noindent where $T$ is the size of the index table in rows,
+$\mathcal{Z}(x)$ is the number of trailing zeros in $x$, and $f$ is a
+parameter that controls the expected distance between the two hash
+locations.  The particular formulation is not important, but the
+effect is that the first location is chosen uniformly at random, while
+second is chosen as a uniformly random offset of the first drawn from
+a probablistically bounded range.  The latter part is key, as any
+fixed bound on the distance between hash locations leads to
+low maximum fill factors (on the order of 10--15\% in our
+experiments).  Instead, RCuckoo chooses exponentially fewer locations
+at increased distances.  Figure~\ref{fig:locality-hashing}(b) shows
+the distance between hash locations as a CDF for different values of
+$f$,
+%% Setting .  using a third hash function $h_3(x)$
+%% which generates a higher exponent at a logarithmic rate to determine
+%% which locations will have large distances between them
+%% %\footnote{The
+%% %value of $h_3(x)$ is the sum of trailing zeros after calculating a
+%% %keys 64bit hash value}
+%% These few, but far apart hash locations
+%% increase the max fill by alleviating hotspots in the table. While
+%% searching for cuckoo paths with BFS these entries act as gateways for
+%% paths to access less filled portions of the table.
+while Figure~\ref{fig:locality-hashing}(c) shows that larger values of
+$f$ enable practical fill factors for tables with 100~M entries. In
+our experiments we set $f=2.1$.  As shown in the figure, for index
+tables with eight entries per row, it delivers an expected max fill of
+greater than 90\% with a 68\% probability that hash locations are
+located three or fewer rows apart.
+
+
+\subsubsection{Locking}
+\label{sec:locking}
+
 
 Increased path locality dually increases lock locality. If
 multiple locks are within a 64 bit range of one another they
