@@ -442,97 +442,26 @@ located three or fewer rows apart.
 
 Decreased distances between hash locations naturally lead to shorter
 cuckoo paths when compined with our breadth-first search approach.
-Using $f=2.1$, Figure~\ref{fig:locality-hashing}(c) shows that when a
-100-M row table is XX\% full, 95\% of insertions require cuckoo paths
-that span 32 or fewer rows while nearly 99\% span 256 or fewer.  This
-result implies that paths will freqently fit within the rows returned from a
-covering read.
-
+Using $f=2.1$ and a table size of 100-K rows,
+Figure~\ref{fig:locality-hashing}(c) shows that when filling the table
+to 95\% full, 95\% of insertions require cuckoo paths that span 32 or
+fewer rows while nearly 99\% span 256 or fewer.  This result implies
+that paths will freqently fit within the rows returned from a covering
+read.
+%
 Moreover, the required locks are also close to each other in the lock
-bit array.  Recall the lock table is a linear array of lock bits and
-each bit locks one or more table rows.  As mentioned previously,
-RCuckoo implements lock acquire and release using RDMA masked
-compare-and-swap (MCAS) operations that can access 64 bits at a time.
-Hence, Figure~\ref{fig:locality-hashing}(c)---which shows that 99\% of
-cuckoo spans are 256 rows or less---implies that if each lock protects
-4 rows nearly 99\% of insertions can have their locks acquired with a
-single MCAS.
+bit array.
 
-
-\subsubsection{Locking}
-\label{sec:locking}
-
-
-
-
-RCuckoo uses NIC hardware features and lock
-virtualization to achieve scalability, low contention, and high
-performance.  First, we locate the lock table in NIC device memory
-which delivers $3\times$ higher throughout on contented addresses than
-host memory (see Figure~\ref{fig:rdma-benchmarks}). It is also lower
-latency as operations to device memory avoid a PCIe round trip.
-Unfortunately, NIC memory is limited (to 256~KB on our ConnectX-5s),
-so this choice bounds the size of the lock table.  Second,
-
-
-We address this tradeoff through the use of a \textit{virtual} lock
-table where multiple logical locks map to a single physical lock.
-Concretely, we map a logical lock $l$ drawn from a table of size $L$
-to a physical location $p$ in a bit-array of size $P$ by computing $p
-= l \mod P$.  Mapping multiple virtual locks to a single physical lock
-leads to false sharing, but allows us to support arbitrarily large
-index tables.
-
-Figure~\ref{fig:cuckoo-problems}(c) shows the effect of lock
-density (y-axis) and lock granularity (x-axis) on insert
-performance. The top row shows the 99th percentile round
-trips needed for inserts which aquire a single lock. In the
-top left fine grained locking with one lock per message
-results in 55 round trips. The far right colum shows how a
-single global lock results in high contention. Dense tables
-with a few rows per lock result in the fewest round trips.
-
-
-
-% Using locks rather than opportunistic concurrency halves the
-% latency of reads from two to one round trip. Opportunistic
-% updates commit changes by atomically updating a pointer
-% (with CAS) in the hash index to point to a new value. Both
-% the index, then the value must be read for each operation.
-% Values can not be inlined in the index as they are limited
-% to the 64bit width of CAS. Rcuckoo uses locks to enable
-% inlined entries which can be read in a single round trip.
-% Locks introduce multiple challenges such as scalability,
-% deadlocks and fault tolerance each of which is discussed
-% below.
-
-
-In our
-experiments we use 16 rows per lock as it has a negligible
-effect on contention and requires a single lock to be
-acquired for vast majority of insertions.
-%%
-
-
-To avoid deadlock we aquire locks in incremental order.
-Given a cuckoo path the rows are translated to virtual
-locks, then to physical locks, then sorted. The sorted
-locks are broken into 64 bit chunks which are mapped to
-individual MCAS packets.  Lock requests are issued in order.
-Clients continuously poll on lock requests and only move to
-the next request only after the prior has been successfully
-acquired.
-
-Locality provides an additional opportunity to reduce round
-trips by reading additional buckets. If locks are close
-together but not contiguous clients issue a \textit{covering
-read} spanning all rows between each bucket. We use 512
-bytes as a max threshold. Covering reads synchronize a
-clients cache for non-locked rows. If the second search
-fails to find a valid cuckoo path the next iterations
-speculative search will benefit from the fresh read.
-Figure~\ref{fig:table-diagram} illustrates a covering read
-between keys $K$ and $C$.
+%% Locality provides an additional opportunity to reduce round
+%% trips by reading additional buckets. If locks are close
+%% together but not contiguous clients issue a \textit{covering
+%% read} spanning all rows between each bucket. We use 512
+%% bytes as a max threshold. Covering reads synchronize a
+%% clients cache for non-locked rows. If the second search
+%% fails to find a valid cuckoo path the next iterations
+%% speculative search will benefit from the fresh read.
+%% Figure~\ref{fig:table-diagram} illustrates a covering read
+%% between keys $K$ and $C$.
 
 % Speculative locks may not be sufficient to complete an
 % insertion.  However, due to locality hashing there is a high
@@ -550,18 +479,97 @@ between keys $K$ and $C$.
 % marked the rows for $C$ and $K$ to be locked. A covering
 % read (red) spans the rows between both entries.
 
-Clients may fail while holding locks leaving them set and
-stranded. Clients detect failed locks by timing out on them
-while acquiring them. To separate failures from clients
-acquiring a long list of contended locks clients are given a
-bounded time to aquire their locks. If a client takes longer
-than this time to aquire all of its locks it releases all
-held locks and starts the process again to prevent false
-failure detection. Our complete fault detection and recovery
-mechanism is described in Section~\ref{sec:fault-tolerance}.
+\subsubsection{Virtual locking}
+\label{sec:locking}
+
+Recall the lock table is a linear array of lock bits and each bit
+locks one or more table rows.  As mentioned previously, RCuckoo
+implements lock acquire and release using RDMA masked compare-and-swap
+(MCAS) operations that can access 64 bits at a time.  Hence,
+Figure~\ref{fig:locality-hashing}(c)---which shows that 99\% of cuckoo
+spans are 256 rows or less---implies that if each lock protects at
+least four rows nearly 99\% of insertions can have their locks
+acquired with a single MCAS.  Of course, increasing the number of rows
+covered by a single lock can lead to false sharing.  (In the extreme,
+there would just be one, global lock for the entire table.)
+
+In addition, to imporove locking performance, RCuckoo locates the lock
+table in NIC device memory which delivers $3\times$ higher throughout
+on contented addresses than host memory (see
+Figure~\ref{fig:rdma-benchmarks}). It is also lower latency as
+operations to device memory avoid a PCIe round trip.  Unfortunately,
+NIC memory is limited (to 256~KB on our ConnectX-5s), so this choice
+bounds the size of the lock table.
+%
+We address this tradeoff through the use of a \textit{virtual} lock
+table where multiple logical locks map to a single physical lock.
+Concretely, we map a logical lock $l$ drawn from a table of size $L$
+to a physical location $p$ in a bit-array of size $P$ by computing $p
+= l \mod P$.  Mapping multiple virtual locks to a single physical lock
+introduces yet another source of false sharing, but allows us to
+support arbitrarily large tables.
+
+To avoid deadlock RCuckoo aquires locks in increasing physical order.  Given
+a cuckoo path the rows are translated to virtual locks, then to
+physical locks, then sorted. The sorted locks are broken into 64-bit
+chunks which are mapped to individual MCAS packets.  The MCAS
+operations are issued one at a time in order of their target address.  Clients
+continuously spin on lock acquisitions and only move to the next MCAS
+operation after the current one succeeds.
+
+Due to this one-MCAS-per-roundtrip lock acquition procedure, lock granularity has a pivotal role on performance.
+Figure~\ref{fig:cuckoo-problems}(c) shows the effect of lock density
+(y-axis) and lock granularity (x-axis) on insert performance. The top
+row shows the 99-th percentile round trips needed for inserts which
+aquire a single lock at a time. In the top left fine-grained locking with one
+lock per message results in 55 round trips. The far right column shows
+that a single global lock results in high contention. Dense tables with
+few rows per lock result in the fewest round trips.  In our
+experiments we use 16 rows per lock as it has a negligible effect on
+contention and requires a single lock to be acquired for vast majority
+of insertions.
+
+%
+
+
+
+
+
+% Using locks rather than opportunistic concurrency halves the
+% latency of reads from two to one round trip. Opportunistic
+% updates commit changes by atomically updating a pointer
+% (with CAS) in the hash index to point to a new value. Both
+% the index, then the value must be read for each operation.
+% Values can not be inlined in the index as they are limited
+% to the 64bit width of CAS. Rcuckoo uses locks to enable
+% inlined entries which can be read in a single round trip.
+% Locks introduce multiple challenges such as scalability,
+% deadlocks and fault tolerance each of which is discussed
+% below.
+
+
+%%
+
+
+Clients may fail while holding locks, preventing other clients from
+making progress.  As described below, clients independently detect
+such failures by setting a time out for lock acquisition. To avoid
+false alarms, i.e., clients timing out due to a slow-moving client
+(who might, for example need to acquire a long list of contended
+locks), RCuckoo clients are given a bounded time to aquire all their
+locks. If a client takes longer than this time to aquire all of its
+locks it releases all held locks and restarts the (timer and)
+acquisition process, hopefully allowing other clients to complete
+their own acquisitions.
+
 
 \subsection{Fault Tolerance}
 \label{sec:fault-tolerance}
+
+
+%to prevent false failure detection. Our complete
+%fault detection and recovery mechanism is described in
+%Section~\ref{sec:fault-tolerance}.
 
 The table must be repaired if a client fails while holding a
 lock. In our fault recovery algorithm non-failed clients
