@@ -223,14 +223,14 @@ retries the operation.
 
 \begin{figure*}[t]
     \centering
-    \begin{subfigure}{0.3\linewidth}
-        \begin{align*}
-            L_1 &= h_1(k) \\
-            L_2 &= L_1 + (h_2(k)\mod f^{f + log_2(h_3(k))})
-        \end{align*}
-        % \caption{}
-        % \label{fig:hash_factor}
-    \end{subfigure}
+%    \begin{subfigure}{0.3\linewidth}
+%        \begin{align*}
+%            L_1 &= h_1(k) \\
+%            L_2 &= L_1 + (h_2(k)\mod f^{f + log_2(h_3(k))})
+%        \end{align*}
+%        % \caption{}
+%        % \label{fig:hash_factor}
+%    \end{subfigure}
     \begin{subfigure}{0.3\linewidth}
         \includegraphics[width=0.99\linewidth]{fig/hash_factor.pdf}
         % \label{fig:hash_factor}
@@ -243,9 +243,9 @@ retries the operation.
     \end{subfigure}.
     \vspace{-1em}
     \caption{
-    \textbf{(a)} Dependent hashing for factor $f$.
-    \textbf{(b)} CDF of distances between cuckoo locations dependent hashing on different exponential factors.
-    \textbf{(c)} Exponential factor relation to max fill in cuckoo hash. 90\% fill marked in red.
+ %   \textbf{(a)} Dependent hashing for factor $f$.
+    \textbf{(a)} CDF of distances between cuckoo locations for different locality settings using RCuckoo's dependent hashing.
+    \textbf{(b)} Achieved maximum fill percentage for different locality settings. 90\% fill indicated by dashed red line.
     }
     \label{fig:locality-hashing}
 
@@ -420,7 +420,7 @@ a probablistically bounded range.  The latter part is key, as any
 fixed bound on the distance between hash locations leads to
 low maximum fill factors (on the order of 10--15\% in our
 experiments).  Instead, RCuckoo chooses exponentially fewer locations
-at increased distances.  Figure~\ref{fig:locality-hashing}(b) shows
+at increased distances.  Figure~\ref{fig:locality-hashing}(a) shows
 the distance between hash locations as a CDF for different values of
 $f$,
 %% Setting .  using a third hash function $h_3(x)$
@@ -433,7 +433,7 @@ $f$,
 %% increase the max fill by alleviating hotspots in the table. While
 %% searching for cuckoo paths with BFS these entries act as gateways for
 %% paths to access less filled portions of the table.
-while Figure~\ref{fig:locality-hashing}(c) shows that larger values of
+while Figure~\ref{fig:locality-hashing}(b) shows that larger values of
 $f$ enable practical fill factors for tables with 100~M entries. In
 our experiments we set $f=2.1$.  As shown in the figure, for index
 tables with eight entries per row, it delivers an expected max fill of
