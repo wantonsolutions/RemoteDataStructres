@@ -3,19 +3,24 @@
 
 \begin{figure}[t]
     \includegraphics[width=0.99\linewidth]{fig/table-diagram.pdf}
-    \caption{Rcuckoo's table design showing an insert of the key $K$ as it displaces $C$.~\todo{add lease table}}
+    \caption{Rcuckoo's table design showing an insert of the key $K$ as it displaces $C$.}
     \label{fig:table-diagram}
 \end{figure}
 
 In this section we describe the design of RCuckoo, a fully
 disaggregated lock-based cuckoo hash table in which clients
 communicate with passive memory servers over reliable RDMA connections
-using exclusively 1-sided operations.  We first describe our table
-design and protocol to read and modify the contents of the table.
-Next we introduce a novel, locality-enhanced hashing algorithm and show
-how it enables our protocol to perform most operations in two round
-trips or less.  We close with a discussion of how RCuckoo detects and
-recovers from client failures.
+using exclusively 1-sided operations.  For simplicity, we describe our
+design in the context of a single memory server, but it is
+straightforward to shard a large hash table across multiple servers
+(with a minor tweak to the hashing function, see
+Section~\ref{sec:dephash}).  We first describe our table design and
+protocol to read and modify the contents of the table.  Next we
+introduce a novel, locality-enhanced hashing algorithm and show how it
+enables our protocol to perform most operations in two round trips or
+less.
+%We close with a discussion of how RCuckoo detects and recovers
+%from client failures.
 
 \subsection{Data structures}
 \label{sec:table-design}
@@ -33,8 +38,9 @@ version numbers enable clients to detect if a row has been modified.
 Locks (stored in a bit vector in NIC memory, shown on the left) each
 protect a tunable number (here, two) of index rows.  Clients perform
 lock acquisition and release with RDMA compare-and-swap (CAS)
-operations.  Specifically, RCuckoo leverages masked CAS operations to
-avoid false sharing of single-bit locks.
+operations.  Specifically, RCuckoo leverages masked CAS (MCAS)
+operations~\cite{rdma-masked-cas,sherman} to obtain multiple locks
+simultaneously while avoiding false sharing.
 
 %by polling CRCs which is used to detect if a client
 %has failed while holding a lock (Section~\ref{sec:fault-tolerance}).
@@ -43,7 +49,7 @@ As shown at the bottom of the figure, Table entries contain either
 inlined key/value pairs (signified by a 0 MSB) or a key and 48-bit
 pointer to an extent entry for larger values.
 %~\footnote{Inlined entries perform better on small key value pairs}.
-Extents are located in pre-allocated, per-client regions of server
+Extents are located in preallocated, per-client regions of server
 memory to avoid contention on inserts.
 
 
@@ -97,11 +103,23 @@ and issue RDMA reads for both rows simultaneously.  Because all
 operations between a client and a given server travel over a reliable
 connection, they are intrinsically ordered, but in our description we
 will only call out when a particular ordering among a batch of
-messages is required.  Moreover, as we discuss below, if the rows are
+messages is required.
+
+Moreover, as we discuss below, if the rows are
 located sufficiently close together, it can be beneficial for the
 client to issue a single \emph{covering read} that returns the
 contents of both rows---as well as intervening and potentially
-surrounding ones---in a single request.  A read is successful if
+surrounding ones---in a single request.
+A single, large read rather than two small reads are issued
+if both locations are within
+%close to one another in the table to
+%reduce tail latency. We use
+128 bytes of each other as our experiments show it has a negligible
+increase in latency over smaller RDMA requests
+(Figure~\ref{fig:rdma-benchmarks}(a)) and provides substantial
+improvement for insert operations.
+
+A read is successful if
 either row contains an entry with the desired key and the row's CRC is
 valid. An invalid CRC indicates a torn write or rare
 failure case (Section~\ref{sec:table-repair}).  As shown in
@@ -110,7 +128,7 @@ one round trip, while reads for large values require a second round
 trip to retrieve the extent.
 
 
-\subsubsection{Updates and Deletes}
+\subsubsection{Updates and deletes}
 
 Updates and deletes, like reads, are straightforward, but require a
 client to acquire the appropriate locks.  Clients attempt to acquire
@@ -126,7 +144,7 @@ store the value to a new extent in an RDMA write that is batched with
 the lock acquisition requests to avoid additional round trips.
 Deletes of extent-based values simply mark the entry for later garbage
 collection.  Figure~\ref{fig:message_diagram}(b) shows that an
-un-contested operations complete in two round trip times; clients
+uncontested operations complete in two round trip times; clients
 retry failed lock acquisitions until they succeed or detect a failed
 client (Section~\ref{sec:table-repair}).
 
@@ -208,6 +226,42 @@ that similarly consists only of currently locked rows---exists.  If
 so, the insert is performed; if not, the client releases its locks and
 retries the operation.
 
+\begin{figure*}[t]
+    \centering
+%    \begin{subfigure}{0.3\linewidth}
+%        \begin{align*}
+%            L_1 &= h_1(k) \\
+%            L_2 &= L_1 + (h_2(k)\mod f^{f + log_2(h_3(k))})
+%        \end{align*}
+%        % \caption{}
+%        % \label{fig:hash_factor}
+%    \end{subfigure}
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/hash_factor.pdf}
+        % \label{fig:hash_factor}
+        % \caption{}
+    \end{subfigure}
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/hash_fill.pdf}
+        % \label{fig:hash_fill}
+        % \caption{}
+    \end{subfigure}
+        \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/insertion_span.pdf}
+        % \label{fig:insertion_span}
+        % \caption{}
+    \end{subfigure}
+    \vspace{-1em}
+    \caption{
+ %   \textbf{(a)} Dependent hashing for factor $f$.
+    \textbf{(a)} CDF of distances between cuckoo locations for different locality settings using RCuckoo's dependent hashing.
+    \textbf{(b)} Achieved maximum fill percentage for different locality settings. 90\% fill indicated by dashed red line.
+        \textbf{(c)} CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path.~\todo{buckets to rows}
+    }
+    \label{fig:locality-hashing}
+
+\end{figure*}
+
 \textbf{Speculative local search:} As noted in
 Section~\ref{sec:cuckoo-back} identifying a viable cuckoo path for
 insertions requires multiple dependent reads.  RCuckoo attempts to
@@ -276,10 +330,11 @@ locked rows.  Hence, if the initial path is no longer viable, clients
 perform a second search restricted to only the synchronized part of
 its cache, i.e., rows for which they currently hold the lock.  In
 either case, if a valid path is found the series of swaps and
-version/CRC updates are calculated and issued as a single batch of
-RDMA writes followed by (an ordered set of) lock releases. If no valid
-path exists the client releases its locks and tries again, conducting
-another speculative search on the updated cache contents.
+version/CRC updates are calculated and issued as a batch of RDMA
+writes, one row at a time, followed by (an ordered set of) lock
+releases. If no valid path exists the client releases its locks and
+tries again, conducting another speculative search on the updated
+cache contents.
 
 This entire process repeats until success or a failed client is
 detected (due to repeated lock acquisition failures, see
@@ -307,214 +362,135 @@ those identified by the speculative search.
 
 \subsection{Locality}
 
-\begin{figure*}[t]
+
+%% Randomly spread cuckoo paths take many round trips to find and lock.
+%% Similarly, reads require reads of both the potential locations for a
+%% given key.  
+
+In this section we introduce our dependent hashing algorithm that
+makes the distance between keys' two cuckoo hash locations a tunable
+parameter.  Increased locality reduces the region of the index table likely
+to be spanned by cuckoo paths, which has two direct benefits for
+RCuckoo: it increases the probability that both of a keys' locations
+will be read with a single covering read---which updates more of a
+client's local cache, improving the likelihood that failed insert
+operations will succeed upon retry---and that all the necessary locks
+can be acquired with a singe MCAS operation.  Conversely, increased
+locality leads to hot spots that limit the table's expected maximum
+fill factor.  We show experimentally that an optimal locality setting
+can dramatically decrease the number of round trips required to
+perform inserts in RCuckoo.
+
+
+\subsubsection{Dependent hashing}
+\label{sec:dephash}
+
+
+%% \begin{figure*}[t]
+%%     \centering
+%%     \begin{subfigure}{0.3\linewidth}
+%%         \includegraphics[width=0.99\linewidth]{fig/optimistic_failures.pdf}
+%%         % \label{fig:optimistic_failures}
+%%         % \caption{}
+%%     \end{subfigure}
+%%     \begin{subfigure}{0.3\linewidth}
+%%         \includegraphics[width=0.99\linewidth]{fig/buckets_per_lock_vs_locks_per_message.pdf}
+%%         % \label{fig:tbd}
+%%         % \caption{}
+%%     \end{subfigure}
+%%     \vspace{-1em}
+%%     \caption{
+%%     \textbf{(a)} Failure rate of optimistic cuckoo insertions.
+%%     \textbf{(c)} Round trips (99th percentile) on a table
+%%     with 512 rows required per insert while filling a table
+%%     to 95\%. 512 buckets per lock is a single global lock.}
+
+%%     \label{fig:cuckoo-problems}
+
+%% \end{figure*}
+
+Our hashing algorithm borrows from both cuckoo and hopscotch hashing
+to achieve tunable locality.   We start with a base
+hash\footnote{We use xxHash in our implementation.}, $h()$, and use it to
+implement three independent hash functions $h_1()$, $h_2()$, and $h_3()$.
+(In our implementation we use a different salt for each of the
+three functions.)  We compute the two locations $L_1$ and $L_2$
+for a key $K$ as
+\[ L_1(K) = h_1(K)\mod T, \]
+\[ L_2(K) = L_1 + (h_2(K)\mod f^{f+\mathcal{Z}(h_3(K))})\mod T, \]
+\noindent where $T$ is the size of the index table in rows,
+$\mathcal{Z}(x)$ is the number of trailing zeros in $x$, and $f$ is a
+parameter that controls the expected distance between the two hash
+locations.  The particular formulation is not important, but the
+effect is that the first location is chosen uniformly at random, while
+second is chosen as a uniformly random offset of the first drawn from
+a probabilistically bounded range.  (In a sharded deployment, the
+second location is restricted to the same shard by ``wrapping around''
+the offset accordingly.) The latter part is key, as any fixed bound on
+the distance between hash locations leads to low maximum fill factors
+(on the order of 10--15\% in our experiments).  Instead, RCuckoo
+chooses exponentially fewer locations at increased distances.
+Figure~\ref{fig:locality-hashing}(a) shows the distance between hash
+locations as a CDF for different values of $f$,
+%% Setting .  using a third hash function $h_3(x)$
+%% which generates a higher exponent at a logarithmic rate to determine
+%% which locations will have large distances between them
+%% %\footnote{The
+%% %value of $h_3(x)$ is the sum of trailing zeros after calculating a
+%% %keys 64bit hash value}
+%% These few, but far apart hash locations
+%% increase the max fill by alleviating hotspots in the table. While
+%% searching for cuckoo paths with BFS these entries act as gateways for
+%% paths to access less filled portions of the table.
+while Figure~\ref{fig:locality-hashing}(b) shows that larger values of
+$f$ enable practical fill factors for tables with 100~M entries. In
+our experiments we set $f=2.1$.  As shown in the figure, for index
+tables with eight entries per row, it delivers an expected max fill of
+greater than 90\% with a 68\% probability that hash locations are
+located three or fewer rows apart.
+
+\begin{figure}[t]
+  \vskip -1em
     \centering
-    \begin{subfigure}{0.3\linewidth}
-        \begin{align*}
-            L_1 &= h_1(k) \\
-            L_2 &= L_1 + (h_2(k)\mod f^{f + log_2(h_3(k))})
-        \end{align*}
-        % \caption{}
-        % \label{fig:hash_factor}
-    \end{subfigure}
-    \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/hash_factor.pdf}
-        % \label{fig:hash_factor}
-        % \caption{}
-    \end{subfigure}
-    \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/hash_fill.pdf}
-        % \label{fig:hash_fill}
-        % \caption{}
-    \end{subfigure}.
-    \vspace{-1em}
-    \caption{
-    \textbf{(a)} Dependent hashing for factor $f$.
-    \textbf{(b)} CDF of distances between cuckoo locations dependent hashing on different exponential factors.
-    \textbf{(c)} Exponential factor relation to max fill in cuckoo hash. 90\% fill marked in red.
-    }
-    \label{fig:locality-hashing}
-
-\end{figure*}
-
-Randomly spread cuckoo paths take many round trips to find and lock.
-Similarly, reads require reads of both the potential locations for a
-given key.  A single, large read rather than two small reads are issued
-if both a keys locations are close to one another in the table to
-reduce tail latency. We use a read threshold of 128 bytes as it has a
-negligible increase in latency over smaller RDMA packets
-Figure~\ref{fig:rdma-benchmarks}(a).
-
-
-In this section we describe a novel
-\textit{dependent} hashing algorithm which makes locality
-between hash location a tunable parameter. We describe the
-tradeoffs of removing hash independence and demonstrate a
-dramatic improvement in the round trips required to perform
-insertions.
-
-
-\subsubsection{Dependent Hashing}
-
-Our hashing algorithm borrows from both cuckoo and hopscotch
-hashing to achieve tunable locality. The distance between
-two hash locations is determined by probabilistically
-\textit{dependent} rather than independent hash functions.
-Locality between hash entries reduces the span of cuckoo
-paths and increases the probability that multiple locks can
-be set with a singe MCAS and both of a keys locations can be read
-with a single RDMA message. However, high locality increases
-the probability of hotspots in the table which decreases its
-maximum fill factor.
-
-Figure~\ref{fig:locality-hashing}(a) is our formula for
-dependent hashing. The first hash location is chosen
-uniformly at random, while second is chosen as an offset of
-the first.  $f$ determines the max distance the second item
-can be placed. Higher values of $f$ decrease locality.
-Figure~\ref{fig:locality-hashing}(b) shows the distance
-between hash locations as a CDF for different values of $f$.
-Setting a constant bound on the distance between hash
-locations leads to bad fill factors (on the order of
-10-15\%). Our function places exponentially few locations
-exponentially far apart using a third hash function $h_3(x)$
-which generates a higher exponent at a logarithmic rate to
-determine which locations will have large distances between
-them\footnote{The value of $h_3(x)$ is the sum of trailing
-zeros after calculating a keys 64bit hash value} These few,
-but far apart hash locations increase the max fill by
-alleviating hotspots in the table. While searching for
-cuckoo paths with BFS these entries act as gateways for
-paths to access less filled portions of the table. 
-
-Figure~\ref{fig:locality-hashing}(c) shows how larger values
-of $f$ enable higher fill factors for tables with 100M
-entries. In our experiments we use $f$ of 2.1 and an
-associativity of 8 as it provides a 90\% max fill an a 68\%
-probability that hash locations are located 3 or fewer
-buckets apart.
-
-
-\subsubsection{Locking}
-\label{sec:locking}
-
-\begin{figure*}[t]
-    \centering
-    \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/optimistic_failures.pdf}
-        % \label{fig:optimistic_failures}
-        % \caption{}
-    \end{subfigure}
-    \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/insertion_span.pdf}
-        % \label{fig:insertion_span}
-        % \caption{}
-    \end{subfigure}
-    \begin{subfigure}{0.3\linewidth}
         \includegraphics[width=0.99\linewidth]{fig/buckets_per_lock_vs_locks_per_message.pdf}
-        % \label{fig:tbd}
-        % \caption{}
-    \end{subfigure}
     \vspace{-1em}
-    \caption{
-    \textbf{(a)} Failure rate of optimistic cuckoo insertions.
-    \textbf{(b)} CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path.~\todo{buckets to rows}
-    \textbf{(c)} Round trips (99th percentile) on a table
+    \caption{Round trips (99th percentile) on a table
     with 512 rows required per insert while filling a table
     to 95\%. 512 buckets per lock is a single global lock.}
 
     \label{fig:cuckoo-problems}
 
-\end{figure*}
+\end{figure}
 
-Increased path locality dually increases lock locality. If
-multiple locks are within a 64 bit range of one another they
-can be set atomically with a masked CAS.
-Figure~\ref{fig:cuckoo-problems}(b) shows that 95\% of
-dependent insertions span 32 or fewer rows while nearly 99\%
-span 256 or fewer. If each lock protects 4 rows nearly 99\%
-of insertions can have their locks acquired with a single
-MCAS.
+Decreased distances between hash locations naturally lead to shorter
+cuckoo paths when combined with our breadth-first search approach.
+Using $f=2.1$ and a table size of 100-K rows,
+Figure~\ref{fig:locality-hashing} shows that when filling the table
+to 95\% full, 95\% of insertions require cuckoo paths that span 32 or
+fewer rows while nearly 99\% span 256 or fewer.  This result implies
+that paths will frequently fit within the rows returned from a covering
+read.
+%
+Moreover, the required locks are also close to each other in the lock
+bit array.
 
-Figure~\ref{fig:cuckoo-problems}(c) shows the effect of lock
-density (y-axis) and lock granularity (x-axis) on insert
-performance. The top row shows the 99th percentile round
-trips needed for inserts which aquire a single lock. In the
-top left fine grained locking with one lock per message
-results in 55 round trips. The far right colum shows how a
-single global lock results in high contention. Dense tables
-with a few rows per lock result in the fewest round trips.
-
-% Using locks rather than opportunistic concurrency halves the
-% latency of reads from two to one round trip. Opportunistic
-% updates commit changes by atomically updating a pointer
-% (with CAS) in the hash index to point to a new value. Both
-% the index, then the value must be read for each operation.
-% Values can not be inlined in the index as they are limited
-% to the 64bit width of CAS. Rcuckoo uses locks to enable
-% inlined entries which can be read in a single round trip.
-% Locks introduce multiple challenges such as scalability,
-% deadlocks and fault tolerance each of which is discussed
-% below.
-
-RCuckoo uses hardware NIC hardware features and lock
-virtualization to achieve scalability, low contention and
-high performance. The lock table is a linear array lock bits
-and each bit locks one or more table rows. In our
-experiments we use 16 rows per lock as it has a negligible
-effect on contention and requires a single lock to be
-acquired for vast majority of insertions.
-%%
-The lock table is located in NIC device memory which allows
-atomic operations to scale linearly with reads and writes
-and is 3x higher throughput on contented addresses than host
-memory (see Figure~\ref{fig:rdma-benchmarks}). It is also
-lower latency as operations to device memory avoid a PCIe
-round trip.  Second, RDMA Masked Compare and Swaps (MCAS)
-are used rather than CAS~\cite{rdma-masked-cas,sherman}. CAS
-requires an exact 64 bit match to execute, while MCAS uses a
-mask to only set the required bits. MCAS therefore reduces
-contention while enabling locks to be as tightly packed.
-
-Packing locks densely is important for reducing round trips
-and because  NIC device memory is limited to 256KB which by
-default limits table size. We use a \textit{virtual lock
-table} to avoid limiting table size by device memory.
-Multiple virtual locks map to a single physical lock. We use
-modulo arithmetic to map virtual locks onto physical lock to
-support arbitrarily large tables. Mapping multiple virtual
-to a single physical lock leads to false sharing, clients
-can be blocked unessisary on a lock.  In Section~\todo{TODO}
-we show that on large lock tables the performance
-degradation due to false sharing is low, and that lock
-locality is maintained on virtual locks.
-
-To avoid deadlock we aquire locks in incremental order.
-Given a cuckoo path the rows are translated to virtual
-locks, then to physical locks, then sorted. The sorted
-locks are broken into 64 bit chunks which are mapped to
-individual MCAS packets.  Lock requests are issued in order.
-Clients continuously poll on lock requests and only move to
-the next request only after the prior has been successfully
-acquired.
-
-Locality provides an additional opportunity to reduce round
-trips by reading additional buckets. If locks are close
-together but not contiguous clients issue a \textit{covering
-read} spanning all rows between each bucket. We use 512
-bytes as a max threshold. Covering reads synchronize a
-clients cache for non-locked rows. If the second search
-fails to find a valid cuckoo path the next iterations
-speculative search will benefit from the fresh read.
-Figure~\ref{fig:table-diagram} illustrates a covering read
-between keys $K$ and $C$.
+%% Locality provides an additional opportunity to reduce round
+%% trips by reading additional buckets. If locks are close
+%% together but not contiguous clients issue a \textit{covering
+%% read} spanning all rows between each bucket. We use 512
+%% bytes as a max threshold. Covering reads synchronize a
+%% clients cache for non-locked rows. If the second search
+%% fails to find a valid cuckoo path the next iterations
+%% speculative search will benefit from the fresh read.
+%% Figure~\ref{fig:table-diagram} illustrates a covering read
+%% between keys $K$ and $C$.
 
 % Speculative locks may not be sufficient to complete an
 % insertion.  However, due to locality hashing there is a high
 % probability that a valid path does exist in the neighborhood
 % of the speculative locks. 
 % If two speculatively locked rows
-% are close enough together clients issus a single
+% are close enough together clients issues a single
 % \textit{covering read} spanning both rows. Covering reads
 % populate a clients cache and dramatically increase the
 % probability that if the first speculative search fails, a
@@ -525,152 +501,307 @@ between keys $K$ and $C$.
 % marked the rows for $C$ and $K$ to be locked. A covering
 % read (red) spans the rows between both entries.
 
-Clients may fail while holding locks leaving them set and
-stranded. Clients detect failed locks by timing out on them
-while acquiring them. To separate failures from clients
-acquiring a long list of contended locks clients are given a
-bounded time to aquire their locks. If a client takes longer
-than this time to aquire all of its locks it releases all
-held locks and starts the process again to prevent false
-failure detection. Our complete fault detection and recovery
-mechanism is described in Section~\ref{sec:fault-tolerance}.
+\subsubsection{Virtual locking}
+\label{sec:locking}
 
-\subsection{Fault Tolerance}
+Recall the lock table is a linear array of lock bits and each bit
+locks one or more table rows.  As mentioned previously, RCuckoo
+implements lock acquire and release using RDMA masked compare-and-swap
+(MCAS) operations that can access 64 bits at a time.  Hence,
+Figure~\ref{fig:locality-hashing}(c)---which shows that 99\% of cuckoo
+spans are 256 rows or less---implies that if each lock protects at
+least four rows nearly 99\% of insertions can have their locks
+acquired with a single MCAS.  Of course, increasing the number of rows
+covered by a single lock can lead to false sharing.  (In the extreme,
+there would just be one, global lock for the entire table.)
+
+In addition, to improve locking performance, RCuckoo locates the lock
+table in NIC device memory which delivers $3\times$ higher throughout
+on contented addresses than host memory (see
+Figure~\ref{fig:rdma-benchmarks}). It is also lower latency as
+operations to device memory avoid a PCIe round trip.  Unfortunately,
+NIC memory is limited (to 256~KB on our ConnectX-5s), so this choice
+bounds the size of the lock table.
+%
+We address this tradeoff through the use of a \textit{virtual} lock
+table where multiple logical locks map to a single physical lock.
+Concretely, we map a logical lock $l$ drawn from a table of size $L$
+to a physical location $p$ in a bit-array of size $P$ by computing $p
+= l \mod P$.  Mapping multiple virtual locks to a single physical lock
+introduces yet another source of false sharing, but allows us to
+support arbitrarily large tables.
+
+To avoid deadlock RCuckoo acquires locks in increasing physical order.  Given
+a cuckoo path the rows are translated to virtual locks, then to
+physical locks, then sorted. The sorted locks are broken into 64-bit
+chunks which are mapped to individual MCAS packets.  The MCAS
+operations are issued one at a time in order of their target address.  Clients
+continuously spin on lock acquisitions and only move to the next MCAS
+operation after the current one succeeds.
+
+\todo{Not sure this comports with Figure 5(c).}
+
+Due to this one-MCAS-per-round-trip lock acquisition procedure, lock
+granularity has a pivotal role on performance.
+Figure~\ref{fig:cuckoo-problems}(c) shows the effect of lock density
+(y-axis) and lock granularity (x-axis) on insert performance. The top
+row shows the 99th-percentile round trips needed for inserts which
+acquire a single lock at a time. In the top left fine-grained locking
+with one lock per message results in 55 round trips. The far right
+column shows that a single global lock results in high
+contention. Dense tables with few rows per lock result in the fewest
+round trips.  In our experiments we use 16 rows per lock as it has a
+negligible effect on contention and requires a single lock to be
+acquired for vast majority of insertions.
+
+%
+
+
+
+
+
+% Using locks rather than opportunistic concurrency halves the
+% latency of reads from two to one round trip. Opportunistic
+% updates commit changes by atomically updating a pointer
+% (with CAS) in the hash index to point to a new value. Both
+% the index, then the value must be read for each operation.
+% Values can not be inlined in the index as they are limited
+% to the 64bit width of CAS. RCuckoo uses locks to enable
+% inlined entries which can be read in a single round trip.
+% Locks introduce multiple challenges such as scalability,
+% deadlocks and fault tolerance each of which is discussed
+% below.
+
+
+%%
+
+
+Clients may fail while holding locks, preventing other clients from
+making progress.  As described below, clients independently detect
+such failures by setting a time out for lock acquisition. To avoid
+false alarms, i.e., clients timing out due to a slow-moving client
+(who might, for example need to acquire a long list of contended
+locks), RCuckoo clients are given a bounded time to acquire all their
+locks. If a client takes longer than this time to acquire all of its
+locks it releases all held locks and restarts the (timer and)
+acquisition process, hopefully allowing other clients to complete
+their own acquisitions.
+
+
+\section{Fault tolerance}
 \label{sec:fault-tolerance}
 
-The table must be repaired if a client fails while holding a
-lock. In our fault recovery algorithm non-failed clients
-aquire repair leases to reclaim the locks of failed clients
-and then perform the operations required to return the table
-to a valid state. In this section we describe how RCuckoo
-clients detect faults, repair the table, and prevent stray
-RDMA writes from failed clients from corrupting the table.
+In keeping with the rest of its design, RCuckoo handles failures in a
+fully disaggregated manner as well.  We depend upon the RDMA hardware
+to handle network failures and focus exclusively on fail-stop client
+behavior.  (Addressing server failure requires data replication, a
+topic we defer to future work.)  Client failure is only a concern if
+the failure occurs in the middle of a mutating operation (i.e.,
+update, delete, or insert); hence, RCuckoo detects client failures by
+noticing that a pending mutation does not complete in a timely
+fashion.  Any client that encounters such a situation endeavors to
+recover the stranded lock and repair the impacted portion of the index
+table.
+%
+%to prevent false failure detection. Our complete
+%fault detection and recovery mechanism is described in
+%Section~\ref{sec:fault-tolerance}.
+%
+%Specifically, clients acquire repair leases to reclaim the locks of
+%failed clients and then perform the operations required to return the
+%table to a valid state. In this section we
+The remainder of this section describes how RCuckoo
+clients detect faults, repair the table, and prevent delayed
+RDMA writes issued by (assumed-to-be) failed clients from corrupting the table.
 
-\subsubsection{Failure Detection} 
-\todo{note that we don't know who has the lock or when they got it}
+\subsection{Failure detection} 
+%\todo{note that we don't know who has the lock or when they got it}
 
-Clients detect failures with timeouts triggered when a lock
-acquisition or read fails repeatedly and the state of the
-locked or read rows is unaltered by other clients.  True
-failures are distinguished from frequently accessed rows by
-checking CRCs which are modified on every row update due to
-row version numbers (Section~\ref{sec:table-design}).
-Clients reset their failure timers whenever a CRC changes
-between requests.
+Clients detect failures by setting a timeout when attempting repeated
+lock acquisition or read requests.  Because RCuckoo operations are
+designed to require only a few round trip times, a client performing a
+successful mutating operation will complete and release its locks
+extremely rapidly.  Conversely, a client that is unable to acquire all
+the locks required for an insert operation releases those they do hold
+before trying again.  Hence, it is extremely unlikely that repeated
+attempts to acquire a lock or perform an untorn read will fail
+continuously.
 
+Of course, there is a possibility that a given row is highly popular,
+leading to extreme lock contention and/or repeated torn reads.
+Clients distinguish this case by consulting the CRC for the row they
+are unable to successfully read or lock.  Because each mutation
+increases the version number, even updates that replace an entry with
+the same value will result in a different CRC.  Clients declare a
+false positive and restart their failure timer if a CRC changes
+between attempts.
 
-\todo{talk about the actual timeout value} We view failures
-as a rare but essential component of our protocol. As such
-our fault timers are set conservativly. Failure timers for
-locks must include locking time, second search time, and
-update transit time. We bound locking time (Section
-~\ref{sec:locking}), search, and message propagation is
-measured in single digit microseconds. We additionally want
-to ensure that network conditions are not causing continual
-RDMA retries. We set the max RDMA operation retry number to
-3 for all our experiments. We set our failure timeout to
-100ms as it is orders of magnitude above our 99th percentile
-insert time (50us) and above the RDMA retry limit.
-
-
-\subsubsection{Repair Leases}
-\todo{mention repair lease table}
-
-Repair leases provide clients with exclusive permission to
-reclaim locks on a region of the table. The table is broken
-into $n$ regions so repairs can be executed in parallel (see
-Figure~\ref{fig:table-diagram}). Leases are set with 64 bit
-CAS and track the lease holders QP id, a set bit, and a
-counter (incremented on each acquisition).  Failures while
-holding a lease are easier to detect than normal locks as a
-leases owner and liveness are tracked within it.  Leases are
-revoked using a similar timeout to normal locks. When a
-client times out on a lease it claims it for itself and
-marks the lease holder as failed (see
-Section~\ref{sec:stale-writes}).  A lock is reclaimed once a
-client both times out on a lock and acquires the locks
-repair lease. 
+We expect client failures to be relatively rare, so set
+%\todo{talk about the actual timeout value} We view failures
+%as a rare but essential component of our protocol. As such
+our fault timeout conservatively. Failure timers must allow for
+worst-case locking time, second-search time, and RDMA message
+transmission time. We bound locking time (Section~\ref{sec:locking});
+search and message propagation are both measured in single-digit
+microseconds on our testbed.  To guard against the possibility that
+network conditions lead to high rates of RDMA retries we set
+the maximum RDMA operation retry number to three.  In
+this context, we set the failure timeout to 100~ms in our experiments,
+orders of magnitude above the 99th-percentile insert time
+of 50$~\mu$s.
 
 
-\subsubsection{Table Repair} 
+\subsection{Repair leases}
+%\todo{mention repair lease table}
+
+\todo{add lease table}
+
+RCuckoo recovers stranded locks one lock at a time; if a client fails
+holding multiple locks recovery may be conducted by multiple clients
+at different times depending on their access patterns.  RCuckoo's lock
+table does not maintain records of ownership, so there is no way to
+``transfer'' lock ownership from the failed node to a recovery node in
+the table itself.  Instead, clients acquire a \emph{repair lease} that
+grants exclusive permission to reclaim locks on a region of the index
+table. The index table is broken into $n$ regions so repairs can be
+executed in parallel.
+
+Figure~\ref{fig:lease-table-diagram} shows
+RCuckoo's lease table, maintained in RDMA-registered main memory on
+the server.  Lease entires contain the lease holder's queue pair ID
+(which RDMA ensures is unique for a given server), a set bit, and a
+counter (incremented on each acquisition).  A lease is considered free
+if the set bit of the current entry in the lease table is zero.
+Clients attempt to acquire the lease using RDMA CAS operations to
+ensure mutual exclusion.
+%Failures
+%while holding a lease are easier to detect than normal locks as a
+%lease's owner and liveness are tracked within it.
+Upon successful acquisition, a client completes the repair (described
+below) and then relinquishes the lease by clearing the set bit.
+Leases are revoked (to handle the case of a failed recovery node)
+using a timeout mechanism similar to normal locks.  If a client times
+out while attempting lease acquisition it claims it for itself (again,
+using CAS to resolve any races) and marks the lease holder as failed
+(see Section~\ref{sec:stale-writes}).
+%A lock is reclaimed once a client
+%both times out on a lock and acquires the locks repair lease.
+
+
+\subsection{Table repair} 
 \label{sec:table-repair}
 
-Cuckoo updates occur along a path
-and client failures could occur at any point along an
-insertion path. Updates and Deletes are a special case where
-the path length is 1. If a client fails mid modification it
-can leave the table in 3 distinct states based on where in
-the update it fails. 
+%Our table design ensures that clients can perform repairs
+%and recover from all states a failed client may have
+%created.
 
-Our table design ensures that clients can perform repairs
-and recover from all states a failed client may have
-created. Recovery is simple if a client with locks fails
-prior to issuing its updates or if it fails before releasing
-its locks. A client with a repair lease can simply set
-unlock the stranded lock in this case. Failures during
-modifications require special care to recover from. All
-modification operations Update, Delete, and Insert write new
-entries as a cuckoo path~\footnote{updates and deletes are a
-cuckoo path of length 1}. As described in
-Section~\ref{sec:insert} cuckoo paths are executed by first
-setting an open entry to claim it and migrating entries
-backwards along the path until a new entry is written. If
-partially executed this algorithm can produce 3 distinct
-states.
-
+All modification operations write new entries as a cuckoo path;
+updates and deletes have a path of length one.  As described in
+Section~\ref{sec:cuckoo-back} cuckoo paths are executed by first
+claiming an open entry at the end of the path and proceeding backward
+along the path, cuckooing entries forward one-by-one until the new
+entry is written at the beginning of the path.  Client failures can
+occur at any point along an insertion path; a failed client can leave
+the table in three distinct states based on how far along it was:
 \begin{enumerate}
-    \item{A duplicate entry exists and one has a bad CRC}
-    \item{A duplicate entry exists and both have correct CRCs} 
-    \item{No duplicate exists but one row has a bad CRC}
+\item{A duplicate entry exists and one has a bad CRC,}
+    \item{A duplicate entry exists and both have correct CRCs,} 
+    \item{No duplicate exists but one row has a bad CRC, or}
+      \item{No duplicate exists and no rows have a bad CRC.}
 \end{enumerate}
+\noindent The last case can occur if a client fails prior to issuing
+any updates to the table or if it fails after updating all the rows
+but before releasing the locks.  In either case recovery is trivial: a
+client with the repair lease can simply unlock the stranded lock.
+Recovery from the other three cases requires modification to the index
+table.
 
-To repair the table a client first detects which state the
-table is in and then transitions the table forward through
-the states with a deterministic sequence of operations so
-that failures during recovery can be continued by any other
-client. A client detects the state issuing reads to all rows
-protected by the stranded lock. Then all entries within the
-rows have both hash locations read individually to check for
-duplicates. The error state can be detected by the presence
-of duplicates in these rows and the existence of bad CRCs.
+To repair the table a client first detects in which state the table is
+and then transitions the table forward through the states with a
+deterministic sequence of operations so that failures during recovery
+can be repaired by a subsequent client. A client determines the state
+by issuing reads to all rows protected by the stranded lock.  It then
+proceeds one-by-one through each entry within the rows, checking both
+hash locations for the corresponding key (one of which may not be in
+the locked rows) for duplicates or a bad CRC.  Because RCuckoo updates
+one row per RDMA write, there can be at most one duplicate or bad CRC.
 
-Table corrections are issued as a batched sequence of 3 or
-fewer writes as follow: $1 \rightarrow 2$ - write a new CRC
-for the bad duplicate.  $2->3$ - Set the duplicate in the
-second hash location to empty. $3\rightarrow$ - recalculate
-and write a new CRC. After a client has issued its repair
-sequence it unlocks the reclaimed lock and returns its
-lease.
+Clients repair the table by moving though the states one by one.
+Corrections are issued as a batched sequence of three or fewer writes
+as follows: To move from state 1 to 2, the client writes a new CRC for
+the bad duplicate.  The table can be transitioned from state 2 to 4 by
+clearing the duplicate entry in the second (i.e., pointed to by
+$L_2(K)$) location. Finally, the table can be transitioned from state
+3 to 4 by recalculating and writing a new CRC to the impacted
+row. After a client has issued its repair sequence it unlocks the
+reclaimed lock and returns its lease.
 
+From a correctness perspective, once all rows have a valid CRC and
+there are no duplicates, the table is usable again.  Clearly the new
+value being inserted into the table by the failed client is lost, but
+this is indistinguishable from the case that the client failed before
+attempting the insert.  If the client was in the middle of cuckooing
+values up the path, a subset of the values were moved from their
+primary cuckoo location to their secondary location, but reads check
+both locations in any case, so the entry will still be located.
+Finally, because duplicate entries are freed, no space in the table is
+lost.
 
-\subsubsection{Preventing Stale Writes}
+\subsection{Preventing stale writes}
 %%
 \label{sec:stale-writes}
 %%
 
-An RDMA connection must be closed, transitioned to an error
-state, or have it's permissions revoked to prevent its
-operations from being executed on memory. Because we assume
-remote memory is passive (it will not tear down connections)
-and that faulty clients will not tear down their connections
-it is possible that the connection of a failed client will
-stay open and stale writes may be delivered to memory after
-a faulty clients lock is revoked. We use conservative
-timeouts to out-wait network delays and RDMA retransmissions
-at the cost of recovery latency. 
+The one remaining concern is that a supposed-failed client could
+just be slow, and may yet attempt to complete its cuckoo path despite
+the fact that its locks were reclaimed.
+%(While
+%RCuckoo clients abort insert operations if they take too long to
+%acquire the required locks, they proceed to completion regardless of
+%long it takes to issue the updates.)
+Our failure timeout is
+deliberately set many orders of magnitude larger than the expected
+operation completion time, but we cannot completely rule out the
+possibility.  Ideally, RCucko could ensure that clients deemed to have
+failed by the failure detector are prevented from issuing further
+operations to the table without manual intervention (e.g. a reboot).
 
-At the time of writing the infiniband specification does not
-enable clients to modify each others permissions. Type II
-memory windows enable clients to remove their own
-permissions using the \textit{send with invalidate} verb. If
-the specification were extended to allow a client with
-elevated privileges to revoke the permissions of a faulty
-client it would provide a clean means of handling client
-failure in the disaggregated setting. Given the current
-specification a client can corrupt the QP's of another by
-sending a crafting an invalid packet and sending to their
-queue pair pair~\cite{redmark}[attack 2]. For this attack to
-work the packet sequence number of the shutdown packet must
-match the sequence number of the receiver so $2^{24}$
-packets must be sent to ensure a connection is corrupted
+%% An RDMA connection must be closed, transitioned to an error
+%% state, or have it's permissions revoked to prevent its
+%% operations from being executed on memory. Because we assume
+%% remote memory is passive (it will not tear down connections)
+%% and that faulty clients will not tear down their connections
+%% it is possible that the connection of a failed client will
+%% stay open and stale writes may be delivered to memory after
+%% a faulty clients lock is revoked. We use conservative
+%% timeouts to out-wait network delays and RDMA retransmissions
+%% at the cost of recovery latency. 
+
+\todo{Stew - I added the below; is it not necessary?}
+While clients that fail holding a recovery lease are easy to identify,
+our current implementation has no way to identify which client failed
+holding a stranded lock.  There are two straightforward extensions to
+provide that functionality: increase the size of lock entries to
+include the queue pair of the client, or have a separate liveness
+datastructure that each client must update with some frequency so
+failed (or unreasonably slow) clients can be identified by their
+failure to update their entry in a timely manner.
+
+Once identified, real-world deployments likely have many ways to
+ensure clients cease operation, but it is interesting to consider if
+it is possible to provide such functionality within RCuckoo
+itself.  Unfortunately, at the time of writing the Infiniband
+specification does not allow clients to modify each other's
+RDMA permissions.\footnote{Type II memory windows enable clients to remove
+their own permissions using the send-with-invalidate verb, but it
+cannot be issued by another client.}
+%One alternative would be to extend the specification to allow
+%a client with elevated privileges to revoke the permissions of a
+%faulty client in the disaggregated setting.}
+To the best of our knowledge, the only current alternative is to reset
+a failed client's queue pair by crafting an invalid packet and
+sending it to their queue pair at the server~\cite[Attack
+  2]{redmark}. For this attack to work the packet sequence number of
+the invalid packet must match expected sequence number at the receiver
+so $2^{24}$ packets must be sent to ensure the connection is corrupted
 successfully.

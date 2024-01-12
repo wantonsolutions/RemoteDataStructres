@@ -1,13 +1,12 @@
-\section{Implementation}
+\subsection{Implementation}
 
-Our implementation of RCukcoo consists of a of 8.7k C++
-implementation and a 12k line Python implementation which
-simulates RDMA. Both implementations will be made available
-on Github.  All results reported in Section~\ref{sec:eval}
-are from the C++ implementation. At the time of writing only
-the python implementation includes support for delete
-operations, and extent entries. As such all C++ results are
-for inserts, reads, updates and inlined table operations.
-RCuckoo is designed for ConnectX-5 NICs. It uses OFED-4.9
-which supports experimental verbs for atomic masked CAS and
-device mapped memory. 
+We have built two separate versions of RCuckoo, an 8.7~K-line C++
+implementation tuned for high performance and a 12~K-line Python
+implementation that simulates RDMA operations to facilitate
+correctness testing. Both implementations will be made available on
+GitHub at the time of publication.  We report results using our C++
+implementation which requires OFED-4.9 to support masked CAS
+operations and device-mapped memory on ConnectX-5 NICs.  At the time
+of writing extent entries and delete operations are supported by our
+Python implementation alone; the experiments consider reads, inserts
+and updates of inlined table entries.
