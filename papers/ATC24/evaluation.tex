@@ -1,12 +1,14 @@
 \section{Evaluation}
 \label{sec:eval}
 
-We evaluate our cuckoo hash by directly comparing it's
-performance in terms of latency and throughput with other
-state of the art disaggregated key value stores. We
-substantiate our design decisions through a series of
-micro-benchmarks. We measure throughput as a response to
-hashing factor, read threshold, and search algorithm.
+We evaluate RCuckoo by directly comparing its performance in terms of
+latency and throughput with other state-of-the-art disaggregated key
+value stores. We substantiate our design decisions through a series of
+micro-benchmarks. Specifically, we measure throughput as a function of
+hashing locality, covering read threshold, and choice of search
+algorithm.
+
+\input{implementation}
 
 \begin{figure*}[ht]
     \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_throughput.pdf}
@@ -44,50 +46,52 @@ hashing factor, read threshold, and search algorithm.
     \label{fig:search_dependence}
 \end{figure}
 
-\subsection{Setup}
+\subsection{Testbed}
 
-Our evaluate setup is an 11 node cluster of dual socket
+We conduct our evaluation on an 11-node cluster of dual-socket
 Intel machines. Each CPU is an Intel Xeon(R) E5-2650 clocked
-at 2.20GHz. Each machine has 256GB of RAM with 128GB per
-NUMA node. All machines have a single dual socket ConnectX-5
-attached to a 100GBPs Mellanox Onyx switch. In our
-experiments for RCuckoo we use one sever as a memory server,
+at 2.20~GHz. Each machine has 256~GB of RAM with 128~GB per
+NUMA node. All machines have a single dual-socket ConnectX-5
+attached to a 100-Gbps Mellanox Onyx switch. In our
+RCuckoo experiments we use one sever as the passive memory server,
 and the rest a client machines spreading out client threads
 evenly across machines.
 
-\subsection{Systems}
+\subsection{Comparision systems}
+
+We compare RCuckoo against three recent key-value stores with
+different designs.  While none have the same feature set as RCuckoo,
+each represents an apt comparision point for different aspects.
 
 \subsubsection{FUSEE}
 
-FUSEE is a remote memory key-value store designed for full
-disaggregation~\cite{fusee}.  It is built on top of
-RACE~\cite{race} with extensions to support replication in
-the face of contention.  Currently RCuckoo does not support
-replication, our FUSEE setup uses a single memory node to
-effectively remove the overhead of replication. RACE is the
-most similar system in terms of assumptions to RCuckoo,
-however no open source implementation of RACE is available.
-RACE hashing uses fixed sized 64 bit index entries to
-support RDMA compare and swap operation width. As such RACE
-based systems cannot store key value pairs in the index and
-must use a second round trip on reads to recover extent
-entries which contain full key value pairs.
+FUSEE is a key-value store designed for full
+disaggregation~\cite{fusee}.  It is built on top of RACE~\cite{race}
+with extensions to support replication in the face of contention.
+While RACE represents a more direct comparison to RCuckoo, no open
+source implementation of RACE is available.  Instead, we deploy FUSEE
+with a single memory node to effectively remove the overhead of
+replication.  FUSEE/RACE hashing uses fixed-sized 64-bit index entries
+to in order to employ RDMA compare-and-swap operations for updates. As
+such, RACE-based systems cannot store key-value pairs in the index
+table itself and require a second round trip even for reads of small values.
+%on reads to recover
+%extent entries which contain full key value pairs.
 
 \subsubsection{Clover}
 
-Clover is a remote memory key-value store designed for
-persistent memory. It does not support full disaggregation,
-it's index structure is managed by CPU cores on a metadata
-server. However, it's persistence safe updates are managed
-by one sided operations. Clover uses index caching to
-optimize reads. Clover reads are self verifying unlike FUSEE
-as clover entries contain a NULL terminating pointer if the
-entry is valid. When re-reading key-value entires clover can
-achieve close to RDMA line rate as it directly reads the
-entry without negotiating with the index. In contrast to
-prior work which has compared with Clover~\cite{fusee} we do
-not force clients to read from the index on each read and
-allow it to take advantage of it's caching algorithm.
+Clover is a key-value store designed for remote persistent memory. It
+does not support full disaggregation; instead, its index structure is
+managed by CPU cores on a metadata server. However, its
+persistent-memory updates are implemented using by one-sided
+operations. Clover uses index caching to optimize reads. Clover reads
+are self verifying unlike FUSEE as clover entries contain a NULL
+terminating pointer if the entry is valid. When re-reading key-value
+entires clover can achieve close to RDMA line rate as it directly
+reads the entry without negotiating with the index. In contrast to
+prior work which has compared with Clover~\cite{fusee} we do not force
+clients to read from the index on each read and allow it to take
+advantage of it's caching algorithm.
 
 \subsubsection{Sherman}
 
