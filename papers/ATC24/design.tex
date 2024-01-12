@@ -10,12 +10,17 @@
 In this section we describe the design of RCuckoo, a fully
 disaggregated lock-based cuckoo hash table in which clients
 communicate with passive memory servers over reliable RDMA connections
-using exclusively 1-sided operations.  We first describe our table
-design and protocol to read and modify the contents of the table.
-Next we introduce a novel, locality-enhanced hashing algorithm and show
-how it enables our protocol to perform most operations in two round
-trips or less.  We close with a discussion of how RCuckoo detects and
-recovers from client failures.
+using exclusively 1-sided operations.  For simplicity, we describe our
+design in the context of a single memory server, but it is
+straightforward to shard a large hash table across multiple servers
+(with a minor tweak to the hashing function, see
+Section~\ref{sec:dephash}).  We first describe our table design and
+protocol to read and modify the contents of the table.  Next we
+introduce a novel, locality-enhanced hashing algorithm and show how it
+enables our protocol to perform most operations in two round trips or
+less.
+%We close with a discussion of how RCuckoo detects and recovers
+%from client failures.
 
 \subsection{Data structures}
 \label{sec:table-design}
@@ -378,29 +383,31 @@ perform inserts in RCuckoo.
 
 
 \subsubsection{Dependent hashing}
+\label{sec:dephash}
 
-\begin{figure*}[t]
-    \centering
-    \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/optimistic_failures.pdf}
-        % \label{fig:optimistic_failures}
-        % \caption{}
-    \end{subfigure}
-    \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/buckets_per_lock_vs_locks_per_message.pdf}
-        % \label{fig:tbd}
-        % \caption{}
-    \end{subfigure}
-    \vspace{-1em}
-    \caption{
-    \textbf{(a)} Failure rate of optimistic cuckoo insertions.
-    \textbf{(c)} Round trips (99th percentile) on a table
-    with 512 rows required per insert while filling a table
-    to 95\%. 512 buckets per lock is a single global lock.}
 
-    \label{fig:cuckoo-problems}
+%% \begin{figure*}[t]
+%%     \centering
+%%     \begin{subfigure}{0.3\linewidth}
+%%         \includegraphics[width=0.99\linewidth]{fig/optimistic_failures.pdf}
+%%         % \label{fig:optimistic_failures}
+%%         % \caption{}
+%%     \end{subfigure}
+%%     \begin{subfigure}{0.3\linewidth}
+%%         \includegraphics[width=0.99\linewidth]{fig/buckets_per_lock_vs_locks_per_message.pdf}
+%%         % \label{fig:tbd}
+%%         % \caption{}
+%%     \end{subfigure}
+%%     \vspace{-1em}
+%%     \caption{
+%%     \textbf{(a)} Failure rate of optimistic cuckoo insertions.
+%%     \textbf{(c)} Round trips (99th percentile) on a table
+%%     with 512 rows required per insert while filling a table
+%%     to 95\%. 512 buckets per lock is a single global lock.}
 
-\end{figure*}
+%%     \label{fig:cuckoo-problems}
+
+%% \end{figure*}
 
 Our hashing algorithm borrows from both cuckoo and hopscotch hashing
 to achieve tunable locality.   We start with a base
@@ -417,13 +424,14 @@ parameter that controls the expected distance between the two hash
 locations.  The particular formulation is not important, but the
 effect is that the first location is chosen uniformly at random, while
 second is chosen as a uniformly random offset of the first drawn from
-a probabilistically bounded range.  The latter part is key, as any
-fixed bound on the distance between hash locations leads to
-low maximum fill factors (on the order of 10--15\% in our
-experiments).  Instead, RCuckoo chooses exponentially fewer locations
-at increased distances.  Figure~\ref{fig:locality-hashing}(a) shows
-the distance between hash locations as a CDF for different values of
-$f$,
+a probabilistically bounded range.  (In a sharded deployment, the
+second location is restricted to the same shard by ``wrapping around''
+the offset accordingly.) The latter part is key, as any fixed bound on
+the distance between hash locations leads to low maximum fill factors
+(on the order of 10--15\% in our experiments).  Instead, RCuckoo
+chooses exponentially fewer locations at increased distances.
+Figure~\ref{fig:locality-hashing}(a) shows the distance between hash
+locations as a CDF for different values of $f$,
 %% Setting .  using a third hash function $h_3(x)$
 %% which generates a higher exponent at a logarithmic rate to determine
 %% which locations will have large distances between them
@@ -441,10 +449,23 @@ tables with eight entries per row, it delivers an expected max fill of
 greater than 90\% with a 68\% probability that hash locations are
 located three or fewer rows apart.
 
+\begin{figure}[t]
+  \vskip -1em
+    \centering
+        \includegraphics[width=0.99\linewidth]{fig/buckets_per_lock_vs_locks_per_message.pdf}
+    \vspace{-1em}
+    \caption{Round trips (99th percentile) on a table
+    with 512 rows required per insert while filling a table
+    to 95\%. 512 buckets per lock is a single global lock.}
+
+    \label{fig:cuckoo-problems}
+
+\end{figure}
+
 Decreased distances between hash locations naturally lead to shorter
 cuckoo paths when combined with our breadth-first search approach.
 Using $f=2.1$ and a table size of 100-K rows,
-Figure~\ref{fig:locality-hashing}(c) shows that when filling the table
+Figure~\ref{fig:locality-hashing} shows that when filling the table
 to 95\% full, 95\% of insertions require cuckoo paths that span 32 or
 fewer rows while nearly 99\% span 256 or fewer.  This result implies
 that paths will frequently fit within the rows returned from a covering
