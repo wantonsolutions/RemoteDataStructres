@@ -1,7 +1,10 @@
 
-from experiments import plot_cuckoo as plot_cuckoo
-from experiments import data_management as dm
-import experiments.orchestrator as orchestrator
+# from experiments import plot_cuckoo as plot_cuckoo
+# from experiments import data_management as dm
+# import experiments.orchestrator as orchestrator
+from cuckoo import plot_cuckoo as plot_cuckoo
+from cuckoo import data_management as dm
+import cuckoo.orchestrator as orchestrator
 import numpy as np
 import matplotlib.pyplot as plt
 import lib
@@ -148,7 +151,7 @@ def plot_factor_exp_static():
 
 
 
-# factor_exp()
-# plot_factor_exp()
+factor_exp()
+plot_factor_exp()
 
-plot_factor_exp_static()
+# plot_factor_exp_static()

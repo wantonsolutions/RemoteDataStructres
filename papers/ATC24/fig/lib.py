@@ -33,8 +33,8 @@ def get_config():
 
 
     #maditory fields added to prevent breakage
-    config["description"] = "This is a test run and a manditory field"
-    config["name"] = "test_run"
+    config["description"] = "ATC'24 experiment"
+    config["name"] = "no name given"
     config["state_machine"] = "cuckoo"
     config['date']=datetime.datetime.now().strftime("%Y-%m-%d")
     config['commit']=git.Repo(search_parent_directories=True).head.object.hexsha
@@ -56,6 +56,9 @@ def get_config():
     config["search_function"]="a_star"
     config["location_function"]="dependent"
 
+    config["virtual_lock_scale_factor"] = 1
+    config["use_virtual_lock_table"] = "false"
+
     #Client State Machine Arguements
     total_inserts = 1
     max_fill = 50
@@ -74,6 +77,12 @@ def get_config():
     #RDMA Engine Arguments
     config["server_address"]="192.168.1.12"
     config["base_port"] = "20886"
+
+    #failure config
+    config["simulate_failures"]="false"
+    config["lock_timeout_us"]="10000"
+    config["lease_timeout_us"]="10000"
+    config["delay_between_failures_us"]="1000000000"
 
     config["trials"] = 1
     return config
