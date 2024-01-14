@@ -5,6 +5,19 @@ import datetime
 import git
 import matplotlib as matplotlib
 
+
+#definitions of variables.
+#https://sashamaps.net/docs/resources/20-colors/
+rcuckoo_color='#4363d8'
+fusee_color='#e6194B'
+clover_color='#3cb44b'
+sherman_color='#f58231'
+
+cyan_color='#42d4f4'
+teal_color='#469990'
+navy_color='#000075'
+
+
 def mops(data):
     # return [x / 1000000 if x is not None else 0 for x in data]
     return [float(x) if x is not None else 0 for x in data]

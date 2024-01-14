@@ -210,10 +210,10 @@ def plot_hero_ycsb_fill_static():
     write_latency = [x/1000 for x in write_latency]
     fig, (ax1, ax2, ax3, ax4) = plt.subplots(1,4, figsize=(13,2.5))
 
-    ax1.plot(fill_factors, a_tput, label="A", color="black", linestyle="solid", marker="o")
-    ax1.plot(fill_factors, b_tput, label="B", color="black", linestyle="dashed", marker="s")
-    ax1.plot(fill_factors, c_tput, label="C", color="black", linestyle="dotted", marker="^")
-    ax1.plot(fill_factors, w_tput, label="W", color="black", linestyle="dashdot", marker="x")
+    ax1.plot(fill_factors, c_tput, label="C", color=lib.cyan_color, linestyle="dotted", marker="^")
+    ax1.plot(fill_factors, b_tput, label="B", color=lib.teal_color, linestyle="dashed", marker="s")
+    ax1.plot(fill_factors, a_tput, label="A", color=lib.rcuckoo_color, linestyle="solid", marker="o")
+    ax1.plot(fill_factors, w_tput, label="W", color=lib.navy_color, linestyle="dashdot", marker="x")
     ax1.legend(fontsize=8, ncol=4, loc="upper center")
     ax1.set_ylim(bottom=0,top=55)
     ax1.set_ylabel("MOPS")
@@ -221,27 +221,27 @@ def plot_hero_ycsb_fill_static():
 
     fusee_read_latency  = 5.02
     fusee_insert_latency = 10.5
-    ax2.axhline(y=fusee_read_latency, color='r', linestyle=':', label="FUSEE Read")
-    fusee = ax2.axhline(y=fusee_insert_latency, color='r', linestyle='-', label="FUSEE")
+    ax2.axhline(y=fusee_read_latency, color=lib.fusee_color, linestyle=':', label="FUSEE Read")
+    fusee = ax2.axhline(y=fusee_insert_latency, color=lib.fusee_color, linestyle='-', label="FUSEE")
 
     from matplotlib.lines import Line2D
     sherman_read_latency=3.4
     sherman_write_latency=9.4
-    ax2.axhline(y=sherman_read_latency, color='b', linestyle=':', label="Sherman")
-    sherman = ax2.axhline(y=sherman_write_latency, color='b', linestyle='-', label="Sherman")
+    ax2.axhline(y=sherman_read_latency, color=lib.sherman_color, linestyle=':', label="Sherman")
+    sherman = ax2.axhline(y=sherman_write_latency, color=lib.sherman_color, linestyle='-', label="Sherman")
 
     clover_read_latency=2.9
     clover_insert_latency=8.5
-    ax2.axhline(y=clover_read_latency, color='g', linestyle=':', label="Clover")
-    clover = ax2.axhline(y=clover_insert_latency, color='g', linestyle='-', label="Clover")
+    ax2.axhline(y=clover_read_latency, color=lib.clover_color, linestyle=':', label="Clover")
+    clover = ax2.axhline(y=clover_insert_latency, color=lib.clover_color, linestyle='-', label="Clover")
     ax2.axhline()
 
-    cuckoo = Line2D([0], [0], label='RCuckoo', color='black')
+    cuckoo = Line2D([0], [0], label='RCuckoo', color=lib.rcuckoo_color)
     read = Line2D([0], [0], label='Read', color='grey', linestyle='dashed')
     insert = Line2D([0], [0], label='Insert', color='grey', linestyle='solid')
 
-    ax2.plot(fill_factors, write_latency, label="RCuckoo", color="black", linestyle="solid", marker="o")
-    ax2.plot(fill_factors, read_latency, label="read", color="black", linestyle="dashed", marker="s")
+    ax2.plot(fill_factors, write_latency, label="RCuckoo", color=lib.rcuckoo_color, linestyle="solid", marker="o")
+    ax2.plot(fill_factors, read_latency, label="read", color=lib.rcuckoo_color, linestyle="dashed", marker="s")
 
     ax2.legend(handles=[read, insert, fusee, sherman, clover, cuckoo], fontsize=8, ncol=2, loc="upper center")
 
@@ -257,16 +257,16 @@ def plot_hero_ycsb_fill_static():
     ax2.set_ylabel("us")
     ax2.set_xlabel("fill factor")
 
-    ax3.plot(fill_factors, write_bytes, label="insert", color="black", linestyle="solid", marker="o")
-    ax3.plot(fill_factors, read_bytes, label="read", color="black", linestyle="dashed", marker="s")
+    ax3.plot(fill_factors, write_bytes, label="insert", color=lib.rcuckoo_color, linestyle="solid", marker="o")
+    ax3.plot(fill_factors, read_bytes, label="read", color=lib.rcuckoo_color, linestyle="dashed", marker="s")
     ax3.legend(fontsize=8)
     ax3.set_ylabel("bytes/op")
     ax3.set_xlabel("fill factor")
     ax3.set_ylim(bottom=0,top=3400)
 
 
-    ax4.plot(fill_factors, write_messages, label="insert", color="black", linestyle="solid", marker="o")
-    ax4.plot(fill_factors, read_messages, label="read", color="black", linestyle="dashed", marker="s")
+    ax4.plot(fill_factors, write_messages, label="insert", color=lib.rcuckoo_color, linestyle="solid", marker="o")
+    ax4.plot(fill_factors, read_messages, label="read", color=lib.rcuckoo_color, linestyle="dashed", marker="s")
     ax4.legend(fontsize=8)
     ax4.set_ylabel("messages/op")
     ax4.set_xlabel("fill factor")
