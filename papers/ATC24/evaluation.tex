@@ -34,8 +34,31 @@ spreading threads evenly across machines.
 
 We compare RCuckoo against three recent RDMA key-value stores with
 different designs.  While none have the same assumptions or feature
-set as RCuckoo, each represents an apt comparision point for different
+set as RCuckoo, each represents an apt comparison point for different
 aspects.
+
+We directly compare RCuckoo against three disaggregated
+key-value stores Fusee~\cite{fusee}, Clover~\cite{clover},
+and Sherman~\cite{sherman}. Each system has distinct design
+tradeoffs. 
+%%
+Fusee is the nearest system to RCuckoo in our design space.
+It is fully disaggregated and uses optimistic inserts rather
+than locks. Fusee is based on race hashing which uses 64 bit
+width index entries set with CAS to point to extent entries.
+Fusee is the closest comparison we have to illustrate the
+tradeoffs between locks and optimistic concurrency.
+%%
+Clover is a partially disaggregated system which uses
+two-sided RDMA operations to modify the index and one-sided
+operations for updates, deletes, and reads.
+%%
+Sherman a disaggregated B-Tree and the only system at the
+time of writing which uses locks and not optimistic
+concurrency to guard its index. Our performance comparison
+with Sherman is not apples to apples. Sherman maintains
+ordered key-value pairs for range queries and thus has
+higher overheads on updates than the other systems.
 
 \textbf{FUSEE}
 is a key-value store designed for full
@@ -164,39 +187,51 @@ could be brought to par with RCuckoo.
 %By default YCSB-A,B,C use updates. RCuckoo's insert
 %algorithm is it's most complex and bandwidth intensive
 %component. In this section
-We evaluate RCuckoo's insert performance using a modified YCSB
-workload that employs inserts instead of updates, so YCSB-A is 50\%
-read, 50\% insert. We further consider an additional workload
-YCSB-W that is insert only.  Figure~\ref{fig:ycsb_fill}(a)
-shows the aggregate throughput of 400 clients across four different
-workloads as a function of the table's fill factor.  As the index
-table fills, cuckoo paths become longer leading to increased
-contention and additional bandwidth consumption from larger covering
-reads. In each case (except YCSB-C) RCuckoo's performance declines with
-fill factor. In the insert-only YCSB-W case RCuckoo's
-performance drops from 11.5 to 4.5 MOPS.  As a point of comparison,
-FUSEE's maximum insert-only performance is 9.1 MOPS on our testbed,
-although it is independent of fill factor.  While FUSEE out-performs
-RCuckoo at high fill factors, we observe that an insert-only workload is
-uncommon in practice~\cite{facebook-memcached}.
 
-We plot operation latency, size, and message counts (in terms of RDMA
-packets) as a function of fill factor in
-Figure~\ref{fig:ycsb_fill}(b--d).  For comparision, we report latency
-values of insert and read operations for the comparisoin
-systems. These values were not collected under load and represent
-best-case performance on our testbed.  Read latency is nearly
-identical for all systems save FUSEE, as it requires an additional
-round trip.  Insert times vary: Clover and Sherman use two-sided RDMA
-operations for insert and both need to perform allocations and set up
-metadata for the requesting client.  FUSEE is slightly slower, roughly
-the same as RCuckoo's best-case.  As the table fills, however, cuckoo
-paths grow in length causing RCuckoo insert operations to require
-additional round trips to find valid cuckoo paths.  At maximum fell,
-insert operations take roughly twice as long as in an empty
-table. This rising cost is reflected by the increase in both bytes
-and messages per operation.  RCuckoo reads, on the other hand, have
-roughly the same cost and performance regardless of fill factor.
+RCuckoo insert operation is high performance despite
+containing nearly all of our algorithms complexity. Inserts
+are more expensive when cuckoo indexes are nearly full so we
+report insert performance as a function of the indexes fill
+factor. To show how RCuckoo responds to insert heavy
+workloads we modify YCSB to perform \textbf{inserts rather
+than updates}. All experiments in Figure~\ref{fig:ycsb_fill}
+use inserts rather than updates, for example YCSB-A is 50\%
+update and 50\% read. YCSB-W is a write only or 100\% insert
+workload.
+%%
+Figure~\ref{fig:ycsb_fill}(a) shows the aggregate throughput
+of 400 clients across four different workloads as a function
+of the table's fill factor.  As the index table fills,
+cuckoo paths become longer leading to increased contention
+and additional bandwidth consumption from larger covering
+reads. In each case (except YCSB-C) RCuckoo's performance
+declines with fill factor. In the insert-only YCSB-W case
+RCuckoo's performance drops from 11.5 to 4.5 MOPS.  As a
+point of comparison, FUSEE's maximum insert-only performance
+is 9.1 MOPS on our testbed, although it is independent of
+fill factor.  While FUSEE out-performs RCuckoo at high fill
+factors, we observe that an insert-only workload is uncommon
+in practice~\cite{facebook-memcached}.
+
+We plot operation latency, size, and message counts (in
+terms of RDMA packets) as a function of fill factor in
+Figure~\ref{fig:ycsb_fill}(b--d).  For comparison, we report
+latency values of insert and read operations for the
+comparison systems. These values were not collected under
+load and represent best-case performance on our testbed.
+Read latency is nearly identical for all systems save FUSEE,
+as it requires an additional round trip.  Insert times vary:
+Clover and Sherman use two-sided RDMA operations for insert
+and both need to perform allocations and set up metadata for
+the requesting client.  FUSEE is slightly slower, roughly
+the same as RCuckoo's best-case.  As the table fills,
+however, cuckoo paths grow in length causing RCuckoo insert
+operations to require additional round trips to find valid
+cuckoo paths.  At maximum fell, insert operations take
+roughly twice as long as in an empty table. This rising cost
+is reflected by the increase in both bytes and messages per
+operation.  RCuckoo reads, on the other hand, have roughly
+the same cost and performance regardless of fill factor.
 
 
 \begin{figure}[t]
@@ -208,25 +243,33 @@ roughly the same cost and performance regardless of fill factor.
 
 \subsection{Fault tolerance}
 
-Client failures can strand locks and reduce overall system
-performance. We measure RCuckoo's performance in the face of failures
-by injecting stranded locks.  We emulate client failures by performing
-a partial insert operation that issues a random prefix of the RDMA
-operations rquired for the insert. This process leaves the table in
-one of the recovery states and strands at least one lock. In our
-experiment the table is filled to 80\%, non-failing clients employ a
-YCSB-A workload, and the fault-injection client is given a fixed rate
-at which to inject faults.
+RCuckoo runs at nearly full throughput during realistic
+failure scenarios and remains functional in the face of
+hundreds of failures per second. When a client fails while
+holding a lock the lock is stranded and requests for that
+lock will block until after a client times out and reclaims
+the lock.
+%%
+We emulate hundreds of client failures per second by
+performing a partial insert operation which truncates the
+batch of insert packets including lock releases. The table
+entries are left in one of the inconsistent states listed in
+Section~\ref{sec:table-repair} and locks are left set.
 
-Figure~\ref{fig:failure_throughput} shows the degradation in aggregate
-throughput as a function of failure rate. The more rows a lock
-protects the larger the failure's impact and time to triage and repair
-the failure. The performance impact of a few number of failures per
-second is low which is ideal considering that failures in RDMA
-clusters are relatively rare.  As a point of refrence, we observe that
-RCuckoo can still operate despite thousands of failures per second
-while a server can only establish approximately 1.4~K RDMA connections
-per second using state of the art techniques~\cite{xrdma}.
+
+Figure~\ref{fig:failure_throughput} illustrates RCuckoos
+ability to operate at high throughput in the face of
+failures. Lock granularity increases the probability that
+multiple clients will block on the same failed lock. Larger
+locks have little difference when failures are semi-frequent
+and have a larger impact as hundred of failures occur per
+second.  The performance impact of a few number of failures
+per second is low which is ideal considering that failures
+in RDMA clusters are relatively rare.  As a point of
+reference, we observe that RCuckoo can still operate despite
+thousands of failures per second while a server can only
+establish approximately 1.4~K RDMA connections per second
+using state of the art techniques~\cite{xrdma}.
 
 \subsection{Dependent hashing and search}
 
