@@ -71,6 +71,7 @@ def plot_entry_size_exp():
             if i==0:
                 entry_size_order.append(entry_size)
     hatches = ['/', 'o', '\\', '.']
+    colors = [lib.rcuckoo_color, lib.clover_color, lib.sherman_color, lib.fusee_color]
     print(entry_size_order)
     print(entry_sizes)
     print(workloads)
@@ -79,7 +80,8 @@ def plot_entry_size_exp():
     x=np.arange(len(workloads))
     for attribute, measurement in entry_sizes.items():
         offset = width * multiplier
-        rects = ax.bar(x + offset, measurement, width,hatch=hatches[multiplier], label=str(attribute) + " KV", alpha=0.99, edgecolor="black", color="white")
+        # rects = ax.bar(x + offset, measurement, width,hatch=hatches[multiplier], label=str(attribute) + " KV", alpha=0.99, edgecolor="black", color=colors[multiplier])
+        rects = ax.bar(x + offset, measurement, width, label=str(attribute) + " KV", alpha=0.99, edgecolor="black", color=colors[multiplier])
         # ax.bar_label(rects, padding=3 )
         multiplier += 1
     
@@ -94,7 +96,7 @@ def plot_entry_size_exp():
     # ax.set_xticks(x, workloads)
     ax.set_ylim(0,50)
     ax.legend()
-    ax.grid()
+    ax.grid(axis='y')
     plt.tight_layout()
     plt.savefig("entry_size.pdf")
 

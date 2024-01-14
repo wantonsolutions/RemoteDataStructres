@@ -101,7 +101,7 @@ def plot_buckets_per_lock_vs_locks_per_message_experiment():
 
     z_axis_rtt = np.array(z_axis_rtt)
     im, cbar = lib.heatmap(z_axis_rtt, y_axis_locks_per_message, x_axis_buckets_per_lock, ax=ax,
-                    cmap="YlGn", cbarlabel="Lock Aquire RTT")
+                    cmap="YlGn_r", cbarlabel="Lock Aquire RTT")
     texts = lib.annotate_heatmap(im, valfmt="{x:.0f}")
 
     # ax.colorbar()

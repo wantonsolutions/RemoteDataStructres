@@ -96,7 +96,7 @@ CAS, and curved dashed lines are writes.}
 
 RCuckoo is designed to facilitate lock-less, single round-trip reads as
 they are the dominant operation for key-value stores in data
-centers~\cite{facebook-memcached}. To read the value associated with a
+centers~\cite{facebook-memcached,rocks-db-workload}. To read the value associated with a
 given key clients calculate the potential table locations for the
 key's entry (using the hash functions described in the next section)
 and issue RDMA reads for both rows simultaneously.  Because all

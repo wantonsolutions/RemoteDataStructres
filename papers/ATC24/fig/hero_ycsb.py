@@ -76,7 +76,7 @@ def plot_sherman_ycsb(axs):
             print("avg_ops=", lib.ops(workload_data))
             print("threads=", clients)
 
-            axs[i].plot(clients,workload_data, marker='x', label="Sherman")
+            axs[i].plot(clients,workload_data, marker='x', label="Sherman", color=lib.sherman_color)
         except:
             continue
         i+=1
@@ -167,9 +167,9 @@ def plot_hero_ycsb_throughput_static():
     clients=[10,20, 40, 80, 160, 320, 400]
     fig, axs = plt.subplots(1,len(workloads), figsize=(15,3))
 
-    axs[0].plot(clients,cuck_a_tput,label="RCuckoo",marker="o")
-    axs[1].plot(clients,cuck_b_tput,label="RCuckoo",marker="o")
-    axs[2].plot(clients,cuck_c_tput,label="RCuckoo",marker="o")
+    axs[0].plot(clients,cuck_a_tput,label="RCuckoo",marker="o",color=lib.rcuckoo_color)
+    axs[1].plot(clients,cuck_b_tput,label="RCuckoo",marker="o",color=lib.rcuckoo_color)
+    axs[2].plot(clients,cuck_c_tput,label="RCuckoo",marker="o",color=lib.rcuckoo_color)
     # axs[3].plot(clients,cuck_w_tput,label="cuckoo",marker="o")
 
     #fusee
@@ -180,9 +180,9 @@ def plot_hero_ycsb_throughput_static():
     # fusee_w_tput=[0.03022,   0.123381,  0.868236,  6.1967235, 9.7452085, 9.7876635]
     fusee_clients = [8, 16, 32, 64, 128, 256]
 
-    axs[0].plot(fusee_clients,fusee_a_tput_zipf,label="FUSEE",marker="s")
-    axs[1].plot(fusee_clients,fusee_b_tput_zipf,label="FUSEE",marker="s")
-    axs[2].plot(fusee_clients,fusee_c_tput_zipf,label="FUSEE",marker="s")
+    axs[0].plot(fusee_clients,fusee_a_tput_zipf,label="FUSEE",marker="s", color=lib.fusee_color)
+    axs[1].plot(fusee_clients,fusee_b_tput_zipf,label="FUSEE",marker="s", color=lib.fusee_color)
+    axs[2].plot(fusee_clients,fusee_c_tput_zipf,label="FUSEE",marker="s", color=lib.fusee_color)
     # axs[3].plot(fusee_clients,fusee_w_tput,label="fusee",marker="s")
 
     clover_c_tput=[1836632,3572209,7003510,13673092,25654763,34857976,39180515,39757292,39917704,40295512,]
@@ -195,9 +195,9 @@ def plot_hero_ycsb_throughput_static():
     clover_b_tput = [x / 1000000 for x in clover_b_tput]
     clover_a_tput = [x / 1000000 for x in clover_a_tput]
 
-    axs[0].plot(clover_clients,clover_a_tput,label="Clover",marker="^")
-    axs[1].plot(clover_clients,clover_b_tput,label="Clover",marker="^")
-    axs[2].plot(clover_clients,clover_c_tput,label="Clover",marker="^")
+    axs[0].plot(clover_clients,clover_a_tput,label="Clover",marker="^", color = lib.clover_color)
+    axs[1].plot(clover_clients,clover_b_tput,label="Clover",marker="^", color = lib.clover_color)
+    axs[2].plot(clover_clients,clover_c_tput,label="Clover",marker="^", color = lib.clover_color)
 
 
 
