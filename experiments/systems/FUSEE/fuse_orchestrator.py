@@ -302,7 +302,9 @@ class Orchestrator:
         thr = threading.Thread(target=self.server.run_cmd,args=(command,), kwargs={})
         thr.start()
 
-        for i in range(120):
+        server_wait=25
+        print("Waiting for server to start for ",server_wait," seconds")
+        for i in tqdm(range(server_wait)):
             time.sleep(1)
 
         threads_per_client = self.get_threads_per_client(config)
@@ -316,16 +318,18 @@ class Orchestrator:
             "CLIENTS="+str(threads_per_client)+";"
             'rm -f '+output_file +';'
             # "yes | numactl -N "+ str(numa_node) +" -m "+ str(numa_node) + " ./" + self.ycsb_throughput_client_program_name + ' ../client_config_orc.json '+ config["workload"]+ ' $CLIENTS > '+output_file)
-            "yes | stdbuf -oL ./" + self.ycsb_throughput_client_program_name + ' ../client_config_orc.json '+ config["workload"]+ ' $CLIENTS > '+output_file +' 2> err.out')
+            "yes | ./" + self.ycsb_throughput_client_program_name + ' ../client_config_orc.json '+ config["workload"]+ ' $CLIENTS > '+output_file +' 2> err.out')
 
             print(client_command)
             client_thread = threading.Thread(target=client.run_cmd,args=(client_command,), kwargs={})
             client_threads.append(client_thread)
         
         print("Starting client")
+        clieint_start_offset=1.0
         for client_thread in client_threads:
             client_thread.start()
             print("starting client thread",client_thread)
+            time.sleep(clieint_start_offset)
         print("waiting for clients to join")    
         timeout_time = 120
         for i, client_thread in enumerate(client_threads):
@@ -470,7 +474,7 @@ class Orchestrator:
         client_config["client_local_size"] = self.gb_to_bytes(client_memory)
 
         #calculate the server data len
-        server_memory = 200
+        server_memory = 100
         # server_memory = int(config["clients"]) / 2
         server_config["server_data_len"] = self.gb_to_bytes(server_memory)
         client_config["server_data_len"] = self.gb_to_bytes(server_memory)
@@ -553,11 +557,12 @@ def run_throughput_trial(data_file="data/fusee_throughput"):
     orch.setup()
     config = dict()
     # clients = [1,2,4,8]
-    clients = [2,4,8,16,32,48, 64, 80]
+    clients = [64]
     # clients = [80]
     # clients = [2,4]
     run_tputs = []
-    operations = ["insert", "search", "update", "delete"]
+    # operations = ["insert", "search", "update", "delete"]
+    operations = ["insert"]
     config["operations"] = operations
     for client in clients:
         config["clients"] = client
@@ -586,9 +591,14 @@ def run_ycsb_throughput_trial(data_file="data/fusee_ycsb"):
     # clients = [5, 10, 20, 40, 80, 160, 200]
     # clients = [60, 96, 120]
     clients = [8,16,32,64,128,256]
+    # clients = [8]
+    # clients = [256]
     # clients = [256]
     # clients = [200]
-    workloads = ["workloada", "workloadb", "workloadc", "workloadd"]
+    # workloads = ["workloada", "workloadb", "workloadc", "workloadd"] #workloadd is not update only
+    workloads = ["workloada", "workloadb", "workloadc", "workloadupd100"]
+    # workloads = ["workloadupd100"]
+    # workloads = ["workloadupd100"]
     all_results = dict()
     for workload in workloads:
         results = []
@@ -609,9 +619,9 @@ def run_many_ycsb_trials(trials=5):
 
             # dm.save_statistics(result,"data/fusee_throughput_"+workload)
 
-#run throughput trial
-# run_throughput_trial()
-# pf.plot_tput()
+# run throughput trial
+run_throughput_trial()
+pf.plot_tput()
 
 #get raw operation latency numbers
 # run_latency_trial()
@@ -620,8 +630,9 @@ def run_many_ycsb_trials(trials=5):
 # run ycsb throughput trial
 # run_ycsb_throughput_trial()
 
-run_many_ycsb_trials(10)
-pf.plot_ycsb()
+# run_many_ycsb_trials(10)
+# pf.plot_ycsb()
+# pf.plot_ycsb_multi_run()
 
 
     

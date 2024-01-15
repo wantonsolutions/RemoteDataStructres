@@ -294,7 +294,12 @@ class Orchestrator:
             'stdbuf -oL ./'+ self.memory_program_name + ' ' + 'configs/' + self.config_name + ' > memserver.out 2>&1 &')
         server_thread = threading.Thread(target=self.server.run_cmd, args=(server_command,))
         server_thread.start()
-        time.sleep(15)
+
+        sleeptime=15
+        print("sleeping for ", sleeptime, " seconds")
+        for i in tqdm(range(sleeptime)):
+            # print("Waiting for server to start")
+            time.sleep(1)
 
 
             # 'export MLX5_SINGLE_THREADED=1;'
@@ -315,13 +320,15 @@ class Orchestrator:
             # print("starting client thread", client_thread)
             client_thread.start()
             time.sleep(1)
-        timeout = 30
+        timeout = 120
         print("Waiting for all {} clients to finish..".format(len(client_threads)))
         for i, client_thread in enumerate(client_threads):
-            # print("Waiting for client", i)
+            print("Waiting for client", i)
             client_thread.join(timeout=timeout)
             timeout=5
         print("All clients finished")
+
+        time.sleep(15)
 
         self.kill()
 

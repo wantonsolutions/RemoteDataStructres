@@ -324,7 +324,15 @@ def bytes_per_operation_line(ax, stats, label, x_axis="clients"):
 
     read_bytes, read_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'read_operation_bytes', 'completed_read_count')
     write_bytes, write_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'insert_operation_bytes', 'completed_insert_count')
+    read_bytes = [x for x in read_bytes if str(x) != 'nan']
+    write_bytes = [x for x in write_bytes if str(x) != 'nan']
+    read_err = [x for x in read_err if str(x) != 'nan']
+    write_err = [x for x in write_err if str(x) != 'nan']
+    print("read_bytes=", read_bytes)
+    print("write_bytes=", write_bytes)
+
     x_axis_vals = get_x_axis(stats, x_axis)
+    print("bytes x axis", x_axis_vals)
 
     p = ax.errorbar(x_axis_vals,read_bytes,yerr=read_err,label=label+"-read", marker="s")
     color = p[0].get_color()
@@ -395,6 +403,14 @@ def messages_per_operation_line(axs, stats, label, x_axis="clients"):
     write_messages, write_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'insert_operation_messages', 'completed_insert_count')
     x_axis_vals = get_x_axis(stats, x_axis)
 
+    read_messages = [x for x in read_messages if str(x) != 'nan']
+    write_messages = [x for x in write_messages if str(x) != 'nan']
+    read_err = [x for x in read_err if str(x) != 'nan']
+    write_err = [x for x in write_err if str(x) != 'nan']
+
+    print("read_messages=", read_messages)
+    print("write_messages=", write_messages)
+
 
     h1 = ax.errorbar(x_axis_vals,write_messages,yerr=write_err, linestyle=op_linestyles['insert'], marker=op_markers['insert'], label=label+"-insert")
     color = h1[0].get_color()
@@ -444,8 +460,12 @@ def latency_per_operation_line(axs, stats, label, x_axis="clients", hide_zeros=F
         ax = axs[0]
         axt = axs[0]
 
-    read_latency, read_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'sum_read_latency_ns','completed_read_count' )
-    write_latency, write_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats,  'sum_insert_latency_ns','completed_insert_count' )
+    percentile=50
+    read_latency, read_err = client_stats_get_percentile_err_trials(stats, 'read_latency_ns', percentile)
+    write_latency, write_err = client_stats_get_percentile_err_trials(stats, 'insert_latency_ns', percentile)
+
+    # read_latency, read_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats, 'sum_read_latency_ns','completed_read_count' )
+    # write_latency, write_err = client_stats_x_per_y_get_mean_std_multi_run_trials(stats,  'sum_insert_latency_ns','completed_insert_count' )
 
     print("read_latency", read_latency)
     print("write_latency", write_latency)
@@ -454,6 +474,11 @@ def latency_per_operation_line(axs, stats, label, x_axis="clients", hide_zeros=F
     write_latency = [x/1000 for x in write_latency]
     read_err = [x/1000 for x in read_err]
     write_err = [x/1000 for x in write_err]
+
+    read_latency = [x for x in read_latency if str(x) != 'nan']
+    write_latency = [x for x in write_latency if str(x) != 'nan']
+    read_err = [x for x in read_err if str(x) != 'nan']
+    write_err = [x for x in write_err if str(x) != 'nan']
     x_axis_vals = get_x_axis(stats, x_axis)
 
     print("hiding zeros:", hide_zeros)
@@ -749,7 +774,11 @@ def single_run_throughput(stat):
             insert_operations = int(client['stats']['completed_insert_count'])
             # print("insert_operations: ", insert_operations)
             insert_operations_mop = insert_operations/1000000
-            total_operations_mop += read_operations_mop + insert_operations_mop
+
+            update_operations = int(client['stats']['completed_update_count'])
+            # print("update_operations: ", update_operations)
+            update_operations_mop = update_operations/1000000
+            total_operations_mop += read_operations_mop + insert_operations_mop + update_operations_mop
             # print("total_operations_mop: ", total_operations_mop)
     except:
         print("error in stat: ", stat)
@@ -920,11 +949,11 @@ def client_stats_x_per_y_get_mean_std(stat, x,y):
         for client in stat['clients']:
             y_val = client['stats'][y]
             x_val = client['stats'][x]
-            # print("yval - ",y,y_val)
-            # print("xval - ",x,x_val)
             vals.append(div_by_zero_to_zero(x_val, y_val))
         # print("vals: ", vals)
-        return np.mean(vals), stderr(vals)
+        mean, std = np.mean(vals), stderr(vals)
+        print("mean: ", mean, "std: ", std , x,  "/", y)
+        return mean, std
         # print("90th percentile: ", np.percentile(vals,99))
         # return np.percentile(vals,99), stderr(vals)
 
@@ -944,7 +973,7 @@ def client_stats_x_per_y_get_mean_std_multi_run_trials(stats, x, y):
 def client_stats_get_percentile_err(stat, key, percentile):
     vals = []
     # print("STAT: ", stat)
-    print("KEY: ", key)
+    # print("KEY: ", key)
 
     for client in stat['clients']:
         value = client['stats'][key]
@@ -969,7 +998,7 @@ def client_stats_get_percentile_err(stat, key, percentile):
             continue
     if len(vals) == 0:
         return 0, 0
-    print("PERCENTILE: ",np.percentile(vals, percentile))
+    # print("PERCENTILE: ",np.percentile(vals, percentile))
     return np.percentile(vals, percentile), stderr(vals)
 
 def client_stats_get_percentile_err_trials(stats, key, percentile):
@@ -980,7 +1009,7 @@ def client_stats_get_percentile_err_trials(stats, key, percentile):
             m, s = (client_stats_get_percentile_err(run, key, percentile))
             r_means.append(m)
             r_stds.append(s)
-        print("MEANS!!!: ", r_means)
+        # print("MEANS!!!: ", r_means)
         means.append(np.mean(r_means))
         stds.append(np.mean(r_stds))
     return means, stds
@@ -1083,7 +1112,14 @@ def get_config_axis(stats,name):
         try:
             axis.append(stat['config'][name])
         except:
-            axis.append(stat[0]['config'][name])
+            try:
+                axis.append(stat[0]['config'][name])
+            except:
+                print("error getting config axis")
+                print("name: ", name)
+                # print("stat: ", stat)
+                # exit(1)
+    print("axis: ", axis)
     return axis
 
 

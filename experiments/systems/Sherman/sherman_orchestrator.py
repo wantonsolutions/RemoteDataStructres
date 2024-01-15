@@ -58,8 +58,8 @@ class ssh_wrapper:
         stdin, stdout, stderr = self.ssh.exec_command(cmd)
         stdout_result =stdout.read()
         stderr_result = stderr.read()
-        print(self.hostname, "stdout: ", stdout_result.decode("utf-8"))
-        print(self.hostname, "stderr: ", stderr_result.decode("utf-8"))
+        # print(self.hostname, "stdout: ", stdout_result.decode("utf-8"))
+        # print(self.hostname, "stderr: ", stderr_result.decode("utf-8"))
 
         error_code = stdout.channel.recv_exit_status()
         return
@@ -291,6 +291,7 @@ def run_ycsb_trial(datadir="data/sherman_ycsb"):
 
     # clients = [2,4,8]
     workloads = ["workloada","workloadb","workloadc","workloadupd100"]
+    # workloads = ["workloadb","workloadc","workloadupd100"]
 
     # clients = [4,8,16,32,64,128,200]
     # clients = [5,10,20,40,80,160,200]
@@ -300,8 +301,8 @@ def run_ycsb_trial(datadir="data/sherman_ycsb"):
     client_count = 8
     multiple = 40
     client_count = client_count * multiple
-    clients = [client_count]
-    workloads = ["workloada"]
+    clients = [8,16,32,64,128,200,256,320]
+    # workloads = ["workloada"]
 
     all_results= dict()
     for workload in workloads:
@@ -310,15 +311,28 @@ def run_ycsb_trial(datadir="data/sherman_ycsb"):
             config["clients"] = client
             config["workload"] = workload
             orch.run_ycsb_test(config)
-            result = orch.collect_ycsb_stats()
-            results.append(result)
+            try:
+                result = orch.collect_ycsb_stats()
+                print(result)
+                results.append(result)
+
+                #intermediate results
+                tmp_results = result_array_to_dict(results)
+                tmp_results['clients'] = clients
+                dm.save_statistics(tmp_results,datadir+"/"+workload)
+            except:
+                continue
+
         all_results[workload] = result_array_to_dict(results)
         print(result_array_to_dict(results))
+        workload_results = result_array_to_dict(results)
+        dm.save_statistics(workload_results,datadir+"/"+workload)
     all_results['clients'] = clients
     print(all_results)
     dm.save_statistics(all_results,datadir)
 
 
+# run_ycsb_trial("data/sherman_ycsb_uniform")
 run_ycsb_trial("data/sherman_ycsb_zipf")
 ps.plot_ycsb()
 # ps.plot_latency()

@@ -135,16 +135,18 @@ def average_runs(runs, workload):
 
 
 def plot_ycsb_multi_run():
+    total_runs=2
     fig, ax = plt.subplots(1, 1, figsize=(5, 3))
-    runs = extract_multiple_ycsb_runs(5)
+    runs = extract_multiple_ycsb_runs(total_runs)
 
-    workloads = ["workloada", "workloadb", "workloadc", "workloadd"]
-    workload_labels = ["ycsb-a", "ycsb-b", "ycsb-c", "ycsb-d"]
+    workloads = ["workloada", "workloadb", "workloadc", "workloadupd100"]
+    workload_labels = ["ycsb-a", "ycsb-b", "ycsb-c", "ycsb-w"]
 
     for load, label in zip(workloads, workload_labels):
         avg, err = average_runs(runs, load)
-        avg = avg / 1000000
-        err = err / 1000000
+        print("average",avg)
+        # avg = avg / 1000000
+        # err = err / 1000000
         print(label)
         print("threads=", runs[0]["clients"])
         print("avg_ops=", avg)
@@ -165,5 +167,5 @@ def plot_ycsb_multi_run():
     plt.savefig("FUSEE-ycsb-throughput-multi.pdf")
 
 # def __main__():
-# plot_ycsb_multi_run()
+plot_ycsb_multi_run()
 

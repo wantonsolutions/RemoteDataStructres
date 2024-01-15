@@ -102,5 +102,5 @@ def plot_ycsb():
     plt.savefig("Sherman-ycsb-throughput-uniform.pdf")
 
 # plot_ycsb()
-plot_latency()
+# plot_latency()
 
