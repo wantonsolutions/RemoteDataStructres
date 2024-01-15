@@ -81,16 +81,18 @@ exchanges.
 \label{sec:reading}
 
 
-RCuckoo is designed to facilitate lock-less, single round-trip reads for small values as
-they are the dominant operation for key/value stores in data
-centers~\cite{facebook-memcached,rocks-db-workload}. To read the value associated with a
-given key clients calculate the potential table locations for the
-key's entry (using the hash functions described in the next section)
-and issue RDMA reads for both rows simultaneously.  Because all
-operations between a client and a given server travel over a reliable
-connection, they are intrinsically ordered, but in our description we
-will only call out when a particular ordering among a batch of
-messages is required.
+RCuckoo is designed to facilitate lock-less, single
+round-trip reads for small values as they are the dominant
+operation for key/value stores in data
+centers~\cite{rocks-db-workload,facebook-memcached}. To read
+the value associated with a given key clients calculate the
+potential table locations for the key's entry (using the
+hash functions described in the next section) and issue RDMA
+reads for both rows simultaneously.  Because all operations
+between a client and a given server travel over a reliable
+connection, they are intrinsically ordered, but in our
+description we will only call out when a particular ordering
+among a batch of messages is required.
 
 Moreover, as we discuss below, if the rows are
 located sufficiently close together, it can be beneficial for the
@@ -130,14 +132,15 @@ trip to retrieve the extent.
 
 \subsubsection{Updates and deletes}
 
-Updates and deletes, like reads, access only two locations in the
-index table, but require a client to acquire the associated locks.
-Due RCuckoo's locality enhancement, it is usually possible to attempt
-to acquire both locks in a single MCAS operation
-(Section~\ref{sec:locking}).  If so, the client issues read(s) for the
-corresponding rows of the index table immediately afterwards but in
-the same batch of operations.  (In the rare case that the locks must
-be acquired independently---necessitating an additional round
+Updates and deletes, like reads, access only two locations
+in the index table, but require a client to acquire the
+associated locks.  Due to RCuckoo's locality enhancement, it
+is usually possible to attempt to acquire both locks in a
+single MCAS operation (Section~\ref{sec:locking}).  If so,
+the client issues read(s) for the corresponding rows of the
+index table immediately afterwards but in the same batch of
+operations.  (In the rare case that the locks must be
+acquired independently---necessitating an additional round
 trip---the reads are batched with the second lock request.)
 
 Assuming
@@ -252,48 +255,53 @@ failed prior attempt to insert the same key.
 % insertion path can be found in buckets near a speculative
 % path, even if the clients cache is stale.
 
-\textbf{Cache synchronization:} Armed with a potential cuckoo path,
-clients identify the set of locks necessary to protect the relevant
-rows.  Unlike with updates and deletes, it is unlikely that all of the
-locks required for a complete cuckoo path can be acquired with a
-single MCAS operation, so locks are acquired in groups (see
-Section~\ref{sec:locking}). Immediately after, but in the same batch
-of RDMA operations as each attempt to acquire (a subset of) the locks,
-clients synchronize their local cache by issuing reads for (at least)
-all of the rows covered by that set of locks.  (In general, locks cover
-multiple rows, so this will be a superset of the rows necessary for
-the identified path.)  Note that if lock acquisition is successful,
-the values returned by the read of the corresponding rows---and, thus,
-the client's local cache of those rows---will remain synchronized
-until the lock is released.
+\textbf{Cache synchronization:} Armed with a potential
+cuckoo path, clients identify the set of locks necessary to
+protect the relevant rows.  
+%%
+Approximately 99\% of paths can be locked with a single MCAS
+(Figure~\ref{fig:locality-hashing}(c)). The other 1\% of
+paths acquire locks in groups (Section~\ref{sec:locking}).
+%%
+Immediately after, but in the same batch of RDMA operations
+as each attempt to acquire (a subset of) the locks, clients
+synchronize their local cache by issuing reads for (at
+least) all of the rows covered by that set of locks.  (In
+general, locks cover multiple rows, so this will be a
+superset of the rows necessary for the identified path.)
+Note that if lock acquisition is successful, the values
+returned by the read of the corresponding rows---and, thus,
+the client's local cache of those rows---will remain
+synchronized until the lock is released.
 
-Figure~\ref{fig:table-diagram} shows an example insert operation where
-the client updated its cache of the section of the
-index table outlined by the dashed red line using a single covering read.
-Here, the primary row for $K$ is full and the entry for key $C$ is
-being evicted its secondary location.  Hence, the client has
-acquired locks corresponding to the row where it hopes to insert the
-entry for key $K$ as well as the row into which it plans to cuckoo the
-existing entry for key $C$.  The rows shaded in gray are synchronized
-because they are covered by the acquired locks, while the intervening
-two (unshaded) rows are updated in the client's cache, but their
-contents cannot be depended upon without additional validation.
-Rather, they may increase the likelihood that a subsequent speculative
-search yields a valid result.
+Figure~\ref{fig:table-diagram} shows an example insert
+operation where the client updated its cache of the section
+of the index table outlined by the dashed red line using a
+single covering read.  Here, the primary row for $K$ is full
+and the entry for key $C$ is being evicted its secondary
+location.  Hence, the client has acquired locks
+corresponding to the row where it hopes to insert the entry
+for key $K$ as well as the row into which it plans to cuckoo
+the existing entry for key $C$.  The rows shaded in gray are
+synchronized because they are covered by the acquired locks,
+while the intervening two (unshaded) rows are updated in the
+client's cache, but their contents cannot be depended upon
+without additional validation.  Rather, they may increase
+the likelihood that a subsequent speculative search yields a
+valid result.
 % In this section we describe our protocol for reading,
-% inserting, and performing updates and deletes to an RCuckoo
-% hash table.
-%In principle, the cache can be maintained not just across retries but
-%also across insert operations for different keys, but
-%%Caches can be purged or persisted between requests
-%%depending on a clients available memory. 
-%%While theoretically
-%%these caches could be persisted to improve performance our
-%experimentation shows that performance gains are minimal
-%% due to high churn in the cuckoo index lock granularity paired with
-%%read strategy (Section~\ref{sec:insert}) has a far higher impact on
-%%search success over caching
-%(Section~\ref{sec:search_success}).
+% inserting, and performing updates and deletes to an
+% RCuckoo hash table.  In principle, the cache can be
+% maintained not just across retries but also across insert
+% operations for different keys, but %Caches can be purged
+% or persisted between requests %depending on a clients
+% available memory.  %While theoretically %these caches
+% could be persisted to improve performance our
+% experimentation shows that performance gains are minimal %
+% due to high churn in the cuckoo index lock granularity
+% paired with %read strategy (Section~\ref{sec:insert}) has
+% a far higher impact on %search success over caching
+% (Section~\ref{sec:search_success}).
 
 \textbf{Second search:} If all the lock acquisitions are successful,
 the client validates that the initial path remains valid.  Under an
@@ -700,7 +708,15 @@ of 50$~\mu$s.
 \subsection{Repair leases}
 %\todo{mention repair lease table}
 
-\todo{add lease table}
+\begin{figure}[t]
+  \vskip -1em
+    \centering
+        \includegraphics[width=0.99\linewidth]{fig/lease.pdf}
+    \vspace{-1em}
+    \caption{Bit layout of a repair lease}
+    \label{fig:lease}
+
+\end{figure}
 
 RCuckoo recovers stranded locks one lock at a time; if a client fails
 holding multiple locks recovery may be conducted by multiple clients
