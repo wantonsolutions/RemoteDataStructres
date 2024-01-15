@@ -69,7 +69,6 @@ memory to avoid contention on inserts.
 % \textbf{Client Caching:}
 %%
 \todo{describe memory allocation}
-\todo{describe resizing}
 
 \subsection{Operations}
 
@@ -321,7 +320,10 @@ cache contents.
 This entire process repeats until success, a client determines there
 is no viable cuckoo path (at which point the insert operation returns
 an error indicating the table is full), or a failed client is detected
-(Section~\ref{sec:table-repair}).
+(Section~\ref{sec:table-repair}).  Given the fully-disaggregated
+context we assume the index table will be initially provisioned at its
+maximum size; we defer resizing to future work.
+%\todo{describe resizing}
 % During development we
 % experimented heavily with guided A* search but found that it
 % only offered improvements over BFS when the table was over
