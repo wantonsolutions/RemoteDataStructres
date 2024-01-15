@@ -141,7 +141,7 @@ facilitate lock-based updates by decreasing the number of round
 trips required to acquire locks and perform mutating operations.
 
 We introduce RCuckoo, a fully disaggregated key/value store based on
-cuckoo hashing that
+cuckoo hashing~\cite{cuckoo} that
 %delivers high performance using
 uses only one-sided RDMA operations.  At its heart, RCuckoo builds
 around a \emph{dependent hashing} algorithm that makes spatial
@@ -229,6 +229,34 @@ failures:
 %% message round-trips for both reads and writes,
 %% improving performance for small-object reads and significantly
 %% improving writes.
+
+
+\begin{figure*}[t]
+    \centering
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/rdma_concur.pdf}
+        % \label{fig:optimistic_failures}
+        % \caption{}
+    \end{subfigure}
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/rdma_latency.pdf}
+        % \label{fig:rdma_latency}
+        % \caption{}
+    \end{subfigure}
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/rdma_cas_throughput.pdf}
+        % \label{fig:optimistic_failures}
+        % \caption{}
+    \end{subfigure}
+    \vspace{-1em}
+    \caption{Basic RDMA performance on our testbed.
+    \textbf{(a)} (64-bit) operations per second;
+    \textbf{(b)} operation latency as a function of message size~\cite{rdma-latency}; and
+    \textbf{(c)} compare-and-swap performance on device and main memory.
+    }
+    \label{fig:rdma-benchmarks}
+\end{figure*}
+
 
 Combined with a datastructure design that facilitates aggressive
 batching of RDMA operations, these techniques enable RCuckoo to limit

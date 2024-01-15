@@ -1,91 +1,105 @@
+
 \section{Background}
 \label{sec:background}
 
-\subsection{RDMA}
 
-\begin{figure*}[t]
-    \centering
-    \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/rdma_latency.pdf}
-        % \label{fig:rdma_latency}
-        % \caption{}
-    \end{subfigure}
-    \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/rdma_concur.pdf}
-        % \label{fig:optimistic_failures}
-        % \caption{}
-    \end{subfigure}
-    \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/rdma_cas_throughput.pdf}
-        % \label{fig:optimistic_failures}
-        % \caption{}
-    \end{subfigure}
-    \vspace{-1em}
-    \caption{
-    \textbf{(a)} CX5 RDMA latency vs message size~\cite{rdma-latency}
-    \textbf{(b)} RDMA operation scalability
-    \textbf{(c)} Compare and swap performance. Device memory vs main memory.
-    }
-    \label{fig:rdma-benchmarks}
-\end{figure*}
-
-
-RDMA NIC bandwidth has increased disproportionately to
-latency in the last decade leading to interesting design
-tradeoffs. CX7 NICs have 10$\times$ the bandwidth of CX3's
-but their intra-rack RTT has only shrunk by 1.5$\times$.
-Figure~\ref{fig:rdma-benchmarks}(a) shows NIC-to-NIC round
-trips times on CX5s for variable sized writes. All writes up
-to 128 bytes have comparable latencies and writes must
-exceed 1KB before the latency of a single large packet
-exceeds two round trips of smaller writes. \textbf{If there
-is surplus bandwidth a single large message can have much
-lower latency than two dependent smaller messages.}
-
-RDMA is an enabling technology for memory disaggregation. It
-allows client machines to directly access the memory of a
-remote server with one-sided operations like read, write and
-atomic update without the involvement of a remote
-CPU~\cite{infiniband-spec}.  
-%%
-Atomic operations such as compare-and-swap (CAS) are
-essential for implementing locks or opportunistic
-concurrency. Atomics are limited to 64 bit operations and
-bottleneck at lower ops/s than reads and writes because they
-block requests on data dependent addresses while waiting on
-PCIe round trips~\cite{design-guidelines,sherman}.
-Figure~\ref{fig:rdma-benchmarks}(b) shows the scalability of
-these operations on CX5 NICs for 64 bit operations.
-%%
-Vendors have provided some workarounds for atomic
-bottlenecks by adding device memory and masked atomic
-operations. CX series NICs have a 256KB region of on-NIC
-RDMAable memory. Atomics to this region avoid the round trip
-and execute with lower latency and up to 3x higher
-throughput~\cite{device-memory}(Figure~\ref{fig:rdma-benchmarks}(c)).
-Masked CAS (MCAS) allows for each bit to be set
-independently thus enabling higher density locks while
-reducing contention~\cite{rdma-masked-cas}. While multi-CAS
-is not supported these features have been demonstrated to
-enable fast dense lock tables~\cite{sherman}.
-
-
-\subsection{RDMA Key-Value Stores}
+%\subsection{RDMA Key-Value Stores}
 
 %% %Describe existing key value stores relation to rdma and
 %serialization %
-Many non-disaggregated key-value stores have used RDMA to
+Key/value stores have long looked to RDMA to
+%Many non-disaggregated key-value stores have used RDMA to
 accelerate their
 performance~\cite{farm,memc3,erpc,herd,faast,mica,pilaf,cell,storm}.
 %%
-These systems strike a careful balance between directly
-accessing memory with client side RDMA and serializing
-requests with a server side CPU.
+These systems strike a careful balance between directly accessing hash
+tables stored in remote memory with one-sided RDMA requests and
+serializing mutating operations at a server-side CPU.
 %%
-Cuckoo and Hopscotch hashes have flourished in this space
-because clients can locally calculate the location of keys
-and perform lockless $O(1)$ reads with
-RDMA~\cite{hopscotch,farm,pilaf,cuckoo}.
+Cuckoo~\cite{cuckoo} and hopscotch~\cite{hopscotch} hashing are popular choices in
+this space because clients can independently calculate the location of
+keys without needing to consult the server and potentially perform
+lock-less reads with RDMA~\cite{farm,pilaf,cuckoo}.
+
+
+
+\subsection{RDMA}
+
+RDMA
+%is an enabling technology for memory disaggregation. It allows
+allows
+clients to directly access the memory of a remote server with
+one-sided operations like read, write and atomic update without the
+involvement of a remote CPU~\cite{infiniband-spec}.  To set the
+context for RCuckoo's design, we benchmark the baseline performance of
+our testbed hardware, illustrating the constraints and
+opportunities.
+
+%%
+Atomic operations such as compare-and-swap (CAS) are essential for
+implementing locks or opportunistic concurrency. Atomics are limited
+to 64-bit operations and bottleneck at lower rates than reads and
+writes because they block requests on data-dependent addresses while
+waiting on PCIe round trips~\cite{design-guidelines,sherman}.
+Figure~\ref{fig:rdma-benchmarks}(a) shows that the NICs in our testbed
+(100-Gbps NVIDIA Mellanox ConnectX-5s) are capable of serving many 10s of
+millions of RDMA operations per second (limited only by link speed),
+but CAS operations to remote server memory top out around 50 MOPS.  Hence, we employ atomic operations judiciously in RCuckoo.
+
+%the scalability of
+%these operations on CX5 NICs for 64 bit operations.
+%%
+
+While atomic operations are limited to 64 bits, read and write message
+sizes are bounded only by the link MTU.
+%can 
+%RDMA NIC bandwidth has increased disproportionately to
+%latency in the last decade leading to interesting design
+%tradeoffs. CX7 NICs have 10$\times$ the bandwidth of CX3's
+%but their intra-rack RTT has only shrunk by 1.5$\times$.
+Figure~\ref{fig:rdma-benchmarks}(b) shows that on our testbed
+NIC-to-NIC round-trip times are similar for all message sizes
+less than about 128 bytes, and
+%on CX5s for variable sized writes. All writes up
+%to 128 bytes have comparable latencies and
+messages must exceed 1~KB before the latency of a single large operation
+exceeds two RTTs of smaller ones.  We leverage this
+observation in RCuckoo by collapsing multiple small reads into a single
+large one when appropriate.
+
+%\textbf{If there
+%is surplus bandwidth a single large message can have much
+%lower latency than two dependent smaller messages.}
+
+Finally, we highlight that our testbed NICs, like those from several
+vendors, include a small amount (256~KB in our case) of on-NIC memory
+that can be addressed by remote clients using RDMA
+operations~\cite{device-memory}.  Accesses to NIC memory avoid the
+need to cross the server's PCIe bus, decreasing latency and increasing
+throughput.  The performance gain is particularly significant for
+atomic operations.  Figure~\ref{fig:rdma-benchmarks}(c) shows the
+maximum aggregate throughput of concurrent CAS operations targeting
+the same single (i.e., contended) address or distinct, independant
+addresses in both main server memory (shown in orange) and on-NIC
+device memory (blue).  CAS operations perform between 1.8--3.1$\times$
+faster on NIC memory.  RCuckoo's datastructures are designed so that
+all CAS operations are performed on NIC memory.
+
+%many modern NICs
+%Vendors have provided some workarounds for atomic
+%bottlenecks by adding device memory and masked atomic
+%operations. CX series NICs have a 256KB region of on-NIC
+%RDMAable memory. Atomics to this region avoid the round trip
+%and execute with lower latency and up to 3x higher
+%throughput().
+%Masked CAS (MCAS) allows for each bit to be set
+%independently thus enabling higher density locks while
+%reducing contention~\cite{rdma-masked-cas}. While multi-CAS
+%is not supported these features have been demonstrated to
+%enable fast dense lock tables~\cite{sherman}.
+
+\subsection{Full disaggregation}
+
 %%
 Disaggregated key-value in contrast assume that a memory
 server cannot provide serialization and orchestrate their
@@ -118,6 +132,7 @@ to execute atomically.
 
 \subsection{Cuckoo Hashing} 
 \label{sec:cuckoo-back}
+\todo{Make sure to describe how a cuckoo path works}
 Cuckoo hashing uses two independent hash functions to assign
 keys a primary and secondary table location. When a key is
 inserted if its primary location is occupied the existing
