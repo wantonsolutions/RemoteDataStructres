@@ -46,7 +46,7 @@ def get_config():
 
 
     #maditory fields added to prevent breakage
-    config["description"] = "ATC'24 experiment"
+    config["description"] = "ATC24 experiment"
     config["name"] = "no name given"
     config["state_machine"] = "cuckoo"
     config['date']=datetime.datetime.now().strftime("%Y-%m-%d")

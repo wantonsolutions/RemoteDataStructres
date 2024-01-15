@@ -1,6 +1,6 @@
-from experiments import plot_cuckoo as plot_cuckoo
-from experiments import data_management as dm
-import experiments.orchestrator as orchestrator
+from cuckoo import plot_cuckoo as plot_cuckoo
+from cuckoo import data_management as dm
+import cuckoo.orchestrator as orchestrator
 import numpy as np
 import matplotlib.pyplot as plt
 import lib
@@ -14,11 +14,11 @@ def independent_search():
     locks_per_message = [1,2,4,8,16,32,64]
     # locks_per_message = [1]
     # locks_per_message = [1]
-    buckets_per_lock = 1
+    buckets_per_lock = 16
     configs = [
-        ("independent", "random", "ind_random"),
-        ("independent", "bfs", "ind_bfs"),
-        ("dependent", "random", "dep_random"),
+        # ("independent", "random", "ind_random"),
+        # ("independent", "bfs", "ind_bfs"),
+        # ("dependent", "random", "dep_random"),
         ("dependent", "bfs", "dep_bfs"),
     ]
     entry_size=8
@@ -36,7 +36,10 @@ def independent_search():
     config["prime_fill"]="85"
     config["max_fill"]="90"
     config["workload"]="ycsb-w"
-    config["num_clients"]=400
+    config["num_clients"]="320"
+    config["use_virtual_lock_table"]="false"
+    config["simulate_failures"]="false"
+
     # config["location_function"]="independent"
     # config["search_function"]="random"
     config["buckets_per_lock"] = str(buckets_per_lock)
@@ -68,6 +71,7 @@ def plot_round_trips_per_insert_operation():
         bfs_dir="data/dep_bfs"
         print("loading ind stats")
         ind_stats, dir = dm.load_statistics(dirname=ind_dir)
+        print(ind_stats)
         print("loading dep stats")
         dep_stats, dir = dm.load_statistics(dirname=dep_dir)
         print("loading bfs stats")
@@ -88,6 +92,13 @@ def plot_round_trips_per_insert_operation():
         dep_99_err= [1.6795664939458914, 0.4174385633905766, 0.3709775735580779, 0.3168660476608781, 0.2625183284137047, 0.23270803861983266, 0.24446079357693565]
         dep_50= [10.0, 8.0, 5.0, 5.0, 5.0, 5.0, 5.0]
         dep_50_err= [1.6795664939458914, 0.4174385633905766, 0.3709775735580779, 0.3168660476608781, 0.2625183284137047, 0.23270803861983266, 0.24446079357693565]
+
+        bfs_ind_99= [1400.0, 300.0, 195.0, 91.0, 91.0, 90.0, 90.0]
+        bfs_ind_99_err= [0.05643571842321897, 0.021736940995661473, 0.015328496953842325, 0.016637542933797766, 0.017181553194536087, 0.019327593169027695, 0.01589452059167094]
+        bfs_ind_50= [9.0, 7.0, 5.0, 5.0, 5.0, 4.0, 4.0]
+        bfs_ind_50_err= [0.05643571842321897, 0.021736940995661473, 0.015328496953842325, 0.016637542933797766, 0.017181553194536087, 0.019327593169027695, 0.01589452059167094]
+
+
         bfs_99= [140.0, 59.0, 53.0, 53.0, 54.0, 57.0, 58.0]
         bfs_99_err= [0.05643571842321897, 0.021736940995661473, 0.015328496953842325, 0.016637542933797766, 0.017181553194536087, 0.019327593169027695, 0.01589452059167094]
         bfs_50= [8.0, 6.0, 4.0, 4.0, 4.0, 4.0, 4.0]
@@ -133,9 +144,11 @@ def plot_round_trips_per_insert_operation():
 
     ax.plot(x_axis_vals,ind_99, color=write_steering_color, linestyle='--',marker='o')
     ax.plot(x_axis_vals,dep_99, color=default_clover_color, linestyle='--',marker='x')
+    ax.plot(x_axis_vals,bfs_ind_99, color=connection_color, linestyle='--',marker='^')
     ax.plot(x_axis_vals,bfs_99, color=read_write_steering_color, linestyle='--',marker='s')
     di = ax.plot(x_axis_vals,ind_50, label="dfs (independent)", color=write_steering_color, marker='o')
     dd = ax.plot(x_axis_vals,dep_50, label="dfs (dependent)",  color=default_clover_color, marker='x')
+    bi = ax.plot(x_axis_vals,bfs_ind_50, label= "bfs (independent)", color=connection_color, marker='^')
     bd = ax.plot(x_axis_vals,bfs_50, label="bfs (dependent)",  color=read_write_steering_color, marker='s')
 
     ax.legend()
@@ -173,8 +186,8 @@ def plot_round_trips_per_insert_operation():
 
 
     ax.set_ylabel("Round Trips")
-    legend_labels=["dfs (independent)","dfs (dependent)","bfs (dependent)","99th percentile","50th percentile"]
-    legend_lines=[di[0],dd[0],bd[0],dashed,solid]
+    legend_labels=["dfs (independent)","dfs (dependent)","bfs (independent)", "bfs (dependent)","99th percentile","50th percentile"]
+    legend_lines=[di[0],dd[0],bi[0], bd[0],dashed,solid]
     ax.legend(legend_lines,legend_labels, ncol=2, bbox_to_anchor=(0.15,1.02,1,0.2), loc='lower left', fontsize=8)
     # plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
 
@@ -182,5 +195,5 @@ def plot_round_trips_per_insert_operation():
     plt.tight_layout()
     plt.savefig("search_dependence.pdf")
 
-independent_search()
-# plot_round_trips_per_insert_operation()
+# independent_search()
+plot_round_trips_per_insert_operation()

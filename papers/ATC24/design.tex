@@ -760,7 +760,7 @@ grants exclusive permission to reclaim locks on a region of the index
 table. The index table is broken into $n$ regions so repairs can be
 executed in parallel.
 
-Figure~\ref{fig:lease-table-diagram} shows
+Figure~\ref{fig:lease} shows
 RCuckoo's lease table, maintained in RDMA-registered main memory on
 the server.  Lease entries contain the lease holder's queue pair ID
 (which RDMA ensures is unique for a given server), a set bit, and a
