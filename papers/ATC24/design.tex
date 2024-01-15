@@ -30,7 +30,7 @@ Figure~\ref{fig:table-diagram} shows RCuckoo's index and lock table
 (both maintained at the remote memory server) during an insertion of
 key $K$.  The index table (right) is a single region of
 RDMA-registered main memory divided into rows of fixed-width entries.
-Each row contains $n$ associative entries (3 in this figure) and
+Each row contains $n$ associative entries (3 in this figure, \todo{we use 8 in practice}) and
 terminates with an 8-bit version number and 64-bit CRC (that is
 computed over the entire row including version number).  Clients
 access the index table using 1-sided RDMA reads and writes; CRCs
@@ -48,7 +48,7 @@ simultaneously while avoiding false sharing.
 
 As shown at the bottom of the figure, Table entries contain either
 inlined key/value pairs which are used by default (and signified by a 0 MSB) or a key and 48-bit
-pointer to an extent entry for larger values.
+pointer to an extent entry for larger values.  \todo{We use 8-byte entries in our experiments, with 4-byte keys and 4-byte values.}
 %~\footnote{Inlined entries perform better on small key value pairs}.
 Extents are located in preallocated, per-client regions of server
 memory to avoid contention on inserts.
@@ -489,8 +489,9 @@ Figure~\ref{fig:locality-hashing}(c) shows that when filling the table
 to 95\% full, 95\% of insertions require cuckoo paths that span 32 or
 fewer rows while nearly 99\% span 256 or fewer.  This setting yields
 paths that will frequently fit within the rows returned by a covering
-read.
+read.  
 %
+\todo{I don't understand the independent lien---50\% have a span of 1?  Maybe remove for now?}
 
 %% Locality provides an additional opportunity to reduce round
 %% trips by reading additional buckets. If locks are close

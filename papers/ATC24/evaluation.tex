@@ -10,9 +10,9 @@ approach to client failure detection and recovery enables RCuckoo to
 sustain high throughput even though 100s of clients are failing per
 second.  Finally, we justify our design decisions through a series of
 micro-benchmarks. Specifically, we quantify the benefit RCuckoo
-extracts from its speculative search insert strategy and conduct
-sensitivity analyses of our choice of locality parameter, covering
-read threshold, and index-table entry size.
+extracts from its locality enhancement and speculative search strategy
+and conduct sensitivity analyses of our choice of locality parameter,
+covering read threshold, and index-table entry size.
 
 \input{implementation}
 
@@ -36,7 +36,7 @@ node. All machines have a single dual-socket ConnectX-5 attached to a
 sever as the memory server and the rest a client machines
 spreading threads evenly across machines.
 
-%\subsection{Comparision systems}
+%\subsection{Comparison systems}
 
 We compare RCuckoo against three recent RDMA key-value stores with
 different designs, FUSEE~\cite{fusee}, Clover~\cite{clover}, and
@@ -121,10 +121,10 @@ that is responsible for servicing allocation RPC calls from clients.
 As such, Sherman does not encounter the same bandwidth bottlenecks as
 the other systems because requests are partitioned across all
 machines in the cluster.
-%However, it assumes that colocated clients can resolve lock
-%contention locally and clients colocated with their segment
+%However, it assumes that collocated clients can resolve lock
+%contention locally and clients collocated with their segment
 %of the B-Tree can perform local operations. These
-%assumptions enable sherman to have high performance under
+%assumptions enable Sherman to have high performance under
 %contention even though it uses locks and manages a more
 %complex data structure than the unordered key-value stores.
 %While Sherman does not meet the fully disaggregated model it
@@ -138,10 +138,10 @@ machines in the cluster.
 \begin{figure*}[ht]
     \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill.pdf}
 
-    \caption{Insert and read performance as a
-    function of fill factor. \textbf{(a)} Throughput for four different workloads. \textbf{(b)}
-    Median operation latency, \textbf{(c)} average operation size, and \textbf{(d)}
-    average messages per operation under YCSB-A.}
+    \caption{Performance as a
+    function of fill factor. \textbf{(a)} Throughput for four different YCSB insert workloads, \textbf{(b)}
+    median operation latency, \textbf{(c)} mean operation size, and \textbf{(d)}
+    mean RDMA message count per operation under YCSB-A.}
 
     \label{fig:ycsb_fill}
 \end{figure*}
@@ -172,15 +172,13 @@ insert 90-M entries containing 32-bit keys and 32-bit values into a
 100-M-entry hash table.
 
 
-On YCSB-A RCuckoo tops out after approximately 160 clients due to lock
-contention on hot keys.  FUSEE's maximum performance is slightly lower
-due to its requirement for an additional round trip per operation (to
+On YCSB-A RCuckoo begins to surpass FUSEE after about 125 clients.  FUSEE's maximum performance is gated by its requirement for an additional round trip per operation (to
 retrieve the extent). Sherman keeps pace until about 5 MOPS at which
 point it suffers from lock contention due to its B-Tree structure.
 (Sherman and RCuckoo perform similarly for uniform workloads where
 lock contention is less of an issue.).  Clover performs the worst
-under write-heavy workloads due to the inability to effective leverage
-client-side caching of its constantly changing index structure.
+under write-heavy workloads due to its inability to effectively leverage
+client-side caching of a constantly changing index structure.
 
 On read-mostly and read-only workloads (YCSB-B and C)
 RCuckoo extracts even further benefit over FUSEE from its ability to
@@ -193,8 +191,8 @@ continues to bottleneck on lock contention in YCSB-B due to hot
 keys. While Sherman experiences no such bottleneck on YCSB-C its read
 algorithm is more complex than RCuckoo's leading to lower top-end
 performance. Clover performs similarly to FUSEE on YCSB-B, and is the
-most competitive with RCuckoo in read-only sceario.  When it is able
-to leverge its client index cache, Clover's reads are very similar to
+most competitive with RCuckoo in read-only scenario.  When it is able
+to leverage its client index cache, Clover's reads are very similar to
 RCuckoo in that they require only a single 1-sided RDMA read;  we
 suspect that with tuning Clover's read-only performance
 could be brought to par with RCuckoo.
@@ -206,13 +204,13 @@ could be brought to par with RCuckoo.
 %component. In this section
 Despite its complexity, RCuckoo's insert operation remains highly
 performant.  To evaluate insert performance we modify YCSB to perform
-inserts rather than updates.  Figure~\ref{fig:ycsb_fill}(a) plots
-RCuckoo's performance on workloads that use inserts rather than
-updates, for example in this instance YCSB-A is 50\% insert and 50\%
-read. YCSB-W is write only, i.e. 100\% insert workload.  Inserts become
+inserts rather than updates.  Figure~\ref{fig:ycsb_fill} considers
+RCuckoo's performance on workloads that exclusively use inserts (rather than
+updates), for example in this instance YCSB-A is 50\% insert and 50\%
+read. YCSB-W is write only, i.e. a 100\%-insert workload.  Inserts become
 more expensive as the table fills, so we report insert performance as
 a function of the table's fill factor.
-%%
+
 Figure~\ref{fig:ycsb_fill}(a) shows the aggregate throughput
 of 400 clients across four different workloads as a function
 of the table's fill factor.  As the index table fills,
@@ -238,12 +236,12 @@ as it requires an additional round trip.  Insert times vary:
 Clover and Sherman use two-sided RDMA operations for insert
 and both need to perform allocations and set up metadata for
 the requesting client.  FUSEE is slightly slower, roughly
-the same as RCuckoo's best-case.  As the table fills,
+the same as RCuckoo's best case.  As the table fills,
 however, cuckoo paths grow in length causing RCuckoo insert
 operations to require additional round trips to find valid
-cuckoo paths.  At maximum fell, insert operations take
-roughly twice as long as in an empty table. This rising cost
-is reflected by the increase in both bytes and messages per
+cuckoo paths.  At maximum fill, insert operations take
+roughly twice as long as in an empty table. This rising costs
+is reflected by the increase in both bytes (Figure~\ref{fig:ycsb_fill}(c)) and messages (Figure~\ref{fig:ycsb_fill}(d)) per
 operation.  RCuckoo reads, on the other hand, have roughly
 the same cost and performance regardless of fill factor.
 
@@ -271,7 +269,7 @@ entries are left in one of the inconsistent states listed in
 Section~\ref{sec:table-repair} and locks are left set.
 
 
-Figure~\ref{fig:failure_throughput} illustrates RCuckoos
+Figure~\ref{fig:failure_throughput} illustrates RCuckoo's
 ability to operate at high throughput in the face of
 failures. Lock granularity increases the probability that
 multiple clients will block on the same failed lock. Larger
@@ -285,54 +283,71 @@ thousands of failures per second while a server can only
 establish approximately 1.4~K RDMA connections per second
 using state of the art techniques~\cite{xrdma}.
 
-\subsection{Dependent hashing and search}
+\subsection{Microbenchmarks}
 
-\begin{figure}[ht]
+Having established RCuckoo's superiority over prior systems and
+demonstrated its robustness to client failure, we now evaluate the
+impact of particular design choices.
+
+\subsubsection{Locality enhancement}
+
+\begin{figure}[t]
     \includegraphics[width=0.99\linewidth]{fig/search_dependence.pdf}
 
-    \caption{ Search function performance with independent
-    and dependent hashing.}
+    \caption{Round trips per insert operation with independent
+    and dependent hashing.  (Note log-scale axes.)}
 
     \label{fig:search_dependence}
 \end{figure}
 
-Hash dependence and search function choice have the highest
-impact on RCuckoo's performance. Dependent hashing reduces
-the probability locks are scattered throughout the table
-which enables RCuckoo to combine lock requests into a few
-masked CAS messages. Simultaneously search function choice
-dramatically affects the length of cuckoo paths. BFS
-produces much shorter paths than
-DFS~\cite{cuckoo-improvements,pilaf,cuckoo}.
-Figure~\ref{fig:search_dependence} illustrates the effect of
-search function and dependent hashing on RCuckoo's inserts.
-We vary the number of locks per message to demonstrate the
-effect of path length and show why masked cas plays an
-important role in RCuckoo's performance. We measured both
-the median, and 99th percentile round trips per request on a
-table with 100M entries. We fille the table to 85\% and then
-executed insert operations to 95\%.
+%Hash dependence and search function choice have the highest
+%impact on RCuckoo's performance. Dependent hashing reduces
+%the probability locks are scattered throughout the table
+%which enables RCuckoo to combine lock requests into a few
+%masked CAS messages. Simultaneously search function choice
+%dramatically affects the length of cuckoo paths.
 
-DFS with no hash dependence has extremely poor performance
-at it's tail, taking over 2K round trips to complete. Both
-at it's median and 99th percentile it sees only small
-benefits from setting multiple locks per request as the
-locks are scattered throughout the table. DFS with
-dependence has far lower tail latency, and improves the
-number of locks which can be acquired per message, however
-it still constructs long rather than minimum length paths.
-BFS with dependence provides the best performance and gains
-the most from setting more locks per request. At 64 locks
-per request it has 7.5x lower round trips at it's 99th
-percentile and 4 rather than 5 round trips on average. We
-found that A* search provided the same minimal path length
-as DFS with slightly better locality. It's performance
-against BFS was only superior at fill factors above 95\% and
-lower elsewhere due to a higher runtime cost on short paths.
+Figure~\ref{fig:search_dependence} illustrates the dramatic benefit
+RCuckoo extracts from its dependent hashing combined with a BFS
+cuckoo-path search strategy.  To focus on longer cuckoo paths, we
+pre-fill a 100-M entry table to 85\% and then report both the median
+and 99th percentile number of round trips required to insert new
+key/value pairs until the table is 95\% full as a function of lock
+granularity.  While median performance is on the same order, the
+99th-percentile insert takes an order of magnitude fewer round trips
+with dependent hashing and BFS as opposed to independent hashing and
+DFS as used in prior cuckoo hash
+systems~\cite{cuckoo-improvements,pilaf,cuckoo}.  As before
+(c.f. Figure~\ref{fig:cuckoo-problems}), performance is similar with
+four or more locks per message.
+
+%% We vary the number of locks per message to demonstrate the
+%% effect of path length and show why masked cas plays an
+%% important role in RCuckoo's performance. We measured both
+%% the median, and 99th percentile round trips per request on a
+%% table with 100M entries. We fill the table to 85\% and then
+%% executed insert operations to 95\%.
+
+%% DFS with no hash dependence has extremely poor performance
+%% at it's tail, taking over 2K round trips to complete. Both
+%% at it's median and 99th percentile it sees only small
+%% benefits from setting multiple locks per request as the
+%% locks are scattered throughout the table. DFS with
+%% dependence has far lower tail latency, and improves the
+%% number of locks which can be acquired per message, however
+%% it still constructs long rather than minimum length paths.
+%% BFS with dependence provides the best performance and gains
+%% the most from setting more locks per request. At 64 locks
+%% per request it has 7.5x lower round trips at it's 99th
+%% percentile and 4 rather than 5 round trips on average. We
+%% found that A* search provided the same minimal path length
+%% as DFS with slightly better locality. It's performance
+%% against BFS was only superior at fill factors above 95\% and
+%% lower elsewhere due to a higher runtime cost on short paths.
 
 
 
-% Hash function locality hash a major impact in rcuckoo's
+% Hash function locality hash a major impact in RCuckoo's
 % performance.  Acquiring locks can only be done in a few
 % round trips when the locks are clustered together tightly in
 % the lock table.  Furthermore, the search function used to
@@ -346,12 +361,12 @@ lower elsewhere due to a higher runtime cost on short paths.
 % Figure~\ref{fig:search_dependence} shows the performance
 % improvements gained by both locality hashing and A* search.
 % In this experiment the table is filled from 0 to 90\% full
-% with a ycsb-w workload. We measure the 99th percentile of
+% with a YCSB-w workload. We measure the 99th percentile of
 % round trips for these workloads. Random search with
 % independent hashing leads to a large number of round trips
 % as locks are scattered throughout the table. RDMA masked CAS
 % operation do little here to reduce the round trips as they
-% can rarely aquire more than one lock in a round trip. With
+% can rarely acquire more than one lock in a round trip. With
 % dependent hashing and random search RDMA CAS operation are
 % almost sufficient to reduce round trips, however the absolute
 % number of locks required per insert is high which leads to
@@ -359,121 +374,10 @@ lower elsewhere due to a higher runtime cost on short paths.
 % cuckoo paths that are both short, and clustered together.
 
 
-\begin{figure*}[t]
-    \centering
-    \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/masked_cas_lock_size.pdf}
-    \end{subfigure}
-    \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/read_size.pdf}
-        % \label{fig:hash_factor}
-        % \caption{}
-    \end{subfigure}
-    \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/factor.pdf}
-        % \label{fig:hash_fill}
-        % \caption{}
-    \end{subfigure}.
-    \vspace{-1em}
-    \caption{
-    \textbf{(a)} Masked CAS vs Unmasked CAS throughput.
-    \textbf{(b)} Read threshold vs throughput.
-    \textbf{(c)} Exponential factor relation to max fill in cuckoo hash.
-    }
-    \label{fig:performance_breakdown}
+\subsubsection{Speculative search}
 
-\end{figure*}
-
-\subsubsection{Masked CAS}
-
-Under contention masked CAS operations provide a significant
-performance improvement. We measure it's benefit in terms of
-throughput by comparing it with default CAS. In the
-default case, when acquiring locks clients set the lock bits
-for the locks they require and set all other bits in the cas
-to 0. If the cas fails the current state of the lock table
-over that range is returned as a result to the client and
-the client tries to aquire their locks again using the
-updated state of the lock table. Masked compare and swaps
-are issued with the minimal mask required to set the locks.
-
-Figure~\ref{fig:performance_breakdown} shows the improvement
-gained by masked CAS. Default CAS operations perform better
-with fewer rows per lock, as the probability of a lock being
-set within the 64bit range is at its lowest. At higher rows
-per lock CAS suffers from failed lock acquisitions from both
-contested locks and due to a lack of synchronization. In
-contrast masked CAS sees an improvement when two rows per
-lock are used, as more second search attempts succeed, and
-only suffers from direct lock contention as the rows per
-lock increase.
-
-
-\subsection{Hash Function Factor $f$}
-
-Low hash factors $f$ have higher performance due to better
-locality at the tradeoff of their maximum fill factor. The
-relationship between $f$ and performance is nearly linear,
-while the relationship between $f$ and fill factor is
-exponential. Figure~\ref{fig:performance_breakdown}(c) shows
-the relationship between $f$, the max fill rate, and insert
-performance. These numbers were collected on an insert only
-workload with 100 million table entries. We choose an $f$ of
-2.3 in practice as it has the highest product of fill factor
-and throughput.
-
-\subsection{Read Threshold Performance}
-\label{sec:read_threshold}
-As described in section ~\ref{sec:reading} rcuckoo uses a
-read threshold to capture both hash locations if the
-locations are within a defined read threshold.
-Figure~\ref{fig:performance_breakdown}(b) shows the
-performance gains from increasing the read threshold. Here
-each row is 64 bytes so our minimum threshold of 64 ensures
-two packets are issued for each read request. We limit the
-number of clients to 40 so that their is plenty of bandwidth
-to support the inflated reads. Higher read thresholds trade
-off network bandwidth for operation latency. When bandwidth
-is plentiful large windows can improve throughput but up to
-8\%.
-
-% \begin{figure}[ht]
-%     \includegraphics[width=0.99\linewidth]{fig/read_size.pdf}
-%     \caption{Read Threshold vs Throughput}
-%     \label{fig:read_threshold}
-% \end{figure}
-
-
-\subsection{Entry Size}
-\begin{figure}[ht]
-    \includegraphics[width=0.99\linewidth]{fig/entry_size.pdf}
-    \caption{Throughput vs KV entry size}
-    \label{fig:entry_size}
-\end{figure}
-
-Key value pairs embedded directly in the index enable single
-round trip reads, at the cost of inflating the bandwidth of
-operations. We run a 50\% read 50\% insert and a read only
-workload to illustrate the overhead of larger entries.
-Figure~\ref{fig:entry_size} shows the effect of key value
-pair size on operation throughput. Insert quickly saturates
-the network bandwidth. At 16 byte KV entries the network
-bandwidth is fully absorbed at 8MOPS. Reads which have lower
-bandwidth requirements see very little chance in throughput
-across entry sizes. We suggest that known read heavy
-workloads should use inlined entries as reads see a large
-boost in performance. Update operations are similarly
-unaffected by entry size up to 64 bytes. 
-
-% Our design choice
-% in embedding KV pairs is motivated by networking trends
-% which suggest that 800 GBPS and higher network speeds will
-% be available in the coming years. While round trip latency
-% is expected to remain largely the same.
-
-\subsection{Search Success}
 \label{sec:search_success}
-\begin{figure}[ht]
+\begin{figure}[t]
     \includegraphics[width=0.99\linewidth]{fig/search_success_lock_size.pdf}
     \caption{Failure rate of search algorithms vs lock size under high contention}
     \label{fig:search_success}
@@ -499,6 +403,143 @@ granularity grows the frequency of second search success
 drops dramatically. At 64 rows per lock our second search
 succeeds 95\% of the time even when the cached search fails
 at a rate of 99\% per insert.
+
+
+\begin{figure*}[t]
+    \centering
+%    \begin{subfigure}{0.3\linewidth}
+%        \includegraphics[width=0.99\linewidth]{fig/masked_cas_lock_size.pdf}
+%    \end{subfigure}
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/factor.pdf}
+        % \label{fig:hash_fill}
+        % \caption{}
+    \end{subfigure}
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/read_size.pdf}
+        % \label{fig:hash_factor}
+        % \caption{}
+    \end{subfigure}
+    %\begin{figure}[ht]
+    \begin{subfigure}{0.3\linewidth}
+      \includegraphics[width=0.99\linewidth]{fig/entry_size.pdf}
+          \end{subfigure}
+%    \caption{Throughput vs KV entry size}
+
+%\end{figure}
+    \vspace{-1em}
+    \caption{RCuckoo parameter sweeps:
+      \textbf{(a)} Throughput and max fill vs locality factor,
+          \textbf{(b)} throughput vs read threshold, and 
+    \textbf{(c)} throughput vs key/value entry size.
+    }
+    \label{fig:performance_breakdown}
+             \label{fig:entry_size}
+\end{figure*}
+
+%% \subsubsection{Masked CAS}
+
+%% Under contention masked CAS operations provide a significant
+%% performance improvement. We measure it's benefit in terms of
+%% throughput by comparing it with default CAS. In the
+%% default case, when acquiring locks clients set the lock bits
+%% for the locks they require and set all other bits in the cas
+%% to 0. If the cas fails the current state of the lock table
+%% over that range is returned as a result to the client and
+%% the client tries to acquire their locks again using the
+%% updated state of the lock table. Masked compare and swaps
+%% are issued with the minimal mask required to set the locks.
+
+%% Figure~\ref{fig:performance_breakdown} shows the improvement
+%% gained by masked CAS. Default CAS operations perform better
+%% with fewer rows per lock, as the probability of a lock being
+%% set within the 64bit range is at its lowest. At higher rows
+%% per lock CAS suffers from failed lock acquisitions from both
+%% contested locks and due to a lack of synchronization. In
+%% contrast masked CAS sees an improvement when two rows per
+%% lock are used, as more second search attempts succeed, and
+%% only suffers from direct lock contention as the rows per
+%% lock increase.
+
+
+\subsection{Parameter sweeps}
+
+Figure~\ref{fig:performance_breakdown} plots the sensitivity of
+RCuckoo performance to various parameter settings.
+
+\textbf{Locality factor.}  The left-most graph shows that lower hash
+factors $f$ deliver higher performance (plotted against the left axis)
+due to better locality at the cost of lower expected maximum fill
+factors (right axis).
+%the tradeoff of their maximum fill factor. The
+%relationship between $f$ and performance is nearly linear, while the
+%relationship between $f$ and fill factor is
+%exponential. Figure~\ref{fig:performance_breakdown}(c) shows the
+%relationship between $f$, the max fill rate, and insert
+%performance. These numbers were collected on an
+This experiment consists of an insert-only workload (YCSB-W)
+on a 100-M entry table. We choose an $f$ of 2.3 in practice as
+it has the highest product of fill factor and throughput.
+\todo{Section 4 says we use an f of 2.1?}
+
+\textbf{Read threshold.}
+\label{sec:read_threshold}
+As described in Section~\ref{sec:reading} RCuckoo issues a covering
+read if both key locations are within a defined threshold (128 bytes
+in our experiments) of each other.
+Figure~\ref{fig:performance_breakdown}(b) shows that performance
+increases with larger thresholds, but at the cost of additional
+bandwidth consumption.  In this experiment, only 40 clients
+access a table with 64-byte rows, so they do not exhaust link bandwidth even with a 4-KB covering read, but performance levels off after 2 KB.
+%% performance gains from increasing the read threshold. Here
+%% each row is 64 bytes so our minimum threshold of 64 ensures
+%% two packets are issued for each read request. We limit the
+%% number of clients to 40 so that their is plenty of bandwidth
+%% to support the inflated reads. Higher read thresholds trade
+%% off network bandwidth for operation latency. 
+Under these conditions, if bandwidth is plentiful larger (i.e., 2-KB
+vs 128-B) covering reads can improve throughput, but only modestly.
+%8\%.
+
+% \begin{figure}[ht]
+%     \includegraphics[width=0.99\linewidth]{fig/read_size.pdf}
+%     \caption{Read Threshold vs Throughput}
+%     \label{fig:read_threshold}
+% \end{figure}
+
+
+\textbf{Entry size.}  Inlined key/value entries enable RCuckoo's
+single-round-trip reads, so the larger the entries, the fewer values
+that require a second round trip.  However, for a fixed row size,
+larger entries imply fewer entries per row, increasing cuckoo path
+lengths (when measured in terms of rows), impacting insert performance.
+%% but larger values must be stored in extents.  
+%% at the cost of inflating the bandwidth of
+%% operations. We run a 50\% read 50\% insert and a read only
+%% workload to illustrate the overhead of larger entries.
+Figure~\ref{fig:entry_size}(c) shows the effect of entry size on
+operation throughput under YCSB-A. Insert is a bandwidth-limited
+operation;
+%quickly saturates
+%the network bandwidth. At
+at 16-B entries link capacity restricts throughput to 8 MOPS. The
+performance of reads (and updates/deletes, not shown), on the other
+hand, are largely unaffected by entry size.  Hence,
+%which have lower
+%bandwidth requirements see very little chance in throughput
+%across entry sizes. We suggest that known read heavy
+%workloads should use inlined entries as reads see a large
+installations serving read-heavy workloads may wish to favor larger entry sizes.
+%
+%boost in performance. Update operations are similarly
+%unaffected by entry size up to 64 bytes. 
+
+% Our design choice
+% in embedding KV pairs is motivated by networking trends
+% which suggest that 800 GBPS and higher network speeds will
+% be available in the coming years. While round trip latency
+% is expected to remain largely the same.
+
 
 
 
