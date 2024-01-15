@@ -38,12 +38,12 @@ spreading threads evenly across machines.
 
 %\subsection{Comparison systems}
 
-We compare RCuckoo against three recent RDMA key-value stores with
+We compare RCuckoo against three recent RDMA key/value stores with
 different designs, FUSEE~\cite{fusee}, Clover~\cite{clover}, and
 Sherman~\cite{sherman}.  While none have the exact same assumptions or
 feature set as RCuckoo, each represents an apt comparison point for
-different aspects.  To avoid biasing our evaluation, we use the same
-workloads (YCSB) as the previous efforts.
+different aspects.  To avoid biasing our evaluation, we consider the same
+workloads (YCSB) as the authors of the previous systems.
 %
 %We directly compare RCuckoo against three disaggregated
 %key-value stores  Each system has distinct design
@@ -57,7 +57,7 @@ represents the closest available comparison point to RCuckoo.  While
 both employ only 1-sided RDMA operations, FUSEE eschews locking in
 favor of optimistic insertions.  FUSEE clients use CAS operations
 to manage fixed, 64-bit index table entries that contain pointers to
-values stores in extents.  Due to its reliance on CAS operations, FUSEE is unable to support inlined storage of small
+values stored in extents.  Due to its reliance on CAS operations, FUSEE is unable to support inlined storage of small
 values like RCuckoo, forcing all reads to require two round trips.
 %Fusee is the closest comparison we have to illustrate
 %the tradeoffs between locks and optimistic concurrency.
@@ -159,18 +159,18 @@ machines in the cluster.
 We start by considering the classical YCSB workloads which employ
 varying mixes of read and update operations before turning to the more
 complex insert operation.  RCuckoo delivers the highest performance
-across all settings, while the others each shine on different
+across all settings, while the other systems each shine on different
 mixes.
 \todo{What is the row/read size?  How close are we to line rate?}
 
-\textbf{YCSB:}
-Figure~\ref{fig:ycsb_throughput} shows throughput in terms of
-operations per second for RCuckoo, FUSEE, Sherman, and Clover on
-three different YCSB workloads with a Zipf(0.99) distribution. YCSB-A
-is a 50\% read 50\% update, YCSB-B is 95\% read and 5\% update, and
-YCSB-C is 100\% read.  In each experiment a variable number of clients
-insert 90-M entries containing 32-bit keys and 32-bit values into a
-100-M-entry hash table.
+\textbf{YCSB:} Figure~\ref{fig:ycsb_throughput} shows throughput in
+terms of operations per second for RCuckoo, FUSEE, Sherman, and Clover
+on three different YCSB workloads. YCSB-A is a 50\% read 50\% update,
+YCSB-B is 95\% read and 5\% update, and YCSB-C is 100\% read.  In each
+experiment a variable number of clients access 90~M entries according
+to a Zipf(0.99) distribution, where each entry consits of a 32-bit key
+alongside an inlined 32-bit value.  All entries are stored in a table
+with a total capacity of 100~M entires.
 
 
 On YCSB-A RCuckoo begins to surpass FUSEE after about 125 clients.  FUSEE's maximum performance is gated by its requirement for an additional round trip per operation (to
