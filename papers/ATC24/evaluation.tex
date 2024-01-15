@@ -156,22 +156,22 @@ machines in the cluster.
 
 \subsection{Performance}
 
-We start by considering the classical YCSB workloads which employ
-varying mixes of read and update operations before turning to the more
-complex insert operation.  RCuckoo delivers the highest performance
-across all settings, while the other systems each shine on different
-mixes.
-\todo{What is the row/read size?  How close are we to line rate?}
+We start by considering throughput and latency on the classical YCSB
+workloads which employ varying mixes of read and update operations
+before turning to the more complex insert operation.  RCuckoo delivers
+the highest performance on reads and updates across all settings,
+while insert performance varies as a function of table fill factor.  \todo{What is
+  the row/read size?  How close are we to line rate?}
 
-\textbf{YCSB:} Figure~\ref{fig:ycsb_throughput} shows throughput in
+\textbf{Throughput.} Figure~\ref{fig:ycsb_throughput} shows throughput in
 terms of operations per second for RCuckoo, FUSEE, Sherman, and Clover
 on three different YCSB workloads. YCSB-A is a 50\% read 50\% update,
-YCSB-B is 95\% read and 5\% update, and YCSB-C is 100\% read.  In each
-experiment a variable number of clients access 90~M entries according
-to a Zipf(0.99) distribution, where each entry consits of a 32-bit key
-alongside an inlined 32-bit value.  All entries are stored in a table
-with a total capacity of 100~M entires.
-
+YCSB-B is 95\% read and 5\% update, and YCSB-C is 100\% read.  For
+each system, we provision a 100-M-entry table and prepopulate it with
+90~M entries that each consist of a 32-bit key and 32-bit value
+(inlined in the case of RCuckoo).  We plot the performance of a
+variable number of clients concurrently accessing entries according to
+a Zipf(0.99) distribution.
 
 On YCSB-A RCuckoo begins to surpass FUSEE after about 125 clients.  FUSEE's maximum performance is gated by its requirement for an additional round trip per operation (to
 retrieve the extent). Sherman keeps pace until about 5 MOPS at which
@@ -181,24 +181,23 @@ lock contention is less of an issue.).  Clover performs the worst
 under write-heavy workloads due to its inability to effectively leverage
 client-side caching of a constantly changing index structure.
 
-On read-mostly and read-only workloads (YCSB-B and C)
-RCuckoo extracts even further benefit over FUSEE from its ability to
-complete read in a single round trip rather than two and gains
-additional benefit by collapsing most reads into a single packet
-(Section~\ref{sec:read_threshold}).  Sherman performs well on
-read-mostly workloads as it can directly read from the B-Tree in a
-single round trip without the need for pointer chasing, but it
+On read-mostly (YCSB-B) and read-only (YCSB-C) workloads RCuckoo
+extracts even further benefit from its ability to complete
+reads in a single round trip by collapsing most reads into a single
+RDMA request (Section~\ref{sec:read_threshold}).  Sherman performs
+well on read-mostly workloads as it can directly read from the B-Tree
+in a single round trip without the need for pointer chasing, but it
 continues to bottleneck on lock contention in YCSB-B due to hot
 keys. While Sherman experiences no such bottleneck on YCSB-C its read
 algorithm is more complex than RCuckoo's leading to lower top-end
 performance. Clover performs similarly to FUSEE on YCSB-B, and is the
 most competitive with RCuckoo in read-only scenario.  When it is able
 to leverage its client index cache, Clover's reads are very similar to
-RCuckoo in that they require only a single 1-sided RDMA read;  we
-suspect that with tuning Clover's read-only performance
-could be brought to par with RCuckoo.
+RCuckoo in that they require only a single 1-sided RDMA read; we
+suspect that with tuning Clover's read-only performance could be
+brought to par with RCuckoo.
 
-\textbf{Inserts:}
+\textbf{Inserts.}
 %%
 %By default YCSB-A,B,C use updates. RCuckoo's insert
 %algorithm is it's most complex and bandwidth intensive
@@ -209,23 +208,25 @@ inserts rather than updates.  Figure~\ref{fig:ycsb_fill} considers
 RCuckoo's performance on workloads that exclusively use inserts (rather than
 updates), for example in this instance YCSB-A is 50\% insert and 50\%
 read. YCSB-W is write only, i.e. a 100\%-insert workload.  Inserts become
-more expensive as the table fills, so we report insert performance as
-a function of the table's fill factor.
+more expensive as the table fills, so we prepopulate the table with a varying number of entries and report insert performance as
+a function of the table's initial fill factor.
+\todo{HOw long/how many inserts are performed?}
 
-Figure~\ref{fig:ycsb_fill}(a) shows the aggregate throughput
-of 400 clients across four different workloads as a function
-of the table's fill factor.  As the index table fills,
-cuckoo paths become longer leading to increased contention
-and additional bandwidth consumption from larger covering
-reads. In each case (except YCSB-C) RCuckoo's performance
-declines with fill factor. In the insert-only YCSB-W case
-RCuckoo's performance drops from 11.5 to 4.5 MOPS.  As a
-point of comparison, FUSEE's maximum insert-only performance
-is 9.1 MOPS on our testbed, although it is independent of
-fill factor.  While FUSEE out-performs RCuckoo at high fill
-factors, we observe that an insert-only workload is uncommon
-in practice~\cite{facebook-memcached}.
+Figure~\ref{fig:ycsb_fill}(a) shows the aggregate throughput of 400
+clients across four different workloads as a function of the table's
+fill factor.  As the index table fills, cuckoo paths become longer
+leading to increased contention and additional bandwidth consumption
+from larger covering reads. In each case (except read-only YCSB-C)
+RCuckoo's performance declines with fill factor. In the insert-only
+YCSB-W case RCuckoo's performance drops from a high of 11.5 MOPS in a
+nearly empty table to 4.5 MOPS at a 90\% fill factor.  As a point of
+comparison, FUSEE's maximum insert-only performance is 9.1 MOPS on our
+testbed, although it is independent of fill factor.  While FUSEE
+out-performs RCuckoo at high fill factors, we observe that 
+insert-only workloads are rare in
+practice~\cite{facebook-memcached}.
 
+\textbf{Latency and overhead.}
 We plot operation latency, size, and message counts (in
 terms of RDMA packets) as a function of fill factor in
 Figure~\ref{fig:ycsb_fill}(b--d).  For comparison, we report
@@ -241,7 +242,7 @@ the same as RCuckoo's best case.  As the table fills,
 however, cuckoo paths grow in length causing RCuckoo insert
 operations to require additional round trips to find valid
 cuckoo paths.  At maximum fill, insert operations take
-roughly twice as long as in an empty table. This rising costs
+roughly twice as long as in an empty table. This rising cost
 is reflected by the increase in both bytes (Figure~\ref{fig:ycsb_fill}(c)) and messages (Figure~\ref{fig:ycsb_fill}(d)) per
 operation.  RCuckoo reads, on the other hand, have roughly
 the same cost and performance regardless of fill factor.
