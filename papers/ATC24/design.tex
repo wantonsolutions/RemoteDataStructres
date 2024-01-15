@@ -81,31 +81,17 @@ exchanges.
 \label{sec:reading}
 
 
-<<<<<<< HEAD
-RCuckoo is designed to facilitate lock-less, single
-round-trip reads for small values as they are the dominant
-operation for key/value stores in data
-centers~\cite{rocks-db-workload,facebook-memcached}. To read
-the value associated with a given key clients calculate the
-potential table locations for the key's entry (using the
-hash functions described in the next section) and issue RDMA
-reads for both rows simultaneously.  Because all operations
-between a client and a given server travel over a reliable
-connection, they are intrinsically ordered, but in our
-description we will only call out when a particular ordering
-among a batch of messages is required.
-=======
-RCuckoo is designed to facilitate lock-free, single round-trip reads for small values as
-they are the dominant operation for key/value stores in data
-centers~\cite{facebook-memcached,rocks-db-workload}. To read the value associated with a
-given key clients calculate the potential table locations for the
-key's entry (using the hash functions described in the next subsection)
-and issue RDMA reads for both rows simultaneously.  Because all
-operations between a client and a given server travel over a reliable
-connection, they are intrinsically ordered, but in our description we
-will only call out when a particular ordering among a batch of
-messages is required.
->>>>>>> ecf59fd77476896f8a501ad4dc060796891fff18
+RCuckoo is designed to facilitate lock-free, single round-trip reads
+for small values as they are the dominant operation for key/value
+stores in data centers~\cite{facebook-memcached,rocks-db-workload}. To
+read the value associated with a given key clients calculate the
+potential table locations for the key's entry (using the hash
+functions described in the next subsection) and issue RDMA reads for
+both rows simultaneously.  Because all operations between a client and
+a given server travel over a reliable connection, they are
+intrinsically ordered, but in our description we will only call out
+when a particular ordering among a batch of messages is required.
+
 
 Moreover, as we discuss below, if the rows are
 located sufficiently close together, it can be beneficial for the
@@ -145,17 +131,6 @@ trip to retrieve the extent.
 
 \subsubsection{Updates and deletes}
 
-<<<<<<< HEAD
-Updates and deletes, like reads, access only two locations
-in the index table, but require a client to acquire the
-associated locks.  Due to RCuckoo's locality enhancement, it
-is usually possible to attempt to acquire both locks in a
-single MCAS operation (Section~\ref{sec:locking}).  If so,
-the client issues read(s) for the corresponding rows of the
-index table immediately afterwards but in the same batch of
-operations.  (In the rare case that the locks must be
-acquired independently---necessitating an additional round
-=======
 Updates and deletes, like reads, access only two locations in the
 index table, but require a client to acquire the associated locks.
 Due to RCuckoo's locality enhancement, it is usually possible to attempt
@@ -165,7 +140,6 @@ corresponding rows of the index table immediately afterwards but in
 the same batch of operations\footnote{Because the lock table is located in NIC memory, RCuckoo clients can employ \texttt{SEND\_FENCE} on covering
 reads batched with lock acquisitions to ensure consistency without incurring a performance penalty.}.  (In the rare case that the locks must
 be acquired independently---necessitating an additional round
->>>>>>> ecf59fd77476896f8a501ad4dc060796891fff18
 trip---the reads are batched with the second lock request.)
 
 Assuming
@@ -740,16 +714,6 @@ of 50$~\mu$s.
 \subsection{Repair leases}
 %\todo{mention repair lease table}
 
-\begin{figure}[t]
-  \vskip -1em
-    \centering
-        \includegraphics[width=0.99\linewidth]{fig/lease.pdf}
-    \vspace{-1em}
-    \caption{Bit layout of a repair lease}
-    \label{fig:lease}
-
-\end{figure}
-
 RCuckoo recovers stranded locks one lock at a time; if a client fails
 holding multiple locks recovery may be conducted by multiple clients
 at different times depending on their access patterns.  RCuckoo's lock
@@ -760,7 +724,17 @@ grants exclusive permission to reclaim locks on a region of the index
 table. The index table is broken into $n$ regions so repairs can be
 executed in parallel.
 
-Figure~\ref{fig:lease-table-diagram} shows
+\begin{figure}[t]
+%  \vskip -1em
+    \centering
+        \includegraphics[width=0.99\linewidth]{fig/lease.pdf}
+ %   \vspace{-1em}
+    \caption{Format of a repair lease table entry}
+    \label{fig:lease}
+   \vspace{-1em}
+\end{figure}
+
+Figure~\ref{fig:lease} shows the format for entries in
 RCuckoo's lease table, maintained in RDMA-registered main memory on
 the server.  Lease entries contain the lease holder's queue pair ID
 (which RDMA ensures is unique for a given server), a set bit, and a
