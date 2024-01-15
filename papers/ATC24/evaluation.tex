@@ -462,7 +462,7 @@ at a rate of 99\% per insert.
 %% lock increase.
 
 
-\subsection{Parameter sweeps}
+\subsubsection{Parameter sweeps}
 
 Figure~\ref{fig:performance_breakdown} plots the sensitivity of
 RCuckoo performance to various parameter settings.
@@ -484,7 +484,8 @@ it has the highest product of fill factor and throughput.
 
 \textbf{Read threshold.}
 \label{sec:read_threshold}
-As described in Section~\ref{sec:reading} RCuckoo issues a covering
+%As described in Section~\ref{sec:reading}
+RCuckoo issues a covering
 read if both key locations are within a defined threshold (128 bytes
 in our experiments) of each other.
 Figure~\ref{fig:performance_breakdown}(b) shows that performance
@@ -529,7 +530,8 @@ hand, are largely unaffected by entry size.  Hence,
 %bandwidth requirements see very little chance in throughput
 %across entry sizes. We suggest that known read heavy
 %workloads should use inlined entries as reads see a large
-installations serving read-heavy workloads may wish to favor larger entry sizes.
+installations serving read-heavy workloads may wish to employ larger
+entry sizes.
 %
 %boost in performance. Update operations are similarly
 %unaffected by entry size up to 64 bytes. 
