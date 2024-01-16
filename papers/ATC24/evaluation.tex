@@ -89,7 +89,7 @@ FUSEE---and similar to RCuckoo---Clover reads are self verifying.
 %Clover uses index caching to optimize reads.  When re-reading key-value
 %entries clover can as it directly
 %reads the entry without negotiating with the index.
-In contrast to prior Clover comparisons~\cite{fusee} that force
+In contrast to prior comparisons~\cite{fusee} that force
 clients to consult the metadata server on each read, we allow Clover
 to take advantage of its client caching to achieve maximum performance
 on read-heavy workloads.
@@ -197,11 +197,11 @@ regardless of the distribution, leading to the highest performance.
 Absolute performance for all systems decreases with increasing update
 rate due to contention.  Even with only 5\% updates (YCSB-B), the
 picture changes dramatically.  Sherman performs well at low levels of
-concurrency due to its single-round-trip-reads, but it hits a severe
-bottleneck due to lock contention in YCSB-B.  (Sherman performance is
+concurrency due to its single-round-trip-reads, but hits a severe
+bottleneck due to lock contention on the skewed access pattern.  (Sherman performance is
 improves---but does not surpass RCuckoo---for uniform workloads, not
 shown, where lock contention is less of an issue.)
-Caching is less effective with updates, bringing Clover's throughput inline with FUSEE.
+Caching is less effective with updates, bringing Clover's throughput in line with FUSEE.
 %performs similarly to FUSEE on YCSB-B; we
 %suspect that with tuning Clover's read-only performance could be
 %brought to par with RCuckoo.
