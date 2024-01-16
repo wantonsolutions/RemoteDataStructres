@@ -3,6 +3,7 @@ import sys
 # sys.path.insert(1, '/home/ena/RemoteDataStructres/rmem_simulator')
 from experiments import plot_cuckoo as pc
 from experiments import data_management as dm
+import lib
 
 #commit 102f229f5096df69810e274e54a86eb24e913af4 
 #is good for taking data for this experiment
@@ -134,7 +135,9 @@ def plot_static_hash_fill():
     x_labels = [str(f[0]) for f in max_fill]
     x = [ v[0] for v in max_fill]
     y = [ v[1] for v in max_fill]
-    ax.bar(x,y,width=0.15, edgecolor='black')
+    barlist=ax.bar(x,y,width=0.15, edgecolor='black', color=lib.fusee_color)
+    barlist[3].set_color(lib.rcuckoo_color)
+    barlist[3].set_edgecolor('black')
     # fill = ax.plot(x,y, label="max fill", color="black", linestyle="--")
     ax.set_xticks(x, x_labels)
     ax.grid(True, axis='y', linestyle=':')
