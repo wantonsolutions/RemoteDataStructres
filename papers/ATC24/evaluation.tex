@@ -84,7 +84,7 @@ designed to leverage remote persistent memory and implements both
 reads and updates using one-sided RDMA operations.  Moreover, unlike
 FUSEE---and similar to RCuckoo---Clover reads are self verifying.
 %Clover uses index caching to optimize reads.  When re-reading key-value
-%entires clover can as it directly
+%entries clover can as it directly
 %reads the entry without negotiating with the index.
 In contrast to prior Clover comparisons~\cite{fusee} that force
 clients to consult the metadata server on each read, we allow Clover
@@ -163,8 +163,11 @@ We start by considering throughput and latency on the classical YCSB
 workloads which employ varying mixes of read and update operations
 before turning to the more complex insert operation.  RCuckoo delivers
 the highest performance on reads and updates across all settings,
-while insert performance varies as a function of table fill factor.  \todo{What is
-  the row/read size?  How close are we to line rate?}
+while insert performance varies as a function of table fill factor.
+Even in the worst case, however, RCuckoo limits I/O amplification to
+around 2$\times$.
+\todo{What is the row/read size?  How close are we
+  to line rate?}
 
 \textbf{Throughput.} Figure~\ref{fig:ycsb_throughput} shows throughput in
 terms of operations per second for RCuckoo, FUSEE, Sherman, and Clover
@@ -246,7 +249,7 @@ updates), for example in this instance YCSB-A is 50\% insert and 50\%
 read. YCSB-W is write only, i.e. a 100\%-insert workload.  Inserts become
 more expensive as the table fills, so we prepopulate the table with a varying number of entries and report insert performance as
 a function of the table's initial fill factor.
-\todo{HOw long/how many inserts are performed?}
+\todo{How long/how many inserts are performed?}
 
 Figure~\ref{fig:ycsb_fill}(a) shows the aggregate throughput of 400
 clients across four different workloads as a function of the table's
@@ -278,9 +281,9 @@ the same as RCuckoo's best case.  As the table fills,
 however, cuckoo paths grow in length causing RCuckoo insert
 operations to require additional round trips to find valid
 cuckoo paths.  At maximum fill, insert operations take
-roughly twice as long as in an empty table. This rising cost
+roughly twice as long as in an empty table. This I/O amplification
 is reflected by the increase in both bytes (Figure~\ref{fig:ycsb_fill}(c)) and messages (Figure~\ref{fig:ycsb_fill}(d)) per
-operation.  RCuckoo reads, on the other hand, have roughly
+operation.  Reads, on the other hand, have roughly
 the same cost and performance regardless of fill factor.
 
 
@@ -319,7 +322,7 @@ Figure~\ref{fig:microbenchmarks}(a) shows that
 throughput remains high until about 500 client failures per second, at
 which point lock granularity begins to play a significant role;
 finer-grained locks are easier to recover leading to less throughput
-degredation.
+degradation.
 %locks have little difference when failures are semi-frequent
 %and have a larger impact as hundred of failures occur per
 %second.  The performance impact of a few number of failures
@@ -360,7 +363,7 @@ impact of particular design choices.
 Figure~\ref{fig:microbenchmarks}(b) illustrates the dramatic benefit
 RCuckoo extracts from its dependent hashing combined with a BFS
 cuckoo-path search strategy.  To focus on longer cuckoo paths, we
-pre-fill a 100-M entry table to 85\% and then report both the median
+prepopulate a 100-M entry table to 85\% and then report both the median
 and 99th percentile number of round trips required to insert new
 key/value pairs until the table is 95\% full as a function of lock
 granularity.  While median performance is on the same order, the

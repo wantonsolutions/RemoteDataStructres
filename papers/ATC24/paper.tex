@@ -115,14 +115,14 @@ single round-trip reads of small values while updates and deletes
 require only two.  We introduce locality-enhancing dependent hashing
 that allows us to adjust the expected distance between a key's
 potential table locations, dramatically improving insert performance
-compared to prior cuckoo-hashing approaches while maintaining
-practical (90\%+) maximum fill factors.  We show that not only do
-RCuckoo reads outperform all existing state-of-the-art RDMA-based
-key/value stores on our testbed, but under contention RCuckoo delivers up to
-1.4--10$\times$ greater throughput than comparison systems on standard
-YCSB workloads.  Moreover, RCuckoo's lease-based locking mechanism
-enables it to maintain high throughout in the face of 100s of
-client failures per second.
+compared to prior cuckoo-hashing approaches while limiting I/O
+amplification and maintaining practical maximum fill factors.  We show
+that not only do RCuckoo reads outperform all existing
+state-of-the-art RDMA-based key/value stores on our testbed, but under
+contention RCuckoo delivers up to 1.4--10$\times$ greater throughput
+than comparison systems on standard YCSB workloads.  Moreover,
+RCuckoo's lease-based locking mechanism enables it to gracefully
+recover from 100s of client failures per second.
 
 %% lock based cuckoo hash. Prior work avoids locks in favor of optimistic
 %% concurrency as locks can have large critical sections and complex
@@ -140,11 +140,11 @@ client failures per second.
 % strategies can perform better than state of the art
 % optimistic concurrency algorithms. We demonstrate this
 % through the design of a remote memory key value store based
-% on cuckoo hashing. Our cuckoo hashing algorithm (rcuckoo)uses dependent,
+% on cuckoo hashing. Our cuckoo hashing algorithm (RCuckoo)uses dependent,
 % rather than independent hash functions to increase the
 % probability that both hashes of a key will be
 % close in the hash table. This locality enables fast lock
-% acquisition and release. We demonstrate that rcuckoo
+% acquisition and release. We demonstrate that RCuckoo
 % outperforms optimistic concurrency algorithms by 2x in
 % terms of throughput and up to a 2x improvement on read
 % latency.
