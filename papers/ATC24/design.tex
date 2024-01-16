@@ -24,27 +24,25 @@ to the hashing function, see Section~\ref{sec:dephash}).
     \includegraphics[width=0.99\linewidth]{fig/table-diagram.pdf}
     \caption{RCuckoo's datastructures showing an insert of the key $K$ as it displaces $C$.}
     \label{fig:table-diagram}
+    \vskip -1em
 \end{figure}
 
-Figure~\ref{fig:table-diagram} shows RCuckoo's index and
-lock table (both maintained at the remote memory server)
-during an insertion of key $K$.  The index table (right) is
-a single region of RDMA-registered main memory divided into
-rows of fixed-width entries.  Each row contains $n$
-associative entries (3 in this figure, we use 8 in practice)
-and terminates with an 8-bit version number and 64-bit CRC
-(that is computed over the entire row including version
-number).  Clients access the index table using 1-sided RDMA
-reads and writes; CRCs facilitate lock-free reads as each
-row can be self-verified while version numbers enable
-clients to detect if a row has been modified.  Locks (stored
-in a bit vector in NIC memory, shown on the left) each
-protect a tunable number (here, two) of index rows.  Clients
-perform lock acquisition and release with RDMA
-compare-and-swap (CAS) operations.  Specifically, RCuckoo
-leverages masked CAS (MCAS)
-operations~\cite{rdma-masked-cas,sherman} to obtain multiple
-locks simultaneously while avoiding false sharing.
+Figure~\ref{fig:table-diagram} shows RCuckoo's index and lock table
+(both maintained at the remote memory server) during an insertion of
+key $K$.  The index table (right) is a single region of
+RDMA-registered main memory divided into rows of fixed-width entries.
+Each row contains $n$ associative entries (3 in this figure, we use 8
+in practice) and terminates with an 8-bit version number and 64-bit
+CRC (that is computed over the entire row including version number).
+Clients access the index table using 1-sided RDMA reads and writes;
+CRCs facilitate lock-free reads as each row can be self-verified while
+version numbers enable clients to detect if a row has been modified.
+Locks (stored in a bit vector in NIC memory, shown on the left) each
+protect a tunable number (here, two; 16 in our experiments) of index
+rows.  Clients perform lock acquisition and release with RDMA
+compare-and-swap (CAS) operations.  Specifically, RCuckoo leverages
+masked CAS (MCAS) operations~\cite{rdma-masked-cas,sherman} to obtain
+multiple locks simultaneously while avoiding false sharing.
 
 %by polling CRCs which is used to detect if a client
 %has failed while holding a lock (Section~\ref{sec:fault-tolerance}).
@@ -53,7 +51,8 @@ As shown at the bottom of the figure, Table entries contain
 either inlined key/value pairs which are used by default
 (and signified by a 0 MSB) or a key and 48-bit pointer to an
 extent entry for larger values. We use 8-byte entries in our
-experiments, with 4-byte keys and 4-byte values\footnote{The performance of larger values is shows in Section~\ref{sec:entry_size}}.
+experiments, with 4-byte keys and 4-byte values.
+%\footnote{The performance of larger values is shows in Section~\ref{sec:entry_size}}.
 %~\footnote{Inlined entries perform better on small key
 %value pairs}.
 Extents are located in preallocated, per-client regions of
@@ -103,10 +102,12 @@ located sufficiently close together, it can be beneficial for the
 client to issue a single \emph{covering read} that returns the
 contents of both rows---as well as intervening and potentially
 surrounding ones---in a single request.
-RCuckoo clients issue a single, large read rather than two small reads if both locations are within
+In our experiments RCuckoo clients issue a single, large read rather than two small reads if the locations are within 148 bytes of each other (i.e., adjacent rows)
+%within
 %close to one another in the table to
 %reduce tail latency. We use
-128 bytes of each other as our experiments show it has a negligible
+%128 bytes of each other
+as our parameter sweeps show it has a negligible
 increase in latency over smaller RDMA requests
 (Figure~\ref{fig:rdma-benchmarks}(b)) and provides substantial
 improvement for insert operations.  (If bandwidth is not a concern, we
@@ -123,6 +124,7 @@ extent accesses. Solid lines are reads, dotted lines are
 CAS, and curved dashed lines are writes.}
 %%
 \label{fig:message_diagram}
+\vskip -1em
 \end{figure}
 
 
@@ -139,13 +141,16 @@ trip to retrieve the extent.
 
 Updates and deletes, like reads, access only two locations in the
 index table, but require a client to acquire the associated locks.
-Due to RCuckoo's locality enhancement, it is usually possible to attempt
-to acquire both locks in a single MCAS operation
+Due to RCuckoo's locality enhancement, it is usually possible to
+attempt to acquire both locks in a single MCAS operation
 (Section~\ref{sec:locking}).  If so, the client issues read(s) for the
 corresponding rows of the index table immediately afterwards but in
-the same batch of operations\footnote{Because the lock table is located in NIC memory, RCuckoo clients can employ \texttt{SEND\_FENCE} on reads batched with lock acquisitions to ensure consistency without incurring a performance penalty.}.  (In the rare case that the locks must
-be acquired independently---necessitating an additional round
-trip---the reads are batched with the second lock request.)
+the same batch of operations.\footnote{Because the lock table is
+located in NIC memory, RCuckoo clients can employ \texttt{SEND\_FENCE}
+on reads batched with lock acquisitions to ensure consistency without
+incurring a performance penalty.}  In the rare case that the locks
+must be acquired independently---necessitating an additional round
+trip---the reads are batched with the second lock request.
 
 Assuming
 successful lock acquisition and valid reads, the operation can proceed
@@ -346,7 +351,7 @@ valid result.
     \textbf{(c)} CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path.
     }
     \label{fig:locality-hashing}
-
+\vskip -1em
 \end{figure*}
 
 
@@ -493,10 +498,10 @@ locations as a CDF for different values of $f$,
 %% paths to access less filled portions of the table.
 while Figure~\ref{fig:locality-hashing}(b) shows that larger values of
 $f$ enable practical fill factors for tables with 100~M entries. In
-our evaluation we set $f=2.1$.  As shown in the figures, for index
+our evaluation we set $f=2.3$.  As shown in the figures, for index
 tables with eight entries per row, RCuckoo delivers an expected max fill of
-greater than 90\% with a 68\% probability that a key's locations are
-located three or fewer rows apart.
+greater than 95\% with a 68\% probability that a key's locations are
+located five or fewer rows apart.
 
 
 Decreased distances between hash locations naturally lead to shorter
@@ -582,10 +587,11 @@ spans are 256 rows or less, and each lock protects four rows, nearly
 99\% of insertions can have their locks acquired with a single MCAS.
 Of course, increasing the number of rows covered by a single lock can
 lead to false sharing, forcing additional retries to acquire the
-necessary locks.  (In the extreme, there would just be one, global
-lock for the entire table.)  We conduct a parameter sweep to determine
-the best choice of lock granularity for our setting.
-
+necessary locks.
+%(In the extreme, there would just be one, global
+%lock for the entire table.)  We conduct a parameter sweep to determine
+%the best choice of lock granularity for our setting.
+%
 Figure~\ref{fig:cuckoo-problems} shows the results of a representative
 experiment where \todo{XXX} clients are concurrently filling a 512-row
 table to 95\% full.  We report the 99th-percentile (i.e., the most
@@ -690,7 +696,7 @@ index table.
 %table to a valid state. In this section we
 The remainder of this section describes how RCuckoo clients detect
 faults, reclaim stranded locks, and, if necessary, repair the index
-table.  We conclude with a discussion of additional measures that can
+table.  Finally, we discuss additional measures that can
 be employed to prevent stale writes if desired.
 
 %, and prevent delayed
@@ -724,7 +730,8 @@ We expect client failures to be relatively rare, so set
 %as a rare but essential component of our protocol. As such
 our fault timeout conservatively. Failure timers must allow for
 worst-case locking time, second-search time, and RDMA message
-transmission time. We bound locking time (Section~\ref{sec:locking});
+transmission time. We bound locking time;
+%(Section~\ref{sec:locking});
 search and message propagation are both measured in single-digit
 microseconds on our testbed.  To guard against the possibility that
 network conditions lead to high rates of RDMA retries we set

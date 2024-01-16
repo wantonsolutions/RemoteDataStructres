@@ -197,6 +197,36 @@ RCuckoo in that they require only a single 1-sided RDMA read; we
 suspect that with tuning Clover's read-only performance could be
 brought to par with RCuckoo.
 
+\begin{figure*}[t]
+    \centering
+    \begin{subfigure}{0.24\linewidth}
+      \includegraphics[width=0.99\linewidth]{fig/fault-rate.pdf}
+          \end{subfigure}
+    \begin{subfigure}{0.24\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/search_dependence.pdf}
+        % \label{fig:hash_fill}
+        % \caption{}
+    \end{subfigure}
+    \begin{subfigure}{0.24\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/search_success_lock_size.pdf}
+        % \label{fig:hash_factor}
+        % \caption{}
+    \end{subfigure}
+    %\begin{figure}[ht]
+    \begin{subfigure}{0.24\linewidth}
+      \includegraphics[width=0.99\linewidth]{fig/entry_size.pdf}
+          \end{subfigure}
+
+    \caption{RCuckoo parameter sweeps:
+      \textbf{(a)} YCSB-A throughput vs client failure rate.,
+          \textbf{(b)} Failure rate of search algorithms vs lock size under high contention,
+    \textbf{(c)} Failure rate of search algorithms vs lock size under high contention, and
+    \textbf{(D)} throughput vs key/value entry size for YCSB-A (insert) and YCSB-C.
+    }
+    % \label{fig:microbenchmarks}
+             \label{fig:microbenchmarks}
+\end{figure*}
+
 \textbf{Inserts.}
 %%
 %By default YCSB-A,B,C use updates. RCuckoo's insert
@@ -257,35 +287,6 @@ the same cost and performance regardless of fill factor.
 
 \subsection{Fault tolerance}
 
-\begin{figure*}[t]
-    \centering
-    \begin{subfigure}{0.24\linewidth}
-      \includegraphics[width=0.99\linewidth]{fig/fault-rate.pdf}
-          \end{subfigure}
-    \begin{subfigure}{0.24\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/search_dependence.pdf}
-        % \label{fig:hash_fill}
-        % \caption{}
-    \end{subfigure}
-    \begin{subfigure}{0.24\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/search_success_lock_size.pdf}
-        % \label{fig:hash_factor}
-        % \caption{}
-    \end{subfigure}
-    %\begin{figure}[ht]
-    \begin{subfigure}{0.24\linewidth}
-      \includegraphics[width=0.99\linewidth]{fig/entry_size.pdf}
-          \end{subfigure}
-
-    \caption{RCuckoo parameter sweeps:
-      \textbf{(a)} YCSB-A throughput vs client failure rate.,
-          \textbf{(b)} Failure rate of search algorithms vs lock size under high contention,
-    \textbf{(c)} Failure rate of search algorithms vs lock size under high contention, and
-    \textbf{(D)} throughput vs key/value entry size for YCSB-A (insert) and YCSB-C.
-    }
-    % \label{fig:microbenchmarks}
-             \label{fig:microbenchmarks}
-\end{figure*}
 
 RCuckoo runs at nearly full throughput during realistic
 failure scenarios and remains functional in the face of
