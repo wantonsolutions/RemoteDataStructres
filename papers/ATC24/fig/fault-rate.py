@@ -60,12 +60,12 @@ def plot_fault_rate_static():
 
     vals=[(1,tput_1,x_1),(2,tput_2,x_2),(4,tput_4,x_4),(8,tput_8,x_8), (16,tput_16,x_16)]
 
-    fig, ax = plt.subplots(1,1, figsize=(4,2.5))
+    fig, ax = plt.subplots(1,1, figsize=(3,2.5))
     for rpl, y, x in vals:
         ax.plot(x, y, label=str(rpl), marker="s")
     # ax.set_xscale('log')
     ax.legend()
-    ax.set_ylim(0,20)
+    ax.set_ylim(0,18)
     ax.set_xlabel("Failures per second (# locks)")
     ax.set_ylabel("MOPS")
     plt.tight_layout()

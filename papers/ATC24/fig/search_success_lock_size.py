@@ -55,7 +55,7 @@ def search_success_lock_size():
         # plot_general_stats_last_run(dirname=dirname)
 
 def plot_search_success_lock_size():
-    fig, ax = plt.subplots(1,1, figsize=(4,2.5))
+    fig, ax = plt.subplots(1,1, figsize=(3,2.5))
     dirname="search_success_lock_size"
     stats = dm.load_statistics(dirname=dirname)
     stats=stats[0]
@@ -79,7 +79,7 @@ def plot_search_success_lock_size():
     # ax.errorbar(x_axis_vals,lock_retries,yerr=lock_errors,label="failed lock aquisitions", marker="o", linestyle=":", color=color)
 
 def plot_search_success_lock_size_static():
-    fig, ax = plt.subplots(1,1, figsize=(4,2.5))
+    fig, ax = plt.subplots(1,1, figsize=(3,2.5))
 
     first_search_fails=[4.598514299393423,3.5937194462323604, 2.8302924266573823 ,2.1008837486960084 ,1.4873636954870904 ,1.1852649674092721 ,1.0151446920478682 ,0.9307166854219571 ]
     second_search_fails=[3.937585437932405  ,2.973340926977462  ,2.0747392797475492 ,1.2378803095887552 ,0.5375662427481417 ,0.217275521568523  ,0.0560772062348307 ,0.01250699956548677,]

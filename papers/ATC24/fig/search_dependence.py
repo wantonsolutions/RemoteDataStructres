@@ -115,7 +115,7 @@ def plot_round_trips_per_insert_operation():
     # print(ind_stats)
     # print(dep_stats)
     # print(bfs_stats)
-    fig, ax = plt.subplots(1,1, figsize=(5,3))
+    fig, ax = plt.subplots(1,1, figsize=(3,2.5))
     percentile=99
     # ax.hlines(3,0,128)
 
@@ -188,7 +188,7 @@ def plot_round_trips_per_insert_operation():
     ax.set_ylabel("Round Trips")
     legend_labels=["dfs (independent)","dfs (dependent)","bfs (independent)", "bfs (dependent)","99th percentile","50th percentile"]
     legend_lines=[di[0],dd[0],bi[0], bd[0],dashed,solid]
-    ax.legend(legend_lines,legend_labels, ncol=2, bbox_to_anchor=(0.15,1.02,1,0.2), loc='lower left', fontsize=8)
+    ax.legend(legend_lines,legend_labels, ncol=2, bbox_to_anchor=(0.1,1.02,1,0.2), loc='lower left', fontsize=5)
     # plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
 
     # ax.legend()

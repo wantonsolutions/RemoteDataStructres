@@ -52,7 +52,7 @@ def plot_entry_size_exp():
     entry_size_order=[]
     entry_sizes = dict()
 
-    fig, ax = plt.subplots(1,1, figsize=(4,2))
+    fig, ax = plt.subplots(1,1, figsize=(3,2.5))
     for i in range(len(workloads)):
         print("plotting workload", workloads[i])
         dirname="entry_size/entry_size_"+workloads[i]
@@ -89,7 +89,8 @@ def plot_entry_size_exp():
     # ax.set_title("Entry Size vs Throughput")
 
     capitalized_workloads = [x.upper() for x in workloads]
-    labels = ["50% insert, 50% read", "read only"]
+    # labels = ["50% insert, 50% read", "read only"]
+    labels = ["YCSB-A (insert)", "read only"]
     size = len(entry_size_order)
     visual_offset = (size-1) * width / 2
     ax.set_xticks(x + visual_offset, labels)
