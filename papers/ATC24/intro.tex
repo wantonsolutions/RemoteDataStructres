@@ -262,13 +262,14 @@ failures:
 Combined with a datastructure design that facilitates aggressive
 batching of RDMA operations, these techniques enable RCuckoo to limit
 the number of round trips required for all table operations.  In the
-common case, reads execute in a single round trip, uncontested updates
-and deletes require two round trips, and the median insert operation
-involves only two round trips---although the expected number increases
-as the table fills.  On our testbed, RCuckoo delivers higher
-performance across a full suite of YCSB benchmarks than all of the
-existing disaggregated key/value stores we consider.  Concretely, with
-400 clients RCuckoo delivers between 1.3--2.2$\times$ higher read
-throughput and 1.4--10$\times$ aggregate throughput on write-heavy
-workloads.  Moreover, we show that RCuckoo's performance remains high
-despite failure rates on the order of 100s of clients per second.
+common case, reads execute in one or two (for large values) round
+trips, uncontested updates and deletes require two round trips, and
+the median insert operation involves only two round trips---although
+the expected number increases as the table fills.  On our testbed,
+RCuckoo delivers higher performance across a full suite of YCSB
+benchmarks than all of the existing disaggregated key/value stores we
+consider.  Concretely, with 400 clients RCuckoo delivers between
+1.3--2.2$\times$ higher read throughput and 1.4--10$\times$ aggregate
+throughput on write-heavy workloads.  Moreover, we show that RCuckoo's
+performance remains high despite failure rates on the order of 100s of
+clients per second.

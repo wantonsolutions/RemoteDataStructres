@@ -506,9 +506,9 @@ located five or fewer rows apart.
 
 Decreased distances between hash locations naturally lead to shorter
 cuckoo paths when combined with our breadth-first search approach.
-Using $f=2.1$ and a table size of 100-K rows,
+Using $f=2.3$ and a table size of 100-K rows,
 Figure~\ref{fig:locality-hashing}(c) shows that when filling the table
-to 95\% full, more than half of insertions do not require any
+to 95\% full, slightly more than half of insertions do not require any
 cuckooing, and 95\% of insertions require cuckoo paths that span 32 or
 fewer rows while nearly 99\% span 256 or fewer.  Conversely, with
 independent hashing, insertions that require any cukooing at all

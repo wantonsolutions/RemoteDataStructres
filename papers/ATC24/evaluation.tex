@@ -3,15 +3,18 @@
 
 We evaluate RCuckoo by directly comparing its performance in terms of
 throughput and latency against representative state-of-the-art
-disaggregated key/value stores and find that RCuckoo outperforms them
-all in terms of throughput while delivering competitive insert
-latencies.  Using fault injection, we show that our distributed
+disaggregated key/value stores.  When accessing large values,
+aggregate throughput is limited by link rate, so we focus on small
+key/value pairs where the table management overhead is most
+significant.  When values are small enough to be stored inline,
+RCuckoo outperforms existing systems while delivering competitive
+insert latencies.  Using fault injection, we show that our distributed
 approach to client failure detection and recovery enables RCuckoo to
 sustain high throughput even though 100s of clients are failing per
 second.  Finally, we justify our design decisions through a series of
 micro-benchmarks. Specifically, we quantify the benefit RCuckoo
 extracts from its locality enhancement and speculative search strategy
-and measure the impact of
+before measuring the impact of
 %conduct sensitivity analysis
 %of our choice of locality parameter,
 %covering read threshold, and
@@ -22,9 +25,8 @@ index-table entry size.
 \begin{figure*}[ht]
     \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_throughput.pdf}
 
-    \caption{Throughput as a function of the number of clients for three different workloads (Zipf $\theta$=0.99): \textbf{(a)} YCSB-A 50\%
-    read 50\% update, \textbf{(b)} YCSB-B 95\% read 5\% update and \textbf{(c)}
-    YCSB-C 100\% read.}
+    \caption{Throughput as a function of the number of clients for three different workloads (Zipf $\theta$=0.99): \textbf{(a)} Read only (YCSB-C), \textbf{(b)} YCSB-B 95\% read, 5\% update and \textbf{(c)}
+    50\% read 50\% update (YCSB-A).}
     \label{fig:ycsb_throughput}
  \end{figure*}
 
@@ -169,41 +171,59 @@ around 2$\times$.
 \todo{What is the row/read size?  How close are we
   to line rate?}
 
-\textbf{Throughput.} Figure~\ref{fig:ycsb_throughput} shows throughput in
-terms of operations per second for RCuckoo, FUSEE, Sherman, and Clover
-on three different YCSB workloads. YCSB-A is a 50\% read 50\% update,
-YCSB-B is 95\% read and 5\% update, and YCSB-C is 100\% read.  For
-each system, we provision a 100-M-entry table and prepopulate it with
-90~M entries that each consist of a 32-bit key and 32-bit value
-(inlined in the case of RCuckoo).  We plot the performance of a
-variable number of clients concurrently accessing entries according to
-a Zipf(0.99) distribution.
+\textbf{Throughput.} Figure~\ref{fig:ycsb_throughput} shows throughput
+in terms of operations per second for RCuckoo, FUSEE, Clover, and
+Sherman on three different YCSB workloads.  Moving from left to right,
+the left-most graph is read-only (YCSB-C), the middle graph is 95\%
+read and 5\% update (YCSB-B), and the right-most graph presents a 50\%
+read, 50\% update mix (YCSB-A).  For each system, we provision a
+100-M-entry table and prepopulate it with 90~M entries that each
+consist of a 32-bit key and 32-bit value (we consider larger sizes in Section~\ref{ss:mb}).  We plot the aggregate throughput of a variable number of
+clients concurrently accessing entries according to a Zipf(0.99)
+distribution.
 
-On the mixed YCSB-A workload RCuckoo and FUSEE perform similarly, although we are unable to scale FUSEE past 250 clients in our testbed.
+In a read-only (YCSB-C) workload, FUSEE suffers from its extent-based
+value storage.  RCuckoo, Clover, and Sherman perform similarly at
+low-to-moderate levels of concurrency, but they separate at scale.
+Sherman's read algorithm is more complex than RCuckoo's leading to
+lower top-end performance.  Clover's client-side caching shines under
+this skewed workload, where almost all reads hit in a client's index
+cache, requiring only a single read for the value; its performance
+degrades under a more uniform workload (not shown).  RCuckoo, on the
+other hand, reads inlined values in a single round trip
+regardless of the distribution, leading to the highest performance.
+
+Absolute performance for all systems decreases with increasing update
+rate due to contention.  Even with only 5\% updates (YCSB-B), the
+picture changes dramatically.  Sherman performs well at low levels of
+concurrency due to its single-round-trip-reads, but it hits a severe
+bottleneck due to lock contention in YCSB-B.  (Sherman performance is
+improves---but does not surpass RCuckoo---for uniform workloads, not
+shown, where lock contention is less of an issue.)
+Caching is less effective with updates, bringing Clover's throughput inline with FUSEE.
+%performs similarly to FUSEE on YCSB-B; we
+%suspect that with tuning Clover's read-only performance could be
+%brought to par with RCuckoo.
+%, and is the
+%most competitive with RCuckoo in read-only scenario.  When it is able
+%to leverage its client index cache,
+
+On the 50/50-mixed YCSB-A workload RCuckoo and FUSEE perform
+similarly, although we are unable to scale FUSEE past 250 clients in
+our testbed while RCuckoo continues to scale.
 %begins to surpass FUSEE after about 125 clients.  FUSEE's maximum performance is gated by its requirement for an additional round trip per operation (to
 %retrieve the extent).
-Sherman begins to suffer from lock contention around 5 MOPS due to its B-Tree structure.
-(Sherman performance is comparable to RCuckoo for uniform workloads, not shown, where
-lock contention is less of an issue.)  Clover performs the worst
-under write-heavy workloads due to its inability to effectively leverage
-client-side caching of a constantly changing index structure.
+Sherman begins to suffer from lock contention even earlier, topping
+out around 5 MOPS before collapsing.  Clover performs worst under
+write-heavy workloads due to its inability to effectively leverage
+caching with a constantly changing index structure.
 
-On read-mostly (YCSB-B) and read-only (YCSB-C) workloads RCuckoo
-pulls ahead.
+%On read-mostly (YCSB-B) and read-only (YCSB-C) workloads RCuckoo
+%pulls ahead.
 %, extracts even further benefit from its ability to complete
 %reads in a single round trip by collapsing most reads into a single
 %RDMA request (Section~\ref{sec:read_threshold}).
-Sherman performs
-well at low levels of concurrency as it can directly read from the B-Tree
-in a single round trip without the need for pointer chasing, but it
-continues to bottleneck on lock contention in YCSB-B.  While lock contention is not an issue in the read-only YCSB-C, Sherman's read
-algorithm is more complex than RCuckoo's leading to lower top-end
-performance. Clover performs similarly to FUSEE on YCSB-B, and is the
-most competitive with RCuckoo in read-only scenario.  When it is able
-to leverage its client index cache, Clover's reads are very similar to
-RCuckoo in that they require only a single 1-sided RDMA read; we
-suspect that with tuning Clover's read-only performance could be
-brought to par with RCuckoo.
+%  While lock contention is not an issue in the read-only YCSB-C,
 
 \begin{figure*}[t]
     \centering
@@ -336,7 +356,7 @@ establish approximately 1.4~K RDMA connections per second~\cite{xrdma}.
 %using state of the art techniques~\cite{xrdma}.
 
 \subsection{Microbenchmarks}
-
+\label{ss:mb}
 
 Having established RCuckoo's superiority over prior systems and
 demonstrated its robustness to client failure, we now evaluate the
@@ -466,8 +486,8 @@ at a rate of 99\% per insert.
 %% performance improvement. We measure it's benefit in terms of
 %% throughput by comparing it with default CAS. In the
 %% default case, when acquiring locks clients set the lock bits
-%% for the locks they require and set all other bits in the cas
-%% to 0. If the cas fails the current state of the lock table
+%% for the locks they require and set all other bits in the CAS
+%% to 0. If the CAS fails the current state of the lock table
 %% over that range is returned as a result to the client and
 %% the client tries to acquire their locks again using the
 %% updated state of the lock table. Masked compare and swaps
