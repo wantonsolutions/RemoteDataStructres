@@ -159,7 +159,7 @@ if the key is present in either location.  In a single (ordered) batch
 of operations, the client first writes the updated/freed entry and
 recomputed row version and CRC before releasing the locks. When
 updating values stored in extents, clients store the value to a new
-extent in an RDMA write that is batched with the lock acquisition
+extent in an RDMA write that is sent before the lock acquisition
 requests to avoid additional round trips.  Deletes of extent-based
 values simply mark the entry for later garbage collection.
 Figure~\ref{fig:message_diagram}(b) shows that most uncontested operations
