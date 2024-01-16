@@ -293,7 +293,7 @@ Figure~\ref{fig:table-diagram} shows an example insert
 operation where the client updated its cache of the section
 of the index table outlined by the dashed red line using a
 single covering read.  Here, the primary row for $K$ is full
-and the entry for key $C$ is being evicted its secondary
+and the entry for key $C$ is being evicted to its secondary
 location.  Hence, the client has acquired locks
 corresponding to the row where it hopes to insert the entry
 for key $K$ as well as the row into which it plans to cuckoo
