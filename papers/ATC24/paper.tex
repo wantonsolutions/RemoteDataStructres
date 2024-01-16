@@ -98,28 +98,41 @@
 
 \section*{Abstract}
 
-Memory disaggregation promises high resource utilization,
-and efficient resource sharing. However designing fully
-disaggregated systems remains challenging due to complex
-serialization, high latency, and failures. Key-value store 
-indexes often adopt a partially disaggregated approach
-where writes to the index are routed through a CPU for
-serialization, while reads are made directly to memory.
-Fully disaggregation assumes no such CPU and must serialize
-writes entirely with clients.
+%% Memory disaggregation promises high resource utilization,
+%% and efficient resource sharing. However designing fully
+%% disaggregated systems remains challenging due to complex
+%% serialization, high latency, and failures. Key-value store 
+%% indexes often adopt a partially disaggregated approach
+%% where writes to the index are routed through a CPU for
+%% serialization, while reads are made directly to memory.
+%% Fully disaggregation assumes no such CPU and must serialize
+%% writes entirely with clients.
 
-In this paper we describe the first fully disaggregated
-lock based cuckoo hash. Prior work avoids locks in favor of
-optimistic concurrency as locks can have large critical
-sections and complex failures. We show that that with
-careful design locks can have higher performance than
-opportunistic algorithms and recover from failures quickly.
-We develop a locality based hashing algorithm which enables
-fast reads, and efficient locking. We compare our
-performance against state of the art key value stores and
-show gains on an YCSB benchmarks against all systems
-achieving between 1.4x to 10x on write heavy workloads and
-1.3x to 2.2x on read heavy workloads.
+RCuckoo is a fully disaggregated lock-based key/value store in which
+clients cooperatively access a passive memory server using exclusively
+one-sided RDMA operations.  RCuckoo employs cuckoo hashing to enable
+single round-trip reads of small values while updates and deletes
+require only two.  We introduce locality-enhancing dependent hashing
+that allows us to adjust the expected distance between a key's
+potential table locations, dramatically improving insert performance
+compared to prior cuckoo-hashing approaches while maintaining
+practical (90\%+) maximum fill factors.  We show that not only do
+RCuckoo reads outperform all existing state-of-the-art RDMA-based
+key/value stores on our testbed, but under contention RCuckoo delivers up to
+1.4--10$\times$ greater throughput than comparison systems on standard
+YCSB workloads.  Moreover, RCuckoo's lease-based locking mechanism
+enables it to maintain high throughout in the face of 100s of
+client failures per second.
+
+%% lock based cuckoo hash. Prior work avoids locks in favor of optimistic
+%% concurrency as locks can have large critical sections and complex
+%% failures. We show that that with careful design locks can have higher
+%% performance than opportunistic algorithms and recover from failures
+%% quickly.  We develop a locality based hashing algorithm which enables
+%% fast reads, and efficient locking. We compare our performance against
+%% state of the art key value stores and show gains on an YCSB benchmarks
+%% against all systems achieving between 1.4x to 10x on write heavy
+%% workloads and 1.3x to 2.2x on read heavy workloads.
 
 
 % with careful data structure and protocol design, as well as
@@ -139,7 +152,7 @@ achieving between 1.4x to 10x on write heavy workloads and
 \input{intro}
 \input{background}
 \input{body}
-\input{problems}
+%\input{problems}
 \input{design}
 \input{evaluation}
 %\input{limitation}
