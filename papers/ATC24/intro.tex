@@ -143,7 +143,9 @@ trips required to acquire locks and perform mutating operations.
 We introduce RCuckoo, a fully disaggregated key/value store based on
 cuckoo hashing~\cite{cuckoo} that
 %delivers high performance using
-uses only one-sided RDMA operations.  At its heart, RCuckoo builds
+uses only one-sided RDMA operations.
+%At its heart,
+RCuckoo builds
 around a \emph{dependent hashing} algorithm that makes spatial
 locality a tunable parameter.
 %
@@ -265,11 +267,10 @@ common case, reads execute in one or two (for large values) round
 trips, uncontested updates and deletes require two round trips, and
 the median insert operation involves only two round trips---although
 the expected number increases as the table fills.  On our testbed,
-RCuckoo delivers higher performance on small values across a full
-suite of YCSB benchmarks than all of the existing disaggregated
+RCuckoo delivers comparable or higher performance on small values across the standard set  of YCSB benchmarks than all of the existing disaggregated
 key/value stores we consider.  Concretely, with 320 clients RCuckoo
 delivers up to a 2.5$\times$ throughput improvement on read-intensive
 (YCSB-B) workloads and 0.9--7.1$\times$ the throughput on skewed
-write-intensive (YCSB-A) workloads.  Moreover, we show that RCuckoo's
+write-intensive (YCSB-A) workloads.  Moreover, RCuckoo's
 performance remains high despite failure rates on the order of 100s of
 clients per second.

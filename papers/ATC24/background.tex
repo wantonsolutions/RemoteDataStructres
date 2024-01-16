@@ -7,17 +7,16 @@
 
 %% %Describe existing key value stores relation to RDMA and
 %serialization %
-Key/value stores have long looked to RDMA to
+Key/value stores have long used RDMA to
 %Many non-disaggregated key-value stores have used RDMA to
-accelerate their
+accelerate
 performance~\cite{farm,memc3,erpc,herd,faast,mica,pilaf,cell,storm}.
 %%
-These systems strike a careful balance between directly accessing hash
-tables stored in remote memory with one-sided RDMA requests and
+These systems strike a careful balance between directly accessing remote memory with one-sided RDMA requests and
 serializing mutating operations at a server-side CPU.
 %%
 Cuckoo~\cite{cuckoo} and hopscotch~\cite{hopscotch} hashing are popular choices in
-this space because clients can independently calculate the location of
+this space because clients can calculate the location of
 keys without needing to consult the server and potentially perform
 lock-less reads with RDMA~\cite{farm,pilaf,cuckoo}.
 
@@ -136,10 +135,10 @@ a bounded neighborhood.  (While cuckoo hashing limits the number of
 locations in which a key may be stored, it does not provide any
 locality guarantees regarding those locations.) It does so by finding
 the physically closest empty entry to the desired location and then,
-if that location is not within the desired neighborhood, iteratively
+if that location is not within the neighborhood, iteratively
 moving other entries out of the way to make room for the new key.
 The hopscotch process is facilitated by maintaining a per-entry
-bitmask of nearby collisions.  As with cuckoo hashing, clients can complete a read in a single round trip time by reading a key's entire
+bitmask of nearby collisions.  As with cuckoo hashing, clients can read in a single round trip time by reading a key's entire
 neighborhood at once.
 
 The insert operation is expensive for both approaches, and prior
@@ -179,8 +178,8 @@ bitmasks whenever concurrent inserts execute.)  Second, keys exist in
 one of two locations in cuckoo hashing so updates and deletes require
 locking only two rows, while hopscotch entries inhabit a range of
 locations, so a conservative locking strategy must lock the entire
-range.  That said, RCuckoo takes inspiration from hopscotch neighborhoods and employs dependent hashing to increase the spatial
-locality of keys' potential locations, enabling clients to use local
+range.  Yet, RCuckoo takes inspiration from hopscotch neighborhoods and employs dependent hashing to increase the spatial
+locality of key locations, enabling clients to use local
 caches to speculatively compute cuckoo paths.
 
 %Because each lock

@@ -22,9 +22,10 @@ to the hashing function, see Section~\ref{sec:dephash}).
 
 \begin{figure}[t]
     \includegraphics[width=0.99\linewidth]{fig/table-diagram.pdf}
+\vskip -0.5em
     \caption{RCuckoo's datastructures showing an insert of the key $K$ as it displaces $C$.}
     \label{fig:table-diagram}
-    \vskip -1em
+    \vskip -1.5em
 \end{figure}
 
 Figure~\ref{fig:table-diagram} shows RCuckoo's index and lock table
@@ -162,8 +163,7 @@ extent in an RDMA write that is batched with the lock acquisition
 requests to avoid additional round trips.  Deletes of extent-based
 values simply mark the entry for later garbage collection.
 Figure~\ref{fig:message_diagram}(b) shows that most uncontested operations
-complete in two round trip times; clients retry failed lock
-acquisitions until they succeed or detect a failed client.
+complete in two round trips; clients retry acquisitions until they succeed or detect a failed client.
 %(see Section~\ref{ss:fd}).
 
 \todo{How does extent garbage collection work?}
@@ -194,7 +194,7 @@ compute a complete cuckoo path ahead of time and then acquire locks on
 all the relevant rows to ensure its success.  Moreover, to facilitate
 recovery from client failures, an insert is performed by cuckooing
 elements one at a time, starting by moving the last entry in the path
-to the empty location, and then replacing that entry with the previous
+to the empty location, and then replacing it with the previous
 entry in the path, and so on until the new entry is inserted in its primary location.
 
 
