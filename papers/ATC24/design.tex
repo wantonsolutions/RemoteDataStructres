@@ -82,7 +82,7 @@ exchanges.
 
 RCuckoo is designed to facilitate lock-free, single round-trip reads
 for small values as they are the dominant operation for key/value
-stores in data centers~\cite{facebook-memcached,rocks-db-workload}. To
+stores in data centers~\cite{rocks-db-workload,facebook-memcached}. To
 read the value associated with a given key clients calculate the
 potential table locations for the key's entry (using the hash
 functions described in the next subsection) and issue RDMA reads for
@@ -103,7 +103,7 @@ if both locations are within
 %reduce tail latency. We use
 128 bytes of each other as our experiments show it has a negligible
 increase in latency over smaller RDMA requests
-(Figure~\ref{fig:rdma-benchmarks}(a)) and provides substantial
+(Figure~\ref{fig:rdma-benchmarks}(b)) and provides substantial
 improvement for insert operations.
 
 
@@ -119,10 +119,10 @@ CAS, and curved dashed lines are writes.}
 \end{figure}
 
 
-A read is successful if
-either row contains an entry with the desired key and the row's CRC is
-valid. An invalid CRC indicates a torn write or rare
-failure case (Section~\ref{sec:table-repair}).  As shown in
+A read is successful if either row contains an entry with the desired
+key and the row's CRC is valid. An invalid CRC indicates a torn write
+or rare failure case, in which case the operation is retried
+(see Section~\ref{ss:fd}).  As shown in
 Figure~\ref{fig:message_diagram}(a) inlined reads are complete after
 one round trip, while reads for large values require a second round
 trip to retrieve the extent.
@@ -136,8 +136,7 @@ Due to RCuckoo's locality enhancement, it is usually possible to attempt
 to acquire both locks in a single MCAS operation
 (Section~\ref{sec:locking}).  If so, the client issues read(s) for the
 corresponding rows of the index table immediately afterwards but in
-the same batch of operations\footnote{Because the lock table is located in NIC memory, RCuckoo clients can employ \texttt{SEND\_FENCE} on covering
-reads batched with lock acquisitions to ensure consistency without incurring a performance penalty.}.  (In the rare case that the locks must
+the same batch of operations\footnote{Because the lock table is located in NIC memory, RCuckoo clients can employ \texttt{SEND\_FENCE} on reads batched with lock acquisitions to ensure consistency without incurring a performance penalty.}.  (In the rare case that the locks must
 be acquired independently---necessitating an additional round
 trip---the reads are batched with the second lock request.)
 
@@ -152,8 +151,8 @@ requests to avoid additional round trips.  Deletes of extent-based
 values simply mark the entry for later garbage collection.
 Figure~\ref{fig:message_diagram}(b) shows that most uncontested operations
 complete in two round trip times; clients retry failed lock
-acquisitions until they succeed or detect a failed client (see
-Section~\ref{sec:table-repair}).
+acquisitions until they succeed or detect a failed client.
+%(see Section~\ref{ss:fd}).
 
 \todo{How does extent garbage collection work?}
 
@@ -180,12 +179,18 @@ Inserts are challenging because concurrent operations might result in
 cuckoo paths that collide.  Rather than face the prospect of having to
 unravel a partially completed insert upon collision, RCuckoo clients
 compute a complete cuckoo path ahead of time and then acquire locks on
-all the relevant rows to ensure its success.  To facilitate
-cuckoo-path searches, RCuckoo clients keep a local, RDMA-registered
-cache of (relevant portions of) the index table.  Clients
-validate---and, if necessary, update---their cache at each step of the
-insert operation as explained below, so stale cache entries do not
-impact correctness, only performance.
+all the relevant rows to ensure its success.  Moreover, to facilitate
+recovery from client failures, an insert is performed by cuckooing
+elements one at a time, starting by moving the last entry in the path
+to the empty location, and then replacing that entry with the previous
+entry in the path, and so on until the new entry is inserted in its primary location.
+
+
+To speed up cuckoo-path searches, RCuckoo clients keep a local,
+RDMA-registered cache of (relevant portions of) the index table.
+Clients validate---and, if necessary, update---their cache at each
+step of the insert operation as explained below, so stale cache
+entries do not impact correctness, only performance.
 
 
 
@@ -243,7 +248,7 @@ speculative cuckoo path.  As with prior work, we use breadth-first
 search (BFS) to identify short paths in an attempt to minimize
 bandwidth and locking overhead~\cite{cuckoo-improvements}.  If the
 client cache is empty the degenerate path is presumed, i.e., that the
-key will be inserted into either its primary or backup location
+key will be inserted into either its primary location
 without the need for any cuckooing.  Obviously, speculative cuckoo
 paths are most useful when client caches are fresh---often due to a
 failed prior attempt to insert the same key.
@@ -258,15 +263,15 @@ cuckoo path, clients identify the set of locks necessary to
 protect the relevant rows.  
 %%
 Approximately 99\% of paths can be locked with a single MCAS
-(Figure~\ref{fig:locality-hashing}(c)). The other 1\% of
+operation (Figure~\ref{fig:locality-hashing}(c)); longer
 paths acquire locks in groups (Section~\ref{sec:locking}).
 %%
 Immediately after, but in the same batch of RDMA operations
 as each attempt to acquire (a subset of) the locks, clients
 synchronize their local cache by issuing reads for (at
-least) all of the rows covered by that set of locks.  (In
+least) all of the rows covered by that set of locks.  In
 general, locks cover multiple rows, so this will be a
-superset of the rows necessary for the identified path.)
+superset of the rows necessary for the identified path.
 Note that if lock acquisition is successful, the values
 returned by the read of the corresponding rows---and, thus,
 the client's local cache of those rows---will remain
@@ -319,8 +324,7 @@ cache contents.
 
 This entire process repeats until success, a client determines there
 is no viable cuckoo path (at which point the insert operation returns
-an error indicating the table is full), or a failed client is detected
-(Section~\ref{sec:table-repair}).  Given the fully-disaggregated
+an error indicating the table is full), or a failed client is detected.  Given the fully-disaggregated
 context we assume the index table will be initially provisioned at its
 maximum size; we defer resizing to future work.
 %\todo{describe resizing}
@@ -331,9 +335,9 @@ maximum size; we defer resizing to future work.
 % most paths are short.
 If cuckoo paths were to randomly span the table it is unlikely that an
 alternate valid path would exist within the locked rows when
-speculation fails.  In the next section, however, we describe how RCuckoo uses
-dependent hashing to dramatically increase the likelihood that an
-alternate path exists using rows surrounding those identified
+speculation fails.  In the next subsection, however, we describe how
+RCuckoo uses dependent hashing to dramatically increase the likelihood
+that an alternate path exists using rows surrounding those identified
 by the speculative search.
 %Our evaluation measures the success
 %rate of insertions as a function of lock granularity
@@ -677,7 +681,8 @@ be employed to prevent stale writes if desired.
 %, and prevent delayed
 %RDMA writes issued by (assumed-to-be) failed clients from corrupting the table.
 
-\subsection{Failure detection} 
+\subsection{Failure detection}
+\label{ss:fd}
 %\todo{note that we don't know who has the lock or when they got it}
 
 Clients detect failures by setting a timeout when attempting repeated

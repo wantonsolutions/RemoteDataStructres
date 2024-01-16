@@ -107,7 +107,7 @@ individual clients~\cite{rolex,fusee,race}.  Like any hash table, the
 underlying hashing algorithm must have an approach to managing
 collisions. Cuckoo and hopscotch hashing are particularly attractive
 in this context, because they both provide the property that the
-potential location(s) of an entry in the table, regardless of
+potential locations of an entry in the table, regardless of
 contention or collision, can be deterministically computed by clients
 based only upon the key itself.  Moreover, the set of locations is
 limited.  Hence, at least in theory, systems built around either
@@ -116,16 +116,17 @@ reads.
 
 %\todo{Make sure to describe how a cuckoo path works}
 
-\textbf{Cuckoo hashing} uses two or more independent hash functions to
-assign a set of potential table locations for a key, where locations
-correspond to an associative row of entries.  RCuckoo uses two
-locations, a primary and a secondary.  When a key is inserted, if its
-primary row is full an existing key is evicted to its alternative
-row. If the eviction causes another collision the process iterates
-until an open location is found. The path of evictions is known as
-a~\textit{cuckoo path}.  While insertions can be involved, reads can
-always be executed in a single round trip by reading the rows
-corresponding to both of a key's locations
+\textbf{Cuckoo hashing} uses independent hash functions to compute two
+potential table locations for a key, a primary and a secondary, where
+each location corresponds to an associative row of entries.  A key is
+always inserted into its primary location.  If that row is full, an
+existing key is evicted (or ``cuckooed'') to its secondary row to make
+space. If the cuckooed entry's secondary row is also full, the process
+iterates (by selecting yet another entry in the secondary row to
+cuckoo) until an open location is found. The path of evictions is
+known as a~\textit{cuckoo path}.  While insertions can be involved,
+reads can always be executed in a single round trip by reading the
+rows corresponding to both of a key's locations
 simultaneously~\cite{pilaf}.
 
 \textbf{Hopscotch hashing} works in a similar fashion but provides a
@@ -136,10 +137,9 @@ locality guarantees regarding those locations.) It does so by finding
 the physically closest empty entry to the desired location and then,
 if that location is not within the desired neighborhood, iteratively
 moving other entries out of the way to make room for the new key.
-This process is typically facilitated by maintaining a per-entry
-bitmask of nearby collisions.  Like cuckoo hashing, reads can be
-conducted in a single round trip time by reading the entire
-neighborhood at a time.
+The hopscotch process is facilitated by maintaining a per-entry
+bitmask of nearby collisions.  As with cuckoo hashing, clients can complete a read in a single round trip time by reading a key's entire
+neighborhood at once.
 
 The insert operation is expensive for both approaches, and prior
 systems have taken steps to mitigate its cost.  In associative hashes
@@ -170,17 +170,17 @@ concerns.
 %hashing for the following reasons:
 %%
 First, each step of a cuckoo insert process requires one update---to
-the entry being moved to its alternate location---rather than two.
+the entry being moved to its secondary location---rather than two.
 When an entry is relocated in a hopscotch table, the collision bitmask
 must also be updated.  (Reno~\cite{reno} uses one-sided atomics to
 sloppily update the bitmask but requires a server-side CPU to fix the
 bitmasks whenever concurrent inserts execute.)  Second, keys exist in
 one of two locations in cuckoo hashing so updates and deletes require
-only two locks, while hopscotch entries inhabit a range of locations,
-so a conservative locking strategy must lock the entire range.  That
-said, RCuckoo takes inspiration from hopscotch hashing's neighborhoods
-and employs dependent hashing to increase the spatial locality of
-keys' potential locations.
+locking only two rows, while hopscotch entries inhabit a range of
+locations, so a conservative locking strategy must lock the entire
+range.  That said, RCuckoo takes inspiration from hopscotch neighborhoods and employs dependent hashing to increase the spatial
+locality of keys' potential locations, enabling clients to use local
+caches to speculatively compute cuckoo paths.
 
 %Because each lock
 %acquisition is expensive this increases the fundamental difficulty of
