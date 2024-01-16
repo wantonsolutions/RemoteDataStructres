@@ -32,7 +32,7 @@ index-table entry size.
 
 \subsection{Testbed}
 
-We conduct our evaluation on an 11-node cluster of dual-socket Intel
+We conduct our evaluation on an 9-node cluster of dual-socket Intel
 machines. Each CPU is an Intel Xeon E5-2650 clocked at
 2.20~GHz. Each machine has 256~GB of RAM with 128~GB per NUMA
 node. All machines have a single dual-socket ConnectX-5 attached to a
@@ -270,7 +270,7 @@ more expensive as the table fills, so we prepopulate the table with a varying nu
 a function of the table's initial fill factor.
 \todo{How long/how many inserts are performed?}
 
-Figure~\ref{fig:ycsb_fill}(a) shows the aggregate throughput of 400
+Figure~\ref{fig:ycsb_fill}(a) shows the aggregate throughput of 320
 clients across four different workloads as a function of the table's
 fill factor.  As the index table fills, cuckoo paths become longer
 leading to increased contention and additional bandwidth consumption
@@ -461,7 +461,7 @@ four or more locks per message.
 To demonstrate the
 value of RCuckoo's two-stage search strategy we measure
 the success rate of cuckoo-path searches under high contention. With
-400 concurrent clients we prepopulate a small (10-M entry) table
+320 concurrent clients we prepopulate a small (10-M entry) table
 up to 85\% prior to measuring success rate in order to
 maximize cuckoo path length. Figure~\ref{fig:microbenchmarks}(c)
 shows the number of failure rate of both search stages. The first

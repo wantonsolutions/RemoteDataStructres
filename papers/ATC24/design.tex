@@ -6,7 +6,7 @@ disaggregated lock-based cuckoo hash table in which clients
 communicate with passive memory servers over reliable RDMA connections
 using exclusively 1-sided operations.  We first describe our table
 design and protocol to read and modify the contents of the table.  In
-the common case, reads complete in one round trip while update and
+the common case, reads complete in one or two round trips while update and
 delete operations require two.  Then we introduce a locality-enhanced
 hashing algorithm and show how it enables our protocol to perform
 inserts in a small number of round trips.  Finally, we discuss
@@ -88,7 +88,7 @@ exchanges.
 
 RCuckoo is designed to facilitate lock-free, single round-trip reads
 for small values as they are the dominant operation for key/value
-stores in data centers~\cite{rocks-db-workload,facebook-memcached}. To
+stores in many data centers~\cite{rocks-db-workload,facebook-memcached}. To
 read the value associated with a given key clients calculate the
 potential table locations for the key's entry (using the hash
 functions described in the next subsection) and issue RDMA reads for
