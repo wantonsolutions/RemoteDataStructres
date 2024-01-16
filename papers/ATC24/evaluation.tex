@@ -257,36 +257,6 @@ the same cost and performance regardless of fill factor.
 
 \subsection{Fault tolerance}
 
-RCuckoo runs at nearly full throughput during realistic
-failure scenarios and remains functional in the face of
-hundreds of failures per second. When a client fails while
-holding a lock the lock is stranded and requests for that
-lock will block until after a client times out and reclaims
-the lock.
-%%
-We emulate hundreds of client failures per second by
-performing a partial insert operation which truncates the
-batch of insert packets including lock releases. The table
-entries are left in one of the inconsistent states listed in
-Section~\ref{sec:table-repair} and locks are left set.
-
-
-Figure~\ref{fig:failure_throughput} illustrates RCuckoo's
-ability to operate at high throughput in the face of
-failures. Lock granularity increases the probability that
-multiple clients will block on the same failed lock. Larger
-locks have little difference when failures are semi-frequent
-and have a larger impact as hundred of failures occur per
-second.  The performance impact of a few number of failures
-per second is low which is ideal considering that failures
-in RDMA clusters are relatively rare.  As a point of
-reference, we observe that RCuckoo can still operate despite
-thousands of failures per second while a server can only
-establish approximately 1.4~K RDMA connections per second
-using state of the art techniques~\cite{xrdma}.
-
-\subsection{Microbenchmarks}
-
 \begin{figure*}[t]
     \centering
     \begin{subfigure}{0.24\linewidth}
@@ -308,13 +278,45 @@ using state of the art techniques~\cite{xrdma}.
           \end{subfigure}
 
     \caption{RCuckoo parameter sweeps:
-      \textbf{(a)} Throughput and max fill vs locality factor,
-          \textbf{(b)} throughput vs read threshold, and 
-    \textbf{(c)} throughput vs key/value entry size.
+      \textbf{(a)} YCSB-A throughput vs client failure rate.,
+          \textbf{(b)} Failure rate of search algorithms vs lock size under high contention,
+    \textbf{(c)} Failure rate of search algorithms vs lock size under high contention, and
+    \textbf{(D)} throughput vs key/value entry size for YCSB-A (insert) and YCSB-C.
     }
     % \label{fig:microbenchmarks}
              \label{fig:microbenchmarks}
 \end{figure*}
+
+RCuckoo runs at nearly full throughput during realistic
+failure scenarios and remains functional in the face of
+hundreds of failures per second. When a client fails while
+holding a lock the lock is stranded and requests for that
+lock will block until after a client times out and reclaims
+the lock.
+%%
+We emulate hundreds of client failures per second by
+performing a partial insert operation which truncates the
+batch of insert packets including lock releases. The table
+entries are left in one of the inconsistent states listed in
+Section~\ref{sec:table-repair} and locks are left set.
+
+
+Figure~\ref{fig:microbenchmarks}(a) illustrates RCuckoo's
+ability to operate at high throughput in the face of
+failures. Lock granularity increases the probability that
+multiple clients will block on the same failed lock. Larger
+locks have little difference when failures are semi-frequent
+and have a larger impact as hundred of failures occur per
+second.  The performance impact of a few number of failures
+per second is low which is ideal considering that failures
+in RDMA clusters are relatively rare.  As a point of
+reference, we observe that RCuckoo can still operate despite
+thousands of failures per second while a server can only
+establish approximately 1.4~K RDMA connections per second
+using state of the art techniques~\cite{xrdma}.
+
+\subsection{Microbenchmarks}
+
 
 Having established RCuckoo's superiority over prior systems and
 demonstrated its robustness to client failure, we now evaluate the
@@ -341,7 +343,7 @@ impact of particular design choices.
 %masked CAS messages. Simultaneously search function choice
 %dramatically affects the length of cuckoo paths.
 
-Figure~\ref{fig:search_dependence} illustrates the dramatic benefit
+Figure~\ref{fig:microbenchmarks}(b) illustrates the dramatic benefit
 RCuckoo extracts from its dependent hashing combined with a BFS
 cuckoo-path search strategy.  To focus on longer cuckoo paths, we
 pre-fill a 100-M entry table to 85\% and then report both the median
@@ -424,7 +426,7 @@ effectiveness of our two stage search strategy we measure
 the success rate of our searches under high contention. With
 400 concurrent clients we fill a small table (10M entries)
 up to 85\% prior to measuring success rate in order to
-maximize cuckoo path length. Figure~\ref{fig:search_success}
+maximize cuckoo path length. Figure~\ref{fig:microbenchmarks}(c)
 shows the failure rate of both search stages. The first
 search is the success rate of a search based entirely on
 cached information. The second search is the success rate of
@@ -482,7 +484,7 @@ impacting insert performance.
 %cost of inflating the bandwidth of % operations. We run a
 %50\% read 50\% insert and a read only % workload to
 %illustrate the overhead of larger entries.
-Figure~\ref{fig:entry_size}(c) shows the effect of entry
+Figure~\ref{fig:microbenchmarks}(d) shows the effect of entry
 size on operation throughput under YCSB-A. Insert is a
 bandwidth-limited operation;
 %quickly saturates the network bandwidth. At

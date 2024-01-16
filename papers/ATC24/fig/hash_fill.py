@@ -140,7 +140,7 @@ def plot_static_hash_fill():
     ax.grid(True, axis='y', linestyle=':')
     ax.axhline(y=90, color='r', linestyle=':')
 
-    ax.set_xlabel('factor')
+    ax.set_xlabel('locality parameter')
     ax.set_ylabel('max fill')
 
     # ax.legend()

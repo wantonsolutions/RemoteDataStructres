@@ -783,7 +783,7 @@ along the path, cuckooing entries forward one-by-one until the new
 entry is written at the beginning of the path.  Client failures can
 occur at any point along an insertion path; a failed client can leave
 the table in one of four distinct states based on how far along it was:
-\begin{enumerate}
+\begin{enumerate}[itemsep=1pt]
 \item{A duplicate entry exists and one has a bad CRC,}
     \item{A duplicate entry exists and both have correct CRCs,} 
     \item{No duplicate exists but one row has a bad CRC, or}

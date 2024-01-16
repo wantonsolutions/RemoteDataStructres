@@ -85,8 +85,8 @@ def plot_search_success_lock_size_static():
     second_search_fails=[3.937585437932405  ,2.973340926977462  ,2.0747392797475492 ,1.2378803095887552 ,0.5375662427481417 ,0.217275521568523  ,0.0560772062348307 ,0.01250699956548677,]
     x_axis=[1,2,4,8,16,32,64,128]
     x_axis=[str(x) for x in x_axis]
-    ax.plot(x_axis, first_search_fails, label="first search", marker="s")
-    ax.plot(x_axis, second_search_fails, label="second search", marker="o")
+    ax.plot(x_axis, first_search_fails, label="first search", marker="s", color=lib.fusee_color)
+    ax.plot(x_axis, second_search_fails, label="second search", marker="o", color=lib.rcuckoo_color)
     ax.legend()
     ax.set_xlabel("rows per lock")
     ax.set_ylabel("failured search per insert")

@@ -144,12 +144,12 @@ def plot_round_trips_per_insert_operation():
 
     ax.plot(x_axis_vals,ind_99, color=write_steering_color, linestyle='--',marker='o')
     ax.plot(x_axis_vals,dep_99, color=default_clover_color, linestyle='--',marker='x')
-    ax.plot(x_axis_vals,bfs_ind_99, color=connection_color, linestyle='--',marker='^')
-    ax.plot(x_axis_vals,bfs_99, color=read_write_steering_color, linestyle='--',marker='s')
+    ax.plot(x_axis_vals,bfs_ind_99, color=read_write_steering_color, linestyle='--',marker='^')
+    ax.plot(x_axis_vals,bfs_99, color=lib.rcuckoo_color, linestyle='--',marker='s')
     di = ax.plot(x_axis_vals,ind_50, label="dfs (independent)", color=write_steering_color, marker='o')
     dd = ax.plot(x_axis_vals,dep_50, label="dfs (dependent)",  color=default_clover_color, marker='x')
-    bi = ax.plot(x_axis_vals,bfs_ind_50, label= "bfs (independent)", color=connection_color, marker='^')
-    bd = ax.plot(x_axis_vals,bfs_50, label="bfs (dependent)",  color=read_write_steering_color, marker='s')
+    bi = ax.plot(x_axis_vals,bfs_ind_50, label= "bfs (independent)", color=read_write_steering_color, marker='^')
+    bd = ax.plot(x_axis_vals,bfs_50, label="bfs (dependent)",  color=lib.rcuckoo_color, marker='s')
 
     ax.legend()
 

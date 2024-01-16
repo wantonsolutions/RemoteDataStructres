@@ -58,11 +58,16 @@ def plot_fault_rate_static():
     tput_16= [16.73, 16.80, 17.00, 16.56, 16.13, 16.37, 16.67, 16.23, 15.79, 15.73, 13.87,  8.87, 7.42, 7.23, 6.54, 4.88]
     x_16= [0.11, 1.05, 2.07, 4.05, 8.03, 16.01, 31.91, 63.57, 126.08, 166.52, 383.22,  507.24, 531.11, 545.88, 621.72, 714.51]
 
-    vals=[(1,tput_1,x_1),(2,tput_2,x_2),(4,tput_4,x_4),(8,tput_8,x_8), (16,tput_16,x_16)]
+    vals=[
+        (1,tput_1,x_1,lib.fusee_color),
+        (2,tput_2,x_2,lib.sherman_color),
+        (4,tput_4,x_4,lib.clover_color),
+        (8,tput_8,x_8,lib.navy_color), 
+        (16,tput_16,x_16,lib.rcuckoo_color)]
 
     fig, ax = plt.subplots(1,1, figsize=(3,2.5))
-    for rpl, y, x in vals:
-        ax.plot(x, y, label=str(rpl), marker="s")
+    for rpl, y, x, c in vals:
+        ax.plot(x, y, label=str(rpl), marker="s", color=c)
     # ax.set_xscale('log')
     ax.legend()
     ax.set_ylim(0,18)
