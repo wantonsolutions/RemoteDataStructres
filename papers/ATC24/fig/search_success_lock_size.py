@@ -85,12 +85,17 @@ def plot_search_success_lock_size_static():
     second_search_fails=[3.937585437932405  ,2.973340926977462  ,2.0747392797475492 ,1.2378803095887552 ,0.5375662427481417 ,0.217275521568523  ,0.0560772062348307 ,0.01250699956548677,]
     x_axis=[1,2,4,8,16,32,64,128]
     x_axis=[str(x) for x in x_axis]
-    ax.plot(x_axis, first_search_fails, label="first search", marker="s", color=lib.fusee_color)
-    ax.plot(x_axis, second_search_fails, label="second search", marker="o", color=lib.rcuckoo_color)
-    ax.legend()
+    success_rate = [(f-s)/f for s,f in zip(second_search_fails,first_search_fails)]
+    success_rate = [s  * 100 for s in success_rate]
+    print(success_rate)
+    ax.plot(x_axis, success_rate, marker="s", color=lib.rcuckoo_color)
+    # ax.plot(x_axis, success_rate, label="search success ratio", marker="s", color=lib.rcuckoo_color)
+    # ax.plot(x_axis, first_search_fails, label="first search", marker="s", color=lib.fusee_color)
+    # ax.plot(x_axis, second_search_fails, label="second search", marker="o", color=lib.rcuckoo_color)
+    # ax.legend()
     ax.set_xlabel("rows per lock")
-    ax.set_ylabel("failured search per insert")
-    ax.set_ylim(0,5)
+    ax.set_ylabel("success rate (%)")
+    ax.set_ylim(0,100)
     plt.tight_layout()
     plt.savefig("search_success_lock_size.pdf")
 
