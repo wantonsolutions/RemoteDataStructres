@@ -1,12 +1,6 @@
 \section{Design}
 \label{sec:design}
 
-\begin{figure}[t]
-    \includegraphics[width=0.99\linewidth]{fig/table-diagram.pdf}
-    \caption{RCuckoo's datastructures showing an insert of the key $K$ as it displaces $C$.}
-    \label{fig:table-diagram}
-\end{figure}
-
 In this section we describe the design of RCuckoo, a fully
 disaggregated lock-based cuckoo hash table in which clients
 communicate with passive memory servers over reliable RDMA connections
@@ -25,6 +19,12 @@ to the hashing function, see Section~\ref{sec:dephash}).
 
 \subsection{Datastructures}
 \label{sec:table-design}
+
+\begin{figure}[t]
+    \includegraphics[width=0.99\linewidth]{fig/table-diagram.pdf}
+    \caption{RCuckoo's datastructures showing an insert of the key $K$ as it displaces $C$.}
+    \label{fig:table-diagram}
+\end{figure}
 
 Figure~\ref{fig:table-diagram} shows RCuckoo's index and lock table
 (both maintained at the remote memory server) during an insertion of
