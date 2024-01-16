@@ -581,16 +581,17 @@ necessary locks.  (In the extreme, there would just be one, global
 lock for the entire table.)  We conduct a parameter sweep to determine
 the best choice of lock granularity for our setting.
 
-Figure~\ref{fig:cuckoo-problems} shows the results of a representative
-experiment where \todo{XXX} clients are concurrently filling a 512-row
-table to 95\% full.  We report the 99th-percentile (i.e., the most
-expensive inserts when the table is nearly full) number of
-round trips required to acquire the locks necessary to perform an
-insertion as a function of both lock granularity (i.e., number of rows
-per lock, on the $x$-axis) and lock size (i.e., the number of locks
-that can be accessed with a single MCAS operation, on the
-$y$-axis---RCuckoo's single-bit locks correspond to 64 locks per
-message).
+Figure~\ref{fig:cuckoo-problems} shows the results of a
+representative experiment where 8 clients are concurrently
+filling a 512-row table to 95\% full.  We report the
+99th-percentile (i.e., the most expensive inserts when the
+table is nearly full) number of round trips required to
+acquire the locks necessary to perform an insertion as a
+function of both lock granularity (i.e., number of rows per
+lock, on the $x$-axis) and lock size (i.e., the number of
+locks that can be accessed with a single MCAS operation, on
+the $y$-axis---RCuckoo's single-bit locks correspond to 64
+locks per message).
 
 While there is some noise due to experimental variance, the far-right
 column shows that a single global lock results in high contention (as
