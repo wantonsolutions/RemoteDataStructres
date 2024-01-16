@@ -176,22 +176,24 @@ each system, we provision a 100-M-entry table and prepopulate it with
 variable number of clients concurrently accessing entries according to
 a Zipf(0.99) distribution.
 
-On YCSB-A RCuckoo begins to surpass FUSEE after about 125 clients.  FUSEE's maximum performance is gated by its requirement for an additional round trip per operation (to
-retrieve the extent). Sherman keeps pace until about 5 MOPS at which
-point it suffers from lock contention due to its B-Tree structure.
-(Sherman and RCuckoo perform similarly for uniform workloads where
-lock contention is less of an issue.).  Clover performs the worst
+On the mixed YCSB-A workload RCuckoo and FUSEE perform similarly, although we are unable to scale FUSEE past 250 clients in our testbed.
+%begins to surpass FUSEE after about 125 clients.  FUSEE's maximum performance is gated by its requirement for an additional round trip per operation (to
+%retrieve the extent).
+Sherman begins to suffer from lock contention around 5 MOPS due to its B-Tree structure.
+(Sherman performance is comparable to RCuckoo for uniform workloads, not shown, where
+lock contention is less of an issue.)  Clover performs the worst
 under write-heavy workloads due to its inability to effectively leverage
 client-side caching of a constantly changing index structure.
 
 On read-mostly (YCSB-B) and read-only (YCSB-C) workloads RCuckoo
-extracts even further benefit from its ability to complete
-reads in a single round trip by collapsing most reads into a single
-RDMA request (Section~\ref{sec:read_threshold}).  Sherman performs
-well on read-mostly workloads as it can directly read from the B-Tree
+pulls ahead.
+%, extracts even further benefit from its ability to complete
+%reads in a single round trip by collapsing most reads into a single
+%RDMA request (Section~\ref{sec:read_threshold}).
+Sherman performs
+well at low levels of concurrency as it can directly read from the B-Tree
 in a single round trip without the need for pointer chasing, but it
-continues to bottleneck on lock contention in YCSB-B due to hot
-keys. While Sherman experiences no such bottleneck on YCSB-C its read
+continues to bottleneck on lock contention in YCSB-B.  While lock contention is not an issue in the read-only YCSB-C, Sherman's read
 algorithm is more complex than RCuckoo's leading to lower top-end
 performance. Clover performs similarly to FUSEE on YCSB-B, and is the
 most competitive with RCuckoo in read-only scenario.  When it is able
