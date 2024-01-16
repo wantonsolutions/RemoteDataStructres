@@ -3,12 +3,13 @@ import sys
 from experiments import plot_cuckoo as pc
 from experiments import data_management as dm
 import matplotlib.pyplot as plt
+import lib
 
 from simulator import hash
 # import chash as hash
 
 # factors = [1.8, 1.9, 2.0, 2.1, 2.2, 2.3]
-factors = [1.9, 2.1, 2.3]
+factors = [2.1, 2.3, 2.5]
 data_dir="hash_factor"
 
 def gen_hash_factor_distance_cdf():
@@ -37,14 +38,15 @@ def plot_hash_factor_distance_cdf():
     all_distances = dm.load_statistics(dirname=data_dir)
     all_distances = all_distances[0]
     print("all distance post load: ", len(all_distances))
-
+    
+    colors=[lib.fusee_color,lib.rcuckoo_color,lib.sherman_color]
     for i in range(len(factors)):
         distances = all_distances[i]
         distances = [(v/64) for v in distances]
         print(distances)
         f = factors[i]
         x, y = pc.cdf(distances)
-        ax.plot(x,y, label="f="+str(f))
+        ax.plot(x,y, label="f="+str(f), color=colors[i])
 
     # x = [1,2,4,8,16,32,64, 128, 256, 512, 1024, 2048, 4096] 
     # x = [2,8,32,128,512,2048]

@@ -66,7 +66,12 @@ def plot_insertion_range_protocol_cdf():
 
         search = config['search_function']
         dependent = config['location_function']
-        ax1.plot(x,y, label=str(dependent), linewidth=2)
+        if dependent == "dependent":
+            ax1.plot(x,y, label=str(dependent), linewidth=2, color=lib.rcuckoo_color)
+        elif dependent == "independent":
+            ax1.plot(x,y, label=str(dependent), linewidth=2, color=lib.sherman_color)
+        
+        # ax1.plot(x,y, label=str(dependent), linewidth=2)
         if dependent == "dependent":
             nf=0
             nn=0
