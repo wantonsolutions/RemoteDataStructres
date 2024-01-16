@@ -103,14 +103,15 @@ located sufficiently close together, it can be beneficial for the
 client to issue a single \emph{covering read} that returns the
 contents of both rows---as well as intervening and potentially
 surrounding ones---in a single request.
-A single, large read rather than two small reads are issued
-if both locations are within
+RCuckoo clients issue a single, large read rather than two small reads if both locations are within
 %close to one another in the table to
 %reduce tail latency. We use
 128 bytes of each other as our experiments show it has a negligible
 increase in latency over smaller RDMA requests
 (Figure~\ref{fig:rdma-benchmarks}(b)) and provides substantial
-improvement for insert operations.
+improvement for insert operations.  (If bandwidth is not a concern, we
+find that a 2-KB threshold can deliver a further 3\% boost to insert
+performance, but the resulting read amplification is significant.)
 
 
 \begin{figure}[t]
@@ -502,12 +503,16 @@ Decreased distances between hash locations naturally lead to shorter
 cuckoo paths when combined with our breadth-first search approach.
 Using $f=2.1$ and a table size of 100-K rows,
 Figure~\ref{fig:locality-hashing}(c) shows that when filling the table
-to 95\% full, 95\% of insertions require cuckoo paths that span 32 or
-fewer rows while nearly 99\% span 256 or fewer.  This setting yields
-paths that will frequently fit within the rows returned by a covering
-read.  
+to 95\% full, more than half of insertions do not require any
+cuckooing, and 95\% of insertions require cuckoo paths that span 32 or
+fewer rows while nearly 99\% span 256 or fewer.  Conversely, with
+independent hashing, insertions that require any cukooing at all
+almost always result in spans of 2~K rows or more.
+%This setting
+%yields paths that will frequently fit within the rows returned by a
+%covering read.
 %
-\todo{I don't understand the independent lien---50\% have a span of 1?  Maybe remove for now?}
+%\todo{I don't understand the independent lien---50\% have a span of 1?  Maybe remove for now?}
 
 %% Locality provides an additional opportunity to reduce round
 %% trips by reading additional buckets. If locks are close
