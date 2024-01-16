@@ -85,7 +85,7 @@ def plot_insertion_range_protocol_cdf():
     if not buckets:
         ax1.set_xlabel('Insertion Span (bytes)')
     else:
-        ax1.set_xlabel('Insertion Span (buckets)')
+        ax1.set_xlabel('Insertion Span (rows)')
     # ax1.set_title('Insertion Range CDF')
     ax1.legend(prop={'size': 8})
     ax1.set_ylim(0,1.05)
@@ -96,5 +96,5 @@ def plot_insertion_range_protocol_cdf():
     plt.tight_layout()
     plt.savefig("insertion_span.pdf")
 
-run_insertion_range_protocol_cdf()
+# run_insertion_range_protocol_cdf()
 plot_insertion_range_protocol_cdf()

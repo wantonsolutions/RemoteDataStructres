@@ -26,32 +26,38 @@ to the hashing function, see Section~\ref{sec:dephash}).
     \label{fig:table-diagram}
 \end{figure}
 
-Figure~\ref{fig:table-diagram} shows RCuckoo's index and lock table
-(both maintained at the remote memory server) during an insertion of
-key $K$.  The index table (right) is a single region of
-RDMA-registered main memory divided into rows of fixed-width entries.
-Each row contains $n$ associative entries (3 in this figure, \todo{we use 8 in practice}) and
-terminates with an 8-bit version number and 64-bit CRC (that is
-computed over the entire row including version number).  Clients
-access the index table using 1-sided RDMA reads and writes; CRCs
-facilitate lock-free reads as each row can be self-verified while
-version numbers enable clients to detect if a row has been modified.
-Locks (stored in a bit vector in NIC memory, shown on the left) each
-protect a tunable number (here, two) of index rows.  Clients perform
-lock acquisition and release with RDMA compare-and-swap (CAS)
-operations.  Specifically, RCuckoo leverages masked CAS (MCAS)
-operations~\cite{rdma-masked-cas,sherman} to obtain multiple locks
-simultaneously while avoiding false sharing.
+Figure~\ref{fig:table-diagram} shows RCuckoo's index and
+lock table (both maintained at the remote memory server)
+during an insertion of key $K$.  The index table (right) is
+a single region of RDMA-registered main memory divided into
+rows of fixed-width entries.  Each row contains $n$
+associative entries (3 in this figure, we use 8 in practice)
+and terminates with an 8-bit version number and 64-bit CRC
+(that is computed over the entire row including version
+number).  Clients access the index table using 1-sided RDMA
+reads and writes; CRCs facilitate lock-free reads as each
+row can be self-verified while version numbers enable
+clients to detect if a row has been modified.  Locks (stored
+in a bit vector in NIC memory, shown on the left) each
+protect a tunable number (here, two) of index rows.  Clients
+perform lock acquisition and release with RDMA
+compare-and-swap (CAS) operations.  Specifically, RCuckoo
+leverages masked CAS (MCAS)
+operations~\cite{rdma-masked-cas,sherman} to obtain multiple
+locks simultaneously while avoiding false sharing.
 
 %by polling CRCs which is used to detect if a client
 %has failed while holding a lock (Section~\ref{sec:fault-tolerance}).
 
-As shown at the bottom of the figure, Table entries contain either
-inlined key/value pairs which are used by default (and signified by a 0 MSB) or a key and 48-bit
-pointer to an extent entry for larger values.  \todo{We use 8-byte entries in our experiments, with 4-byte keys and 4-byte values.}
-%~\footnote{Inlined entries perform better on small key value pairs}.
-Extents are located in preallocated, per-client regions of server
-memory to avoid contention on inserts.
+As shown at the bottom of the figure, Table entries contain
+either inlined key/value pairs which are used by default
+(and signified by a 0 MSB) or a key and 48-bit pointer to an
+extent entry for larger values. We use 8-byte entries in our
+experiments, with 4-byte keys and 4-byte values\footnote{The performance of larger values is shows in Section~\ref{sec:entry_size}}.
+%~\footnote{Inlined entries perform better on small key
+%value pairs}.
+Extents are located in preallocated, per-client regions of
+server memory to avoid contention on inserts.
 
 
 %%
@@ -336,7 +342,7 @@ valid result.
  %   \textbf{(a)} Dependent hashing for factor $f$.
     \textbf{(a)} CDF of distances between cuckoo locations for different locality settings using RCuckoo's dependent hashing.
     \textbf{(b)} Achieved maximum fill percentage for different locality settings. 90\% fill indicated by dashed red line.
-        \textbf{(c)} CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path.~\todo{buckets to rows}
+    \textbf{(c)} CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path.
     }
     \label{fig:locality-hashing}
 
