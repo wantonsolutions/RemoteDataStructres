@@ -260,7 +260,7 @@ speculative cuckoo path.  As with prior work, we use breadth-first
 search (BFS) to identify short paths in an attempt to minimize
 bandwidth and locking overhead~\cite{cuckoo-improvements}.  If the
 client cache is empty the degenerate path is presumed, i.e., that the
-key will be inserted into either its primary location
+key will be inserted into its primary location
 without the need for any cuckooing.  Obviously, speculative cuckoo
 paths are most useful when client caches are fresh---often due to a
 failed prior attempt to insert the same key.
