@@ -245,12 +245,12 @@ caching with a constantly changing index structure.
     \begin{subfigure}{0.24\linewidth}
       \includegraphics[width=0.99\linewidth]{fig/entry_size.pdf}
           \end{subfigure}
-
-    \caption{RCuckoo parameter sweeps:
+\vskip -1em
+    \caption{RCuckoo microbenchmarks:
       \textbf{(a)} YCSB-A throughput vs. client failure rate,
           \textbf{(b)} round trip times required to acquire locks on insert,
-    \textbf{(c)} failure rate of search algorithms vs. lock size under high contention, and
-    \textbf{(D)} throughput vs. key/value entry size for YCSB-A (insert) and YCSB-C (read-only) workloads.
+    \textbf{(c)} insert second-search success rate as a function of lock granularity, and
+    \textbf{(d)} throughput vs. key/value-entry size for YCSB-A (insert) and YCSB-C (read-only) workloads.
     }
     % \label{fig:microbenchmarks}
              \label{fig:microbenchmarks}
@@ -460,25 +460,40 @@ four or more locks per message.
 %RCuckoo's two-stage search algorithm is designed to improve
 %the probability that an insert will be successful given that
 %a clients local cache is out of sync.
-To demonstrate the
-value of RCuckoo's two-stage search strategy we measure
-the success rate of cuckoo-path searches under high contention. With
-320 concurrent clients we prepopulate a small (10-M entry) table
-up to 85\% prior to measuring success rate in order to
-maximize cuckoo path length. Figure~\ref{fig:microbenchmarks}(c)
-shows the number of failure rate of both search stages. The first
-search is the success rate of a search based entirely on
-cached information. The second search is the success rate of
-our restricted search performed after acquiring locks. We
-measure the response of both as a function of lock size.
-Given 1 row per lock the failure rate of both searches is
-over 4 as the local cache is almost always out of sync, and
-retries are not guaranteed to be synchronized. As lock
-granularity grows the frequency of second search success
-drops dramatically. At 64 rows per lock our second search
-succeeds 95\% of the time even when the cached search fails
-at a rate of 99\% per insert.
-\todo{I find this graph/section really hard to understand; different presentation or perhaps remove if out of time?}
+To demonstrate the value of RCuckoo's two-stage search strategy we
+measure the success rate of the second cuckoo-path search under high
+contention.  We prepopulate a small (10-M entry) table up to 85\% and
+then have 320 clients concurrently perform insertions (i.e., YCSB-W).
+For this experiment only, we flush the client's cache before every
+insert, ensuring the initial speculative path will fail unless the entry does
+not require cuckooing (unlikely at this fill factor).
+%We report the success rate of second   in order to
+%maximize cuckoo path length.
+Figure~\ref{fig:microbenchmarks}(c) plots the success rate of the
+second search as a function of lock granularity.  \todo{not sure how
+  99th percentile impacts things} Recall that if a second search
+fails, RCuckoo clients release their locks and retry the insert
+operation using the contents of their cache, so multiple speculative
+and secondary searches may be performed.  At one row per lock,
+secondary search has limited effectiveness (as the only alternative is
+to cuckoo a different set of entries among the same rows), leading to
+multiple retries (approaching 4 in the 99th percentile, not shown).
+As locks begin to cover additional rows, however, the second search
+becomes much more useful.
+%% of failure rate of both search stages. The first
+%% search is the success rate of a search based entirely on
+%% cached information. The second search is the success rate of
+%% our restricted search performed after acquiring locks. We
+%% measure the response of both as a function of lock size.
+%% Given 1 row per lock the failure rate of both searches is
+%% over 4 as the local cache is almost always out of sync, and
+%% retries are not guaranteed to be synchronized. As lock
+%% granularity grows the frequency of second search success
+%% drops dramatically. 
+At 64 rows per lock the second search
+succeeds 95\% of the time.
+%even when the cached search fails
+%at a rate of 99\% per insert.
 
 
 %% \subsubsection{Masked CAS}
