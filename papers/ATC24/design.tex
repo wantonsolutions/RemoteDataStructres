@@ -6,7 +6,7 @@ disaggregated lock-based cuckoo hash table in which clients
 communicate with passive memory servers over reliable RDMA connections
 using exclusively 1-sided operations.  We first describe our table
 design and protocol to read and modify the contents of the table.  In
-the common case, reads complete in one round trip while update and
+the common case, reads complete in one or two round trips while update and
 delete operations require two.  Then we introduce a locality-enhanced
 hashing algorithm and show how it enables our protocol to perform
 inserts in a small number of round trips.  Finally, we discuss
@@ -22,9 +22,10 @@ to the hashing function, see Section~\ref{sec:dephash}).
 
 \begin{figure}[t]
     \includegraphics[width=0.99\linewidth]{fig/table-diagram.pdf}
+\vskip -0.5em
     \caption{RCuckoo's datastructures showing an insert of the key $K$ as it displaces $C$.}
     \label{fig:table-diagram}
-    \vskip -1em
+    \vskip -1.5em
 \end{figure}
 
 Figure~\ref{fig:table-diagram} shows RCuckoo's index and lock table
@@ -87,7 +88,7 @@ exchanges.
 
 RCuckoo is designed to facilitate lock-free, single round-trip reads
 for small values as they are the dominant operation for key/value
-stores in data centers~\cite{rocks-db-workload,facebook-memcached}. To
+stores in many data centers~\cite{rocks-db-workload,facebook-memcached}. To
 read the value associated with a given key clients calculate the
 potential table locations for the key's entry (using the hash
 functions described in the next subsection) and issue RDMA reads for
@@ -162,8 +163,7 @@ extent in an RDMA write that is batched with the lock acquisition
 requests to avoid additional round trips.  Deletes of extent-based
 values simply mark the entry for later garbage collection.
 Figure~\ref{fig:message_diagram}(b) shows that most uncontested operations
-complete in two round trip times; clients retry failed lock
-acquisitions until they succeed or detect a failed client.
+complete in two round trips; clients retry acquisitions until they succeed or detect a failed client.
 %(see Section~\ref{ss:fd}).
 
 \todo{How does extent garbage collection work?}
@@ -194,7 +194,7 @@ compute a complete cuckoo path ahead of time and then acquire locks on
 all the relevant rows to ensure its success.  Moreover, to facilitate
 recovery from client failures, an insert is performed by cuckooing
 elements one at a time, starting by moving the last entry in the path
-to the empty location, and then replacing that entry with the previous
+to the empty location, and then replacing it with the previous
 entry in the path, and so on until the new entry is inserted in its primary location.
 
 
@@ -506,9 +506,9 @@ located five or fewer rows apart.
 
 Decreased distances between hash locations naturally lead to shorter
 cuckoo paths when combined with our breadth-first search approach.
-Using $f=2.1$ and a table size of 100-K rows,
+Using $f=2.3$ and a table size of 100-K rows,
 Figure~\ref{fig:locality-hashing}(c) shows that when filling the table
-to 95\% full, more than half of insertions do not require any
+to 95\% full, slightly more than half of insertions do not require any
 cuckooing, and 95\% of insertions require cuckoo paths that span 32 or
 fewer rows while nearly 99\% span 256 or fewer.  Conversely, with
 independent hashing, insertions that require any cukooing at all
@@ -562,7 +562,7 @@ depend critically on locking performance.
     \caption{99th-percentile round trips required per insert in a 512-row table
     when filling to 95\%. 512 buckets per lock corresponds to a single global lock.}
     \label{fig:cuckoo-problems}
-
+\vskip -1em
 \end{figure}
 
 Increased locality decreases the number of round trips required

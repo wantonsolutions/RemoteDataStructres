@@ -143,7 +143,9 @@ trips required to acquire locks and perform mutating operations.
 We introduce RCuckoo, a fully disaggregated key/value store based on
 cuckoo hashing~\cite{cuckoo} that
 %delivers high performance using
-uses only one-sided RDMA operations.  At its heart, RCuckoo builds
+uses only one-sided RDMA operations.
+%At its heart,
+RCuckoo builds
 around a \emph{dependent hashing} algorithm that makes spatial
 locality a tunable parameter.
 %
@@ -258,20 +260,17 @@ failures:
 \vskip -1em
 \end{figure*}
 
-
-Combined with a datastructure design that facilitates
-aggressive batching of RDMA operations, these techniques
-enable RCuckoo to limit the number of round trips required
-for all table operations.  In the common case, reads execute
-in a single round trip, uncontested updates and deletes
-require two round trips, and the median insert operation
-involves only two round trips---although the expected number
-increases as the table fills.  On our testbed, RCuckoo
-delivers higher performance across a full suite of YCSB
-benchmarks than all of the existing disaggregated key/value
-stores we consider.  Concretely, with 320 clients RCuckoo
-delivers more than 2.5x throughput improvement on
-read-intensive workloads (YCSB-B) and between 0.9-7.1x on
-skewed write intensive workloads.  Moreover, we show that
-RCuckoo's performance remains high despite failure rates on
-the order of 100s of clients per second.
+Combined with a datastructure design that facilitates aggressive
+batching of RDMA operations, these techniques enable RCuckoo to limit
+the number of round trips required for all table operations.  In the
+common case, reads execute in one or two (for large values) round
+trips, uncontested updates and deletes require two round trips, and
+the median insert operation involves only two round trips---although
+the expected number increases as the table fills.  On our testbed,
+RCuckoo delivers comparable or higher performance on small values across the standard set  of YCSB benchmarks than all of the existing disaggregated
+key/value stores we consider.  Concretely, with 320 clients RCuckoo
+delivers up to a 2.5$\times$ throughput improvement on read-intensive
+(YCSB-B) workloads and 0.9--7.1$\times$ the throughput on skewed
+write-intensive (YCSB-A) workloads.  Moreover, RCuckoo's
+performance remains high despite failure rates on the order of 100s of
+clients per second.
