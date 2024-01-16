@@ -181,13 +181,14 @@ def plot_hero_ycsb_throughput_static():
     cuck_c_tput=[2.99,5.952564563617636, 11.493884402194366, 22.578766368166765, 39.36893367295243, 46.49349910889845, 46.3064643682979]
     # cuck_w_tput=[0.5, 1.0992159380413737, 1.9709423507842736, 3.0512749083638777, 5.961405911330047, 6.9574283018867895, 7.115548453608248]
     clients=[10,20, 40, 80, 160, 320, 400]
+    clients=[10,20, 40, 80, 160, 320]
     cuck_a_clients= [8,16,40,80,160,320]
     cuck_b_clients=[8,16,40,80,160,320]
     fig, axs = plt.subplots(1,len(workloads), figsize=(15,3))
 
     axs[ycsb_location["ycsb-a"]].plot(cuck_a_clients,cuck_a_tput,label="RCuckoo",marker="o",color=lib.rcuckoo_color, linewidth=lw)
     axs[ycsb_location["ycsb-b"]].plot(cuck_b_clients,cuck_b_tput,label="RCuckoo",marker="o",color=lib.rcuckoo_color, linewidth=lw)
-    axs[ycsb_location["ycsb-c"]].plot(clients,cuck_c_tput,label="RCuckoo",marker="o",color=lib.rcuckoo_color, linewidth=lw)
+    axs[ycsb_location["ycsb-c"]].plot(clients,cuck_c_tput[:len(clients)],label="RCuckoo",marker="o",color=lib.rcuckoo_color, linewidth=lw)
     # axs[3].plot(clients,cuck_w_tput,label="cuckoo",marker="o")
 
     #fusee
@@ -207,15 +208,16 @@ def plot_hero_ycsb_throughput_static():
     clover_b_tput=[1500840,2680607,4929508,7935485,12774234,14548308,14439633,14124372,13402903,13402903,]
     clover_a_tput=[815460,1331156,1858488,2343504,2639795,2386740,2098574,1471908,1830812,1602349,]
     clover_w_tput=[866916,1639656,3114720,5418308,9386624,12991886,14967071,17022698,17165892,17432716,] 
-    clover_clients=[7,14,28,56,112,168,224,280,336,392,]
+    # clover_clients=[7,14,28,56,112,168,224,280,336,392,]
+    clover_clients=[7,14,28,56,112,168,224,280,336]
 
     clover_c_tput = [x / 1000000 for x in clover_c_tput]
     clover_b_tput = [x / 1000000 for x in clover_b_tput]
     clover_a_tput = [x / 1000000 for x in clover_a_tput]
 
-    axs[ycsb_location["ycsb-a"]].plot(clover_clients,clover_a_tput,label="Clover",marker="^", color = lib.clover_color, linewidth=lw)
-    axs[ycsb_location["ycsb-b"]].plot(clover_clients,clover_b_tput,label="Clover",marker="^", color = lib.clover_color, linewidth=lw)
-    axs[ycsb_location["ycsb-c"]].plot(clover_clients,clover_c_tput,label="Clover",marker="^", color = lib.clover_color, linewidth=lw)
+    axs[ycsb_location["ycsb-a"]].plot(clover_clients,clover_a_tput[:len(clover_clients)],label="Clover",marker="^", color = lib.clover_color, linewidth=lw)
+    axs[ycsb_location["ycsb-b"]].plot(clover_clients,clover_b_tput[:len(clover_clients)],label="Clover",marker="^", color = lib.clover_color, linewidth=lw)
+    axs[ycsb_location["ycsb-c"]].plot(clover_clients,clover_c_tput[:len(clover_clients)],label="Clover",marker="^", color = lib.clover_color, linewidth=lw)
 
 
 
