@@ -23,10 +23,12 @@ index-table entry size.
 \input{implementation}
 
 \begin{figure*}[ht]
-    \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_throughput.pdf}
+  \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_throughput.pdf}
+  \vskip -1em
 \caption{Throughput as a function of the number of clients for three different workloads (Zipf $\theta$=0.99): \textbf{(a)} Read only (YCSB-C), \textbf{(b)} YCSB-B 95\% read, 5\% update and \textbf{(c)}
     50\% read 50\% update (YCSB-A).}
-    \label{fig:ycsb_throughput}
+\label{fig:ycsb_throughput}
+\vskip -1em
  \end{figure*}
 
 
@@ -141,12 +143,12 @@ machines in the cluster.
 
 \begin{figure*}[ht]
     \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill.pdf}
-
+\vskip -1em
     \caption{Performance as a
     function of fill factor. \textbf{(a)} Throughput for four different YCSB insert workloads, \textbf{(b)}
     median operation latency, \textbf{(c)} mean operation size, and \textbf{(d)}
     mean RDMA message count per operation under YCSB-A.}
-
+\vskip -1em
     \label{fig:ycsb_fill}
 \end{figure*}
 
