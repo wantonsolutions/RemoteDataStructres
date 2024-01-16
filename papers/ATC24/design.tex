@@ -306,6 +306,43 @@ valid result.
 % a far higher impact on %search success over caching
 % (Section~\ref{sec:search_success}).
 
+\begin{figure*}[t]
+    \centering
+%    \begin{subfigure}{0.3\linewidth}
+%        \begin{align*}
+%            L_1 &= h_1(k) \\
+%            L_2 &= L_1 + (h_2(k)\mod f^{f + log_2(h_3(k))})
+%        \end{align*}
+%        % \caption{}
+%        % \label{fig:hash_factor}
+%    \end{subfigure}
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/hash_factor.pdf}
+        % \label{fig:hash_factor}
+        % \caption{}
+    \end{subfigure}
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/hash_fill.pdf}
+        % \label{fig:hash_fill}
+        % \caption{}
+    \end{subfigure}
+        \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/insertion_span.pdf}
+        % \label{fig:insertion_span}
+        % \caption{}
+    \end{subfigure}
+    \vspace{-1em}
+    \caption{
+ %   \textbf{(a)} Dependent hashing for factor $f$.
+    \textbf{(a)} CDF of distances between cuckoo locations for different locality settings using RCuckoo's dependent hashing.
+    \textbf{(b)} Achieved maximum fill percentage for different locality settings. 90\% fill indicated by dashed red line.
+        \textbf{(c)} CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path.~\todo{buckets to rows}
+    }
+    \label{fig:locality-hashing}
+
+\end{figure*}
+
+
 \textbf{Second search:} If all the lock acquisitions are successful,
 the client validates that the initial path remains valid.  Under an
 insert-heavy workload, however, speculative cuckoo paths are
@@ -352,42 +389,6 @@ by the speculative search.
 
 
 
-\begin{figure*}[t]
-    \centering
-%    \begin{subfigure}{0.3\linewidth}
-%        \begin{align*}
-%            L_1 &= h_1(k) \\
-%            L_2 &= L_1 + (h_2(k)\mod f^{f + log_2(h_3(k))})
-%        \end{align*}
-%        % \caption{}
-%        % \label{fig:hash_factor}
-%    \end{subfigure}
-    \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/hash_factor.pdf}
-        % \label{fig:hash_factor}
-        % \caption{}
-    \end{subfigure}
-    \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/hash_fill.pdf}
-        % \label{fig:hash_fill}
-        % \caption{}
-    \end{subfigure}
-        \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/insertion_span.pdf}
-        % \label{fig:insertion_span}
-        % \caption{}
-    \end{subfigure}
-    \vspace{-1em}
-    \caption{
- %   \textbf{(a)} Dependent hashing for factor $f$.
-    \textbf{(a)} CDF of distances between cuckoo locations for different locality settings using RCuckoo's dependent hashing.
-    \textbf{(b)} Achieved maximum fill percentage for different locality settings. 90\% fill indicated by dashed red line.
-        \textbf{(c)} CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path.~\todo{buckets to rows}
-    }
-    \label{fig:locality-hashing}
-
-\end{figure*}
-
 
 \subsection{Locality}
 
@@ -401,7 +402,13 @@ deliberately independent which allows the table to be filled quite
 full before inserts begin to fail. 
 %
 In RCuckoo the distance between keys' two cuckoo hash locations is a
-tunable parameter.  Increased locality has two direct benefits: it
+tunable parameter.
+We show experimentally that an optimal locality
+setting can dramatically decrease the number of round trips required
+to perform inserts in RCuckoo while maintaining high (90\%+) fill
+maximum factors.
+
+Increased locality has two direct benefits: it
 increases the probability that both of a keys' locations can be read
 with a single covering read---which updates more of a client's local
 cache, improving the likelihood that failed insert operations will
@@ -409,10 +416,7 @@ succeed upon retry---and decreases the number of MCAS operations
 necessary to acquire the relevant locks.  It also reduces the region
 of the index table likely to be spanned by cuckoo paths, which speeds
 up inserts, but leads to hot spots that limit the table's expected
-maximum fill factor.  We show experimentally that an optimal locality
-setting can dramatically decrease the number of round trips required
-to perform inserts in RCuckoo while maintaining high (90\%+) fill
-factors.
+maximum fill factor.  
 
 
 %\subsubsection{Dependent hashing}
@@ -446,7 +450,7 @@ factors.
 %to achieve tunable locality.
 
 
-In RCuckoo, the first location for a key is chosen uniformly at random,
+In RCuckoo, the primary location for a key is chosen uniformly at random,
 while the second is offset from the first by 
 uniformly random value drawn from a probabilistically bounded range, where the
 range is likely to be relatively small.  We start with a base
@@ -464,7 +468,7 @@ locations.  (In a sharded deployment, the second location is
 restricted to the same shard by ``wrapping around'' the offset
 accordingly.) The particular formulation is not important, but the
 upshot is exponentially fewer keys have secondary locations at
-increasing distances from their first.  The latter aspect is crucial, as any
+increasing distances from their primary.  The latter aspect is crucial, as any
 fixed bound on the distance between hash locations leads to low
 maximum fill factors (on the order of 10--15\% in our experiments).
 
