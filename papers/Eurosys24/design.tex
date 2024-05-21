@@ -48,16 +48,17 @@ multiple locks simultaneously while avoiding false sharing.
 %by polling CRCs which is used to detect if a client
 %has failed while holding a lock (Section~\ref{sec:fault-tolerance}).
 
-As shown at the bottom of the figure, Table entries contain
-either inlined key/value pairs which are used by default
-(and signified by a 0 MSB) or a key and 48-bit pointer to an
-extent entry for larger values. We use 8-byte entries in our
-experiments, with 4-byte keys and 4-byte values.
+Table entries contain either inlined key/value pairs which are used by default (and signified by a 0
+LSB) or a key and 48-bit pointer to an extent entry for larger values. We use 8-byte entries in our
+experiments, with 4-byte keys and 4-byte values. Because RCuckoo can support entries larger than 64
+bits extent sizes use 23 bits to encode sizes from $2^3$ to $2^{26}$~\footnote{RACE and FUSEE are
+limited to 8bits for size and support only powers of 2}.
 %\footnote{The performance of larger values is shows in Section~\ref{sec:entry_size}}.
-%~\footnote{Inlined entries perform better on small key
-%value pairs}.
-Extents are located in preallocated, per-client regions of
-server memory to avoid contention on inserts.
+%~\footnote{Inlined entries perform better on small key value pairs}.
+Extents are located in preallocated, per-client regions of server memory to avoid contention on
+inserts. Clients maintain a local slab allocator for their writes. Like FUSEE extents are freed on
+writes by clients by setting a free bit~\cite{fusee}. Clients garbage collect their own extents
+occasionally scanning their allocated region for freed extents.
 
 
 %%
@@ -153,17 +154,14 @@ incurring a performance penalty.}  In the rare case that the locks
 must be acquired independently---necessitating an additional round
 trip---the reads are batched with the second lock request.
 
-Assuming
-successful lock acquisition and valid reads, the operation can proceed
-if the key is present in either location.  In a single (ordered) batch
-of operations, the client first writes the updated/freed entry and
-recomputed row version and CRC before releasing the locks. When
-updating values stored in extents, clients store the value to a new
-extent in an RDMA write that is sent before the lock acquisition
-requests to avoid additional round trips.  Deletes of extent-based
-values simply mark the entry for later garbage collection.
-Figure~\ref{fig:message_diagram}(b) shows that most uncontested operations
-complete in two round trips; clients retry acquisitions until they succeed or detect a failed client.
+Assuming successful lock acquisition and valid reads, the operation can proceed if the key is
+present in either location.  In a single (ordered) batch of operations, the client first writes the
+updated/freed entry and recomputed row version and CRC before releasing the locks. When updating
+values stored in extents, clients store the value to a new extent via an RDMA write that is sent in
+parallel with lock requests. On lock release clients write the first bit of the extent to free it.
+Deletes operate identically to updates save writing a new extent.
+Figure~\ref{fig:message_diagram}(b) shows that most uncontested operations complete in two round
+trips; clients retry acquisitions until they succeed or detect a failed client.
 %(see Section~\ref{ss:fd}).
 
 \todo{How does extent garbage collection work?}

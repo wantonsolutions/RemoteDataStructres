@@ -226,31 +226,38 @@ caching with a constantly changing index structure.
 %RDMA request (Section~\ref{sec:read_threshold}).
 %  While lock contention is not an issue in the read-only YCSB-C,
 
+
+
 \begin{figure*}[t]
     \centering
-    \begin{subfigure}{0.24\linewidth}
+    % \begin{subfigure}{0.24\linewidth} % orignal width for 4 figures
+    \begin{subfigure}{0.19\linewidth}
       \includegraphics[width=0.99\linewidth]{fig/fault-rate.pdf}
           \end{subfigure}
-    \begin{subfigure}{0.24\linewidth}
+    \begin{subfigure}{0.19\linewidth}
         \includegraphics[width=0.99\linewidth]{fig/search_dependence.pdf}
         % \label{fig:hash_fill}
         % \caption{}
     \end{subfigure}
-    \begin{subfigure}{0.24\linewidth}
+    \begin{subfigure}{0.19\linewidth}
         \includegraphics[width=0.99\linewidth]{fig/search_success_lock_size.pdf}
         % \label{fig:hash_factor}
         % \caption{}
     \end{subfigure}
     %\begin{figure}[ht]
-    \begin{subfigure}{0.24\linewidth}
+    \begin{subfigure}{0.19\linewidth}
       \includegraphics[width=0.99\linewidth]{fig/entry_size.pdf}
+          \end{subfigure}
+    \begin{subfigure}{0.19\linewidth}
+      \includegraphics[width=0.99\linewidth]{fig/extent.pdf}
           \end{subfigure}
 \vskip -1em
     \caption{RCuckoo microbenchmarks:
       \textbf{(a)} YCSB-A throughput vs. client failure rate,
           \textbf{(b)} round trip times required to acquire locks on insert,
     \textbf{(c)} insert second-search success rate as a function of lock granularity, and
-    \textbf{(d)} throughput vs. key/value-entry size for YCSB-A (insert) and YCSB-C (read-only) workloads.
+    \textbf{(d)} throughput vs. key/value-entry size for 50\% insert 50\% read,  and YCSB-C (read-only) workloads.
+    \textbf{(e)} Extent performance value sizes up to 1KB. Dashed line marks the inline performance on 16 Byte entries. Overheads marked in black.
     }
     % \label{fig:microbenchmarks}
              \label{fig:microbenchmarks}
@@ -561,6 +568,14 @@ employ larger entry sizes.
 % which suggest that 800 GBPS and higher network speeds will
 % be available in the coming years. While round trip latency
 % is expected to remain largely the same.
+
+Figure~\ref{fig:microbenchmarks}(e) shows extent performance on value sizes from 8 to 1024 bytes.
+The dashed line marks the performance of inlined 8byte values (16 byte entries) as a base line.
+This benchmark was taken on 6 client machines with 120 cores with zipf 0.99 distribution and GC off.
+Inlined entries have two sources of performance gain, first they avoid the overhead of read and
+writing to extents, but most importantly they avoid the overhead of additional rounds trips on cache
+misses. YCSB-B inline ops have a 21\% performance improvement and YCSB-A has a 37\% performance
+improvement (YCSB-C has no cache misses).
 
 
 
