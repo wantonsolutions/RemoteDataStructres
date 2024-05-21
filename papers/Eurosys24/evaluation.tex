@@ -172,16 +172,11 @@ around 2$\times$.
 \todo{What is the row/read size?  How close are we
   to line rate?}
 
-\textbf{Throughput.} Figure~\ref{fig:ycsb_throughput} shows throughput
-in terms of operations per second for RCuckoo, FUSEE, Clover, and
-Sherman on three different YCSB workloads.  Moving from left to right,
-the left-most graph is read-only (YCSB-C), the middle graph is 95\%
-read and 5\% update (YCSB-B), and the right-most graph presents a 50\%
-read, 50\% update mix (YCSB-A).  For each system, we provision a
-100-M-entry table and prepopulate it with 90~M entries that each
-consist of a 32-bit key and 32-bit value (we consider larger sizes in Section~\ref{ss:mb}).  We plot the aggregate throughput of a variable number of
-clients concurrently accessing entries according to a Zipf(0.99)
-distribution.
+\textbf{Throughput.} Figure~\ref{fig:ycsb_throughput} shows YCSB throughput for RCuckoo, FUSEE,
+Clover, and Sherman on three different YCSB workloads. For each system, we allocate a 100-M-entry
+table and prepopulate it with 90~M entries that each consist of a 32-bit key and 32-bit value (we
+consider larger sizes in Section~\ref{ss:mb}).  We plot the aggregate throughput of a variable
+number of clients concurrently accessing entries according to a Zipf(0.99) distribution.
 
 In a read-only (YCSB-C) workload, FUSEE suffers from its extent-based
 value storage.  RCuckoo, Clover, and Sherman perform similarly at
@@ -265,19 +260,14 @@ caching with a constantly changing index structure.
 \end{figure*}
 
 \textbf{Inserts.}
-%%
-%By default YCSB-A,B,C use updates. RCuckoo's insert
-%algorithm is it's most complex and bandwidth intensive
-%component. In this section
-Despite its complexity, RCuckoo's insert operation remains highly
-performant.  To evaluate insert performance we modify YCSB to perform
-inserts rather than updates.  Figure~\ref{fig:ycsb_fill} considers
-RCuckoo's performance on workloads that exclusively use inserts (rather than
-updates), for example in this instance YCSB-A is 50\% insert and 50\%
-read. YCSB-W is write only, i.e. a 100\%-insert workload.  Inserts become
-more expensive as the table fills, so we prepopulate the table with a varying number of entries and report insert performance as
-a function of the table's initial fill factor.
-\todo{How long/how many inserts are performed?}
+%% By default YCSB-A,B,C use updates. RCuckoo's insert algorithm is it's most complex and bandwidth
+%intensive component. In this section
+Despite its complexity, RCuckoo's insert operation remains highly performant.  To evaluate insert
+performance we run workloads with a mix of reads and inserts.  Figure~\ref{fig:ycsb_fill} considers
+RCuckoo's performance on workloads that exclusively use inserts (rather than updates), for example
+in this instance A is 50\% insert and 50\% read. W is insert only. Inserts become more expensive as the table fills, so we prepopulate the table with a
+varying number of entries and report insert performance as a function of the table's initial fill
+factor.  \todo{How long/how many inserts are performed?}
 
 Figure~\ref{fig:ycsb_fill}(a) shows the aggregate throughput of 320
 clients across four different workloads as a function of the table's
@@ -464,43 +454,29 @@ four or more locks per message.
 % \end{figure}
 
 \textbf{Secondary search.}
-%RCuckoo's two-stage search algorithm is designed to improve
-%the probability that an insert will be successful given that
-%a clients local cache is out of sync.
-To demonstrate the value of RCuckoo's two-stage search strategy we
-measure the success rate of the second cuckoo-path search under high
-contention.  We prepopulate a small (10-M entry) table up to 85\% and
-then have 320 clients concurrently perform insertions (i.e., YCSB-W).
-For this experiment only, we flush the client's cache before every
-insert, ensuring the initial speculative path will fail unless the entry does
-not require cuckooing (unlikely at this fill factor).
-%We report the success rate of second   in order to
-%maximize cuckoo path length.
-Figure~\ref{fig:microbenchmarks}(c) plots the success rate of the
-second search as a function of lock granularity.  \todo{not sure how
-  99th percentile impacts things} Recall that if a second search
-fails, RCuckoo clients release their locks and retry the insert
-operation using the contents of their cache, so multiple speculative
-and secondary searches may be performed.  At one row per lock,
-secondary search has limited effectiveness (as the only alternative is
-to cuckoo a different set of entries among the same rows), leading to
-multiple retries (approaching 4 in the 99th percentile, not shown).
-As locks begin to cover additional rows, however, the second search
-becomes much more useful.
-%% of failure rate of both search stages. The first
-%% search is the success rate of a search based entirely on
-%% cached information. The second search is the success rate of
-%% our restricted search performed after acquiring locks. We
-%% measure the response of both as a function of lock size.
-%% Given 1 row per lock the failure rate of both searches is
-%% over 4 as the local cache is almost always out of sync, and
-%% retries are not guaranteed to be synchronized. As lock
-%% granularity grows the frequency of second search success
-%% drops dramatically. 
-At 64 rows per lock the second search
-succeeds 95\% of the time.
-%even when the cached search fails
-%at a rate of 99\% per insert.
+%RCuckoo's two-stage search algorithm is designed to improve the probability that an insert will be
+%successful given that a clients local cache is out of sync.
+We measure second search success rate as a function of lock granularity under high contention.  A
+table is filled up to 85\% and then 320 clients concurrently run an insert-only workload.  For this
+experiment only, we flush the client's cache before every insert, ensuring the initial speculative
+path will fail unless the entry does not require cuckooing (unlikely at this fill factor).
+%We report the success rate of second   in order to maximize cuckoo path length.
+Figure~\ref{fig:microbenchmarks}(c) plots the success rate of the second search as a function of
+lock granularity.  \todo{not sure how 99th percentile impacts things} Recall that if a second search
+fails, RCuckoo clients release their locks and retry the insert operation using the contents of
+their cache, so multiple speculative and secondary searches may be performed.  At one row per lock,
+secondary search has limited effectiveness (as the only alternative is to cuckoo a different set of
+entries among the same rows), leading to multiple retries (approaching 4 in the 99th percentile, not
+shown).  As locks begin to cover additional rows, however, the second search becomes much more
+useful.
+%% of failure rate of both search stages. The first % search is the success rate of a search based
+%entirely on % cached information. The second search is the success rate of % our restricted search
+%performed after acquiring locks. We % measure the response of both as a function of lock size.  %
+%Given 1 row per lock the failure rate of both searches is % over 4 as the local cache is almost
+%always out of sync, and % retries are not guaranteed to be synchronized. As lock % granularity
+%grows the frequency of second search success % drops dramatically. 
+At 64 rows per lock the second search succeeds 95\% of the time.
+%even when the cached search fails at a rate of 99\% per insert.
 
 
 %% \subsubsection{Masked CAS}
@@ -532,36 +508,23 @@ succeeds 95\% of the time.
 % RCuckoo performance to various parameter settings.
 
 
-\textbf{Entry size.}
-\label{sec:entry_size}
-Inlined key/value entries enable single-round-trip
-reads, so the larger the entries, the fewer values that
-require a second round trip.  However, for a fixed row size,
-larger entries imply fewer entries per row, increasing
-cuckoo path lengths (when measured in terms of rows).
-%,
-%impacting insert performance.
-%% but larger values must be stored in extents.  % at the
-%cost of inflating the bandwidth of % operations. We run a
-%50\% read 50\% insert and a read only % workload to
-%illustrate the overhead of larger entries.
-Figure~\ref{fig:microbenchmarks}(d) shows the effect of entry
-size on throughput under YCSB-A and YCSB-C (read-only) workloads. Insert is a
-bandwidth-limited operation;
+\textbf{Entry size.} \label{sec:entry_size} Inlined key/value entries enable single-round-trip
+reads, so the larger the entries, the fewer values that require a second round trip.  However, for a
+fixed row size, larger entries imply fewer entries per row, increasing cuckoo path lengths (when
+measured in terms of rows).
+%, impacting insert performance.  % but larger values must be stored in extents.  % at the cost of
+%inflating the bandwidth of % operations. We run a 50\% read 50\% insert and a read only % workload
+%to illustrate the overhead of larger entries.
+Figure~\ref{fig:microbenchmarks}(d) shows the effect of entry size on throughput under 50\% insert
+and YCSB-C (read-only) workloads. Insert is a bandwidth-limited operation;
 %quickly saturates the network bandwidth. At
-at 16-B entries link capacity restricts throughput to 8
-MOPS. The performance of reads (and updates/deletes, not
-shown), are largely unaffected by entry
-size.  Hence,
-%which have lower bandwidth requirements see very little
-%chance in throughput across entry sizes. We suggest that
-%known read heavy workloads should use inlined entries as
-%reads see a large
-read-heavy services may wish to
-employ larger entry sizes.
+at 16-B entries link capacity restricts throughput to 8 MOPS. The performance of reads (and
+updates/deletes, not shown), are largely unaffected by entry size.  Hence,
+%which have lower bandwidth requirements see very little chance in throughput across entry sizes. We
+%suggest that known read heavy workloads should use inlined entries as reads see a large
+read-heavy services may wish to employ larger entry sizes.
 %
-%boost in performance. Update operations are similarly
-%unaffected by entry size up to 64 bytes. 
+%boost in performance. Update operations are similarly unaffected by entry size up to 64 bytes. 
 
 % Our design choice
 % in embedding KV pairs is motivated by networking trends
