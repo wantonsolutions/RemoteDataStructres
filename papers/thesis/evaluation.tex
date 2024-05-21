@@ -20,7 +20,19 @@ before measuring the impact of
 %covering read threshold, and
 index-table entry size.
 
-\input{implementation}
+\subsection{Implementation}
+
+We have built two separate versions of RCuckoo, an 8.7~K-line C++
+implementation tuned for high performance and a 12~K-line Python
+implementation that simulates RDMA operations to facilitate
+correctness testing. Both implementations will be made available on
+GitHub at the time of publication.  We report results using our C++
+implementation which requires OFED-4.9 to support masked CAS
+operations and device-mapped memory on ConnectX-5 NICs.  At the time
+of writing extent entries and delete operations are supported by our
+Python implementation alone; the experiments consider reads, inserts
+and updates of inlined table entries.
+
 
 \begin{figure*}[ht]
   \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_throughput.pdf}

@@ -140,6 +140,9 @@ constraints of current RDMA hardware.  Specifically, we
 facilitate lock-based updates by decreasing the number of round
 trips required to acquire locks and perform mutating operations.
 
+\todo{Ditto embeds data in the hash index. It's worth pointing out that we can support other data
+structures by enabling fast reads and writes.}
+
 We introduce RCuckoo, a fully disaggregated key/value store based on
 cuckoo hashing~\cite{cuckoo} that
 %delivers high performance using
