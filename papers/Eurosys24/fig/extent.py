@@ -35,11 +35,16 @@ def plot_value_size_static():
     # baselines = [a_static_z50,b_static_z50,c_static_z50]
     dists = [c_z99, b_z99, a_z99]
     baselines = [c_static_z99, b_static_z99, a_static_z99]
+    colors=[lb.cyan_color, lb.teal_color, lb.rcuckoo_color]
+    # ax1.plot(fill_factors, c_tput, label="C", color=lib.cyan_color, linestyle="dotted", marker="^")
+    # ax1.plot(fill_factors, b_tput, label="B", color=lib.teal_color, linestyle="dashed", marker="s")
+    # ax1.plot(fill_factors, a_tput, label="A", color=lib.rcuckoo_color, linestyle="solid", marker="o")
+    # ax1.plot(fill_factors, w_tput, label="W", color=lib.navy_color, linestyle="dashdot", marker="x")
 
     #convert sizes to string
     sizes = [str(s) for s in sizes]
 
-    ax.axhline(y=baselines[0], color='grey', linestyle='--',label="inline")
+    ax.scatter([sizes[0]],[baselines[0]], s=20,color='grey', marker="x",label="inline")
 
     display_gap=True
     for i in range(len(workloads)):
@@ -48,11 +53,11 @@ def plot_value_size_static():
         # stats = dm.load_statistics(dirname=dirname)
         # stats=stats[0]
         # plot_cuckoo.throughput(ax, stats, decoration=False, x_axis="value size", label=w)
-        p = ax.plot(sizes, dists[i], label=workloads[i], marker='o')
+        p = ax.plot(sizes, dists[i], label=workloads[i], color=colors[i],marker='o')
 
         #set the axhline to the color of the prior line
-        ax.axhline(y=baselines[i], color=p[0].get_color(), linestyle='--')
-        ax.plot(sizes[0], baselines[i], color=p[0].get_color(), marker='x')
+        # ax.axhline(y=baselines[i], color=p[0].get_color(), linestyle='--')
+        ax.plot(sizes[0], baselines[i], color=colors[i], marker='x')
 
         if display_gap:
             dist_x = [sizes[0], sizes[0]]
