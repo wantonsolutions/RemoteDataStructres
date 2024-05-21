@@ -189,20 +189,16 @@ degrades under a more uniform workload (not shown).  RCuckoo, on the
 other hand, reads inlined values in a single round trip
 regardless of the distribution, leading to the highest performance.
 
-Absolute performance for all systems decreases with increasing update
-rate due to contention.  Even with only 5\% updates (YCSB-B), the
-picture changes dramatically.  Sherman performs well at low levels of
-concurrency due to its single-round-trip-reads, but hits a severe
-bottleneck due to lock contention on the skewed access pattern.  (Sherman performance is
-improves---but does not surpass RCuckoo---for uniform workloads, not
-shown, where lock contention is less of an issue.)
-Caching is less effective with updates, bringing Clover's throughput in line with FUSEE.
-%performs similarly to FUSEE on YCSB-B; we
-%suspect that with tuning Clover's read-only performance could be
-%brought to par with RCuckoo.
-%, and is the
-%most competitive with RCuckoo in read-only scenario.  When it is able
-%to leverage its client index cache,
+
+Increased update rate slows all systems.  Even with only 5\% updates (YCSB-B), the picture changes
+dramatically.  Sherman performs well at low levels of concurrency due to its
+single-round-trip-reads, but hits a severe bottleneck due to lock contention on the skewed access
+pattern.  (Sherman performance is improves---but does not surpass RCuckoo---for uniform workloads,
+not shown, where lock contention is less of an issue.) Caching is less effective with updates,
+bringing Clover's throughput in line with FUSEE.
+%performs similarly to FUSEE on YCSB-B; we suspect that with tuning Clover's read-only performance
+%could be brought to par with RCuckoo.  , and is the most competitive with RCuckoo in read-only
+%scenario.  When it is able to leverage its client index cache,
 
 On the 50/50-mixed YCSB-A workload RCuckoo and FUSEE perform
 similarly, although we are unable to scale FUSEE past 250 clients in
@@ -283,26 +279,18 @@ out-performs RCuckoo at high fill factors, we observe that
 insert-only workloads are rare in
 practice~\cite{facebook-memcached}.
 
-\textbf{Latency and overhead.}
-We plot operation latency, size, and message counts (in
-terms of RDMA packets) as a function of fill factor in
-Figure~\ref{fig:ycsb_fill}(b--d).  For comparison, we report
-latency values of insert and read operations for the
-comparison systems. These values were not collected under
-load and represent best-case performance on our testbed.
-Read latency is nearly identical for all systems save FUSEE,
-as it requires an additional round trip.  Insert times vary:
-Clover and Sherman use two-sided RDMA operations for insert
-and both need to perform allocations and set up metadata for
-the requesting client.  FUSEE is slightly slower, roughly
-the same as RCuckoo's best case.  As the table fills,
-however, cuckoo paths grow in length causing RCuckoo insert
-operations to require additional round trips to find valid
-cuckoo paths.  At maximum fill, insert operations take
-roughly twice as long as in an empty table. This I/O amplification
-is reflected by the increase in both bytes (Figure~\ref{fig:ycsb_fill}(c)) and messages (Figure~\ref{fig:ycsb_fill}(d)) per
-operation.  Reads, on the other hand, have roughly
-the same cost and performance regardless of fill factor.
+\textbf{Latency and overhead.} We plot operation latency, size, and RDMA message counts as a
+function of fill factor in Figure~\ref{fig:ycsb_fill}(b--d). We report latency values of insert and
+read operations for the comparison systems. These values were not collected under load and represent
+best-case performance on our testbed.  Read latency is nearly identical for all systems save FUSEE,
+as it requires an additional round trip. Insert times vary: Clover and Sherman use two-sided RDMA
+operations for insert and both need to perform allocations and set up metadata for the requesting
+client.  FUSEE is slightly slower, roughly the same as RCuckoo's best case.  As the table fills,
+however, cuckoo paths grow in length causing RCuckoo insert operations to require additional round
+trips to find valid cuckoo paths.  At maximum fill, insert operations take roughly twice as long as
+in an empty table. This I/O amplification is reflected by the increase in both bytes
+(Figure~\ref{fig:ycsb_fill}(c)) and messages (Figure~\ref{fig:ycsb_fill}(d)) per operation.  Reads,
+on the other hand, have roughly the same cost and performance regardless of fill factor.
 
 
 % \begin{figure}[t]
@@ -382,7 +370,7 @@ Figure~\ref{fig:microbenchmarks}(b) illustrates the dramatic benefit
 RCuckoo extracts from its dependent hashing combined with a BFS
 cuckoo-path search strategy.  To focus on longer cuckoo paths, we
 prepopulate a 100-M entry table to 85\% and then report both the median
-and 99th percentile number of round trips required to insert new
+and 99th percentile round trips per insert 
 key/value pairs until the table is 95\% full as a function of lock
 granularity.  While median performance is on the same order, the
 99th-percentile insert takes an order of magnitude fewer round trips
@@ -467,7 +455,7 @@ fails, RCuckoo clients release their locks and retry the insert operation using 
 their cache, so multiple speculative and secondary searches may be performed.  At one row per lock,
 secondary search has limited effectiveness (as the only alternative is to cuckoo a different set of
 entries among the same rows), leading to multiple retries (approaching 4 in the 99th percentile, not
-shown).  As locks begin to cover additional rows, however, the second search becomes much more
+shown).  As locks cover additional rows, however, the second search becomes much more
 useful.
 %% of failure rate of both search stages. The first % search is the success rate of a search based
 %entirely on % cached information. The second search is the success rate of % our restricted search
@@ -508,21 +496,28 @@ At 64 rows per lock the second search succeeds 95\% of the time.
 % RCuckoo performance to various parameter settings.
 
 
-\textbf{Entry size.} \label{sec:entry_size} Inlined key/value entries enable single-round-trip
-reads, so the larger the entries, the fewer values that require a second round trip.  However, for a
-fixed row size, larger entries imply fewer entries per row, increasing cuckoo path lengths (when
-measured in terms of rows).
+\textbf{Entry size.} \label{sec:entry_size} 
+%%
+Inlined key/value entries enable single-round-trip
+reads. However large entries increase bandwidth consumption for inserts.
+% , so the larger the entries, the fewer values that require a second round trip.  
+% However, for a
+% fixed row size, larger entries imply fewer entries per row, increasing cuckoo path lengths (when
+% measured in terms of rows).
+%%
 %, impacting insert performance.  % but larger values must be stored in extents.  % at the cost of
 %inflating the bandwidth of % operations. We run a 50\% read 50\% insert and a read only % workload
 %to illustrate the overhead of larger entries.
 Figure~\ref{fig:microbenchmarks}(d) shows the effect of entry size on throughput under 50\% insert
 and YCSB-C (read-only) workloads. Insert is a bandwidth-limited operation;
 %quickly saturates the network bandwidth. At
-at 16-B entries link capacity restricts throughput to 8 MOPS. The performance of reads (and
-updates/deletes, not shown), are largely unaffected by entry size.  Hence,
+at 16-B entries link capacity restricts throughput to 8 MOPS. The performance of Reads/Update/Delete
+% (and
+% updates/deletes, not shown), 
+are largely unaffected by entry size.  Hence,
 %which have lower bandwidth requirements see very little chance in throughput across entry sizes. We
 %suggest that known read heavy workloads should use inlined entries as reads see a large
-read-heavy services may wish to employ larger entry sizes.
+read-heavy services will benefit from large entries.
 %
 %boost in performance. Update operations are similarly unaffected by entry size up to 64 bytes. 
 
