@@ -91,7 +91,7 @@
 \title{Cuckoo for Clients: Disaggregated Cuckoo Hashing}
 %\author{WORDS '21 Submission \#3}
 % \author{Stewart Grant and Alex C. Snoeren\\ UC San Diego}
-\author{Eurosys '25 submission}
+\author{Eurosys '25 Submission \#1319}
 \date{}
 
 \maketitle
@@ -112,14 +112,14 @@ RCuckoo is a fully disaggregated lock-based key/value store in which
 clients cooperatively access a passive memory server using exclusively
 one-sided RDMA operations.  RCuckoo employs cuckoo hashing to enable
 single round-trip reads of small values while updates and deletes
-require only two.  We introduce locality-enhancing dependent hashing
+require only two.  We introduce locality-enhanced dependent hashing
 that allows us to adjust the expected distance between a key's
 potential table locations, dramatically improving insert performance
 compared to prior cuckoo-hashing approaches while limiting I/O
 amplification and maintaining practical maximum fill factors.  We show
 that not only does RCuckoo outperform all existing
 state-of-the-art RDMA-based key/value stores when reading small values, but under
-severe contention RCuckoo delivers between 0.9--10$\times$ the throughput
+severe contention RCuckoo delivers up to 10$\times$ the throughput
 of comparison systems across the standard set of YCSB workloads.  Moreover,
 RCuckoo's lease-based locking mechanism enables it to gracefully
 recover from 100s of client failures per second.

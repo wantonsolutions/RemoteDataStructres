@@ -6,7 +6,7 @@ disaggregated lock-based cuckoo hash table in which clients
 communicate with passive memory servers over reliable RDMA connections
 using exclusively 1-sided operations.  We first describe our table
 design and protocol to read and modify the contents of the table.  In
-the common case, reads complete in one or two round trips while update and
+the common case, reads complete in one (for small values) or two (for large values) round trips while update and
 delete operations require two.  Then we introduce a locality-enhanced
 hashing algorithm and show how it enables our protocol to perform
 inserts in a small number of round trips.  Finally, we discuss
@@ -21,23 +21,33 @@ to the hashing function, see Section~\ref{sec:dephash}).
 \label{sec:table-design}
 
 \begin{figure}[t]
+  \vskip 0.5em
     \includegraphics[width=0.99\linewidth]{fig/table-diagram.pdf}
 \vskip -0.5em
     \caption{RCuckoo's datastructures showing an insert of the key $K$ as it displaces $C$.}
     \label{fig:table-diagram}
-    \vskip -1.5em
+%    \vskip -1.5em
 \end{figure}
 
 Figure~\ref{fig:table-diagram} shows RCuckoo's index and lock table
 (both maintained at the remote memory server) during an insertion of
 key $K$.  The index table (right) is a single region of
 RDMA-registered main memory divided into rows of fixed-width entries.
-Each row contains $n$ associative entries (3 in this figure, we use 8
-in practice) and terminates with an 8-bit version number and 64-bit
+Each row contains $n$ associative entries (3 in this figure; we use 8
+in practice) and terminates with an 8-bit version number (not shown) and 64-bit
 CRC (that is computed over the entire row including version number).
 Clients access the index table using 1-sided RDMA reads and writes;
 CRCs facilitate lock-free reads as each row can be self-verified while
 version numbers enable clients to detect if a row has been modified.
+
+Table entries contain either inlined key/value pairs a key and 48-bit
+pointer to an extent entry for larger values.  The least-significant bit of an entry signifies its type; values are inlined by default.
+%which are used by
+%default (and signified by a 0 LSB) or 
+Entry and key sizes are configuration parameters, but must be fixed at
+table creation.  We use 8-byte entries in our experiments, with 4-byte
+keys and 4-byte values.
+
 Locks (stored in a bit vector in NIC memory, shown on the left) each
 protect a tunable number (here, two; 16 in our experiments) of index
 rows.  Clients perform lock acquisition and release with RDMA
@@ -48,9 +58,7 @@ multiple locks simultaneously while avoiding false sharing.
 %by polling CRCs which is used to detect if a client
 %has failed while holding a lock (Section~\ref{sec:fault-tolerance}).
 
-Table entries contain either inlined key/value pairs which are used by default (and signified by a 0
-LSB) or a key and 48-bit pointer to an extent entry for larger values. We use 8-byte entries in our
-experiments, with 4-byte keys and 4-byte values. Because RCuckoo can support entries larger than 64
+Because RCuckoo can support entries larger than 64
 bits extent sizes use 23 bits to encode sizes from $2^3$ to $2^{26}$~\footnote{RACE and FUSEE are
 limited to 8bits for size and support only powers of 2}.
 %\footnote{The performance of larger values is shows in Section~\ref{sec:entry_size}}.
