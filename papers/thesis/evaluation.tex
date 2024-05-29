@@ -238,36 +238,66 @@ caching with a constantly changing index structure.
 %RDMA request (Section~\ref{sec:read_threshold}).
 %  While lock contention is not an issue in the read-only YCSB-C,
 
-\begin{figure*}[t]
-    \centering
-    \begin{subfigure}{0.24\linewidth}
+% \begin{figure*}[t]
+%     \centering
+%     \begin{subfigure}{0.24\linewidth}
+%       \includegraphics[width=0.99\linewidth]{fig/fault-rate.pdf}
+%           \end{subfigure}
+%     \begin{subfigure}{0.24\linewidth}
+%         \includegraphics[width=0.99\linewidth]{fig/search_dependence.pdf}
+%         % \label{fig:hash_fill}
+%         % \caption{}
+%     \end{subfigure}
+%     \begin{subfigure}{0.24\linewidth}
+%         \includegraphics[width=0.99\linewidth]{fig/search_success_lock_size.pdf}
+%         % \label{fig:hash_factor}
+%         % \caption{}
+%     \end{subfigure}
+%     %\begin{figure}[ht]
+%     \begin{subfigure}{0.24\linewidth}
+%       \includegraphics[width=0.99\linewidth]{fig/entry_size.pdf}
+%           \end{subfigure}
+% \vskip -1em
+%     \caption{RCuckoo microbenchmarks:
+%       \textbf{(a)} YCSB-A throughput vs. client failure rate,
+%           \textbf{(b)} round trip times required to acquire locks on insert,
+%     \textbf{(c)} insert second-search success rate as a function of lock granularity, and
+%     \textbf{(d)} throughput vs. key/value-entry size for YCSB-A (insert) and YCSB-C (read-only) workloads.
+%     }
+%     % \label{fig:microbenchmarks}
+%              \label{fig:microbenchmarks}
+% \vskip -1em
+% \end{figure*}
+
+
+\begin{figure}
+\centering
       \includegraphics[width=0.99\linewidth]{fig/fault-rate.pdf}
-          \end{subfigure}
-    \begin{subfigure}{0.24\linewidth}
+\caption{YCSB-A throughput vs. client failure rate}
+             \label{fig:microbenchmarks-a}
+\end{figure}
+
+\begin{figure}
+\centering
         \includegraphics[width=0.99\linewidth]{fig/search_dependence.pdf}
-        % \label{fig:hash_fill}
-        % \caption{}
-    \end{subfigure}
-    \begin{subfigure}{0.24\linewidth}
+\caption{round trip times required to acquire locks on insert}
+             \label{fig:microbenchmarks-b}
+\end{figure}
+
+\begin{figure}
+\centering
         \includegraphics[width=0.99\linewidth]{fig/search_success_lock_size.pdf}
         % \label{fig:hash_factor}
-        % \caption{}
-    \end{subfigure}
-    %\begin{figure}[ht]
-    \begin{subfigure}{0.24\linewidth}
+\caption{insert second-search success rate as a function of lock granularity}
+             \label{fig:microbenchmarks-c}
+\end{figure}
+
+\begin{figure}
+\centering
       \includegraphics[width=0.99\linewidth]{fig/entry_size.pdf}
-          \end{subfigure}
-\vskip -1em
-    \caption{RCuckoo microbenchmarks:
-      \textbf{(a)} YCSB-A throughput vs. client failure rate,
-          \textbf{(b)} round trip times required to acquire locks on insert,
-    \textbf{(c)} insert second-search success rate as a function of lock granularity, and
-    \textbf{(d)} throughput vs. key/value-entry size for YCSB-A (insert) and YCSB-C (read-only) workloads.
-    }
-    % \label{fig:microbenchmarks}
-             \label{fig:microbenchmarks}
-\vskip -1em
-\end{figure*}
+\caption{throughput vs. key/value-entry size for YCSB-A (insert) and YCSB-C (read-only) workloads}
+             \label{fig:microbenchmarks-d}
+\end{figure}
 
 \textbf{Inserts.}
 %%
@@ -346,7 +376,7 @@ batch of RDMA operations including lock releases, leaving the table
 in one of the  states listed in
 Section~\ref{sec:table-repair}.
 %and locks are left set.
-Figure~\ref{fig:microbenchmarks}(a) shows that
+Figure~\ref{fig:microbenchmarks-a} shows that
 %illustrates RCuckoo's
 %ability to operate at high throughput in the face of
 %failures.
@@ -393,7 +423,7 @@ impact of particular design choices.
 %dramatically affects the length of cuckoo paths.
 
 \textbf{Locality enhancement.}
-Figure~\ref{fig:microbenchmarks}(b) illustrates the dramatic benefit
+Figure~\ref{fig:microbenchmarks-b} illustrates the dramatic benefit
 RCuckoo extracts from its dependent hashing combined with a BFS
 cuckoo-path search strategy.  To focus on longer cuckoo paths, we
 prepopulate a 100-M entry table to 85\% and then report both the median
@@ -481,7 +511,7 @@ insert, ensuring the initial speculative path will fail unless the entry does
 not require cuckooing (unlikely at this fill factor).
 %We report the success rate of second   in order to
 %maximize cuckoo path length.
-Figure~\ref{fig:microbenchmarks}(c) plots the success rate of the
+Figure~\ref{fig:microbenchmarks-c} plots the success rate of the
 second search as a function of lock granularity.  \todo{not sure how
   99th percentile impacts things} Recall that if a second search
 fails, RCuckoo clients release their locks and retry the insert
@@ -550,7 +580,7 @@ cuckoo path lengths (when measured in terms of rows).
 %cost of inflating the bandwidth of % operations. We run a
 %50\% read 50\% insert and a read only % workload to
 %illustrate the overhead of larger entries.
-Figure~\ref{fig:microbenchmarks}(d) shows the effect of entry
+Figure~\ref{fig:microbenchmarks-d} shows the effect of entry
 size on throughput under YCSB-A and YCSB-C (read-only) workloads. Insert is a
 bandwidth-limited operation;
 %quickly saturates the network bandwidth. At

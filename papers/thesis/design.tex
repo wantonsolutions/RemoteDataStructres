@@ -275,7 +275,7 @@ cuckoo path, clients identify the set of locks necessary to
 protect the relevant rows.  
 %%
 Approximately 99\% of paths can be locked with a single MCAS
-operation (Figure~\ref{fig:locality-hashing}(c)); longer
+operation (Figure~\ref{fig:locality-hashing-c}); longer
 paths acquire locks in groups (Section~\ref{sec:locking}).
 %%
 Immediately after, but in the same batch of RDMA operations
@@ -626,6 +626,7 @@ lock, on the $x$-axis) and lock size (i.e., the number of
 locks that can be accessed with a single MCAS operation, on
 the $y$-axis---RCuckoo's single-bit locks correspond to 64
 locks per message).
+
 
 While there is some noise due to experimental variance, the far-right
 column shows that a single global lock results in high contention (as
