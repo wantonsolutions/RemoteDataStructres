@@ -64,8 +64,7 @@ challenging when setting fine grained randomly scattered
 locks in a cuckoo path with RDMA. Atomic operations do not
 support multi-CAS, have limited (64 bit) width, don't scale
 well in terms of throughput or
-latency~\cite{design-guidelines}(Figure~\ref{fig:rdma-benchmarks}
-b \& c). Acquiring locks in parallel or without order causes
+latency~\cite{design-guidelines}(Figure~\ref{fig:rdma-benchmarks-b} and Figure~\ref{fig:rdma-benchmarks-c}). Acquiring locks in parallel or without order causes
 deadlocks so without multi-CAS or the ability to localize
 multiple locks into a 64 bit range each lock acquisition
 requires an additional round trip.

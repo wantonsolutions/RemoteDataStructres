@@ -233,32 +233,52 @@ failures:
 %% improving writes.
 
 
-\begin{figure*}[t]
-    \centering
-    \begin{subfigure}{0.3\linewidth}
+% \begin{figure*}[t]
+%     \centering
+%     \begin{subfigure}{0.3\linewidth}
+%         \includegraphics[width=0.99\linewidth]{fig/rdma_concur.pdf}
+%         % \label{fig:optimistic_failures}
+%         % \caption{}
+%     \end{subfigure}
+%     \begin{subfigure}{0.3\linewidth}
+%         \includegraphics[width=0.99\linewidth]{fig/rdma_latency.pdf}
+%         % \label{fig:rdma_latency}
+%         % \caption{}
+%     \end{subfigure}
+%     \begin{subfigure}{0.3\linewidth}
+%         \includegraphics[width=0.99\linewidth]{fig/rdma_cas_throughput.pdf}
+%         % \label{fig:optimistic_failures}
+%         % \caption{}
+%     \end{subfigure}
+%     \vspace{-1em}
+%     \caption{Basic RDMA performance on our testbed.
+%     \textbf{(a)} (64-bit) operations per second;
+%     \textbf{(b)} operation latency as a function of message size~\cite{rdma-latency}; and
+%     \textbf{(c)} compare-and-swap performance on device and main memory.
+%     }
+%     \label{fig:rdma-benchmarks}
+% \vskip -1em
+% \end{figure*}
+
+
+\begin{figure}
         \includegraphics[width=0.99\linewidth]{fig/rdma_concur.pdf}
-        % \label{fig:optimistic_failures}
-        % \caption{}
-    \end{subfigure}
-    \begin{subfigure}{0.3\linewidth}
+        \caption{64 bit RDMA operations per second}
+        \label{fig:rdma-benchmarks-a}
+\end{figure}
+
+\begin{figure}
         \includegraphics[width=0.99\linewidth]{fig/rdma_latency.pdf}
-        % \label{fig:rdma_latency}
-        % \caption{}
-    \end{subfigure}
-    \begin{subfigure}{0.3\linewidth}
+        \caption{RDMA operation latency as a function of message size~\cite{rdma-latency}}
+        \label{fig:rdma-benchmarks-b}
+\end{figure}
+
+\begin{figure}
         \includegraphics[width=0.99\linewidth]{fig/rdma_cas_throughput.pdf}
-        % \label{fig:optimistic_failures}
-        % \caption{}
-    \end{subfigure}
-    \vspace{-1em}
-    \caption{Basic RDMA performance on our testbed.
-    \textbf{(a)} (64-bit) operations per second;
-    \textbf{(b)} operation latency as a function of message size~\cite{rdma-latency}; and
-    \textbf{(c)} compare-and-swap performance on device and main memory.
-    }
-    \label{fig:rdma-benchmarks}
-\vskip -1em
-\end{figure*}
+        \caption{compare-and-swap performance on device and main memory}
+        \label{fig:rdma-benchmarks-c}
+\end{figure}
+
 
 Combined with a datastructure design that facilitates aggressive
 batching of RDMA operations, these techniques enable RCuckoo to limit

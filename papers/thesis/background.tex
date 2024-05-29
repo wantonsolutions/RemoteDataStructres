@@ -40,7 +40,7 @@ implementing locks or opportunistic concurrency. Atomics are limited
 to 64-bit operations and bottleneck at lower rates than reads and
 writes because they block requests on data-dependent addresses while
 waiting on PCIe round trips~\cite{design-guidelines,sherman}.
-Figure~\ref{fig:rdma-benchmarks}(a) shows that the NICs in our testbed
+Figure~\ref{fig:rdma-benchmarks-a} shows that the NICs in our testbed
 (100-Gbps NVIDIA Mellanox ConnectX-5s) are capable of serving many 10s of
 millions of RDMA operations per second (limited only by link speed),
 but CAS operations to remote server memory top out around 50 MOPS.  Hence, we employ atomic operations judiciously in RCuckoo.
@@ -56,7 +56,7 @@ sizes are bounded only by the link MTU.
 %latency in the last decade leading to interesting design
 %tradeoffs. CX7 NICs have 10$\times$ the bandwidth of CX3's
 %but their intra-rack RTT has only shrunk by 1.5$\times$.
-Figure~\ref{fig:rdma-benchmarks}(b) shows that on our testbed
+Figure~\ref{fig:rdma-benchmarks-b} shows that on our testbed
 NIC-to-NIC round-trip times are similar for all message sizes
 less than about 128 bytes, and
 %on CX5s for variable sized writes. All writes up
@@ -77,7 +77,7 @@ that can be addressed by remote clients using RDMA
 operations~\cite{device-memory}.  Accesses to NIC memory avoid the
 need to cross the server's PCIe bus, decreasing latency and increasing
 throughput.  The performance gain is particularly significant for
-atomic operations.  Figure~\ref{fig:rdma-benchmarks}(c) shows the
+atomic operations.  Figure~\ref{fig:rdma-benchmarks-c} shows the
 maximum aggregate throughput of concurrent CAS operations targeting
 the same single (i.e., contended) address or distinct, independent
 addresses in both main server memory (shown in orange) and on-NIC

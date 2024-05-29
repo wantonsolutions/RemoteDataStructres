@@ -110,7 +110,7 @@ In our experiments RCuckoo clients issue a single, large read rather than two sm
 %128 bytes of each other
 as our parameter sweeps show it has a negligible
 increase in latency over smaller RDMA requests
-(Figure~\ref{fig:rdma-benchmarks}(b)) and provides substantial
+(Figure~\ref{fig:rdma-benchmarks-b}) and provides substantial
 improvement for insert operations.  (If bandwidth is not a concern, we
 find that a 2-KB threshold can deliver a further 3\% boost to insert
 performance, but the resulting read amplification is significant.)
@@ -318,41 +318,64 @@ valid result.
 % a far higher impact on %search success over caching
 % (Section~\ref{sec:search_success}).
 
-\begin{figure*}[t]
+% \begin{figure*}[t]
+%     \centering
+%     \begin{subfigure}{0.3\linewidth}
+%         \includegraphics[width=0.99\linewidth]{fig/hash_factor.pdf}
+%     \end{subfigure}
+%     \begin{subfigure}{0.3\linewidth}
+%         \includegraphics[width=0.99\linewidth]{fig/hash_fill.pdf}
+%     \end{subfigure}
+%         \begin{subfigure}{0.3\linewidth}
+%         \includegraphics[width=0.99\linewidth]{fig/insertion_span.pdf}
+%     \end{subfigure}
+%     \vspace{-1em}
+%     \caption{
+%  %   \textbf{(a)} Dependent hashing for factor $f$.
+%     \textbf{(a)} CDF of distances between cuckoo locations for different locality settings using RCuckoo's dependent hashing.
+%     \textbf{(b)} Achieved maximum fill percentage for different locality settings. 90\% fill indicated by dashed red line.
+%     \textbf{(c)} CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path.
+%     }
+%     \label{fig:locality-hashing}
+% \vskip -1em
+% \end{figure*}
+% \begin{figure*}[t]
+%     \centering
+%     \begin{subfigure}{0.3\linewidth}
+%     \end{subfigure}
+%     \begin{subfigure}{0.3\linewidth}
+%     \end{subfigure}
+%         \begin{subfigure}{0.3\linewidth}
+%     \end{subfigure}
+%     \vspace{-1em}
+%     \caption{
+%  %   \textbf{(a)} Dependent hashing for factor $f$.
+%     \textbf{(a)} 
+%     \textbf{(b)} 
+%     \textbf{(c)} .
+%     }
+%     \label{fig:locality-hashing}
+% \vskip -1em
+% \end{figure*}
+
+\begin{figure}
     \centering
-%    \begin{subfigure}{0.3\linewidth}
-%        \begin{align*}
-%            L_1 &= h_1(k) \\
-%            L_2 &= L_1 + (h_2(k)\mod f^{f + log_2(h_3(k))})
-%        \end{align*}
-%        % \caption{}
-%        % \label{fig:hash_factor}
-%    \end{subfigure}
-    \begin{subfigure}{0.3\linewidth}
         \includegraphics[width=0.99\linewidth]{fig/hash_factor.pdf}
-        % \label{fig:hash_factor}
-        % \caption{}
-    \end{subfigure}
-    \begin{subfigure}{0.3\linewidth}
+    \caption{CDF of distances between cuckoo locations for different locality settings using RCuckoo's dependent hashing.}
+    \label{fig:locality-hashing-a}
+\end{figure}
+\begin{figure}
+    \centering
         \includegraphics[width=0.99\linewidth]{fig/hash_fill.pdf}
-        % \label{fig:hash_fill}
-        % \caption{}
-    \end{subfigure}
-        \begin{subfigure}{0.3\linewidth}
+    \caption{Achieved maximum fill percentage for different locality settings. 90\% fill indicated by dashed red line.}
+    \label{fig:locality-hashing-b}
+\end{figure}
+\begin{figure}
+    \centering
         \includegraphics[width=0.99\linewidth]{fig/insertion_span.pdf}
-        % \label{fig:insertion_span}
-        % \caption{}
-    \end{subfigure}
-    \vspace{-1em}
-    \caption{
- %   \textbf{(a)} Dependent hashing for factor $f$.
-    \textbf{(a)} CDF of distances between cuckoo locations for different locality settings using RCuckoo's dependent hashing.
-    \textbf{(b)} Achieved maximum fill percentage for different locality settings. 90\% fill indicated by dashed red line.
-    \textbf{(c)} CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path.
-    }
-    \label{fig:locality-hashing}
-\vskip -1em
-\end{figure*}
+    \caption{CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path}
+    \label{fig:locality-hashing-c}
+\end{figure}
 
 
 \textbf{Second search:} If all the lock acquisitions are successful,
@@ -484,7 +507,7 @@ increasing distances from their primary.  The latter aspect is crucial, as any
 fixed bound on the distance between hash locations leads to low
 maximum fill factors (on the order of 10--15\% in our experiments).
 
-Figure~\ref{fig:locality-hashing}(a) shows the distance between hash
+Figure~\ref{fig:locality-hashing-a} shows the distance between hash
 locations as a CDF for different values of $f$,
 %% Setting .  using a third hash function $h_3(x)$
 %% which generates a higher exponent at a logarithmic rate to determine
@@ -496,7 +519,7 @@ locations as a CDF for different values of $f$,
 %% increase the max fill by alleviating hotspots in the table. While
 %% searching for cuckoo paths with BFS these entries act as gateways for
 %% paths to access less filled portions of the table.
-while Figure~\ref{fig:locality-hashing}(b) shows that larger values of
+while Figure~\ref{fig:locality-hashing-b} shows that larger values of
 $f$ enable practical fill factors for tables with 100~M entries. In
 our evaluation we set $f=2.3$.  As shown in the figures, for index
 tables with eight entries per row, RCuckoo delivers an expected max fill of
@@ -507,7 +530,7 @@ located five or fewer rows apart.
 Decreased distances between hash locations naturally lead to shorter
 cuckoo paths when combined with our breadth-first search approach.
 Using $f=2.3$ and a table size of 100-K rows,
-Figure~\ref{fig:locality-hashing}(c) shows that when filling the table
+Figure~\ref{fig:locality-hashing-c} shows that when filling the table
 to 95\% full, slightly more than half of insertions do not require any
 cuckooing, and 95\% of insertions require cuckoo paths that span 32 or
 fewer rows while nearly 99\% span 256 or fewer.  Conversely, with
@@ -582,7 +605,7 @@ on lock acquisitions and only move to the next MCAS operation after
 the current one succeeds.  Due to this one-MCAS-per-round-trip
 acquisition procedure, lock granularity is critical to performance.
 
-If, as in Figure~\ref{fig:locality-hashing}(c), almost 99\% of cuckoo
+If, as in Figure~\ref{fig:locality-hashing-c}, almost 99\% of cuckoo
 spans are 256 rows or less, and each lock protects four rows, nearly
 99\% of insertions can have their locks acquired with a single MCAS.
 Of course, increasing the number of rows covered by a single lock can
@@ -637,7 +660,7 @@ additional design constraint that drives our choice of single-bit
 locks.  Specifically, to improve locking performance, RCuckoo locates
 the lock table in NIC device memory which delivers $3\times$ higher
 throughout on contented addresses than host memory (see
-Figure~\ref{fig:rdma-benchmarks}). It is also lower latency as
+Figure~\ref{fig:rdma-benchmarks-c}). It is also lower latency as
 operations to device memory avoid a PCIe round trip.  Unfortunately, NIC memory is limited (to
 256~KB on our ConnectX-5s), so this choice bounds the size of the lock
 table and drives our single-bit design.
