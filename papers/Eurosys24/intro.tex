@@ -270,7 +270,7 @@ the expected number increases as the table fills.  On our testbed,
 RCuckoo delivers comparable or higher performance on small values across the standard set  of YCSB benchmarks than all of the existing disaggregated
 key/value stores we consider.  Concretely, with 320 clients RCuckoo
 delivers up to a 2.5$\times$ throughput improvement on read-intensive
-(YCSB-B) workloads and 0.9--7.1$\times$ the throughput on skewed
+(YCSB-B) workloads and up to 7.1$\times$ their throughput on
 write-intensive (YCSB-A) workloads.  Moreover, RCuckoo's
-performance remains high despite failure rates on the order of 100s of
-clients per second.
+performance remains high despite 100s of
+clients failing per second.

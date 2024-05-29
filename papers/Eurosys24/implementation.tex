@@ -4,6 +4,8 @@ We have built two separate versions of RCuckoo, an 8.7~K-line C++
 implementation tuned for high performance and a 12~K-line Python
 implementation that simulates RDMA operations to facilitate
 correctness testing. Both implementations will be made available on
-GitHub at the time of publication.  We report results using our C++
+GitHub at publication.  We report results using our C++
 implementation which requires OFED-4.9 to support masked CAS
-operations and device-mapped memory on ConnectX-5 NICs.  
+operations and device-mapped memory on ConnectX-5 NICs.  All
+experiments use 64-KB client index-table caches and
+a virtual lock table at the server.
