@@ -275,6 +275,14 @@ def plot_hero_ycsb_fill_static():
     plt.tight_layout()
     plt.savefig("hero_ycsb_fill.pdf")
 
+    axs = [ax1, ax2, ax3, ax4] 
+    # for ax in axs:
+        # ax.set_xlabel('Threads')
+        # ax.set_ylabel('MOPS')
+        # ax.legend(loc='lower right', ncol=1, fontsize=12)
+    names = ["a", "b", "c", "d"]
+    lib.save_figs(plt, fig, axs, names=names)
+
 
     # print("todo")
 # run_hero_ycsb_fill_latency()

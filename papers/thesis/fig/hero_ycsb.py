@@ -64,7 +64,8 @@ def plot_fusee_ycsb_multi_run(axs):
 def plot_sherman_ycsb(axs, lw):
     dir="zipf"
     # dir="uniform"
-    path="../../../experiments/systems/Sherman/data/sherman_ycsb_{}".format(dir)
+    # path="../../../experiments/systems/Sherman/data/sherman_ycsb_{}".format(dir)
+    path="./sherman-data/sherman_ycsb_{}".format(dir)
     # data, dir = dm.load_statistics("../../../experiments/systems/Sherman/data/sherman_ycsb_uniform")
     data, dir = dm.load_statistics(path)
     # data, dir = dm.load_statistics("data/sherman_ycsb_zipf")
@@ -244,6 +245,15 @@ def plot_hero_ycsb_throughput_static():
 
     plt.tight_layout()
     plt.savefig("hero_ycsb_throughput.pdf")
+
+
+    for ax in axs:
+        ax.legend()
+        # ax.set_xlabel('Threads')
+        # ax.set_ylabel('MOPS')
+        # ax.legend(loc='lower right', ncol=1, fontsize=12)
+    names = ["c", "b", "a"]
+    lib.save_figs(plt, fig, axs, names=names)
 
 # def plot_hero_ycsb_throughput():
 #     workloads = ["ycsb-w", "ycsb-a", "ycsb-b", "ycsb-c"]

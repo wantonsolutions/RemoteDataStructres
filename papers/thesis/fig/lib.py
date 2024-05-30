@@ -4,6 +4,7 @@ import numpy as np
 import datetime
 import git
 import matplotlib as matplotlib
+from matplotlib.transforms import Bbox
 
 
 #definitions of variables.
@@ -17,6 +18,42 @@ cyan_color='#42d4f4'
 teal_color='#469990'
 navy_color='#000075'
 
+def get_plot_name_from_filename():
+    return os.path.splitext(sys.argv[0])[0]
+
+def full_extent(ax, pad=0.0):
+    """Get the full extent of an axes, including axes labels, tick labels, and
+    titles."""
+    # For text objects, we need to draw the figure first, otherwise the extents
+    # are undefined.
+    ax.figure.canvas.draw()
+    items = ax.get_xticklabels() + ax.get_yticklabels() 
+    items += [ax, ax.title, ax.xaxis.label, ax.yaxis.label]
+    items += [ax, ax.title]
+    bbox = Bbox.union([item.get_window_extent() for item in items])
+    return bbox.expanded(1.0 + pad, 1.0 + pad)
+
+def save_figs(plt, fig, axs, names=[], pad=0.0):
+    name=get_plot_name_from_filename()
+    if len(names) == 0:
+        names=['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p']
+    if len(axs) > len(names):
+        print('too many subplots')
+        exit(1)
+
+    for ax in axs:
+        # ax.axis('off')
+        ax.set_visible(False)
+
+    for i, ax in enumerate(axs):
+        # extent = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+        # fig.savefig(name+"-"+subplots[i]+'.pdf', bbox_inches=extent.expanded(1.20, 1.3))
+        # ax.axis('on') 
+        ax.set_visible(True)
+        extent = full_extent(ax, pad).transformed(fig.dpi_scale_trans.inverted())
+        fig.savefig(name+"-"+names[i]+'.pdf', bbox_inches=extent)
+        ax.set_visible(False)
+        # ax.axis('off') 
 
 def mops(data):
     # return [x / 1000000 if x is not None else 0 for x in data]

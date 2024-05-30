@@ -34,14 +34,35 @@ Python implementation alone; the experiments consider reads, inserts
 and updates of inlined table entries.
 
 
-\begin{figure*}[ht]
-  \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_throughput.pdf}
-  \vskip -1em
-\caption{Throughput as a function of the number of clients for three different workloads (Zipf $\theta$=0.99): \textbf{(a)} Read only (YCSB-C), \textbf{(b)} YCSB-B 95\% read, 5\% update and \textbf{(c)}
-    50\% read 50\% update (YCSB-A).}
-\label{fig:ycsb_throughput}
-\vskip -1em
- \end{figure*}
+% \begin{figure*}[ht]
+%   \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_throughput.pdf}
+%   \vskip -1em
+% \caption{Throughput as a function of the number of clients for three different workloads (Zipf $\theta$=0.99): \textbf{(a)} Read only (YCSB-C), \textbf{(b)} YCSB-B 95\% read, 5\% update and \textbf{(c)}
+%     50\% read 50\% update (YCSB-A).}
+% \label{fig:ycsb_throughput}
+% \vskip -1em
+%  \end{figure*}
+
+\begin{figure}
+  \center
+  \includegraphics[width=0.99\linewidth]{fig/hero_ycsb-c.pdf}
+  \caption{Throughput as a function of the number of clients for a read only workload (YCSB-C) (Zipf $\theta$=0.99)}
+  \label{fig:ycsb_throughput_c}
+\end{figure}
+
+\begin{figure}
+  \center
+  \includegraphics[width=0.99\linewidth]{fig/hero_ycsb-b.pdf}
+  \caption{Throughput as a function of the number of clients for a read mostly workload (5\% write) workload (YCSB-B) (Zipf $\theta$=0.99)}
+  \label{fig:ycsb_throughput_b}
+\end{figure}
+
+\begin{figure}
+  \center
+  \includegraphics[width=0.99\linewidth]{fig/hero_ycsb-a.pdf}
+  \caption{Throughput as a function of the number of clients for a write heavy workload (50\% writes) (YCSB-A) (Zipf $\theta$=0.99)}
+  \label{fig:ycsb_throughput_a}
+\end{figure}
 
 
 \subsection{Testbed}
@@ -153,16 +174,42 @@ machines in the cluster.
 % \subsubsection{Clover}
 % \todo{insert a short clover description}
 
-\begin{figure*}[ht]
-    \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill.pdf}
-\vskip -1em
-    \caption{Performance as a
-    function of fill factor. \textbf{(a)} Throughput for four different YCSB insert workloads, \textbf{(b)}
-    median operation latency, \textbf{(c)} mean operation size, and \textbf{(d)}
-    mean RDMA message count per operation under YCSB-A.}
-\vskip -1em
-    \label{fig:ycsb_fill}
-\end{figure*}
+% \begin{figure*}[ht]
+%     \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill.pdf}
+% \vskip -1em
+%     \caption{Performance as a
+%     function of fill factor. \textbf{(a)} Throughput for four different YCSB insert workloads, \textbf{(b)}
+%     median operation latency, \textbf{(c)} mean operation size, and \textbf{(d)}
+%     mean RDMA message count per operation under YCSB-A.}
+% \vskip -1em
+%     \label{fig:ycsb_fill}
+% \end{figure*}
+
+\begin{figure}
+  \center
+  \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill-a.pdf}
+  \caption{RCuckoo performance as a function of fill factor on each YCSB workload. Here updates are replaced with inserts. As the table fills inserts become more difficult thus reducing throughput.}
+  \label{fig:ycsb_fill-a}
+\end{figure}
+\begin{figure}
+  \center
+  \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill-b.pdf}
+  \caption{Read and insert latency as a function of fill factor. RCuckoo's read latency remains constant. Insert latency is proportional to the fill factor}
+  \label{fig:ycsb_fill-b}
+\end{figure}
+\begin{figure}
+  \center
+  \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill-c.pdf}
+  \caption{Bytes per operation as a function of fill factor. As the table fills inserts consume more bytes per operation due to additional round trips.}
+  \label{fig:ycsb_fill-c}
+\end{figure}
+\begin{figure}
+  \center
+  \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill-d.pdf}
+  \caption{Messages per operation as a function of fill factor.}
+  \label{fig:ycsb_fill-d}
+\end{figure}
+
 
 % \begin{figure}[ht]
 %     \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill_ops_bw.pdf}
@@ -184,16 +231,15 @@ around 2$\times$.
 \todo{What is the row/read size?  How close are we
   to line rate?}
 
-\textbf{Throughput.} Figure~\ref{fig:ycsb_throughput} shows throughput
-in terms of operations per second for RCuckoo, FUSEE, Clover, and
-Sherman on three different YCSB workloads.  Moving from left to right,
-the left-most graph is read-only (YCSB-C), the middle graph is 95\%
-read and 5\% update (YCSB-B), and the right-most graph presents a 50\%
-read, 50\% update mix (YCSB-A).  For each system, we provision a
-100-M-entry table and prepopulate it with 90~M entries that each
-consist of a 32-bit key and 32-bit value (we consider larger sizes in Section~\ref{ss:mb}).  We plot the aggregate throughput of a variable number of
-clients concurrently accessing entries according to a Zipf(0.99)
-distribution.
+\textbf{Throughput.}
+Figure[~\ref{fig:ycsb_throughput_c},~\ref{fig:ycsb_throughput_b},~\ref{fig:ycsb_throughput_a}] shows
+throughput in terms of operations per second for RCuckoo, FUSEE, Clover, and Sherman on three
+different YCSB workloads.  Moving from left to right, the left-most graph is read-only (YCSB-C), the
+middle graph is 95\% read and 5\% update (YCSB-B), and the right-most graph presents a 50\% read,
+50\% update mix (YCSB-A).  For each system, we provision a 100-M-entry table and prepopulate it with
+90~M entries that each consist of a 32-bit key and 32-bit value (we consider larger sizes in
+Section~\ref{ss:mb}).  We plot the aggregate throughput of a variable number of clients concurrently
+accessing entries according to a Zipf(0.99) distribution.
 
 In a read-only (YCSB-C) workload, FUSEE suffers from its extent-based
 value storage.  RCuckoo, Clover, and Sherman perform similarly at
@@ -306,7 +352,7 @@ caching with a constantly changing index structure.
 %component. In this section
 Despite its complexity, RCuckoo's insert operation remains highly
 performant.  To evaluate insert performance we modify YCSB to perform
-inserts rather than updates.  Figure~\ref{fig:ycsb_fill} considers
+inserts rather than updates.  Figures[~\ref{fig:ycsb_fill-a},~\ref{fig:ycsb_fill-b},~\ref{fig:ycsb_fill-c},~\ref{fig:ycsb_fill-d}] considers
 RCuckoo's performance on workloads that exclusively use inserts (rather than
 updates), for example in this instance YCSB-A is 50\% insert and 50\%
 read. YCSB-W is write only, i.e. a 100\%-insert workload.  Inserts become
@@ -314,7 +360,7 @@ more expensive as the table fills, so we prepopulate the table with a varying nu
 a function of the table's initial fill factor.
 \todo{How long/how many inserts are performed?}
 
-Figure~\ref{fig:ycsb_fill}(a) shows the aggregate throughput of 320
+Figure~\ref{fig:ycsb_fill-a} shows the aggregate throughput of 320
 clients across four different workloads as a function of the table's
 fill factor.  As the index table fills, cuckoo paths become longer
 leading to increased contention and additional bandwidth consumption
@@ -331,7 +377,7 @@ practice~\cite{facebook-memcached}.
 \textbf{Latency and overhead.}
 We plot operation latency, size, and message counts (in
 terms of RDMA packets) as a function of fill factor in
-Figure~\ref{fig:ycsb_fill}(b--d).  For comparison, we report
+Figures[~\ref{fig:ycsb_fill-b},~\ref{fig:ycsb_fill-c},~\ref{fig:ycsb_fill-d}].  For comparison, we report
 latency values of insert and read operations for the
 comparison systems. These values were not collected under
 load and represent best-case performance on our testbed.
@@ -345,7 +391,7 @@ however, cuckoo paths grow in length causing RCuckoo insert
 operations to require additional round trips to find valid
 cuckoo paths.  At maximum fill, insert operations take
 roughly twice as long as in an empty table. This I/O amplification
-is reflected by the increase in both bytes (Figure~\ref{fig:ycsb_fill}(c)) and messages (Figure~\ref{fig:ycsb_fill}(d)) per
+is reflected by the increase in both bytes (Figure~\ref{fig:ycsb_fill-c}) and messages (Figure~\ref{fig:ycsb_fill-d}) per
 operation.  Reads, on the other hand, have roughly
 the same cost and performance regardless of fill factor.
 

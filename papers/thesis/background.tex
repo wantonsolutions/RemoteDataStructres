@@ -40,7 +40,7 @@ implementing locks or opportunistic concurrency. Atomics are limited
 to 64-bit operations and bottleneck at lower rates than reads and
 writes because they block requests on data-dependent addresses while
 waiting on PCIe round trips~\cite{design-guidelines,sherman}.
-Figure~\ref{fig:rdma-benchmarks-a} shows that the NICs in our testbed
+Figure~\ref{fig:rdma_concur} shows that the NICs in our testbed
 (100-Gbps NVIDIA Mellanox ConnectX-5s) are capable of serving many 10s of
 millions of RDMA operations per second (limited only by link speed),
 but CAS operations to remote server memory top out around 50 MOPS.  Hence, we employ atomic operations judiciously in RCuckoo.
