@@ -261,6 +261,12 @@ failures:
 % \end{figure*}
 
 
+% \begin{figure}
+%         \includegraphics[width=0.99\linewidth]{fig/rdma_concur.pdf}
+%         \caption{64 bit RDMA operations per second}
+%         \label{fig:rdma-benchmarks-a}
+% \end{figure}
+
 \begin{figure}
         \includegraphics[width=0.99\linewidth]{fig/rdma_latency.pdf}
         \caption{RDMA operation latency as a function of message size~\cite{rdma-latency}}
@@ -273,6 +279,7 @@ failures:
         \label{fig:rdma-benchmarks-c}
 \end{figure}
 
+
 Combined with a datastructure design that facilitates aggressive
 batching of RDMA operations, these techniques enable RCuckoo to limit
 the number of round trips required for all table operations.  In the
@@ -283,7 +290,7 @@ the expected number increases as the table fills.  On our testbed,
 RCuckoo delivers comparable or higher performance on small values across the standard set  of YCSB benchmarks than all of the existing disaggregated
 key/value stores we consider.  Concretely, with 320 clients RCuckoo
 delivers up to a 2.5$\times$ throughput improvement on read-intensive
-(YCSB-B) workloads and up to 7.1$\times$ their throughput on
+(YCSB-B) workloads and 0.9--7.1$\times$ the throughput on skewed
 write-intensive (YCSB-A) workloads.  Moreover, RCuckoo's
-performance remains high despite 100s of
-clients failing per second.
+performance remains high despite failure rates on the order of 100s of
+clients per second.

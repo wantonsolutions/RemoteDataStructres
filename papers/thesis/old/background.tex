@@ -1,0 +1,242 @@
+
+\section{Background}
+\label{sec:background}
+
+
+%\subsection{RDMA Key-Value Stores}
+
+%% %Describe existing key value stores relation to RDMA and
+%serialization %
+Key/value stores have long used RDMA to
+%Many non-disaggregated key-value stores have used RDMA to
+accelerate
+performance~\cite{farm,memc3,erpc,herd,faast,mica,pilaf,cell,storm}.
+%%
+These systems strike a careful balance between directly accessing remote memory with one-sided RDMA requests and
+serializing mutating operations at a server-side CPU.
+%%
+Cuckoo~\cite{cuckoo} and hopscotch~\cite{hopscotch} hashing are popular choices in
+this space because clients can calculate the location of
+keys without needing to consult the server and potentially perform
+lock-less reads with RDMA~\cite{farm,pilaf,cuckoo}.
+
+
+
+\subsection{RDMA}
+
+RDMA
+%is an enabling technology for memory disaggregation. It allows
+allows
+clients to directly access the memory of a remote server with
+one-sided operations like read, write and atomic update without the
+involvement of a remote CPU~\cite{infiniband-spec}.  To set the
+context for RCuckoo's design, we benchmark the baseline performance of
+our testbed hardware, illustrating the constraints and
+opportunities.
+
+%%
+Atomic operations such as compare-and-swap (CAS) are essential for
+implementing locks or opportunistic concurrency. Atomics are limited
+to 64-bit operations and bottleneck at lower rates than reads and
+writes because they block requests on data-dependent addresses while
+waiting on PCIe round trips~\cite{design-guidelines,sherman}.
+Figure~\ref{fig:rdma_concur} shows that the NICs in our testbed
+(100-Gbps NVIDIA Mellanox ConnectX-5s) are capable of serving many 10s of
+millions of RDMA operations per second (limited only by link speed),
+but CAS operations to remote server memory top out around 50 MOPS.  Hence, we employ atomic operations judiciously in RCuckoo.
+
+%the scalability of
+%these operations on CX5 NICs for 64 bit operations.
+%%
+
+While atomic operations are limited to 64 bits, read and write message
+sizes are bounded only by the link MTU.
+%can 
+%RDMA NIC bandwidth has increased disproportionately to
+%latency in the last decade leading to interesting design
+%tradeoffs. CX7 NICs have 10$\times$ the bandwidth of CX3's
+%but their intra-rack RTT has only shrunk by 1.5$\times$.
+Figure~\ref{fig:rdma-benchmarks-b} shows that on our testbed
+NIC-to-NIC round-trip times are similar for all message sizes
+less than about 128 bytes, and
+%on CX5s for variable sized writes. All writes up
+%to 128 bytes have comparable latencies and
+messages must exceed 1~KB before the latency of a single large
+operation exceeds two RTTs of smaller ones.  We leverage this
+observation in RCuckoo by collapsing multiple small reads into a
+single larger one when appropriate.  The optimal threshold trades off
+latency reduction against read amplificaiton.
+
+%\textbf{If there
+%is surplus bandwidth a single large message can have much
+%lower latency than two dependent smaller messages.}
+
+Finally, we highlight that our testbed NICs, like those from several
+vendors, include a small amount (256~KB in our case) of on-NIC memory
+that can be addressed by remote clients using RDMA
+operations~\cite{device-memory}.  Accesses to NIC memory avoid the
+need to cross the server's PCIe bus, decreasing latency and increasing
+throughput.  The performance gain is particularly significant for
+atomic operations.  Figure~\ref{fig:rdma-benchmarks-c} shows the
+maximum aggregate throughput of concurrent CAS operations targeting
+the same single (i.e., contended) address or distinct, independent
+addresses in both main server memory (shown in orange) and on-NIC
+device memory (blue).  CAS operations perform between 1.8--3.1$\times$
+faster on NIC memory.  RCuckoo's datastructures are designed so that
+all CAS operations are performed on NIC memory.
+
+%many modern NICs
+%Vendors have provided some workarounds for atomic
+%bottlenecks by adding device memory and masked atomic
+%operations. CX series NICs have a 256KB region of on-NIC
+%RDMAable memory. Atomics to this region avoid the round trip
+%and execute with lower latency and up to 3x higher
+%throughput().
+%Masked CAS (MCAS) allows for each bit to be set
+%independently thus enabling higher density locks while
+%reducing contention~\cite{rdma-masked-cas}. While multi-CAS
+%is not supported these features have been demonstrated to
+%enable fast dense lock tables~\cite{sherman}.
+
+\subsection{Concurrent hash tables} 
+\label{sec:cuckoo-back}
+
+Fully disaggregated key/value stores are essentially concurrent hash
+tables whose conflict resolution strategy is implemented entirely by
+individual clients~\cite{rolex,fusee,race}.  Like any hash table, the
+underlying hashing algorithm must have an approach to managing
+collisions. Cuckoo and hopscotch hashing are particularly attractive
+in this context, because they both provide the property that the
+potential locations of an entry in the table, regardless of
+contention or collision, can be deterministically computed by clients
+based only upon the key itself.  Moreover, the set of locations is
+limited.  Hence, at least in theory, systems built around either
+cuckoo or hopscotch hashing hold the potential for single-round-trip
+reads.
+
+%\todo{Make sure to describe how a cuckoo path works}
+
+\textbf{Cuckoo hashing} uses independent hash functions to compute two
+potential table locations for a key, a primary and a secondary, where
+each location corresponds to an associative row of entries.  A key is
+always inserted into its primary location.  If that row is full, an
+existing key is evicted (or ``cuckooed'') to its secondary row to make
+space. If the cuckooed entry's secondary row is also full, the process
+iterates (by selecting yet another entry in the secondary row to
+cuckoo) until an open location is found. The path of evictions is
+known as a~\textit{cuckoo path}.  While insertions can be involved,
+reads can always be executed in a single round trip by reading the
+rows corresponding to both of a key's locations
+simultaneously~\cite{pilaf}.
+
+\textbf{Hopscotch hashing} works in a similar fashion but provides a
+slightly different guarantee, namely that keys will be located within
+a bounded neighborhood.  (While cuckoo hashing limits the number of
+locations in which a key may be stored, it does not provide any
+locality guarantees regarding those locations.) It does so by finding
+the physically closest empty entry to the desired location and then,
+if that location is not within the neighborhood, iteratively
+moving other entries out of the way to make room for the new key.
+The hopscotch process is facilitated by maintaining a per-entry
+bitmask of nearby collisions.  As with cuckoo hashing, clients can read in a single round trip time by reading a key's entire
+neighborhood at once.
+
+The insert operation is expensive for both approaches, and prior
+systems have taken steps to mitigate its cost.  In associative hashes
+like cuckoo hash tables, multiple entries can be chosen as eviction
+candidates and breadth-first-search (BFS) has been shown to minimize
+both cuckoo-path length and critical section
+time~\cite{memc3,cuckoo-improvements}.
+%While insertions require large
+%critical sections to perform search and execute updates along the
+%cuckoo path
+Farm~\cite{farm} and Reno~\cite{reno}, two systems based on hopscotch
+hashing, completely avoid executing long hopscotch chains due to their
+execution time and complexity.  Moreover, under either approach, the
+insert operation can fail despite vacant entries in the table---they
+are just too far away to be reached by either the cuckoo path or
+hopscotch's neighborhood-bounded linear probing.  The point at which
+inserts being to fail, known as the \emph{maximum fill factor}, is a
+function of the number of hash locations and row associativity in
+cuckoo hashing and desired neighborhood size for hopscotch hashing.
+
+RCuckoo uses cuckoo rather than hopscotch hashing due to locking
+concerns.
+%While both alog
+%also limits a key's location to a bounded set of 
+%bounded range of addresses and we considered using it as our core data
+%structure. We believe that although hopscotch hashing can likely be
+%disaggregated efficiently it is less straightforward than cuckoo
+%hashing for the following reasons:
+%%
+First, each step of a cuckoo insert process requires one update---to
+the entry being moved to its secondary location---rather than two.
+When an entry is relocated in a hopscotch table, the collision bitmask
+must also be updated.  (Reno~\cite{reno} uses one-sided atomics to
+sloppily update the bitmask but requires a server-side CPU to fix the
+bitmasks whenever concurrent inserts execute.)  Second, keys exist in
+one of two locations in cuckoo hashing so updates and deletes require
+locking only two rows, while hopscotch entries inhabit a range of
+locations, so a conservative locking strategy must lock the entire
+range.  Yet, RCuckoo takes inspiration from hopscotch neighborhoods and employs dependent hashing to increase the spatial
+locality of key locations, enabling clients to use local
+caches to speculatively compute cuckoo paths.
+
+%Because each lock
+%acquisition is expensive this increases the fundamental difficulty of
+%disaggregation a hopscotch hash.
+
+
+
+%%
+
+%Cuckoo hashes use
+%associative rows to improve their maximum fill factors.
+
+%%now I want to explain why cuckoo hashing and disaggregation don't work well together.
+
+%% Lockless $O(1)$ reads make Cuckoo hashing a desireable
+%% candidate for a disaggregated index. However, long
+%% unpredictable cuckoo paths and RDMA CAS limitations make
+%% performing insertions without locks difficult in the
+%% disaggregated setting. We designed an RDMA based cuckoo hash
+%% to illustrate the difficulties of performing opportunistic
+%% insertions. On inserts this system makes a sequence of reads
+%% to calculate a valid cuckoo path and then itteratitivly
+%% issues CAS operations to swap value along the path. If any
+%% value on the path is concurrently modified by another client
+%% the insertions will fail and must restart.
+%% Figure~\ref{fig:cuckoo-problems}(a) shows how the failure
+%% rate of insertions filling a table from 80-90\% full.
+
+
+%% \subsection{Full disaggregation}
+
+%% %%
+%% Disaggregated key-value in contrast assume that a memory
+%% server cannot provide serialization and orchestrate their
+%% writes solely using
+%% clients~\cite{rolex,fusee,clover,sherman,ford,race}. With
+%% the exception of Sherman~\cite{sherman} these systems use
+%% systems commit writes optimistically using 64 bit RDMA CAS. 
+%% %%
+%% Opportunistic writes have the advantage that updates are
+%% atomically visible, no critical sections exist, and client
+%% failures do not leave the table in an inconsistent state.
+%% Unfortunately CAS based opportunistic writes perform poorly
+%% under contention leading to high tail latencies
+%% ~\cite{clover}. Additionally RDMA CAS does not scale
+%% well~\cite{design-guidelines}(Figure~\ref{fig:rdma-benchmarks}(b)),
+%% and their small word width and lack of multi-CAS support
+%% constrain the size and types of updates they can perform.
+
+%% CAS width in particular effects system design because
+%% key-value pairs can rarely fit into 64 bits, indexes updated
+%% with CAS must reference keys values indirectly with a
+%% pointer. At minimum resolving a remote pointer requires an
+%% additional round trip for every read~\cite{race,clover}.
+%% %%
+%% As we will show in the following section data structures
+%% like cuckoo and hopscotch hashes are difficult implement with
+%% optimistic CAS updates because they require multiple updates
+%% to execute atomically.
