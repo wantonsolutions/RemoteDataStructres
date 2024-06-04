@@ -1,22 +1,22 @@
-\section{Introduction}
-\label{sec:intro}
+\section{A Case for Fully Disaggregated Cuckoo Hashing}
+\label{sec:cuckoo-intro}
 
-Key/value stores remain a fundamental building block of modern
-scale-out service architectures.  Recent trends in primary storage
-technologies, however, are pushing operators to consider ever-more
-disaggregated designs for their in-memory storage systems.
-Concretely, increases in CPU core counts coupled with stagnating DRAM
-density has led to an increased interest in remote memory tiers, where
-some portion of memory is connected to the server over a network.
-Moreover, once disaggregated, memory can be pooled to achieve greater
-cost and power efficiencies.  The challenge facing fully disaggregated
-memory pools, however, is managing concurrent updates in the face of
-client failures and high access latencies.
+% Key/value stores remain a fundamental building block of modern
+% scale-out service architectures.  Recent trends in primary storage
+% technologies, however, are pushing operators to consider ever-more
+% disaggregated designs for their in-memory storage systems.
+% Concretely, increases in CPU core counts coupled with stagnating DRAM
+% density has led to an increased interest in remote memory tiers, where
+% some portion of memory is connected to the server over a network.
+% Moreover, once disaggregated, memory can be pooled to achieve greater
+% cost and power efficiencies.  The challenge facing fully disaggregated
+% memory pools, however, is managing concurrent updates in the face of
+% client failures and high access latencies.
 %---e.g., 20$\times$ in the case of Ethernet-based RDMA.
 
-While cache-coherent technologies like CXL are beginning to
-become available, RDMA remains the commodity option for
-large-scale in-memory key/value stores.
+% While cache-coherent technologies like CXL are beginning to
+% become available, RDMA remains the commodity option for
+% large-scale in-memory key/value stores.
 %% % made DRAM a scarce resource. In response data center
 %architects have % proposed resource disaggregation to
 %improve resource utilization, % scalability and efficiency
@@ -45,10 +45,10 @@ large-scale in-memory key/value stores.
 %pools of memory.  Many prior disaggregated systems have
 %eschewed sharing for static partitioning to avoid the high
 %overheads~\cite{ reigons,blade-server,legoos}.
-Many prior RDMA-based systems opt for a partially
-disaggregated model, in which a CPU core is collocated with
-remote memory to provide the needed
-serialization~\cite{erpc,herd,pilaf,cell,clover,sherman}.
+% Many prior RDMA-based systems opt for a partially
+% disaggregated model, in which a CPU core is collocated with
+% remote memory to provide the needed
+% serialization~\cite{erpc,herd,pilaf,cell,clover,sherman}.
 %%  ~\cite{clover}. These designs are conceptually % close
 %to prior work on RDMA key value stores which gain %
 %performance benefits from having some operations use %
@@ -70,15 +70,15 @@ serialization~\cite{erpc,herd,pilaf,cell,clover,sherman}.
 %In the fully disaggregated setting serialization is
 %achieved entirely with a client based protocol. 
 %
-Fully disaggregated systems rely upon one-sided RDMA atomic
+Fully disaggregated key-value stores rely upon one-sided RDMA atomic
 operations (e.g., compare-and-swap) to resolve data
 races~\cite{rolex,fusee,race} which constrains their design.
 %suffer from the limited scope of such operations.
 Specifically, RDMA atomic operations can act upon 64 contiguous bits
 of memory at a time at most, leading to implementations that employ
-multi-stage datastructures to support practical key and value sizes.
+multi-stage data structures to support practical key and value sizes.
 
-In general, existing systems rely upon a high-performance index
+In general, key-value stores rely upon a high-performance index
 structure to localize key operations and maintain values separately,
 necessitating multiple RDMA operations and network round trips even in
 the absence of contention.  Moreover, given the dominance of
