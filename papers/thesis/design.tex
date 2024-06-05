@@ -287,6 +287,13 @@ without the need for any cuckooing.  Obviously, speculative cuckoo
 paths are most useful when client caches are fresh---often due to a
 failed prior attempt to insert the same key.
 
+\begin{figure}
+    \centering
+        \includegraphics[width=0.80\linewidth]{fig/hash_factor.pdf}
+    \caption{CDF of distances between cuckoo locations for different locality settings using RCuckoo's dependent hashing.}
+    \label{fig:locality-hashing-a}
+\end{figure}
+
 % Because of
 % locality hashing there is a high probability that a valid
 % insertion path can be found in buckets near a speculative
@@ -310,6 +317,8 @@ Note that if lock acquisition is successful, the values
 returned by the read of the corresponding rows---and, thus,
 the client's local cache of those rows---will remain
 synchronized until the lock is released.
+
+
 
 Figure~\ref{fig:table-diagram} shows an example insert
 operation where the client updated its cache of the section
@@ -343,21 +352,9 @@ valid result.
 
 \begin{figure}
     \centering
-        \includegraphics[width=0.99\linewidth]{fig/hash_factor.pdf}
-    \caption{CDF of distances between cuckoo locations for different locality settings using RCuckoo's dependent hashing.}
-    \label{fig:locality-hashing-a}
-\end{figure}
-\begin{figure}
-    \centering
-        \includegraphics[width=0.99\linewidth]{fig/hash_fill.pdf}
+        \includegraphics[width=0.80\linewidth]{fig/hash_fill.pdf}
     \caption{Achieved maximum fill percentage for different locality settings. 90\% fill indicated by dashed red line.}
     \label{fig:locality-hashing-b}
-\end{figure}
-\begin{figure}
-    \centering
-        \includegraphics[width=0.99\linewidth]{fig/insertion_span.pdf}
-    \caption{CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path}
-    \label{fig:locality-hashing-c}
 \end{figure}
 
 
@@ -374,8 +371,6 @@ writes, one row at a time, followed by (an ordered set of) lock
 releases. If no valid path exists the client releases its locks and
 tries again, conducting another speculative search on the updated
 cache contents.
-
-\todo{Lightly filled table optimization}
 
 This entire process repeats until success, a client determines there
 is no viable cuckoo path (at which point the insert operation returns
@@ -409,6 +404,13 @@ by the speculative search.
 
 
 \subsection{Locality}
+
+\begin{figure}
+    \centering
+        \includegraphics[width=0.80\linewidth]{fig/insertion_span.pdf}
+    \caption{CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path}
+    \label{fig:locality-hashing-c}
+\end{figure}
 
 
 %% Randomly spread cuckoo paths take many round trips to find and lock.

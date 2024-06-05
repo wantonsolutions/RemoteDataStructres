@@ -1,6 +1,13 @@
 \section{Evaluation}
 \label{sec:eval}
 
+\begin{figure}
+  \center
+  \includegraphics[width=0.80\linewidth]{fig/hero_ycsb-c.pdf}
+  \caption{Throughput as a function of the number of clients for a read only workload (YCSB-C) (Zipf $\theta$=0.99)}
+  \label{fig:ycsb_throughput_c}
+\end{figure}
+
 We evaluate RCuckoo by directly comparing its performance in terms of
 throughput and latency against representative state-of-the-art
 disaggregated key/value stores.  When accessing large values,
@@ -29,26 +36,14 @@ index-table entry size.
 % \label{fig:ycsb_throughput}
 % \vskip -1em
 %  \end{figure*}
-\begin{figure}
-  \center
-  \includegraphics[width=0.99\linewidth]{fig/hero_ycsb-c.pdf}
-  \caption{Throughput as a function of the number of clients for a read only workload (YCSB-C) (Zipf $\theta$=0.99)}
-  \label{fig:ycsb_throughput_c}
-\end{figure}
 
 \begin{figure}
   \center
-  \includegraphics[width=0.99\linewidth]{fig/hero_ycsb-b.pdf}
+  \includegraphics[width=0.80\linewidth]{fig/hero_ycsb-b.pdf}
   \caption{Throughput as a function of the number of clients for a read mostly workload (5\% write) workload (YCSB-B) (Zipf $\theta$=0.99)}
   \label{fig:ycsb_throughput_b}
 \end{figure}
 
-\begin{figure}
-  \center
-  \includegraphics[width=0.99\linewidth]{fig/hero_ycsb-a.pdf}
-  \caption{Throughput as a function of the number of clients for a write heavy workload (50\% writes) (YCSB-A) (Zipf $\theta$=0.99)}
-  \label{fig:ycsb_throughput_a}
-\end{figure}
 
 
 \subsection{Testbed}
@@ -76,6 +71,14 @@ workloads (YCSB) as the authors of the previous systems.
 %%
 %%
 %%
+
+\begin{figure}
+  \center
+  \includegraphics[width=0.80\linewidth]{fig/hero_ycsb-a.pdf}
+  \caption{Throughput as a function of the number of clients for a write heavy workload (50\% writes) (YCSB-A) (Zipf $\theta$=0.99)}
+  \label{fig:ycsb_throughput_a}
+\end{figure}
+
 
 \textbf{FUSEE} is a fully disaggregated key/value store that
 represents the closest available comparison point to RCuckoo.  While
@@ -112,6 +115,13 @@ In contrast to prior comparisons~\cite{fusee} that force
 clients to consult the metadata server on each read, we allow Clover
 to take advantage of its client caching to achieve maximum performance
 on read-heavy workloads.
+
+\begin{figure}
+  \center
+  \includegraphics[width=0.65\linewidth]{fig/hero_ycsb_fill-a.pdf}
+  \caption{RCuckoo performance as a function of fill factor on each YCSB workload. Here updates are replaced with inserts. As the table fills inserts become more difficult thus reducing throughput.}
+  \label{fig:ycsb_fill-a}
+\end{figure}
 
 %% Clover is a partially disaggregated system which uses
 %% two-sided RDMA operations to modify the index and one-sided
@@ -158,6 +168,7 @@ machines.
 %other system to use locks in remote memory.
 
 
+
 % \subsubsection{Clover}
 % \todo{insert a short clover description}
 
@@ -171,30 +182,6 @@ machines.
 % \vskip -1em
 %     \label{fig:ycsb_fill}
 % \end{figure*}
-\begin{figure}
-  \center
-  \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill-a.pdf}
-  \caption{RCuckoo performance as a function of fill factor on each YCSB workload. Here updates are replaced with inserts. As the table fills inserts become more difficult thus reducing throughput.}
-  \label{fig:ycsb_fill-a}
-\end{figure}
-\begin{figure}
-  \center
-  \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill-b.pdf}
-  \caption{Read and insert latency as a function of fill factor. RCuckoo's read latency remains constant. Insert latency is proportional to the fill factor}
-  \label{fig:ycsb_fill-b}
-\end{figure}
-\begin{figure}
-  \center
-  \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill-c.pdf}
-  \caption{Bytes per operation as a function of fill factor. As the table fills inserts consume more bytes per operation due to additional round trips.}
-  \label{fig:ycsb_fill-c}
-\end{figure}
-\begin{figure}
-  \center
-  \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill-d.pdf}
-  \caption{Messages per operation as a function of fill factor.}
-  \label{fig:ycsb_fill-d}
-\end{figure}
 
 % \begin{figure}[ht]
 %     \includegraphics[width=0.99\linewidth]{fig/hero_ycsb_fill_ops_bw.pdf}
@@ -206,6 +193,13 @@ machines.
 
 \subsection{Performance}
 
+\begin{figure}
+  \center
+  \includegraphics[width=0.65\linewidth]{fig/hero_ycsb_fill-b.pdf}
+  \caption{Read and insert latency as a function of fill factor. RCuckoo's read latency remains constant. Insert latency is proportional to the fill factor}
+  \label{fig:ycsb_fill-b}
+\end{figure}
+
 We start by considering throughput and latency on the classical YCSB
 workloads which employ varying mixes of read and update operations
 before turning to the more complex insert operation.  RCuckoo delivers
@@ -216,11 +210,23 @@ around 2$\times$.
 \todo{What is the row/read size?  How close are we
   to line rate?}
 
-\textbf{Throughput.} [~\ref{fig:ycsb_throughput_c},~\ref{fig:ycsb_throughput_b},~\ref{fig:ycsb_throughput_a}] shows YCSB throughput for RCuckoo, FUSEE,
-Clover, and Sherman on three different YCSB workloads. For each system, we allocate a 100-M-entry
-table and pre-populate it with 90~M entries that each consist of a 32-bit key and 32-bit value (we
-consider larger sizes in Section~\ref{ss:mb}).  We plot the aggregate throughput of a variable
-number of clients concurrently accessing entries according to a Zipf(0.99) distribution.
+
+\begin{figure}
+  \center
+  \includegraphics[width=0.65\linewidth]{fig/hero_ycsb_fill-c.pdf}
+  \caption{Bytes per operation as a function of fill factor. As the table fills inserts consume more bytes per operation due to additional round trips.}
+  \label{fig:ycsb_fill-c}
+\end{figure}
+
+
+
+\textbf{Throughput.} 
+[~\ref{fig:ycsb_throughput_c},~\ref{fig:ycsb_throughput_b},~\ref{fig:ycsb_throughput_a}] shows YCSB
+throughput for RCuckoo, FUSEE, Clover, and Sherman on three different YCSB workloads. For each
+system, we allocate a 100-M-entry table and pre-populate it with 90~M entries that each consist of a
+32-bit key and 32-bit value (we consider larger sizes in Section~\ref{ss:mb}).  We plot the
+aggregate throughput of a variable number of clients concurrently accessing entries according to a
+Zipf(0.99) distribution.
 
 In a read-only (YCSB-C) workload, FUSEE suffers from its extent-based
 value storage.  RCuckoo, Clover, and Sherman perform similarly at
@@ -232,6 +238,13 @@ cache, requiring only a single read for the value; its performance
 degrades under a more uniform workload (not shown).  RCuckoo, on the
 other hand, reads inlined values in a single round trip
 regardless of the distribution, leading to the highest performance.
+
+\begin{figure}
+  \center
+  \includegraphics[width=0.65\linewidth]{fig/hero_ycsb_fill-d.pdf}
+  \caption{Messages per operation as a function of fill factor.}
+  \label{fig:ycsb_fill-d}
+\end{figure}
 
 
 Increased update rate slows all systems.  Even with only 5\% updates (YCSB-B), the picture changes
@@ -263,77 +276,14 @@ caching with a constantly changing index structure.
 
 
 
-% \begin{figure*}[t]
-%     \centering
-%     % \begin{subfigure}{0.24\linewidth} % original width for 4 figures
-%     \begin{subfigure}{0.19\linewidth}
-%       \includegraphics[width=0.99\linewidth]{fig/fault-rate.pdf}
-%           \end{subfigure}
-%     \begin{subfigure}{0.19\linewidth}
-%         \includegraphics[width=0.99\linewidth]{fig/search_dependence.pdf}
-%         % \label{fig:hash_fill}
-%         % \caption{}
-%     \end{subfigure}
-%     \begin{subfigure}{0.19\linewidth}
-%         \includegraphics[width=0.99\linewidth]{fig/search_success_lock_size.pdf}
-%         % \label{fig:hash_factor}
-%         % \caption{}
-%     \end{subfigure}
-%     %\begin{figure}[ht]
-%     \begin{subfigure}{0.19\linewidth}
-%       \includegraphics[width=0.99\linewidth]{fig/entry_size.pdf}
-%           \end{subfigure}
-%     \begin{subfigure}{0.19\linewidth}
-%       \includegraphics[width=0.99\linewidth]{fig/extent.pdf}
-%           \end{subfigure}
-% \vskip -1em
-%     \caption{RCuckoo microbenchmarks:
-%       \textbf{(a)} YCSB-A throughput vs. client failure rate,
-%           \textbf{(b)} round trip times required to acquire locks on insert,
-%     \textbf{(c)} insert second-search success rate as a function of lock granularity, and
-%     \textbf{(d)} throughput vs. key/value-entry size for 50\% insert 50\% read,  and YCSB-C (read-only) workloads.
-%     \textbf{(e)} Extent performance value sizes up to 1KB. Dashed line marks the inline performance on 16 Byte entries. Overheads marked in black.
-%     }
-%     % \label{fig:microbenchmarks}
-%              \label{fig:microbenchmarks}
-% \vskip -1em
-% \end{figure*}
 
 \begin{figure}
 \centering
-      \includegraphics[width=0.99\linewidth]{fig/fault-rate.pdf}
+      \includegraphics[width=0.70\linewidth]{fig/fault-rate.pdf}
 \caption{YCSB-A throughput vs. client failure rate}
              \label{fig:microbenchmarks-a}
 \end{figure}
 
-\begin{figure}
-\centering
-        \includegraphics[width=0.99\linewidth]{fig/search_dependence.pdf}
-\caption{round trip times required to acquire locks on insert}
-             \label{fig:microbenchmarks-b}
-\end{figure}
-
-\begin{figure}
-\centering
-        \includegraphics[width=0.99\linewidth]{fig/search_success_lock_size.pdf}
-        % \label{fig:hash_factor}
-\caption{insert second-search success rate as a function of lock granularity}
-             \label{fig:microbenchmarks-c}
-\end{figure}
-
-\begin{figure}
-\centering
-      \includegraphics[width=0.99\linewidth]{fig/entry_size.pdf}
-\caption{throughput vs. key/value-entry size for YCSB-A (insert) and YCSB-C (read-only) workloads}
-             \label{fig:microbenchmarks-d}
-\end{figure}
-
-\begin{figure}
-\centering
-      \includegraphics[width=0.99\linewidth]{fig/extent.pdf}
-\caption{Extent performance value sizes up to 1KB. Dashed line marks the inline performance on 16 Byte entries. Overheads marked in black.}
-             \label{fig:microbenchmarks-e}
-\end{figure}
 
 \textbf{Inserts.}
 %% By default YCSB-A,B,C use updates. RCuckoo's insert algorithm is it's most complex and bandwidth
@@ -358,10 +308,17 @@ out-performs RCuckoo at high fill factors, we observe that
 insert-only workloads are rare in
 practice~\cite{facebook-memcached}.
 
+\begin{figure}
+\centering
+        \includegraphics[width=0.70\linewidth]{fig/search_dependence.pdf}
+\caption{round trip times required to acquire locks on insert}
+             \label{fig:microbenchmarks-b}
+\end{figure}
+
+
 \textbf{Latency and overhead.} We plot
 %operation latency, size, and RDMA message counts as a
 %function of fill factor i. We report
-
 the latency of insert and read operations in
 Figures[~\ref{fig:ycsb_fill-b},~\ref{fig:ycsb_fill-c},~\ref{fig:ycsb_fill-d}].  For comparison
 systems we report the best-case (lightly loaded) performance on our testbed.  Read latency is nearly
@@ -384,6 +341,7 @@ is insensitive to fill factor.
 % \end{figure}
 
 \subsection{Fault tolerance}
+
 
 
 RCuckoo runs at nearly full throughput during realistic
@@ -432,6 +390,13 @@ demonstrated its robustness to client failure, we now evaluate the
 impact of particular design choices.
 
 
+\begin{figure}
+\centering
+        \includegraphics[width=0.70\linewidth]{fig/search_success_lock_size.pdf}
+        % \label{fig:hash_factor}
+\caption{insert second-search success rate as a function of lock granularity}
+             \label{fig:microbenchmarks-c}
+\end{figure}
 
 
 
@@ -514,6 +479,13 @@ four or more locks per message.
 % number of locks required per insert is high which leads to
 % greater contention. A* search with dependent hashing has
 % cuckoo paths that are both short, and clustered together.
+\begin{figure}
+\centering
+      \includegraphics[width=0.70\linewidth]{fig/entry_size.pdf}
+\caption{throughput vs. key/value-entry size for YCSB-A (insert) and YCSB-C (read-only) workloads}
+             \label{fig:microbenchmarks-d}
+\end{figure}
+
 
 
 
@@ -599,6 +571,16 @@ while reads (and update/delete, not shown)
 % (and
 % updates/deletes, not shown), 
 are largely unaffected by entry size.
+Extent entries are slightly slower.
+
+
+\begin{figure}
+\centering
+      \includegraphics[width=0.70\linewidth]{fig/extent.pdf}
+\caption{Extent performance value sizes up to 1KB. Dashed line marks the inline performance on 16 Byte entries. Overheads marked in black.}
+             \label{fig:microbenchmarks-e}
+\end{figure}
+
 %Hence,
 %which have lower bandwidth requirements see very little chance in throughput across entry sizes. We
 %suggest that known read heavy workloads should use inlined entries as reads see a large
@@ -611,7 +593,7 @@ are largely unaffected by entry size.
 % which suggest that 800 GBPS and higher network speeds will
 % be available in the coming years. While round trip latency
 % is expected to remain largely the same.
-Extent entries are slightly slower.
+
 Figure~\ref{fig:microbenchmarks-e} shows YCSB throughput as a function of
 value size from 8 to 1024~B on 6 client machines with 120 cores using a
 Zipf(0.99) distribution.  For
@@ -623,7 +605,3 @@ testbed and compute the difference.
 Inlined entries have two sources of performance gain: they avoid the overhead of reading and
 writing to extents which increases with value size, but, more importantly they avoid additional rounds trips on cache
 misses. YCSB-B sees a 21\% performance improvement from inlining while YCSB-A gains 37\% (YCSB-C has misses).
-%(GC is deferred in this experiment.) 
-
-
-

@@ -140,6 +140,13 @@ constraints of current RDMA hardware.  Specifically, we
 facilitate lock-based updates by decreasing the number of round
 trips required to acquire locks and perform mutating operations.
 
+\begin{figure}
+        \includegraphics[width=0.80\linewidth]{fig/rdma_latency.pdf}
+        \caption{RDMA operation latency as a function of message size~\cite{rdma-latency}}
+        \label{fig:rdma-benchmarks-b}
+\end{figure}
+
+
 We introduce RCuckoo, a fully disaggregated key/value store based on
 cuckoo hashing~\cite{cuckoo} that
 %delivers high performance using
@@ -261,17 +268,7 @@ failures:
 % \end{figure*}
 
 
-\begin{figure}
-        \includegraphics[width=0.99\linewidth]{fig/rdma_latency.pdf}
-        \caption{RDMA operation latency as a function of message size~\cite{rdma-latency}}
-        \label{fig:rdma-benchmarks-b}
-\end{figure}
 
-\begin{figure}
-        \includegraphics[width=0.99\linewidth]{fig/rdma_cas_throughput.pdf}
-        \caption{compare-and-swap performance on device and main memory}
-        \label{fig:rdma-benchmarks-c}
-\end{figure}
 
 Combined with a datastructure design that facilitates aggressive
 batching of RDMA operations, these techniques enable RCuckoo to limit
@@ -287,3 +284,10 @@ delivers up to a 2.5$\times$ throughput improvement on read-intensive
 write-intensive (YCSB-A) workloads.  Moreover, RCuckoo's
 performance remains high despite 100s of
 clients failing per second.
+
+\begin{figure}
+        \center
+        \includegraphics[width=0.80\linewidth]{fig/rdma_cas_throughput.pdf}
+        \caption{compare-and-swap performance on device and main memory}
+        \label{fig:rdma-benchmarks-c}
+\end{figure}
