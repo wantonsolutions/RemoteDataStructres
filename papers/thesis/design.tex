@@ -272,19 +272,14 @@ similarly consists only of currently locked rows---exists.  If so, the
 insert is performed; if not, the client releases its locks and retries.
 %the operation.
 
-\textbf{Speculative local search:} As noted in
-Section~\ref{sec:cuckoo-back} identifying a viable cuckoo path for
-insertions requires multiple dependent reads.  RCuckoo attempts to
-limit the number of remote operations by first conducting a
-speculative local search. Prior to contacting the server, RCuckoo
-clients search the contents of their local table cache to build a
-speculative cuckoo path.  As with prior work, we use breadth-first
-search (BFS) to identify short paths in an attempt to minimize
-bandwidth and locking overhead~\cite{cuckoo-improvements}.  If the
-client cache is empty the degenerate path is presumed, i.e., that the
-key will be inserted into its primary location
-without the need for any cuckooing.  Obviously, speculative cuckoo
-paths are most useful when client caches are fresh---often due to a
+\textbf{Speculative local search:} Identifying a viable cuckoo path for insertions requires multiple
+dependent reads.  RCuckoo attempts to limit the number of remote operations by first conducting a
+speculative local search. Prior to contacting the server, RCuckoo clients search the contents of
+their local table cache to build a speculative cuckoo path.  As with prior work, we use
+breadth-first search (BFS) to identify short paths in an attempt to minimize bandwidth and locking
+overhead~\cite{cuckoo-improvements}.  If the client cache is empty the degenerate path is presumed,
+i.e., that the key will be inserted into its primary location without the need for any cuckooing.
+Obviously, speculative cuckoo paths are most useful when client caches are fresh---often due to a
 failed prior attempt to insert the same key.
 
 \begin{figure}
@@ -679,7 +674,7 @@ groups.
 
 
 
-\section{Fault tolerance}
+\section{Fault Tolerance}
 \label{sec:fault-tolerance}
 
 In keeping with the rest of its design, RCuckoo handles failures in a
@@ -750,7 +745,7 @@ orders of magnitude above the 99th-percentile insert time
 of 50$~\mu$s.
 
 
-\subsection{Repair leases}
+\subsection{Repair Leases}
 %\todo{mention repair lease table}
 
 RCuckoo recovers stranded locks one lock at a time; if a client fails
@@ -803,8 +798,8 @@ using CAS to resolve any races) and marks the lease holder as failed
 %created.
 
 All modification operations write new entries as a cuckoo path;
-updates and deletes have a path of length one.  As described in
-Section~\ref{sec:cuckoo-back} cuckoo paths are executed by first
+updates and deletes have a path of length one.
+Cuckoo paths are executed by first
 claiming an open entry at the end of the path and proceeding backward
 along the path, cuckooing entries forward one-by-one until the new
 entry is written at the beginning of the path.  Client failures can
