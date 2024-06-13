@@ -70,13 +70,13 @@
 %In the fully disaggregated setting serialization is
 %achieved entirely with a client based protocol. 
 %
-Fully disaggregated key-value stores rely upon one-sided RDMA atomic
-operations (e.g., compare-and-swap) to resolve data
-races~\cite{rolex,fusee,race} which constrains their design.
-%suffer from the limited scope of such operations.
-Specifically, RDMA atomic operations can act upon 64 contiguous bits
-of memory at a time at most, leading to implementations that employ
-multi-stage data structures to support practical key and value sizes.
+% Fully disaggregated key-value stores rely upon one-sided RDMA atomic
+% operations (e.g., compare-and-swap) to resolve data
+% races~\cite{rolex,fusee,race} which constrains their design.
+% %suffer from the limited scope of such operations.
+% Specifically, RDMA atomic operations can act upon 64 contiguous bits
+% of memory at a time at most, leading to implementations that employ
+% multi-stage data structures to support practical key and value sizes.
 
 In general, key-value stores rely upon a high-performance index
 structure to localize key operations and maintain values separately,
@@ -285,9 +285,3 @@ write-intensive (YCSB-A) workloads.  Moreover, RCuckoo's
 performance remains high despite 100s of
 clients failing per second.
 
-\begin{figure}
-        \center
-        \includegraphics[width=0.80\linewidth]{fig/rdma_cas_throughput.pdf}
-        \caption{compare-and-swap performance on device and main memory}
-        \label{fig:rdma-benchmarks-c}
-\end{figure}
