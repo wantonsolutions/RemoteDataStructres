@@ -343,6 +343,13 @@ is insensitive to fill factor.
 \subsection{Fault Tolerance Performance}
 
 
+\begin{figure}
+\centering
+        \includegraphics[width=0.70\linewidth]{fig/search_success_lock_size.pdf}
+        % \label{fig:hash_factor}
+\caption{Insert second-search success rate as a function of lock granularity}
+             \label{fig:microbenchmarks-c}
+\end{figure}
 
 RCuckoo runs at nearly full throughput during realistic
 failure scenarios and remains functional in the face of
@@ -390,13 +397,6 @@ demonstrated its robustness to client failure, we now evaluate the
 impact of particular design choices.
 
 
-\begin{figure}
-\centering
-        \includegraphics[width=0.70\linewidth]{fig/search_success_lock_size.pdf}
-        % \label{fig:hash_factor}
-\caption{Insert second-search success rate as a function of lock granularity}
-             \label{fig:microbenchmarks-c}
-\end{figure}
 
 
 
