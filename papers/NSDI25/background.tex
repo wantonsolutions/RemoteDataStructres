@@ -2,101 +2,101 @@
 \section{Background}
 \label{sec:background}
 
+Disaggregated Key-Value Stores Are the highest performance technology for sharing disaggregated
+memory. Key-value stores are built with the expectation that clients will see consistent reads and
+writes to shared memory. This stands in contrast to the majority of disaggregated efforts which
+assume that remote memory is isolated. These two approaches are fundamentally different in how they
+achieve performance. Isolated systems do not require serialization across clients so they gain
+performance by avoiding remote accesses with smart caching strategies. Shared memory systems must
+synchronize and serialize for consistency. Their performance hinges on reducing the number of round
+trips required to make a consistent read or write.
 
-%\subsection{RDMA Key-Value Stores}
 
-%% %Describe existing key value stores relation to RDMA and
-%serialization %
-Key/value stores have long used RDMA to
-%Many non-disaggregated key-value stores have used RDMA to
-accelerate
-performance~\cite{farm,memc3,erpc,herd,faast,mica,pilaf,cell,storm}.
+% Key/value stores have long used RDMA to accelerate
+% performance~\cite{farm,memc3,erpc,herd,faast,mica,pilaf,cell,storm}.  These systems strike a careful
+% balance between directly accessing remote memory with one-sided RDMA requests and serializing
+% mutating operations at a server-side CPU.  Cuckoo~\cite{cuckoo} and hopscotch~\cite{hopscotch}
+% hashing are popular choices in this space because clients can calculate the location of keys without
+% needing to consult the server and potentially perform lock-less reads with
+% RDMA~\cite{farm,pilaf,cuckoo}.
+
+\subsection{Disaggregated Key-Value Stores}
+
+Existing Disaggregated Key-values Stores have a close lineage with RDMA key value stores. Precursor
+RDMA KV stores achieved performance by striking a delicate balance between CPU-bypass one-sided RDMA
+operations and CPU-serialized two-sided operations. Disaggregated systems are entirely one-sided as
+they assume no remote CPU exists for serializing requests. Their designs make use of the one-sided
+techniques from prior approaches and adopt new means of serialization with the use of one-sided RDMA
+atomics. In general the performance of a disaggregated key-value store hinges on the performance of
+their serialization mechanism for writes. Achieving fast consistent writes with one-sided RDMA is
+hard due to the limited RDMA atomic interface. Designers must carefully design their index
+structures around 64bit atomic compare and swap updates. This RDMA fact leads to a common design
+pattern, KV indexes consist of 64 bit atomic entries that point to data stored in uncontended
+memory. This pattern leads to suboptimal data accesses as the condensed nature of the 64 bit entry
+usually contains a 48 bit pointer leaving only 16 bits for metadata. Data like the size of the true
+entry, and its key are stored in 16 bit compressed digests. This means that reads require at least
+two round trips to recover an entry or even validate its existence. In general this design pattern
+leads to simplified hash table designs which can not support complex metadata. Established high
+performance RDMA hash tables like Cuckoo and hopscotch hashes can’t be implemented with this
+strategy as they require locks on multiple entries of the index rather than a single atomic update.
+
+Historically network bandwidth has limited KV store throughput more than operation rate. For
+instance a connectx3 nic at 40GBPs can process 75 million packets per second would bottleneck at
+only 5MOPS making 1K reads. Similarly at these lower packet rates the effects of contention on
+skewed distributions are not as noticeable. As bandwidths get higher (400GBPs+) latency and
+contention, rather than bandwidth will become the primary scalability bottleneck. To this end we
+focus on small key workloads which are limited by round trip access latency and contention and not
+bandwidth. We make specific design choices which reduce round trip times at the cost of bandwidth.
+
+Figure~\ref{fig:rdma-benchmarks}(a) shows the tradeoff in round trip time for RDMA reads of
+increasing size. Critically the round trip time of a 1KB packet is lower than the latency of issuing
+two dependent small packets.  The implication is that performance can be gained if a single large
+packet can complete the work of two dependent smaller messages. Figure~\ref{fig:rdma-benchmarks}(b)
+shows the performance overheads of using an extent based design on small key-value pairs. Inlined
+values are read directly from the index while all other values are read from indirect storage. Here
+client caching is turned on and clients optimistically read indirect storage in parallel with their
+index read. Only if a value has changed do clients re-read from extent storage. Due to atomic width
+limitations existing KV stores can not gain this performance.
+
+
+% \subsection{RDMA}
 %%
-These systems strike a careful balance between directly accessing remote memory with one-sided RDMA requests and
-serializing mutating operations at a server-side CPU.
-%%
-Cuckoo~\cite{cuckoo} and hopscotch~\cite{hopscotch} hashing are popular choices in
-this space because clients can calculate the location of
-keys without needing to consult the server and potentially perform
-lock-less reads with RDMA~\cite{farm,pilaf,cuckoo}.
+% RDMA allows clients to directly access the memory of a remote server with one-sided operations like
+% read, write and atomic update without the involvement of a remote CPU~\cite{infiniband-spec}.  To
+% set the context for RCuckoo's design, we benchmark the baseline performance of our testbed hardware,
+% illustrating the constraints and opportunities.
+
+% Atomic operations such as compare-and-swap (CAS) are essential for implementing locks or
+% opportunistic concurrency. Atomics are limited to 64-bit operations and bottleneck at lower rates
+% than reads and writes because they block requests on data-dependent addresses while waiting on PCIe
+% round trips~\cite{design-guidelines,sherman}.  Figure~\ref{fig:rdma-benchmarks}(a) shows that the
+% NICs in our testbed (100-Gbps NVIDIA Mellanox ConnectX-5s) are capable of serving many 10s of
+% millions of RDMA operations per second (limited only by link speed), but CAS operations to remote
+% server memory top out around 50 MOPS.  Hence, we employ atomic operations judiciously in RCuckoo.
 
 
+% While atomic operations are limited to 64 bits, read and write message sizes are bounded only by the
+% link MTU.  Figure~\ref{fig:rdma-benchmarks}(b) shows that on our testbed NIC-to-NIC round-trip times
+% are similar for all message sizes less than about 128 bytes, and messages must exceed 1~KB before
+% the latency of a single large operation exceeds two RTTs of smaller ones.  We leverage this
+% observation in RCuckoo by collapsing multiple small reads into a single larger one when appropriate.
+% The optimal threshold trades off latency reduction against read amplificaiton.
 
-\subsection{RDMA}
 
-RDMA
-%is an enabling technology for memory disaggregation. It allows
-allows
-clients to directly access the memory of a remote server with
-one-sided operations like read, write and atomic update without the
-involvement of a remote CPU~\cite{infiniband-spec}.  To set the
-context for RCuckoo's design, we benchmark the baseline performance of
-our testbed hardware, illustrating the constraints and
-opportunities.
+% Finally, we highlight that our testbed NICs, like those from several
+% vendors, include a small amount (256~KB in our case) of on-NIC memory
+% that can be addressed by remote clients using RDMA
+% operations~\cite{device-memory}.  Accesses to NIC memory avoid the
+% need to cross the server's PCIe bus, decreasing latency and increasing
+% throughput.  The performance gain is particularly significant for
+% atomic operations.  Figure~\ref{fig:rdma-benchmarks}(c) shows the
+% maximum aggregate throughput of concurrent CAS operations targeting
+% the same single (i.e., contended) address or distinct, independent
+% addresses in both main server memory (shown in orange) and on-NIC
+% device memory (blue).  CAS operations perform between 1.8--3.1$\times$
+% faster on NIC memory.  RCuckoo's datastructures are designed so that
+% all CAS operations are performed on NIC memory.
 
-%%
-Atomic operations such as compare-and-swap (CAS) are essential for
-implementing locks or opportunistic concurrency. Atomics are limited
-to 64-bit operations and bottleneck at lower rates than reads and
-writes because they block requests on data-dependent addresses while
-waiting on PCIe round trips~\cite{design-guidelines,sherman}.
-Figure~\ref{fig:rdma-benchmarks}(a) shows that the NICs in our testbed
-(100-Gbps NVIDIA Mellanox ConnectX-5s) are capable of serving many 10s of
-millions of RDMA operations per second (limited only by link speed),
-but CAS operations to remote server memory top out around 50 MOPS.  Hence, we employ atomic operations judiciously in RCuckoo.
-
-%the scalability of
-%these operations on CX5 NICs for 64 bit operations.
-%%
-
-While atomic operations are limited to 64 bits, read and write message
-sizes are bounded only by the link MTU.
-%can 
-%RDMA NIC bandwidth has increased disproportionately to
-%latency in the last decade leading to interesting design
-%tradeoffs. CX7 NICs have 10$\times$ the bandwidth of CX3's
-%but their intra-rack RTT has only shrunk by 1.5$\times$.
-Figure~\ref{fig:rdma-benchmarks}(b) shows that on our testbed
-NIC-to-NIC round-trip times are similar for all message sizes
-less than about 128 bytes, and
-%on CX5s for variable sized writes. All writes up
-%to 128 bytes have comparable latencies and
-messages must exceed 1~KB before the latency of a single large
-operation exceeds two RTTs of smaller ones.  We leverage this
-observation in RCuckoo by collapsing multiple small reads into a
-single larger one when appropriate.  The optimal threshold trades off
-latency reduction against read amplificaiton.
-
-%\textbf{If there
-%is surplus bandwidth a single large message can have much
-%lower latency than two dependent smaller messages.}
-
-Finally, we highlight that our testbed NICs, like those from several
-vendors, include a small amount (256~KB in our case) of on-NIC memory
-that can be addressed by remote clients using RDMA
-operations~\cite{device-memory}.  Accesses to NIC memory avoid the
-need to cross the server's PCIe bus, decreasing latency and increasing
-throughput.  The performance gain is particularly significant for
-atomic operations.  Figure~\ref{fig:rdma-benchmarks}(c) shows the
-maximum aggregate throughput of concurrent CAS operations targeting
-the same single (i.e., contended) address or distinct, independent
-addresses in both main server memory (shown in orange) and on-NIC
-device memory (blue).  CAS operations perform between 1.8--3.1$\times$
-faster on NIC memory.  RCuckoo's datastructures are designed so that
-all CAS operations are performed on NIC memory.
-
-%many modern NICs
-%Vendors have provided some workarounds for atomic
-%bottlenecks by adding device memory and masked atomic
-%operations. CX series NICs have a 256KB region of on-NIC
-%RDMAable memory. Atomics to this region avoid the round trip
-%and execute with lower latency and up to 3x higher
-%throughput().
-%Masked CAS (MCAS) allows for each bit to be set
-%independently thus enabling higher density locks while
-%reducing contention~\cite{rdma-masked-cas}. While multi-CAS
-%is not supported these features have been demonstrated to
-%enable fast dense lock tables~\cite{sherman}.
 
 \subsection{Concurrent hash tables} 
 \label{sec:cuckoo-back}
