@@ -39,64 +39,46 @@
 % facilitate lock-based updates by decreasing the number of round
 % trips required to acquire locks and perform mutating operations.
 
-Resource disaggregation promises improvements in scalability and resource utilization. Main memory
-has become a scarce resource in recent years as increased CPU core counts have quickly outpaced
-improvements in memory capacity leading to a lower CPU core to memory ratio than at any point in the
-last 30 years. Architectures for disaggregated memory have shown that pooling memory leads to much
-higher utilization by reducing stranding [huge number of citations]. Critically though many of these
-designs forgo sharing memory due to the high cost of synchronization over the network [citation
-block]. To realize the full benefit of disaggregated memory designers need a low cost mechanism for
-reading and writing to shared resources consistently.
+Disaggregated architectures aim to improve resource scalability and utilization by pooling together
+network attached resources~\cite{dredbox,firebox,blade-server,legoos}. Shared resources pools enable
+data center operators to provision for the sum-of-peak workloads rather than the
+peak-of-sums~\cite{dsnf,supernic}. DRAM density has stagnated in contrast to CPU core counts and
+network bandwidth making main memory a scarce resource and prime candidate for disaggregation over
+RDMA~\cite{fastswap,3po,kona,infiniswap,hydra,leap,legoos,dilos}.
 
-Key/value stores are the current fundamental building blocks for sharing disaggregated memory. In
-most cases these systems are built on top of one-sided RDMA and use RDMA atomic operations as a
-means to synchronize read and write accesses to remote memory. The main challenge in designing these
-systems is efficient serialization. Disaggregation assumes that machines housing pooled DRAM do not
-have powerful CPUs. This means that clients must implement their own serialization protocols. When
-conflicts occur the cost of reconciliation is high. Most systems use RDMA compare-and-swap to
-optimistically commit writes. This approach has two fundamental drawbacks. Firstly atomic writes are
-limited to 64 bits - this means that writes for values larger than 64 bits must be done indirectly.
-One writes to an uncontended region, and a second to a shared index. Second, the cost of
-synchronization is high. In a contended region a CAS may fail as it became state from its last read.
+Sharing memory is fundamentally hard over a network because of the high cost of synchronization.
+Most systems choose to statically partition memory and optimize by reducing remote accesses through
+a variety of techniques (cache policy, compilers, pointer
+analysis~\cite{kona,mira,aifm,trackfm,carbink}). In contrast, disaggregated key-value stores (KVS) both
+pool and share memory with a consistent read and write
+interface~\cite{rolex,smart,ditto,fusee,clover,sherman,ford}.
 
-KV store design around indirect reads and writes leads to two fundamental drawbacks 1) All access
-requires at least two round trips. Read requires a round trip to read the index and another for the
-data. Update, delete and insert operations require at least two if not more. 2) Indirect indexes do
-not support complex updates limiting their generality. High performance indexes for RDMA like Cuckoo
-and Hopscotch hashes can not be supported as they require locks to update multiple locations in the
-index atomically.  Alternatively a lock based index can support inlined operations and complex
-updates but can struggle from large critical sections and failure while clients hold locks.
+The core challenging in designing a disaggregated KVS is efficient serialization. Memory
+disaggregation assumes that machines housing pooled DRAM do not have CPUs powerful enough to service
+requests. Thus, clients must implement their own serialization protocols. These protocols use
+one-sided RDMA and carefully coordinate reads, writes, and atomic operations to maximize operations
+per second.  The choice between lock-based and lock-free synchronization is an extremely delicate
+one. But one which typically falls on semantic lines. KVS's with ordered keys (BTrees \& Radix
+Trees) use locks~\cite{sherman,smart}, while those with unordered keys choose lock-free
+techniques~\cite{rolex,ditto,fusee,clover}. In general the cost of lock-based approaches is
+considered too high for unordered KVS due to critical section size, RDMA atomic bottlenecks, and
+complex failure scenarios. Indeed, all lock based KVS's to date assume that clients are co-located
+to combine writes, and do not provide a fault-tolerance protocol~\cite{sherman,smart}.
 
+In this work we take the view that lock-based synchronization can provide very high performance for
+unordered KVS's. We argue that because locks enable inlined operations on KVS indexes which can
+result in significantly faster reads on common mixed read and write workloads by reducing round
+trips. Further, locks enable the use of established RDMA KVS algorithms like Cuckoo hashing. We show
+that atomic operation bottlenecks can be entirely avoided by using a NIC-based lock table, and that
+through fine grained locking and careful protocol design critical sections can be reduced to a
+single round trip in the common case and achieve high performance without co-locating clients.
+Finally we demonstrate that a leased based lock acquisition protocol can be used to provide
+fault-tolerance in the face of client failures with held locks.  To demonstrate the effectiveness of
+our approach we introduce RCuckoo, a fully disaggregated KVS based on cuckoo hashing~\cite{cuckoo}.
+RCuckoo builds around a novel \emph{dependent hashing} algorithm that makes spatial locality a
+tunable parameter. Locality is the linchpin of our design as it enables us to efficiently determine
+the ranges of memory each operation and acquire the right locks.
 
-We introduce RCuckoo, a fully disaggregated key/value store based on
-cuckoo hashing~\cite{cuckoo} that
-uses only one-sided RDMA operations.
-RCuckoo builds
-around a \emph{dependent hashing} algorithm that makes spatial
-locality a tunable parameter.
-RCuckoo employs a set of
-complimentary techniques that leverage this enhanced locality to deliver higher performance than any prior
-disaggregated key/value store while gracefully handling client
-failures:
-
-\begin{itemize}
-\item{\textbf{Deterministic lock-free reads.}  Cuckoo hashing ensures
-  an entry is always located in one of two locations which can be
-  read in parallel.}
-
-\item{\textbf{Space-efficient locks} frequently allow clients to acquire necessary 
-  locks in a single RDMA operation.}
-
-\item{\textbf{Client-side caching} enables accurate cuckoo-path
-  speculation to improve insert performance.}
-
-\item{\textbf{Leased lock acquisitions} allow clients to detect
-  and recover from client failures using timeouts.}
-\end{itemize}
-
-%% message round-trips for both reads and writes,
-%% improving performance for small-object reads and significantly
-%% improving writes.
 
 
 \begin{figure*}[t]
@@ -127,17 +109,13 @@ failures:
 \vskip -1em
 \end{figure*}
 
-Combined with a datastructure design that facilitates aggressive
-batching of RDMA operations, these techniques enable RCuckoo to limit
-the number of round trips required for all table operations.  In the
-common case, reads execute in one or two (for large values) round
-trips, uncontested updates and deletes require two round trips, and
-the median insert operation involves only two round trips---although
-the expected number increases as the table fills.  On our testbed,
-RCuckoo delivers comparable or higher performance on small values across the standard set  of YCSB benchmarks than all of the existing disaggregated
-key/value stores we consider.  Concretely, with 320 clients RCuckoo
-delivers up to a 2.5$\times$ throughput improvement on read-intensive
-(YCSB-B) workloads and up to 7.1$\times$ their throughput on
-write-intensive (YCSB-A) workloads.  Moreover, RCuckoo's
-performance remains high despite 100s of
-clients failing per second.
+Combined with a datastructure design that facilitates aggressive batching of RDMA operations, these
+techniques enable RCuckoo to limit the number of round trips required for all table operations.  In
+the common case, reads execute in one or two (for large values) round trips, uncontested updates and
+deletes require two round trips, and the median insert operation involves only two round
+trips---although the expected number increases as the table fills.  On our testbed, RCuckoo delivers
+comparable or higher performance on small values across the standard set  of YCSB benchmarks than
+all of the existing disaggregated key/value stores we consider.  Concretely, with 320 clients
+RCuckoo delivers up to a 2.5$\times$ throughput improvement on read-intensive (YCSB-B) workloads and
+up to 7.1$\times$ their throughput on write-intensive (YCSB-A) workloads.  Moreover, RCuckoo's
+performance remains high despite 100s of clients failing per second.

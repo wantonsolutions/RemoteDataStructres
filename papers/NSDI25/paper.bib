@@ -1490,3 +1490,136 @@ url = {https://www.usenix.org/conference/fast20/presentation/cao-zhichao},
 publisher = {USENIX Association},
 month = feb
 }
+
+
+@inproceedings {dsnf,
+author = {Deepak Bansal and Gerald DeGrace and Rishabh Tewari and Michal Zygmunt and James Grantham and Silvano Gai and Mario Baldi and Krishna Doddapaneni and Arun Selvarajan and Arunkumar Arumugam and Balakrishnan Raman and Avijit Gupta and Sachin Jain and Deven Jagasia and Evan Langlais and Pranjal Srivastava and Rishiraj Hazarika and Neeraj Motwani and Soumya Tiwari and Stewart Grant and Ranveer Chandra and Srikanth Kandula},
+title = {Disaggregating Stateful Network Functions},
+booktitle = {20th USENIX Symposium on Networked Systems Design and Implementation (NSDI 23)},
+year = {2023},
+isbn = {978-1-939133-33-5},
+address = {Boston, MA},
+pages = {1469--1487},
+url = {https://www.usenix.org/conference/nsdi23/presentation/bansal},
+publisher = {USENIX Association},
+month = apr
+}
+
+@misc{3po,
+      title={3PO: Programmed Far-Memory Prefetching for Oblivious Applications}, 
+      author={Christopher Branner-Augmon and Narek Galstyan and Sam Kumar and Emmanuel Amaro and Amy Ousterhout and Aurojit Panda and Sylvia Ratnasamy and Scott Shenker},
+      year={2022},
+      eprint={2207.07688},
+      archivePrefix={arXiv},
+      primaryClass={cs.OS}
+}
+
+@inproceedings {hydra,
+author = {Youngmoon Lee and Hasan Al Maruf and Mosharaf Chowdhury and Asaf Cidon and Kang G. Shin},
+title = {Hydra : Resilient and Highly Available Remote Memory},
+booktitle = {20th USENIX Conference on File and Storage Technologies (FAST 22)},
+year = {2022},
+isbn = {978-1-939133-26-7},
+address = {Santa Clara, CA},
+pages = {181--198},
+url = {https://www.usenix.org/conference/fast22/presentation/lee},
+publisher = {USENIX Association},
+month = feb
+}
+
+@inproceedings{dilos,
+author = {Yoon, Wonsup and Oh, Jinyoung and Ok, Jisu and Moon, Sue and Kwon, Youngjin},
+title = {DiLOS: adding performance to paging-based memory disaggregation},
+year = {2021},
+isbn = {9781450386982},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3476886.3477507},
+doi = {10.1145/3476886.3477507},
+abstract = {Memory disaggregation places computing and memory in physically separate nodes and achieves improved memory utilization in datacenters. Kernel-based approaches for memory disaggregation offer transparent virtual memory by using paging schemes but suffer from expensive page fault handling. As an alternative, library-based approaches incorporate application semantics to memory disaggregation and can even eliminate page fault handling on its data path. However, its lack of compatibility harms generality and obstruct wide adoption.This paper revisits the paging-based approaches and challenges their performance. We posit that the page fault overhead is not a fundamental limitation. We propose DiLOS, a new memory disaggregating unikernel, that delivers both performance and generality. The key insight of DiLOS to overcome performance drawbacks while maintaining generality lies in the design of a fast, lightweight page fault handler on top of the unikernel's simple execution model. Since each unikernel serves a single application, it also opens room for extra optimization via app-aware prefetching. DiLOS outperforms a recent library-based system (AIFM) by 1.52\texttimes{} and 1.31\texttimes{} when the cache size is 12.5\% and 100\% of the total working set, respectively. Compared to the state-of-the-art paging-based system (Fastswap), DiLOS with a general-purpose prefetcher achieves up to 2.2\texttimes{} higher performance in real-world workload. An app-aware prefetcher further improves the throughput of Redis in-memory database up to 27\%.},
+booktitle = {Proceedings of the 12th ACM SIGOPS Asia-Pacific Workshop on Systems},
+pages = {70–78},
+numpages = {9},
+keywords = {unikernel, memory disaggregation, disaggregated data center},
+location = {Hong Kong, China},
+series = {APSys '21}
+}
+
+@inproceedings{mira,
+author = {Guo, Zhiyuan and He, Zijian and Zhang, Yiying},
+title = {Mira: A Program-Behavior-Guided Far Memory System},
+year = {2023},
+isbn = {9798400702297},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3600006.3613157},
+doi = {10.1145/3600006.3613157},
+abstract = {Far memory, where memory accesses are non-local, has become more popular in recent years as a solution to expand memory size and avoid memory stranding. Prior far memory systems have taken two approaches: transparently swap memory pages between local and far memory, and utilizing new programming models to explicitly move fine-grained data between local and far memory. The former requires no program changes but comes with performance penalty. The latter has potentially better performance but requires significant program changes.We propose a new far-memory approach by automatically inferring program behavior and efficiently utilizing it to improve application performance. With this idea, we build Mira. Mira utilizes program analysis results, profiled execution information, and system environments together to guide code compilation and system configurations for far memory. Our evaluation shows that Mira outperforms prior swap-based and programming-model-based systems by up to 18 times.},
+booktitle = {Proceedings of the 29th Symposium on Operating Systems Principles},
+pages = {692–708},
+numpages = {17},
+location = {, Koblenz, Germany, },
+series = {SOSP '23}
+}
+
+@inproceedings{ditto,
+author = {Shen, Jiacheng and Zuo, Pengfei and Luo, Xuchuan and Su, Yuxin and Gu, Jiazhen and Feng, Hao and Zhou, Yangfan and Lyu, Michael R.},
+title = {Ditto: An Elastic and Adaptive Memory-Disaggregated Caching System},
+year = {2023},
+isbn = {9798400702297},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3600006.3613144},
+doi = {10.1145/3600006.3613144},
+abstract = {In-memory caching systems are fundamental building blocks in cloud services. However, due to the coupled CPU and memory on monolithic servers, existing caching systems cannot elastically adjust resources in a resource-efficient and agile manner. To achieve better elasticity, we propose to port in-memory caching systems to the disaggregated memory (DM) architecture, where compute and memory resources are decoupled and can be allocated flexibly. However, constructing an elastic caching system on DM is challenging since accessing cached objects with CPU-bypass remote memory accesses hinders the execution of caching algorithms. Moreover, the elastic changes of compute and memory resources on DM affect the access patterns of cached data, compromising the hit rates of caching algorithms. We design Ditto, the first caching system on DM, to address these challenges. Ditto first proposes a client-centric caching framework to efficiently execute various caching algorithms in the compute pool of DM, relying only on remote memory accesses. Then, Ditto employs a distributed adaptive caching scheme that adaptively switches to the best-fit caching algorithm in real-time based on the performance of multiple caching algorithms to improve cache hit rates. Our experiments show that Ditto effectively adapts to the changing resources on DM and outperforms the state-of-the-art caching systems by up to 3.6\texttimes{} in real-world workloads and 9\texttimes{} in YCSB benchmarks.},
+booktitle = {Proceedings of the 29th Symposium on Operating Systems Principles},
+pages = {675–691},
+numpages = {17},
+keywords = {key-value cache, RDMA, disaggregated memory},
+location = {Koblenz, Germany},
+series = {SOSP '23}
+}
+
+@inproceedings{trackfm,
+author = {Tauro, Brian R. and Suchy, Brian and Campanoni, Simone and Dinda, Peter and Hale, Kyle C.},
+title = {TrackFM: Far-out Compiler Support for a Far Memory World},
+year = {2024},
+isbn = {9798400703720},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3617232.3624856},
+doi = {10.1145/3617232.3624856},
+abstract = {Large memory workloads with favorable locality of reference can benefit by extending the memory hierarchy across machines. Systems that enable such far memory configurations can improve application performance and overall memory utilization in a cluster. There are two current alternatives for software-based far memory: kernel-based and library-based. Kernel-based approaches sacrifice performance to achieve programmer transparency, while library-based approaches sacrifice programmer transparency to achieve performance. We argue for a novel third approach, the compiler-based approach, which sacrifices neither performance nor programmer transparency. Modern compiler analysis and transformation techniques, combined with a suitable tightly-coupled runtime system, enable this approach. We describe the design, implementation, and evaluation of TrackFM, a new compiler-based far memory system. Through extensive benchmarking, we demonstrate that TrackFM outperforms kernel-based approaches by up to 2\texttimes{} while retaining their programmer transparency, and that TrackFM can perform similarly to a state-of-the-art library-based system (within 10\%). The application is merely recompiled to reap these benefits.},
+booktitle = {Proceedings of the 29th ACM International Conference on Architectural Support for Programming Languages and Operating Systems, Volume 1},
+pages = {401–419},
+numpages = {19},
+keywords = {disaggregated memory, compilers, far memory},
+location = {La Jolla, CA, USA},
+series = {ASPLOS '24}
+}
+
+@inproceedings {carbink,
+author = {Yang Zhou and Hassan M. G. Wassel and Sihang Liu and Jiaqi Gao and James Mickens and Minlan Yu and Chris Kennelly and Paul Turner and David E. Culler and Henry M. Levy and Amin Vahdat},
+title = {Carbink: {Fault-Tolerant} Far Memory},
+booktitle = {16th USENIX Symposium on Operating Systems Design and Implementation (OSDI 22)},
+year = {2022},
+isbn = {978-1-939133-28-1},
+address = {Carlsbad, CA},
+pages = {55--71},
+url = {https://www.usenix.org/conference/osdi22/presentation/zhou-yang},
+publisher = {USENIX Association},
+month = jul
+}
+
+@inproceedings {smart,
+author = {Xuchuan Luo and Pengfei Zuo and Jiacheng Shen and Jiazhen Gu and Xin Wang and Michael R. Lyu and Yangfan Zhou},
+title = {{SMART}: A {High-Performance} Adaptive Radix Tree for Disaggregated Memory},
+booktitle = {17th USENIX Symposium on Operating Systems Design and Implementation (OSDI 23)},
+year = {2023},
+isbn = {978-1-939133-34-2},
+address = {Boston, MA},
+pages = {553--571},
+url = {https://www.usenix.org/conference/osdi23/presentation/luo},
+publisher = {USENIX Association},
+month = jul
+}

@@ -2,14 +2,14 @@
 \section{Background}
 \label{sec:background}
 
-Disaggregated Key-Value Stores Are the highest performance technology for sharing disaggregated
+Disaggregated Key-value stores are the highest performance technology for sharing disaggregated
 memory. Key-value stores are built with the expectation that clients will see consistent reads and
 writes to shared memory. This stands in contrast to the majority of disaggregated efforts which
-assume that remote memory is isolated. These two approaches are fundamentally different in how they
-achieve performance. Isolated systems do not require serialization across clients so they gain
-performance by avoiding remote accesses with smart caching strategies. Shared memory systems must
-synchronize and serialize for consistency. Their performance hinges on reducing the number of round
-trips required to make a consistent read or write.
+assume that remote memory is isolated~\cite{legoos,blade}. These two approaches are fundamentally
+different in how they achieve performance. Isolated systems do not require serialization across
+clients so they gain performance by avoiding remote accesses with smart caching strategies. Shared
+memory systems must synchronize and serialize for consistency. Their performance hinges on reducing
+the number of round trips required to make a consistent read or write.
 
 
 % Key/value stores have long used RDMA to accelerate
