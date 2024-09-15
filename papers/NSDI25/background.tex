@@ -3,13 +3,9 @@
 \label{sec:background}
 
 Disaggregated Key-value stores are the highest performance technology for sharing disaggregated
-memory. Key-value stores are built with the expectation that clients will see consistent reads and
-writes to shared memory. This stands in contrast to the majority of disaggregated efforts which
-assume that remote memory is isolated~\cite{legoos,blade}. These two approaches are fundamentally
-different in how they achieve performance. Isolated systems do not require serialization across
-clients so they gain performance by avoiding remote accesses with smart caching strategies. Shared
-memory systems must synchronize and serialize for consistency. Their performance hinges on reducing
-the number of round trips required to make a consistent read or write.
+memory with a lineage in RDMA key-value stores. In this section we will provide a background on
+existing Disaggregated key values stores and their relationship to prior RDMA KVS. Additionally we
+will describe the technological and algorithmic challenges in the design of these systems.
 
 
 % Key/value stores have long used RDMA to accelerate
@@ -22,15 +18,27 @@ the number of round trips required to make a consistent read or write.
 
 \subsection{Disaggregated Key-Value Stores}
 
-Existing Disaggregated Key-values Stores have a close lineage with RDMA key value stores. Precursor
-RDMA KV stores achieved performance by striking a delicate balance between CPU-bypass one-sided RDMA
-operations and CPU-serialized two-sided operations. Disaggregated systems are entirely one-sided as
-they assume no remote CPU exists for serializing requests. Their designs make use of the one-sided
-techniques from prior approaches and adopt new means of serialization with the use of one-sided RDMA
-atomics. In general the performance of a disaggregated key-value store hinges on the performance of
-their serialization mechanism for writes. Achieving fast consistent writes with one-sided RDMA is
-hard due to the limited RDMA atomic interface. Designers must carefully design their index
-structures around 64bit atomic compare and swap updates. This RDMA fact leads to a common design
+The primary difference between disaggregated KVS and prior RDMA KVS is that the former assumes that
+servers do not have a CPU capable of serializing requests. Precursor RDMA KV stores achieved
+performance by striking a delicate balance between CPU-bypass one-sided RDMA operations and
+CPU-serialized two-sided operations~\cite{farm,herd,pilaf,cell,storm}. Disaggregated KVS must only
+use one-sided operations even when performing complex operations like insertions which may require
+many operations on a hash tables index to resolve collisions.
+
+In general the performance of a disaggregated key-value store hinges on the performance of their
+serialization mechanism for writes. Achieving fast consistent writes with one-sided RDMA is hard due
+to the limited RDMA atomic interface. Hash indexes are carefully designed around around 8-byte
+atomic compare-and-swaps (CAS). Because RDMA atomic writes have a small fixed width a common design
+choice for unordered KVS is to use out-of-place optimistic updates~\cite{race,fusee,ditto}. In this
+design pattern a hash table index contains 8-byte atomic entires which point to an uncontested
+\textit{extent} region containing the actual data. This design pattern has the advantage that the
+critical section of a write is only the duration of an RDMA CAS and that client failures do not
+effect the state of the index (i.e no locks held). The tradeoff is that index information is highly
+limited. Of the 64 bits 48 are used for a pointer typically leaving only 16 bits for data like the
+key of the entry or the entries size. This leads to additonal round trips to check for a keys
+presence or limitations in the size of values an entry can support~\cite{race,fusee}
+
+This RDMA fact leads to a common design
 pattern, KV indexes consist of 64 bit atomic entries that point to data stored in uncontended
 memory. This pattern leads to suboptimal data accesses as the condensed nature of the 64 bit entry
 usually contains a 48 bit pointer leaving only 16 bits for metadata. Data like the size of the true

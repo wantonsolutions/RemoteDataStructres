@@ -77,7 +77,7 @@ fault-tolerance in the face of client failures with held locks.  To demonstrate 
 our approach we introduce RCuckoo, a fully disaggregated KVS based on cuckoo hashing~\cite{cuckoo}.
 RCuckoo builds around a novel \emph{dependent hashing} algorithm that makes spatial locality a
 tunable parameter. Locality is the linchpin of our design as it enables us to efficiently determine
-the ranges of memory each operation and acquire the right locks.
+the ranges of memory each operation needs and acquire the right locks.
 
 
 
