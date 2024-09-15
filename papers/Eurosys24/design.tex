@@ -2,17 +2,25 @@
 \label{sec:design}
 
 In this section we describe the design of RCuckoo, a fully
-disaggregated lock-based cuckoo hash table in which clients
-communicate with passive memory servers over reliable RDMA connections
-using exclusively 1-sided operations.  We first describe our table
-design and protocol to read and modify the contents of the table.  In
-the common case, reads complete in one (for small values) or two (for large values) round trips while update and
-delete operations require two.  Then we introduce a locality-enhanced
-hashing algorithm and show how it enables our protocol to perform
-inserts in a small number of round trips.  Finally, we discuss
-lock-table practicalities.  For simplicity, we describe our design in
-the context of a single memory server, but it is straightforward to
-shard a large hash table across multiple servers (with a minor tweak,
+disaggregated key/value store implemented as a lock-based cuckoo hash table.
+%in which clients
+%communicate with passive memory servers over reliable RDMA connections
+%using exclusively 1-sided operations.
+RCuckoo's performance stems largely from its extremely compact lock
+table which is enabled by our dependent hashing
+algorithm.  Before describing the hashing algorithm or lock
+table, however, we first introduce the datastructures and protocols
+to read and modify the contents of the key/value store.
+%In the common
+%case, reads complete in one (for small values) or two (for large
+%values) round trips while update and delete operations require two.
+%Then we introduce a
+%and show how it enables our protocol to perform
+%inserts in a small number of round trips.  Finally, we discuss
+%lock-table practicalities.
+For simplicity, we describe our design in
+the context of a single server, but it is straightforward to
+shard a large table across multiple servers (with a minor tweak,
 %to the hashing function,
 see Section~\ref{sec:dephash}).
 %We close with a discussion of how RCuckoo detects and recovers
@@ -23,14 +31,14 @@ see Section~\ref{sec:dephash}).
 
 Figure~\ref{fig:table-diagram} shows RCuckoo's index and lock table
 (both maintained at the remote memory server) during an insertion of
-key $K$.  The index table (right) is a single region of
+key $K$ (which requres the cuckooing of key $C$).  The index table (right) is a single region of
 RDMA-registered main memory divided into rows of fixed-width entries.
 Each row contains $n$ associative entries (3 in this figure; we use 8
 in practice) and terminates with an 8-bit version number (not shown) and 64-bit
-CRC (that is computed over the entire row including version number).
-Clients access the index table using 1-sided RDMA reads and writes;
-CRCs facilitate lock-free reads as each row can be self-verified while
-version numbers enable clients to detect if a row has been modified.
+CRC (computed over the entire row including version number).
+Clients access the index table using 1-sided RDMA reads and writes.
+Clients can safely read one or more rows in a single lock-free RDMA operation as CRCs allow each row's contents to be verified while
+version numbers enable clients to detect if a row has been modified (used to detect failures; see Section~\ref{ss:fd}).
 
 \begin{figure}[t]
   \vskip 0.5em
@@ -41,8 +49,8 @@ version numbers enable clients to detect if a row has been modified.
     \vskip -1em
 \end{figure}
 
-Table entries contain either inlined key/value pairs or a key and
-48-bit pointer to an extent to store larger values.  The
+Table entries contain either inlined key/value pairs (bottom left) or a key and
+48-bit pointer to an extent to store larger values (bottom right).  The
 least-significant bit of an entry signifies its type; values are
 inlined by default.  Extent entries use 23 bits to encode the value
 size (which can range from $2^3$ to $2^{26}$ bytes).
@@ -61,7 +69,7 @@ protect a tunable number (here, two; 16 in our experiments) of index
 rows.  Clients perform lock acquisition and release with RDMA
 compare-and-swap (CAS) operations.  Specifically, RCuckoo leverages
 masked CAS (MCAS) operations~\cite{rdma-masked-cas,sherman} to obtain
-multiple locks simultaneously while avoiding false sharing.
+up to 64 locks simultaneously while avoiding false sharing.
 %
 %by polling CRCs which is used to detect if a client
 %has failed while holding a lock (Section~\ref{sec:fault-tolerance}).
@@ -114,7 +122,8 @@ located sufficiently close together, it can be beneficial for the
 client to issue a single \emph{covering read} that returns the
 contents of both rows---as well as intervening and potentially
 surrounding ones---in a single request.
-In our experiments RCuckoo clients issue a single, large read rather than two small reads if the locations are within 148 bytes of each other (i.e., adjacent rows)
+In our experiments RCuckoo clients issue a single, large read rather than two small reads if the locations are in adjacent rows
+%within 148 bytes of each other (i.e., adjacent rows)
 %within
 %close to one another in the table to
 %reduce tail latency. We use
@@ -153,7 +162,7 @@ trip to retrieve the extent.
 
 Updates and deletes, like reads, access only two locations in the
 index table, but require a client to acquire the associated locks.
-Due to RCuckoo's locality enhancement, it is usually possible to
+Due to RCuckoo's dependent hashing, it is usually possible to
 attempt to acquire both locks in a single MCAS operation
 (Section~\ref{sec:locking}).  If so, the client issues read(s) for the
 corresponding rows of the index table immediately afterwards but in
@@ -443,11 +452,12 @@ to perform inserts in RCuckoo while maintaining high (90\%+) fill
 maximum factors.
 
 Increased locality has two direct benefits: it
+decreases the number of MCAS operations
+necessary to acquire the relevant locks and
 increases the probability that both of a keys' locations can be read
 with a single covering read---which updates more of a client's local
 cache, improving the likelihood that failed insert operations will
-succeed upon retry---and decreases the number of MCAS operations
-necessary to acquire the relevant locks.  It also reduces the region
+succeed upon retry.  It also reduces the region
 of the index table likely to be spanned by cuckoo paths, which speeds
 up inserts, but leads to hot spots that limit the table's expected
 maximum fill factor.  
