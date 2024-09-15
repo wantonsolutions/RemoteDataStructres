@@ -35,8 +35,20 @@ design pattern a hash table index contains 8-byte atomic entires which point to 
 critical section of a write is only the duration of an RDMA CAS and that client failures do not
 effect the state of the index (i.e no locks held). The tradeoff is that index information is highly
 limited. Of the 64 bits 48 are used for a pointer typically leaving only 16 bits for data like the
-key of the entry or the entries size. This leads to additonal round trips to check for a keys
-presence or limitations in the size of values an entry can support~\cite{race,fusee}
+key of the entry or the entries size. This leads to additional round trips to check for a keys
+presence or limitations in the size of values an entry can support~\cite{race,fusee}.
+
+KVS with complex data structures like B-Trees or Radix Trees~\cite{Sherman,smart} can't condense the
+complexity of their update into 8bytes and must rely on locks to provide mutual exclusion on all or
+part of their updates. The advantage of locks is that these structures support inline updates and
+thus faster reads, at the cost of expensive writes. Because of locking the cost of contention is
+high especially as updates require multiple round trips which inflate critical section size. Thus
+these systems rely on the assumptions that many clients are colocated so their writes can be
+combined.
+
+While locks are typically regulated for disaggregated KVS with complex data structures they are also
+commonly used on hash tables that require multiple inline updates such as Cuckoo and hopscotch
+hashes which dominated RDMA KVS research.
 
 This RDMA fact leads to a common design
 pattern, KV indexes consist of 64 bit atomic entries that point to data stored in uncontended
