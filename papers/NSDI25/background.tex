@@ -3,9 +3,10 @@
 \label{sec:background}
 
 Disaggregated Key-value stores are the highest performance technology for sharing disaggregated
-memory with a lineage in RDMA key-value stores. In this section we will provide a background on
-existing Disaggregated key values stores and their relationship to prior RDMA KVS. Additionally we
-will describe the technological and algorithmic challenges in the design of these systems.
+memory with a lineage in RDMA key-value stores. In this section we will overview that lineage and
+discuss the algorithmic distinctions between the two. Our hash table design draws strongly from on
+Cuckoo and hopscotch hashing. We provide a brief overview of both hash table designs and related
+literature.
 
 
 % Key/value stores have long used RDMA to accelerate
@@ -19,54 +20,41 @@ will describe the technological and algorithmic challenges in the design of thes
 \subsection{Disaggregated Key-Value Stores}
 
 The primary difference between disaggregated KVS and prior RDMA KVS is that the former assumes that
-servers do not have a CPU capable of serializing requests. Precursor RDMA KV stores achieved
-performance by striking a delicate balance between CPU-bypass one-sided RDMA operations and
+servers do not have a CPU capable of serializing requests near memory. Precursor RDMA KV stores
+achieved performance by striking a delicate balance between CPU-bypass one-sided RDMA operations and
 CPU-serialized two-sided operations~\cite{farm,herd,pilaf,cell,storm}. Disaggregated KVS must only
-use one-sided operations even when performing complex operations like insertions which may require
-many operations on a hash tables index to resolve collisions.
+use one-sided operations even when performing complex operations like resolving a collision while
+inserting.
 
-In general the performance of a disaggregated key-value store hinges on the performance of their
-serialization mechanism for writes. Achieving fast consistent writes with one-sided RDMA is hard due
-to the limited RDMA atomic interface. Hash indexes are carefully designed around around 8-byte
-atomic compare-and-swaps (CAS). Because RDMA atomic writes have a small fixed width a common design
-choice for unordered KVS is to use out-of-place optimistic updates~\cite{race,fusee,ditto}. In this
-design pattern a hash table index contains 8-byte atomic entires which point to an uncontested
-\textit{extent} region containing the actual data. This design pattern has the advantage that the
-critical section of a write is only the duration of an RDMA CAS and that client failures do not
-effect the state of the index (i.e no locks held). The tradeoff is that index information is highly
-limited. Of the 64 bits 48 are used for a pointer typically leaving only 16 bits for data like the
-key of the entry or the entries size. This leads to additional round trips to check for a keys
-presence or limitations in the size of values an entry can support~\cite{race,fusee}.
+In general the performance of a disaggregated KVS hinges write serialization performance.  Fast
+consistent writes with one-sided RDMA are hard because RDMA atomics are small (8-bytes) and the cost
+of round trips is high. This has lead to a divide in the design between KVS that have ordered keys
+for range queries and those than do not. Those with ordered keys use locks~\cite{sherman,smart} for
+their complex updates, and those with unordered keys use lockless optimistic approaches and cram
+their atomic updates into 8-byte writes. These latter designs have hash indexes with 8-byte entries
+which point to uncontested extent regions with the entries actual data. Index entries typically use
+48 of the 64 bits as a pointer and the remaining 16bits for a digest of the key, and the size of the
+data.  This leads to additional round trips to check for a keys presence or limitations in the size
+of values an entry can support~\cite{fusee,race}.
 
-KVS with complex data structures like B-Trees or Radix Trees~\cite{Sherman,smart} can't condense the
-complexity of their update into 8bytes and must rely on locks to provide mutual exclusion on all or
-part of their updates. The advantage of locks is that these structures support inline updates and
-thus faster reads, at the cost of expensive writes. Because of locking the cost of contention is
-high especially as updates require multiple round trips which inflate critical section size. Thus
-these systems rely on the assumptions that many clients are colocated so their writes can be
-combined.
+KVS with B-Trees or Radix Trees for ordered keys~\cite{sherman,smart} use locks because their
+updates are complex.  The advantage of locks is that these structures support inline index updates
+and thus faster reads at the cost of expensive writes. Lock performance is dominated by lock
+granularity and critical section size. At the time of writing all lock based KVS's assume that
+clients are grouped into colocated servers which can locally candidate lock accesses and batch their
+writes~\cite{sherman,smart}, an assumption which is not true for optimistic
+KVS~\cite{clover,fusee,race,ditto}. Our stance is that the the performance gain of inlined
+operations can make locks practical without assuming co-location if critical sections are kept to
+1-RTT and locks are as fine grained as possible.
 
-While locks are typically regulated for disaggregated KVS with complex data structures they are also
-commonly used on hash tables that require multiple inline updates such as Cuckoo and hopscotch
-hashes which dominated RDMA KVS research.
-
-This RDMA fact leads to a common design
-pattern, KV indexes consist of 64 bit atomic entries that point to data stored in uncontended
-memory. This pattern leads to suboptimal data accesses as the condensed nature of the 64 bit entry
-usually contains a 48 bit pointer leaving only 16 bits for metadata. Data like the size of the true
-entry, and its key are stored in 16 bit compressed digests. This means that reads require at least
-two round trips to recover an entry or even validate its existence. In general this design pattern
-leads to simplified hash table designs which can not support complex metadata. Established high
-performance RDMA hash tables like Cuckoo and hopscotch hashes can’t be implemented with this
-strategy as they require locks on multiple entries of the index rather than a single atomic update.
-
-Historically network bandwidth has limited KV store throughput more than operation rate. For
-instance a connectx3 nic at 40GBPs can process 75 million packets per second would bottleneck at
-only 5MOPS making 1K reads. Similarly at these lower packet rates the effects of contention on
-skewed distributions are not as noticeable. As bandwidths get higher (400GBPs+) latency and
-contention, rather than bandwidth will become the primary scalability bottleneck. To this end we
-focus on small key workloads which are limited by round trip access latency and contention and not
-bandwidth. We make specific design choices which reduce round trip times at the cost of bandwidth.
+\subsection{RDMA and Network Performance} Historically network bandwidth has limited KVS store
+throughput more than operation rate. For instance a ConnectX3 NIC at 40GBPs can process 75 million
+packets per second would bottleneck at only 5MOPS making 1K reads. Similarly at these lower packet
+rates the effects of contention on skewed distributions are not as noticeable. As bandwidths get
+higher (400GBPs+) latency and contention, rather than bandwidth will become the primary scalability
+bottleneck. To this end we focus on small key workloads which are limited by round trip access
+latency and contention and not bandwidth. We make specific design choices which reduce round trips
+at the cost of bandwidth.
 
 Figure~\ref{fig:rdma-benchmarks}(a) shows the tradeoff in round trip time for RDMA reads of
 increasing size. Critically the round trip time of a 1KB packet is lower than the latency of issuing
