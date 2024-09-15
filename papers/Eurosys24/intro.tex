@@ -8,15 +8,18 @@ disaggregated designs for their in-memory storage systems.
 Concretely, increases in CPU core counts coupled with stagnating DRAM
 density has led to an increased interest in remote memory tiers, where
 some portion of memory is connected to the server over a network.
-Moreover, once disaggregated, memory can be pooled to achieve greater
-cost and power efficiencies.  The challenge facing fully disaggregated
-memory pools, however, is managing concurrent updates in the face of
-client failures and high access latencies.
+Moreover, once disaggregated, memory can---in theory, at least---be
+pooled to achieve greater cost and power efficiencies.  A key
+challenge facing the widespread depolyment of fully disaggregated
+memory pools, however, is the current inability to sustain
+high-throughput, low-latency lookups in the face of 
+concurrent updates and/or client failures.
+%and high access latencies.
 %---e.g., 20$\times$ in the case of Ethernet-based RDMA.
 
-While cache-coherent technologies like CXL are beginning to
-become available, RDMA remains the commodity option for
-large-scale in-memory key/value stores.
+While cache-coherent technologies like CXL are beginning to enter the
+marketplace, RDMA remains the commodity option for large-scale
+in-memory key/value stores.
 %% % made DRAM a scarce resource. In response data center
 %architects have % proposed resource disaggregation to
 %improve resource utilization, % scalability and efficiency
@@ -45,10 +48,9 @@ large-scale in-memory key/value stores.
 %pools of memory.  Many prior disaggregated systems have
 %eschewed sharing for static partitioning to avoid the high
 %overheads~\cite{ reigons,blade-server,legoos}.
-Many prior RDMA-based systems opt for a partially
-disaggregated model, in which a CPU core is collocated with
-remote memory to provide the needed
-serialization~\cite{erpc,herd,pilaf,cell,clover,sherman}.
+Most existing RDMA-based systems only partially deliver on the
+disaggregated vision, requiring one or more CPU cores to be collocated with
+remote memory to implement traditional access semantics~\cite{erpc,herd,pilaf,cell,clover,sherman}.
 %%  ~\cite{clover}. These designs are conceptually % close
 %to prior work on RDMA key value stores which gain %
 %performance benefits from having some operations use %
@@ -70,22 +72,24 @@ serialization~\cite{erpc,herd,pilaf,cell,clover,sherman}.
 %In the fully disaggregated setting serialization is
 %achieved entirely with a client based protocol. 
 %
-Fully disaggregated systems rely upon one-sided RDMA atomic
+The few systems that realize full disaggregation must rely upon one-sided RDMA atomic
 operations (e.g., compare-and-swap) to resolve data
 races~\cite{rolex,fusee,race} which constrains their design.
 %suffer from the limited scope of such operations.
-Specifically, RDMA atomic operations can act upon 64 contiguous bits
-of memory at a time at most, leading to implementations that employ
-multi-stage datastructures to support practical key and value sizes.
+Specifically, RDMA atomic operations can act upon at most 64 contiguous bits
+of memory at a time, forcing existing systems to employ
+multi-stage datastructures to support practical key/value sizes, resulting in multiple-RTT reads and expensive write operations.
 
-In general, existing systems rely upon a high-performance index
-structure to localize key operations and maintain values separately,
-necessitating multiple RDMA operations and network round trips even in
-the absence of contention.  Moreover, given the dominance of
-read-heavy workloads~\cite{rocks-db-workload,facebook-memcached}, most
-systems eschew locks in favor of optimistic update approaches that can
-lead to poor performance under contention.
-%
+Due to the limited width of RDMA atomic operations, existing fully disaggregated systems rely upon compact index
+structures that localize key operations and maintain values in
+entirely separate memory regions, necessitating multiple RDMA
+operations and network round trips.
+%even in the absence of contention.
+Moreover, given the dominance of read-heavy
+workloads~\cite{rocks-db-workload,facebook-memcached}, these systems
+tend to eschew locks in favor of optimistic update approaches that
+lead to poor performance under even modest contention.  Our tests show the performance of even the highest-performing existing systems collapses beyound 128 clients under a YCSB-B (5\% update) workload.
+
 %optimistically update the index with pointers to
 %enable lock-less reads avoid locking overheads and failures with
 %visible partial writes.  Unfortunately, optimistic approaches can
@@ -135,11 +139,43 @@ lead to poor performance under contention.
 % Sherman}.
 %
 %RDMA and cuckoo hashing
-In this work we design an index datastructure tailored for the
-constraints of current RDMA hardware.  Specifically, we
-facilitate lock-based updates by decreasing the number of round
-trips required to acquire locks and perform mutating operations.
+In this work we design a fully disaggregated key/value store that
+simultaneously delivers low latency and high throughput for read/write
+workloads despite the constraints of current RDMA hardware.
+Specifically, we facilitate lock-based datastructures by decreasing
+the number of round trips required to acquire locks and perform
+mutating operations with RDMA atomics.  Our high-performance locks
+allow us to employ more sophisticated index structures than prior
+systems can support, as their optimistic updates scale poorly with
+both increased contention and operation complexity.
 
+\begin{figure*}[t]
+    \centering
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/rdma_concur.pdf}
+        % \label{fig:optimistic_failures}
+        % \caption{}
+    \end{subfigure}
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/rdma_cas_throughput.pdf}
+        % \label{fig:optimistic_failures}
+        % \caption{}
+    \end{subfigure}
+    \begin{subfigure}{0.3\linewidth}
+        \includegraphics[width=0.99\linewidth]{fig/rdma_latency.pdf}
+        % \label{fig:rdma_latency}
+        % \caption{}
+    \end{subfigure}
+    \vspace{-1em}
+    \caption{Basic RDMA performance on our testbed.
+    \textbf{(a)} (64-bit) main-memory operation performance;
+    \textbf{(b)} compare-and-swap (CAS) performance on device and main memory; and
+    \textbf{(c)} operation latency as a function of message size~\cite{rdma-latency}.}
+    \label{fig:rdma-benchmarks}
+\vskip -1em
+\end{figure*}
+
+%
 We introduce RCuckoo, a fully disaggregated key/value store based on
 cuckoo hashing~\cite{cuckoo} that
 %delivers high performance using
@@ -215,11 +251,11 @@ failures:
 
 \begin{itemize}
 \item{\textbf{Deterministic lock-free reads.}  Cuckoo hashing ensures
-  an entry is always located in one of two locations which can be
+  an entry is always located in one of two memory locations which can be
   read in parallel.}
 
-\item{\textbf{Space-efficient locks} frequently allow clients to acquire necessary 
-  locks in a single RDMA operation.}
+\item{\textbf{Space-efficient locks} allow clients to acquire necessary 
+  locks in a single RDMA operation in most cases.}
 
 \item{\textbf{Client-side caching} enables accurate cuckoo-path
   speculation to improve insert performance.}
@@ -233,40 +269,16 @@ failures:
 %% improving writes.
 
 
-\begin{figure*}[t]
-    \centering
-    \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/rdma_concur.pdf}
-        % \label{fig:optimistic_failures}
-        % \caption{}
-    \end{subfigure}
-    \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/rdma_latency.pdf}
-        % \label{fig:rdma_latency}
-        % \caption{}
-    \end{subfigure}
-    \begin{subfigure}{0.3\linewidth}
-        \includegraphics[width=0.99\linewidth]{fig/rdma_cas_throughput.pdf}
-        % \label{fig:optimistic_failures}
-        % \caption{}
-    \end{subfigure}
-    \vspace{-1em}
-    \caption{Basic RDMA performance on our testbed.
-    \textbf{(a)} (64-bit) operations per second;
-    \textbf{(b)} operation latency as a function of message size~\cite{rdma-latency}; and
-    \textbf{(c)} compare-and-swap performance on device and main memory.
-    }
-    \label{fig:rdma-benchmarks}
-\vskip -1em
-\end{figure*}
+\noindent Combined with a datastructure design that facilitates
+aggressive batching of RDMA operations, these techniques enable
+RCuckoo to limit the number of round trips required for all key/value
+operations.  In the common case, reads execute in one or two round
+trips (for small and large value sizes, respectively), uncontested
+updates and deletes require two round trips, and the median insert
+operation involves only two round trips---although the expected number
+increases as the table fills.
 
-Combined with a datastructure design that facilitates aggressive
-batching of RDMA operations, these techniques enable RCuckoo to limit
-the number of round trips required for all table operations.  In the
-common case, reads execute in one or two (for large values) round
-trips, uncontested updates and deletes require two round trips, and
-the median insert operation involves only two round trips---although
-the expected number increases as the table fills.  On our testbed,
+On our testbed,
 RCuckoo delivers comparable or higher performance on small values across the standard set  of YCSB benchmarks than all of the existing disaggregated
 key/value stores we consider.  Concretely, with 320 clients RCuckoo
 delivers up to a 2.5$\times$ throughput improvement on read-intensive

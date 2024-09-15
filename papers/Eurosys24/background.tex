@@ -22,7 +22,7 @@ lock-less reads with RDMA~\cite{farm,pilaf,cuckoo}.
 
 
 
-\subsection{RDMA}
+\subsection{RDMA performance constraints}
 
 RDMA
 %is an enabling technology for memory disaggregation. It allows
@@ -36,27 +36,41 @@ opportunities.
 
 %%
 Atomic operations such as compare-and-swap (CAS) are essential for
-implementing locks or opportunistic concurrency. Atomics are limited
-to 64-bit operations and bottleneck at lower rates than reads and
+implementing locks or opportunistic concurrency.  Atomic operations can address
+at most 64 bits at a time and bottleneck at lower rates than reads and
 writes because they block requests on data-dependent addresses while
 waiting on PCIe round trips~\cite{design-guidelines,sherman}.
 Figure~\ref{fig:rdma-benchmarks}(a) shows that the NICs in our testbed
 (100-Gbps NVIDIA Mellanox ConnectX-5s) are capable of serving many 10s of
-millions of RDMA operations per second (limited only by link speed),
-but CAS operations to remote server memory top out around 50 MOPS.  Hence, we employ atomic operations judiciously in RCuckoo.
+millions of RDMA operations per second (limited only by link rate, not shown),
+but CAS operations to remote server memory top out around 50 MOPS.
+%Hence, we employ atomic operations judiciously in RCuckoo.
 
 %the scalability of
 %these operations on CX5 NICs for 64 bit operations.
 %%
 
-While atomic operations are limited to 64 bits, read and write message
+Our testbed NICs, however---like those from several
+vendors---include a small amount (256~KB in our case) of on-NIC memory
+that can be addressed by remote clients using RDMA
+operations~\cite{device-memory}.  Accesses to NIC memory avoid the
+need to cross the server's PCIe bus, decreasing latency and increasing
+throughput.  The performance gain is particularly significant for
+atomic operations.  Figure~\ref{fig:rdma-benchmarks}(b) shows the
+maximum aggregate throughput of concurrent CAS operations targeting
+the same single (i.e., contended) address or distinct, independent
+addresses in both main server memory (shown in orange) and on-NIC
+device memory (blue).  CAS operations perform between 1.8--3.1$\times$
+faster on NIC memory.  RCuckoo performs CAS operations only on datstructures in NIC memory.
+
+Finally, we note that while atomic operations are limited to 64 bits, read and write message
 sizes are bounded only by the link MTU.
 %can 
 %RDMA NIC bandwidth has increased disproportionately to
 %latency in the last decade leading to interesting design
 %tradeoffs. CX7 NICs have 10$\times$ the bandwidth of CX3's
 %but their intra-rack RTT has only shrunk by 1.5$\times$.
-Figure~\ref{fig:rdma-benchmarks}(b) shows that on our testbed
+Figure~\ref{fig:rdma-benchmarks}(c) shows that on our testbed
 NIC-to-NIC round-trip times are similar for all message sizes
 less than about 128 bytes, and
 %on CX5s for variable sized writes. All writes up
@@ -64,26 +78,13 @@ less than about 128 bytes, and
 messages must exceed 1~KB before the latency of a single large
 operation exceeds two RTTs of smaller ones.  We leverage this
 observation in RCuckoo by collapsing multiple small reads into a
-single larger one when appropriate.  The optimal threshold trades off
-latency reduction against read amplificaiton.
+single larger one when appropriate.  Selecting the optimal threshold is a trade-off
+between latency reduction and I/O amplification.
 
 %\textbf{If there
 %is surplus bandwidth a single large message can have much
 %lower latency than two dependent smaller messages.}
 
-Finally, we highlight that our testbed NICs, like those from several
-vendors, include a small amount (256~KB in our case) of on-NIC memory
-that can be addressed by remote clients using RDMA
-operations~\cite{device-memory}.  Accesses to NIC memory avoid the
-need to cross the server's PCIe bus, decreasing latency and increasing
-throughput.  The performance gain is particularly significant for
-atomic operations.  Figure~\ref{fig:rdma-benchmarks}(c) shows the
-maximum aggregate throughput of concurrent CAS operations targeting
-the same single (i.e., contended) address or distinct, independent
-addresses in both main server memory (shown in orange) and on-NIC
-device memory (blue).  CAS operations perform between 1.8--3.1$\times$
-faster on NIC memory.  RCuckoo's datastructures are designed so that
-all CAS operations are performed on NIC memory.
 
 %many modern NICs
 %Vendors have provided some workarounds for atomic
@@ -160,7 +161,7 @@ inserts being to fail, known as the \emph{maximum fill factor}, is a
 function of the number of hash locations and row associativity in
 cuckoo hashing and desired neighborhood size for hopscotch hashing.
 
-RCuckoo uses cuckoo rather than hopscotch hashing due to locking
+We use cuckoo rather than hopscotch hashing in RCuckoo due to locking
 concerns.
 %While both alog
 %also limits a key's location to a bounded set of 
