@@ -39,18 +39,19 @@
 % facilitate lock-based updates by decreasing the number of round
 % trips required to acquire locks and perform mutating operations.
 
-Disaggregated architectures aim to improve resource scalability and utilization by pooling together
-network attached resources~\cite{dredbox,firebox,blade-server,legoos}. Shared resources pools enable
-data center operators to provision for the sum-of-peak workloads rather than the
-peak-of-sums~\cite{dsnf,supernic}. DRAM density has stagnated in contrast to CPU core counts and
-network bandwidth making main memory a scarce resource and prime candidate for disaggregation over
-RDMA~\cite{fastswap,3po,kona,infiniswap,hydra,leap,legoos,dilos}.
+Disaggregated architectures aim to improve resource scalability and utilization by pooling network
+attached resources~\cite{dredbox,firebox,blade-server,legoos}. Pools reduce resource fragmentation,
+stranding, and enable datacenter operators to provision for the sum-of-peak workloads rather than
+the peak-of-sums~\cite{dsnf,supernic}. DRAM pooling is particularly attractive due to diminishing
+improvements in its density but simultaneously difficult as local DRAM access latencies are much
+lower than even the fastest RDMA
+networks~\cite{fastswap,3po,kona,infiniswap,hydra,leap,legoos,dilos}.
 
-Sharing memory is fundamentally hard over a network because of the high cost of synchronization.
-Most systems choose to statically partition memory and optimize by reducing remote accesses through
-a variety of techniques (cache policy, compilers, pointer
-analysis~\cite{kona,mira,aifm,trackfm,carbink}). In contrast, disaggregated key-value stores (KVS) both
-pool and share memory with a consistent read and write
+Sharing disaggregated memory is fundamentally hard because cost of synchronization is high.  Most
+systems choose to statically partition memory and optimize by reducing remote accesses through a
+variety of techniques (cache policy, compilers, pointer
+analysis~\cite{kona,mira,aifm,trackfm,carbink}). In contrast, disaggregated key-value stores (KVS)
+both pool and share memory with a consistent read and write
 interface~\cite{rolex,smart,ditto,fusee,clover,sherman,ford}.
 
 The core challenging in designing a disaggregated KVS is efficient serialization. Memory
