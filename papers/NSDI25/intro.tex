@@ -69,9 +69,9 @@ to combine writes, and do not provide a fault-tolerance protocol~\cite{sherman,s
 In this work we take the view that lock-based synchronization can provide very high performance for
 unordered KVS's. We argue that because locks enable inlined operations on KVS indexes which can
 result in significantly faster reads on common mixed read and write workloads by reducing round
-trips. Further, locks enable the use of established RDMA KVS algorithms like Cuckoo hashing. We show
-that atomic operation bottlenecks can be entirely avoided by using a NIC-based lock table, and that
-through fine grained locking and careful protocol design critical sections can be reduced to a
+trips. Further, locks enable the use of established RDMA KVS algorithms like Cuckoo hashing.  We
+show that atomic operation bottlenecks can be entirely avoided by using a NIC-based lock table, and
+that through fine grained locking and careful protocol design critical sections can be reduced to a
 single round trip in the common case and achieve high performance without co-locating clients.
 Finally we demonstrate that a leased based lock acquisition protocol can be used to provide
 fault-tolerance in the face of client failures with held locks.  To demonstrate the effectiveness of

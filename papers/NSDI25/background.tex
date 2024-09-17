@@ -64,7 +64,13 @@ shows the performance overheads of using an extent based design on small key-val
 values are read directly from the index while all other values are read from indirect storage. Here
 client caching is turned on and clients optimistically read indirect storage in parallel with their
 index read. Only if a value has changed do clients re-read from extent storage. Due to atomic width
-limitations existing KV stores can not gain this performance.
+limitations existing KV stores can not gain this performance. RDMA atomic operations issued to main
+memory have a bottleneck of around 50MOPS which can quickly become a system bottleneck if clients
+are spinning on a lock. Recent connectX series NICs have a small amount of on-NIC memory on which
+atomic operations scale linearly with all other RDMA operations. Figure~\ref{fig:rdma-benchmarks}(c)
+illustrated the performance bottlenecks of CAS operations on device and main memory on a single
+address and on multiple addresses. If a data structure can organize it's locks densely into NIC
+memory it can avoid the atomic bottleneck.
 
 
 % \subsection{RDMA}
@@ -109,45 +115,52 @@ limitations existing KV stores can not gain this performance.
 \subsection{Concurrent hash tables} 
 \label{sec:cuckoo-back}
 
-Fully disaggregated key/value stores are essentially concurrent hash
-tables whose conflict resolution strategy is implemented entirely by
-individual clients~\cite{rolex,fusee,race}.  Like any hash table, the
-underlying hashing algorithm must have an approach to managing
-collisions. Cuckoo and hopscotch hashing are particularly attractive
-in this context, because they both provide the property that the
-potential locations of an entry in the table, regardless of
-contention or collision, can be deterministically computed by clients
-based only upon the key itself.  Moreover, the set of locations is
-limited.  Hence, at least in theory, systems built around either
-cuckoo or hopscotch hashing hold the potential for single-round-trip
-reads.
+Fully disaggregated KVS are essentially concurrent hash tables whose conflict resolution strategy is
+implemented entirely by individual clients~\cite{rolex,fusee,race,sherman,smart,ditto}. Cuckoo and
+hopscotch hashing are attractive algorithms as clients can determine a key's location without
+searching a remote index. Unfortunately, both algorithms have complex mechanisms for resolving hash
+collisions which involve iteratively searching and updating multiple index locations. In this
+section we describe both algorithms and their advantages and challenges in the disaggregated
+setting.
+
+% Like any hash table, the
+% underlying hashing algorithm must have an approach to managing
+% collisions. 
+
+% Cuckoo and hopscotch hashing are particularly attractive
+% in this context, because they both provide the property that the
+% potential locations of an entry in the table, regardless of
+% contention or collision, can be deterministically computed by clients
+% based only upon the key itself. 
+
+% Moreover, the set of locations is
+% limited.  Hence, at least in theory, systems built around either
+% cuckoo or hopscotch hashing hold the potential for single-round-trip
+% reads.
 
 %\todo{Make sure to describe how a cuckoo path works}
 
-\textbf{Cuckoo hashing} uses independent hash functions to compute two
-potential table locations for a key, a primary and a secondary, where
-each location corresponds to an associative row of entries.  A key is
-always inserted into its primary location.  If that row is full, an
-existing key is evicted (or ``cuckooed'') to its secondary row to make
-space. If the cuckooed entry's secondary row is also full, the process
-iterates (by selecting yet another entry in the secondary row to
-cuckoo) until an open location is found. The path of evictions is
-known as a~\textit{cuckoo path}.  While insertions can be involved,
-reads can always be executed in a single round trip by reading the
-rows corresponding to both of a key's locations
-simultaneously~\cite{pilaf}.
+\textbf{Cuckoo hashing} uses independent hash functions to compute two potential table locations for
+a key, a primary and a secondary, where each location corresponds to an associative row of entries.
+A key is always inserted into its primary location.  If that row is full, an existing key is evicted
+(or ``cuckooed'') to its secondary row to make space. If the cuckooed entry's secondary row is also
+full, the process iterates (by selecting yet another entry in the secondary row to cuckoo) until an
+open location is found. The path of evictions is known as a~\textit{cuckoo path}.
+Figure~\ref{fig:table-diagram} (our table diagram) shows an example of a cuckoo path of length 1. In
+practice when tables are nearly full paths can grow long and each step in the cuckoo path generates
+reads to random regions of the index.  While insertions can be involved, reads can always be
+executed in a single round trip by reading the rows corresponding to both of a key's locations
+simultaneously~\cite{pilaf,memc3,cuckoo-improvements}.
 
-\textbf{Hopscotch hashing} works in a similar fashion but provides a
-slightly different guarantee, namely that keys will be located within
-a bounded neighborhood.  (While cuckoo hashing limits the number of
-locations in which a key may be stored, it does not provide any
-locality guarantees regarding those locations.) It does so by finding
-the physically closest empty entry to the desired location and then,
-if that location is not within the neighborhood, iteratively
-moving other entries out of the way to make room for the new key.
-The hopscotch process is facilitated by maintaining a per-entry
-bitmask of nearby collisions.  As with cuckoo hashing, clients can read in a single round trip time by reading a key's entire
-neighborhood at once.
+\textbf{Hopscotch hashing} works in a similar fashion but provides a slightly different guarantee,
+namely that keys will be located within a bounded neighborhood.  (While cuckoo hashing limits the
+number of locations in which a key may be stored, it does not provide any locality guarantees
+regarding those locations.) It does so by finding the physically closest empty entry to the desired
+location and then, if that location is not within the neighborhood, iteratively moving other entries
+out of the way to make room for the new key.  The hopscotch process is facilitated by maintaining a
+per-entry bitmask of nearby collisions.  As with cuckoo hashing, clients can read in a single round
+trip time by reading a key's entire neighborhood at once.
+
 
 The insert operation is expensive for both approaches, and prior
 systems have taken steps to mitigate its cost.  In associative hashes
