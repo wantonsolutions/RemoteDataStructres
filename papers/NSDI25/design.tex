@@ -895,7 +895,7 @@ the fact that its locks were reclaimed.
 Our failure timeout is deliberately set many orders of magnitude
 larger than the expected operation completion time, but we cannot
 completely rule out the possibility.  Large-scale deployments can
-implement a separate liveness protocol to identify stalled clients.
+implement a separate liveness protocol to identify stalled clients and prevent such black swan events.
 
 
 %Ideally, RCuckoo could ensure that clients deemed to have
