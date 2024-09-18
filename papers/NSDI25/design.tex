@@ -588,16 +588,6 @@ depend critically on locking performance.
 \subsubsection{Lock granularity}
 \label{sec:locking}
 
-\begin{figure}[t]
-  \vskip -1em
-    \centering
-        \includegraphics[width=0.99\linewidth]{fig/buckets_per_lock_vs_locks_per_message.pdf}
-    \vspace{-1em}
-    \caption{99th-percentile round trips required per insert in a 512-row table
-    when filling to 95\%. 512 buckets per lock corresponds to a single global lock.}
-    \label{fig:cuckoo-problems}
-\vskip -1em
-\end{figure}
 
 Increased locality decreases the number of round trips required
 for lock acquisition.
@@ -617,8 +607,7 @@ the current one succeeds.  Due to this one-MCAS-per-round-trip
 acquisition procedure, lock granularity is critical to performance.
 
 If, as in Figure~\ref{fig:locality-hashing}(c), almost 99\% of cuckoo
-spans are 256 rows or less, and each lock protects four rows, nearly
-99\% of insertions can have their locks acquired with a single MCAS.
+spans are 256 rows or less, and each lock protects four rows, almost all insertions can have their locks acquired with a single MCAS (lock-table accesses do need to be byte aligned).
 Of course, increasing the number of rows covered by a single lock can
 lead to false sharing, forcing additional retries to acquire the
 necessary locks.
@@ -636,7 +625,18 @@ function of both lock granularity (i.e., number of rows per
 lock, on the $x$-axis) and lock size (i.e., the number of
 locks that can be accessed with a single MCAS operation, on
 the $y$-axis---RCuckoo's single-bit locks correspond to 64
-locks per message).
+locks per message shown on the bottom row).
+
+\begin{figure}[t]
+  \vskip -1em
+    \centering
+        \includegraphics[width=0.99\linewidth]{fig/buckets_per_lock_vs_locks_per_message.pdf}
+    \vspace{-1em}
+    \caption{99th-percentile round trips required per insert in a 512-row table
+    when filling to 95\%. 512 buckets per lock corresponds to a single global lock.}
+    \label{fig:cuckoo-problems}
+\vskip -1em
+\end{figure}
 
 While there is some noise due to experimental variance, the far-right
 column shows that a single global lock results in high contention (as
@@ -649,17 +649,17 @@ sweet spot falls in the range of 2--16 rows per lock.  In our
 experiments we use 16 rows per lock as, when combined with our choice of
 $f$, a single MCAS suffices for the vast majority of insertions.
 
-%
-Clients may fail while holding locks, preventing other clients from
-making progress.  As described in the next section, clients
-independently detect such failures by setting a time out for lock
-acquisition. To avoid false alarms, i.e., clients timing out due to a
-slow-moving client (who might, for example need to acquire a long list
-of contended locks), RCuckoo clients are given a bounded time to
-acquire all their locks. If a client takes longer than this time to
-acquire all of its locks it releases all held locks and restarts the
-(timer and) acquisition process, hopefully allowing other clients to
-complete their own acquisitions.
+% ACS - reclaimed for space; redundant with 4.1
+%% Clients may fail while holding locks, preventing other clients from
+%% making progress.  As described in the next section, clients
+%% independently detect such failures by setting a time out for lock
+%% acquisition. To avoid false alarms, i.e., clients timing out due to a
+%% slow-moving client (who might, for example need to acquire a long list
+%% of contended locks), RCuckoo clients are given a bounded time to
+%% acquire all their locks. If a client takes longer than this time to
+%% acquire all of its locks it releases all held locks and restarts the
+%% (timer and) acquisition process, hopefully allowing other clients to
+%% complete their own acquisitions.
 
 
 \subsubsection{Virtual locks}
@@ -670,13 +670,12 @@ number of round trip times required to acquire them, there is an
 additional design constraint that drives our choice of single-bit
 locks.  Specifically, to improve locking performance, RCuckoo locates
 the lock table in NIC device memory which delivers $3\times$ higher
-throughout on contented addresses than host memory (see
-Figure~\ref{fig:rdma-benchmarks}). It is also lower latency as
+throughout on contented addresses than host memory (Figure~\ref{fig:rdma-benchmarks}(c)). It is also lower latency as
 operations to device memory avoid a PCIe round trip.  Unfortunately, NIC memory is limited (to
 256~KB on our ConnectX-5s), so this choice bounds the size of the lock
 table and drives our single-bit design.
 
-Moreover, to allow RCuckoo to support tables with more than 64~M rows,
+To allow RCuckoo to support tables with more than 64~M rows,
 we implement a \textit{virtual} lock table where multiple logical
 locks map to a single physical lock.  Concretely, we map a logical
 lock $l$ drawn from a table of size $L$ to a physical location $p$ in
@@ -715,7 +714,7 @@ behavior.  Server failure can be addressed by employing client-driven
 replication on top of RCuckoo.  While there may be opportunities to
 integrate replication into RCuckoo itself, we defer such an
 exploration to future work.  In RCuckoo, client failure is only of
-concern if the failure occurs in the middle of a mutating operation
+concern if the failure occurs while the client was holding one or more locks, i.e., in the middle of a mutating operation
 (i.e., update, delete, or insert); hence, RCuckoo detects client
 failures by noticing that a pending mutation does not complete in a
 timely fashion.  Any client that encounters such a situation endeavors
