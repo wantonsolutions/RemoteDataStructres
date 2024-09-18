@@ -71,33 +71,35 @@ grained and hold times limited.
 Historically, network bandwidth has limited KVS throughput more than
 operation rate. For instance, while a 40-Gbps ConnectX-3 NIC can
 process 75 million packets per second, line rate restricts it to
-5~MOPS when reading 1-KB objects. As commodity
-datacenter link rates increase from 100 Gbps to 400 Gbps and beyond,
-however, latency and contention---rather than raw network
-bandwidth---becomes the primary scalability bottleneck. To this end
-our design choices reduce round trips at the cost of bandwidth
-utilization.
+5~MOPS when reading 1-KB objects. As commodity datacenter link rates
+increase from 100 Gbps to 400 Gbps and beyond, however, latency and
+contention---rather than raw network bandwidth---become the primary
+scalability bottlenecks. To this end our design choices seek to reduce
+round trips at the cost of slight bandwidth amplification
+and we focus our evaluation on workloads with small key/value pairs
+whose performance is not limited by line rate on our 100-Gbps testbed
+hardware.
 
-Concretely, Figure~\ref{fig:rdma-benchmarks}(a) shows the tradeoff in
-round trip time for RDMA reads of increasing size. Critically the
-round trip time for a single 1-KB read is lower than the latency of
-issuing two dependent reads of just a few bytes each.  This suggests
-that performance can be gained if a single large packet can complete
-the work of two dependent smaller
-messages.
-To evaluate this decision, our evaluation focuses on
-small-key workloads whose performance is already gated by round-trip
-access latency and contention on our 100-Gbps testbed.
+Concretely, Figure~\ref{fig:rdma-benchmarks}(a) shows the growth in
+round trip time for RDMA reads of increasing size. On our hardware,
+the round trip time for a single 1-KB read is lower than the total
+latency of issuing two dependent reads of just a few bytes each.  This
+suggests that performance can be gained if a single large packet can
+complete the work of two smaller, but dependant messages.  Indeed, our
+evaluation (see Figure~\ref{fig:rdma-benchmarks}(b)) shows that even on our
+100-Gbps testbed inlining values and servicing lookups with a single
+large read provides a 4.7--37.2\% increase in throughput compared to a
+pointer-based approach for the same value size.
 
 
-Figure~\ref{fig:rdma-benchmarks}(b) shows the performance
-overheads of using an extent based design on small key-value
-pairs. Inlined values are read directly from the index while all other
-values are read from indirect storage. Here client caching is turned
-on and clients optimistically read indirect storage in parallel with
-their index read. Only if a value has changed do clients re-read from
-extent storage. Due to atomic width limitations existing KV stores can
-not gain this performance.
+%% Figure~\ref{fig:rdma-benchmarks}(b) shows the performance
+%% overheads of using an extent based design on small key-value
+%% pairs. Inlined values are read directly from the index while all other
+%% values are read from indirect storage. Here client caching is turned
+%% on and clients optimistically read indirect storage in parallel with
+%% their index read. Only if a value has changed do clients re-read from
+%% extent storage. Due to atomic width limitations existing KV stores can
+%% not gain this performance.
 
 Similarly, increasing scale and contention places greater pressure on
 the RDMA atomic operations necessary to serialize
@@ -110,7 +112,7 @@ vendors—include a small amount (256 KB in our case) of on-NIC memory
 that can be addressed by remote clients using RDMA
 operations~\cite{device-memory}. Accesses to NIC memory avoid the need
 to cross the server’s PCIe bus, decreasing latency and increasing
-throughput.  CAS operations perform between $1.8--3.1\times$ faster on
+throughput.  CAS operations perform between 1.8--3.1$\times$ faster on
 NIC memory.  We design RCuckoo to perform atomic operations only on
 datstructures in NIC memory.
 
