@@ -2,10 +2,12 @@
 \section{Background}
 \label{sec:background}
 
-Disaggregated Key-value stores are the highest performance technology for sharing disaggregated
-memory with a lineage in RDMA key-value stores. In this section we will overview that lineage and
-discuss the algorithmic distinctions between the two. Our hash table design draws strongly from on
-Cuckoo and hopscotch hashing. We provide a brief overview of both hash table designs and related
+Existing disaggregated key/value stores build upon the extensive literature of
+%are the highest performance technology for sharing disaggregated
+RDMA-based key/value stores. In this section we overview that lineage
+and discuss the algorithmic distinctions between the two. Our hash
+table design draws on both cuckoo and hopscotch hashing. We
+provide a brief overview of both approaches and related
 literature.
 
 
@@ -17,60 +19,114 @@ literature.
 % needing to consult the server and potentially perform lock-less reads with
 % RDMA~\cite{farm,pilaf,cuckoo}.
 
-\subsection{Disaggregated Key-Value Stores}
+\subsection{Disaggregated Key/Value Stores}
 
-The primary difference between disaggregated KVS and prior RDMA KVS is that the former assumes that
-servers do not have a CPU capable of serializing requests near memory. Precursor RDMA KV stores
-achieved performance by striking a delicate balance between CPU-bypass one-sided RDMA operations and
-CPU-serialized two-sided operations~\cite{farm,herd,pilaf,cell,storm}. Disaggregated KVS must only
-use one-sided operations even when performing complex operations like resolving a collision while
-inserting.
+The challenge to adapting existing RDMA-based KVS designs to a fully
+disaggreagated setting is the need to rely exclusively on one-sided
+operations due to the lack of a server-side CPU.  Precursor RDMA KVS
+systems achieve performance by striking a delicate balance between
+efficient one-sided RDMA operations and CPU-serialized two-sided
+operations~\cite{farm,herd,pilaf,cell,storm}, where the later are used
+only judiciously, but are key to correctness.
+%Disaggregated
+%KVS must only use one-sided operations even when performing complex
+%operations like resolving a collision while inserting.
 
-In general the performance of a disaggregated KVS hinges write serialization performance.  Fast
-consistent writes with one-sided RDMA are hard because RDMA atomics are small (8-bytes) and the cost
-of round trips is high. This has lead to a divide in the design between KVS that have ordered keys
-for range queries and those than do not. Those with ordered keys use locks~\cite{sherman,smart} for
-their complex updates, and those with unordered keys use lockless optimistic approaches and cram
-their atomic updates into 8-byte writes. These latter designs have hash indexes with 8-byte entries
-which point to uncontested extent regions with the entries actual data. Index entries typically use
-48 of the 64 bits as a pointer and the remaining 16bits for a digest of the key, and the size of the
-data.  This leads to additional round trips to check for a keys presence or limitations in the size
-of values an entry can support~\cite{fusee,race}.
+In general, the performance of any KVS on a mixed read/write workload
+hinges on its serialization performance.  Fast consistent writes with
+one-sided RDMA are hard because RDMA atomic operations operate on
+small (8-byte) regions of memory and the cost of round trips is
+high. This constraint has lead to a divide in the design of
+disaggregated KVS systems between those that support range queries over
+ordered keys and those that do not. Systems with ordered keys use
+locks to guard their complex updates, while those
+with unordered keys employ lock-free optimistic approaches by
+constraining updates to atomic 8-byte writes. These latter designs
+typically use hash indexes with 8-byte entries that point to
+uncontested extent regions where the corresponding values are stored.
+Commonly the index entries use 48 of the 64 bits as a pointer and the
+remaining 16 bits for a digest of the key and the size of the value.
+This approach requires additional round trips to check for a key's
+presence and limits the size of values that can be
+stored~\cite{fusee,race}.
 
-KVS with B-Trees or Radix Trees for ordered keys~\cite{sherman,smart} use locks because their
-updates are complex.  The advantage of locks is that these structures support inline index updates
-and thus faster reads at the cost of expensive writes. Lock performance is dominated by lock
-granularity and critical section size. At the time of writing all lock based KVS's assume that
-clients are grouped into colocated servers which can locally candidate lock accesses and batch their
-writes~\cite{sherman,smart}, an assumption which is not true for optimistic
-KVS~\cite{clover,fusee,race,ditto}. Our stance is that the the performance gain of inlined
-operations can make locks practical without assuming co-location if critical sections are kept to
-1-RTT and locks are as fine grained as possible.
+On the other hand, KVS systems that support ordered keys use
+locks to guard the complex operations required to update B-Trees or
+Radix Trees.  In exchange for expensive update operations, locks allow
+%The advantage of locks is that
+these systems to support inlined values and, thus, faster small-value
+reads.  Performance is gated, however, by lock granularity and hold
+times. At the time of writing all lock-based KVS systems assume that
+clients are grouped into colocated servers which can locally
+coordinate lock accesses and batch their writes~\cite{smart,sherman},
+an assumption that optimistic
+KVS systems do not make~\cite{ditto,fusee,clover,race}. We show that it is possible to
+realize the performance gain of lock-guarded inlined operations
+without requiring client co-location if locks are sufficiently fine
+grained and hold times limited.
+%critical sections are kept to 1-RTT and locks are as fine grained as possible.
 
-\subsection{RDMA and Network Performance} Historically network bandwidth has limited KVS store
-throughput more than operation rate. For instance a ConnectX3 NIC at 40GBPs can process 75 million
-packets per second would bottleneck at only 5MOPS making 1K reads. Similarly at these lower packet
-rates the effects of contention on skewed distributions are not as noticeable. As bandwidths get
-higher (400GBPs+) latency and contention, rather than bandwidth will become the primary scalability
-bottleneck. To this end we focus on small key workloads which are limited by round trip access
-latency and contention and not bandwidth. We make specific design choices which reduce round trips
-at the cost of bandwidth.
+\subsection{RDMA and Network Performance}
 
-Figure~\ref{fig:rdma-benchmarks}(a) shows the tradeoff in round trip time for RDMA reads of
-increasing size. Critically the round trip time of a 1KB packet is lower than the latency of issuing
-two dependent small packets.  The implication is that performance can be gained if a single large
-packet can complete the work of two dependent smaller messages. Figure~\ref{fig:rdma-benchmarks}(b)
-shows the performance overheads of using an extent based design on small key-value pairs. Inlined
-values are read directly from the index while all other values are read from indirect storage. Here
-client caching is turned on and clients optimistically read indirect storage in parallel with their
-index read. Only if a value has changed do clients re-read from extent storage. Due to atomic width
-limitations existing KV stores can not gain this performance. RDMA atomic operations issued to main
-memory have a bottleneck of around 50MOPS which can quickly become a system bottleneck if clients
-are spinning on a lock. Recent connectX series NICs have a small amount of on-NIC memory on which
-atomic operations scale linearly with all other RDMA operations. Figure~\ref{fig:rdma-benchmarks}(c)
-illustrated the performance bottlenecks of CAS operations on device and main memory on a single
-address and on multiple addresses. If a data structure can organize it's locks densely into NIC
-memory it can avoid the atomic bottleneck.
+Historically, network bandwidth has limited KVS throughput more than
+operation rate. For instance, while a 40-Gbps ConnectX-3 NIC can
+process 75 million packets per second, line rate restricts it to
+5~MOPS when reading 1-KB objects. As commodity
+datacenter link rates increase from 100 Gbps to 400 Gbps and beyond,
+however, latency and contention---rather than raw network
+bandwidth---becomes the primary scalability bottleneck. To this end
+our design choices reduce round trips at the cost of bandwidth
+utilization.
+
+Concretely, Figure~\ref{fig:rdma-benchmarks}(a) shows the tradeoff in
+round trip time for RDMA reads of increasing size. Critically the
+round trip time for a single 1-KB read is lower than the latency of
+issuing two dependent reads of just a few bytes each.  This suggests
+that performance can be gained if a single large packet can complete
+the work of two dependent smaller
+messages.
+To evaluate this decision, our evaluation focuses on
+small-key workloads whose performance is already gated by round-trip
+access latency and contention on our 100-Gbps testbed.
+
+
+Figure~\ref{fig:rdma-benchmarks}(b) shows the performance
+overheads of using an extent based design on small key-value
+pairs. Inlined values are read directly from the index while all other
+values are read from indirect storage. Here client caching is turned
+on and clients optimistically read indirect storage in parallel with
+their index read. Only if a value has changed do clients re-read from
+extent storage. Due to atomic width limitations existing KV stores can
+not gain this performance.
+
+Similarly, increasing scale and contention places greater pressure on
+the RDMA atomic operations necessary to serialize
+updates~\cite{design-guidelines,sherman}.
+Figure~\ref{fig:rdma-benchmarks}(c) shows the 100-Gbps ConnectX-5s in
+our testbed top out at around 50 MOPS per second when servicing atomic
+operations on remote memory, and less than 10 if those operations are
+contended.  Our testbed NICs, however—like those from several
+vendors—include a small amount (256 KB in our case) of on-NIC memory
+that can be addressed by remote clients using RDMA
+operations~\cite{device-memory}. Accesses to NIC memory avoid the need
+to cross the server’s PCIe bus, decreasing latency and increasing
+throughput.  CAS operations perform between $1.8--3.1\times$ faster on
+NIC memory.  We design RCuckoo to perform atomic operations only on
+datstructures in NIC memory.
+
+
+%% at these lower packet
+%% rates the effects of contention are not as severe. 
+%% RDMA atomic operations issued to main
+%% memory have a bottleneck of around 50MOPS which can quickly become a
+%% system bottleneck if clients are spinning on a lock. Recent connectX
+%% series NICs have a small amount of on-NIC memory on which atomic
+%% operations scale linearly with all other RDMA
+%% operations. Figure~\ref{fig:rdma-benchmarks}(c) illustrated the
+%% performance bottlenecks of CAS operations on device and main memory on
+%% a single address and on multiple addresses. If a data structure can
+%% organize it's locks densely into NIC memory it can avoid the atomic
+%% bottleneck.
 
 
 % \subsection{RDMA}
@@ -83,11 +139,7 @@ memory it can avoid the atomic bottleneck.
 % Atomic operations such as compare-and-swap (CAS) are essential for implementing locks or
 % opportunistic concurrency. Atomics are limited to 64-bit operations and bottleneck at lower rates
 % than reads and writes because they block requests on data-dependent addresses while waiting on PCIe
-% round trips~\cite{design-guidelines,sherman}.  Figure~\ref{fig:rdma-benchmarks}(a) shows that the
-% NICs in our testbed (100-Gbps NVIDIA Mellanox ConnectX-5s) are capable of serving many 10s of
-% millions of RDMA operations per second (limited only by link speed), but CAS operations to remote
-% server memory top out around 50 MOPS.  Hence, we employ atomic operations judiciously in RCuckoo.
-
+% round trips~\cite{design-guidelines,sherman}.  Figure~\ref{fig:rdma-benchmarks
 
 % While atomic operations are limited to 64 bits, read and write message sizes are bounded only by the
 % link MTU.  Figure~\ref{fig:rdma-benchmarks}(b) shows that on our testbed NIC-to-NIC round-trip times
@@ -115,12 +167,16 @@ memory it can avoid the atomic bottleneck.
 \subsection{Concurrent hash tables} 
 \label{sec:cuckoo-back}
 
-Fully disaggregated KVS are essentially concurrent hash tables whose conflict resolution strategy is
-implemented entirely by individual clients~\cite{rolex,fusee,race,sherman,smart,ditto}. Cuckoo and
-hopscotch hashing are attractive algorithms as clients can determine a key's location without
-searching a remote index. Unfortunately, both algorithms have complex mechanisms for resolving hash
-collisions which involve iteratively searching and updating multiple index locations. In this
-section we describe both algorithms and their advantages and challenges in the disaggregated
+A fully disaggregated KVS implements a concurrent hash table whose
+conflict resolution strategy is performed entirely by individual
+clients.
+%~\cite{rolex,smart,fusee,race,sherman,ditto}.
+Cuckoo and hopscotch hashing are attractive algorithms in such
+settings as clients can determine a key's location without searching a
+remote index. Unfortunately, both algorithms have complex mechanisms
+for resolving hash collisions which involve iteratively searching and
+updating multiple index locations. In this section we describe both
+algorithms and their advantages and challenges in the disaggregated
 setting.
 
 % Like any hash table, the
@@ -140,17 +196,21 @@ setting.
 
 %\todo{Make sure to describe how a cuckoo path works}
 
-\textbf{Cuckoo hashing} uses independent hash functions to compute two potential table locations for
-a key, a primary and a secondary, where each location corresponds to an associative row of entries.
-A key is always inserted into its primary location.  If that row is full, an existing key is evicted
-(or ``cuckooed'') to its secondary row to make space. If the cuckooed entry's secondary row is also
-full, the process iterates (by selecting yet another entry in the secondary row to cuckoo) until an
-open location is found. The path of evictions is known as a~\textit{cuckoo path}.
-Figure~\ref{fig:table-diagram} (our table diagram) shows an example of a cuckoo path of length 1. In
-practice when tables are nearly full paths can grow long and each step in the cuckoo path generates
-reads to random regions of the index.  While insertions can be involved, reads can always be
-executed in a single round trip by reading the rows corresponding to both of a key's locations
-simultaneously~\cite{pilaf,memc3,cuckoo-improvements}.
+\textbf{Cuckoo hashing} uses independent hash functions to compute two
+potential table locations for a key, a primary and a secondary, where
+each location corresponds to an associative row of entries.  A key is
+always inserted into its primary location.  If that row is full, an
+existing key is evicted (or ``cuckooed'') to its secondary row to make
+space. If the cuckooed entry's secondary row is also full, the process
+iterates---by selecting yet another entry in the secondary row to
+cuckoo---until an open location is found. The chain of evictions is
+known as a~\textit{cuckoo path}.  Figure~\ref{fig:table-diagram} (our
+table diagram) shows an example of a cuckoo path of length 1. In
+practice when tables are nearly full paths can grow long and each step
+in the cuckoo path generates reads to random regions of the index.
+While insertions can be complex, reads can always be executed in a
+single round trip by reading the rows corresponding to both of a key's
+locations simultaneously~\cite{memc3,cuckoo-improvements,pilaf}.
 
 \textbf{Hopscotch hashing} works in a similar fashion but provides a slightly different guarantee,
 namely that keys will be located within a bounded neighborhood.  (While cuckoo hashing limits the

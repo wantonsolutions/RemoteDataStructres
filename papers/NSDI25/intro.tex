@@ -122,13 +122,13 @@ hashing} algorithm that makes spatial locality a tunable parameter.
 Cuckoo hashing works by deterministically computing two potential hash
 locations---primary and secondary---for any key; collisions are
 resolved by relocating the existing entry in a key's primary location
-to that key's secondary location, and so on down what is known as a
-cuckoo path.  Traditionally, a key's two potential locations are drawn
-independently at random, defeating any locality-based optimizations.
-By controlling the distance between a key's locations---and therefore
-the span of a potential cuckoo path---we limit the range of memory
-that must be locked, and, therefore, the number of locks that a client
-must acquire.
+to the existing key's secondary location, and so on down what is known
+as a cuckoo path.  Traditionally, a key's two potential locations are
+drawn independently at random, defeating any locality-based
+optimizations.  By controlling the distance between a key's
+locations---and therefore the span of a potential cuckoo path---we
+probabilistically bound the range of memory that must be locked, and,
+relatedly, the number of locks that a client must acquire.
 
 %Concretely, by controlling how physically far apart alternate locations for a
 
