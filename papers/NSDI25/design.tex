@@ -31,7 +31,7 @@ see Section~\ref{sec:dephash}).
 
 Figure~\ref{fig:table-diagram} shows RCuckoo's index and lock table
 (both maintained at the remote memory server) during an insertion of
-key $K$ (which requres the cuckooing of key $C$).  The index table (right) is a single region of
+key $K$ (which requires the cuckooing of key $C$).  The index table (right) is a single region of
 RDMA-registered main memory divided into rows of fixed-width entries.
 Each row contains $n$ associative entries (3 in this figure; we use 8
 in practice) and terminates with an 8-bit version number (not shown) and 64-bit
@@ -49,8 +49,8 @@ version numbers enable clients to detect if a row has been modified (used to det
     \vskip -1em
 \end{figure}
 
-Table entry and key sizes are configuration parameters, but must be fixed at
-table creation.  Regardless of their size, entries contain either inlined key/value pairs (bottom left) or a key and
+Table entry and key sizes are configuration parameters, but are the same for all rows and must be fixed at
+table creation.  Individual entries, on the other hand, can contain either inlined key/value pairs (bottom left) or a key and
 48-bit pointer to an extent to store larger values (bottom right).  The
 least-significant bit of an entry signifies its type; values are
 inlined by default.  Extent entries use 23 bits to encode the value
@@ -59,6 +59,9 @@ size (which can range from $2^3$ to $2^{26}$ bytes).
 %default (and signified by a 0 LSB) or 
 Extents are located in separate, pre-allocated, per-client, RDMA-registered regions of server memory to avoid contention on
 inserts.
+Given the fully-disaggregated
+context we assume the index table will be initially provisioned at
+maximum size; we defer resizing to future work.
 
 %We use 8-byte entries with 4-byte
 %keys and 4-byte values for the majority of our experiments.
@@ -208,7 +211,7 @@ until they succeed or detect a failed client.
 % detecting and repairing the table from partially completed
 % writes is described in Section~\ref{sec:table-repair}.
 
-\subsubsection{Insert}
+\subsubsection{Inserts}
 \label{sec:insert}
 
 Inserts are challenging because concurrent operations might result in
@@ -223,10 +226,14 @@ entry in the path, and so on until the new entry is inserted in its primary loca
 
 
 To speed up cuckoo-path searches, RCuckoo clients keep a local,
-RDMA-registered cache of (relevant portions\footnote{A small cache suffices; we use 64~KB in our experiments. Caching the entire index yields negligible additional benefit.} of) the index table.
-Clients validate---and, if necessary, update---their cache at each
-step of the insert operation as explained below, so stale cache
-entries do not impact correctness, only performance.  
+RDMA-registered cache of (relevant portions\footnote{A small cache
+suffices; we use 64~KB in our experiments. Caching the entire index
+yields negligible additional benefit.} of) the index table.  The cache
+is populated with the results of any operation, but is
+used only for inserts.  Clients validate---and, if necessary,
+update---their cache at each step of the insert operation as explained
+below, so stale entries do not impact correctness, only
+performance.
 
 
 
@@ -285,9 +292,9 @@ insertions requires multiple dependent reads.  RCuckoo attempts to
 limit the number of remote operations by first conducting a
 speculative local search. Prior to contacting the server, RCuckoo
 clients search the contents of their local table cache to build a
-speculative cuckoo path.  As with prior work, we use breadth-first
+speculative cuckoo path.  As with prior work~\cite{cuckoo-improvements}, we use breadth-first
 search (BFS) to identify short paths in an attempt to minimize
-bandwidth and locking overhead~\cite{cuckoo-improvements}.  If the
+bandwidth and locking overhead.  If the
 client cache is empty the degenerate path is presumed, i.e., that the
 key will be inserted into its primary location
 without the need for any cuckooing.  Obviously, speculative cuckoo
@@ -309,8 +316,7 @@ paths acquire locks in groups (Section~\ref{sec:locking}).
 %%
 Immediately after, but in the same batch of RDMA operations
 as each attempt to acquire (a subset of) the locks, clients
-synchronize their local cache by issuing reads for (at
-least) all of the rows covered by that set of locks.  In
+synchronize their local cache by issuing reads for all of the rows covered by that set of locks.  In
 general, locks cover multiple rows, so this will be a
 superset of the rows necessary for the identified path.
 Note that if lock acquisition is successful, the values
@@ -319,17 +325,15 @@ the client's local cache of those rows---will remain
 synchronized until the lock is released.
 
 Figure~\ref{fig:table-diagram} shows an example insert
-operation where the client updated its cache of the section
-of the index table outlined by the dashed red line using a
-single covering read.  Here, the primary row for $K$ is full
+operation where the primary row for $K$ is full
 and the entry for key $C$ is being evicted to its secondary
 location.  Hence, the client has acquired locks
 corresponding to the row where it hopes to insert the entry
 for key $K$ as well as the row into which it plans to cuckoo
 the existing entry for key $C$.  The rows shaded in gray are
 synchronized because they are covered by the acquired locks,
-while the intervening two (unshaded) rows are updated in the
-client's cache, but their contents cannot be depended upon
+while the contents of any other rows that happen to be in the 
+client's cache cannot be depended upon
 without additional validation.  Rather, they may increase
 the likelihood that a subsequent speculative search yields a
 valid result.
@@ -402,9 +406,7 @@ cache contents.
 
 This entire process repeats until success, a client determines there
 is no viable cuckoo path (at which point the insert operation returns
-an error indicating the table is full), or a failed client is detected.  Given the fully-disaggregated
-context we assume the index table will be initially provisioned at its
-maximum size; we defer resizing to future work.
+an error indicating the table is full), or a failed client is detected.  
 %\todo{describe resizing}
 % During development we
 % experimented heavily with guided A* search but found that it
@@ -413,7 +415,7 @@ maximum size; we defer resizing to future work.
 % most paths are short.
 If cuckoo paths were to randomly span the table it is unlikely that an
 alternate valid path would exist within the locked rows when
-speculation fails.  In the next subsection, however, we describe how
+speculation fails.  In the next subsection, we describe how
 RCuckoo uses dependent hashing to dramatically increase the likelihood
 that an alternate path exists using rows surrounding those identified
 by the speculative search.
@@ -444,21 +446,23 @@ full before inserts begin to fail.
 %
 In RCuckoo the distance between keys' two cuckoo hash locations is a
 tunable parameter.
-We show experimentally that an optimal locality
-setting can dramatically decrease the number of round trips required
-to perform inserts in RCuckoo while maintaining high (90\%+) fill
-maximum factors.
-
 Increased locality has two direct benefits: it
 decreases the number of MCAS operations
 necessary to acquire the relevant locks and
 increases the probability that both of a keys' locations can be read
-with a single covering read---which updates more of a client's local
-cache, improving the likelihood that failed insert operations will
-succeed upon retry.  It also reduces the region
+with a single covering read.
+%---which updates more of a client's local
+%cache, improving the likelihood that failed insert operations will
+%succeed upon retry.
+It also reduces the region
 of the index table likely to be spanned by cuckoo paths, which speeds
 up inserts, but leads to hot spots that limit the table's expected
 maximum fill factor.  
+Experiments show that an optimal locality
+setting can dramatically decrease the number of round trips required
+to perform inserts in RCuckoo while maintaining high (90\%+) maximum fill
+factors.
+
 
 
 %\subsubsection{Dependent hashing}
@@ -510,7 +514,7 @@ locations.  (In a sharded deployment, the second location is
 restricted to the same shard by ``wrapping around'' the offset
 accordingly.) The particular formulation is not important, but the
 upshot is exponentially fewer keys have secondary locations at
-increasing distances from their primary.  The latter aspect is crucial, as any
+increasing distances from their primary.  The probabilistic aspect is crucial, as any
 fixed bound on the distance between hash locations leads to low
 maximum fill factors (on the order of 10--15\% in our experiments).
 
@@ -528,7 +532,7 @@ locations as a CDF for different values of $f$,
 %% paths to access less filled portions of the table.
 while Figure~\ref{fig:locality-hashing}(b) shows that larger values of
 $f$ enable practical fill factors for tables with 100~M entries. In
-our evaluation we set $f=2.3$.  As shown in the figures, for index
+our evaluation we set $f=2.3$.  As shown in the figure, for index
 tables with eight entries per row, RCuckoo delivers an expected max fill of
 greater than 95\% with a 68\% probability that a key's locations are
 located five or fewer rows apart.
