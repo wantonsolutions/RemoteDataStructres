@@ -229,7 +229,8 @@ caching with a constantly changing index structure.
 \begin{figure*}[t]
     \centering
     % \begin{subfigure}{0.24\linewidth} % original width for 4 figures
-    \newcommand{\subfigwidth}{0.24\linewidth}
+    % \newcommand{\subfigwidth}{0.24\linewidth}
+    \newcommand{\subfigwidth}{0.19\linewidth}
     \begin{subfigure}{\subfigwidth}
       \includegraphics[width=0.99\linewidth]{fig/fault-rate.pdf}
           \end{subfigure}
@@ -247,9 +248,9 @@ caching with a constantly changing index structure.
     \begin{subfigure}{\subfigwidth}
       \includegraphics[width=0.99\linewidth]{fig/entry_size.pdf}
           \end{subfigure}
-    % \begin{subfigure}{\subfigwidth}
-    %   \includegraphics[width=0.99\linewidth]{fig/extent.pdf}
-    %       \end{subfigure}
+    \begin{subfigure}{\subfigwidth}
+      \includegraphics[width=0.99\linewidth]{fig/extent.pdf}
+          \end{subfigure}
 \vskip -1em
     \caption{RCuckoo microbenchmarks:
       \textbf{(a)} YCSB-A throughput vs. client failure rate,
