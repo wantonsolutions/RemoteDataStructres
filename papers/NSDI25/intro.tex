@@ -55,7 +55,7 @@ tiers.
 
 High access latencies are particularly challenging for systems that
 seek to support shared read/write workloads due to the need to
-synchronize updates.
+synchronize updates, as coordination costs do not decrease as link bandwidths improve, causing them to become the bottleneck to system performance.
 %Sharing disaggregated memory is fundamentally hard because cost of synchronization is high.
 As a result, most existing far-memory systems choose to statically
 partition memory and optimize performance through a
