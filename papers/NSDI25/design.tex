@@ -892,12 +892,15 @@ the fact that its locks were reclaimed.
 %RCuckoo clients abort insert operations if they take too long to
 %acquire the required locks, they proceed to completion regardless of
 %long it takes to issue the updates.)
-Our failure timeout is
-deliberately set many orders of magnitude larger than the expected
-operation completion time, but we cannot completely rule out the
-possibility.  Ideally, RCuckoo could ensure that clients deemed to have
-failed by the failure detector are prevented from issuing further
-operations to the table without manual intervention (e.g. a reboot).
+Our failure timeout is deliberately set many orders of magnitude
+larger than the expected operation completion time, but we cannot
+completely rule out the possibility.  Large-scale deployments can
+implement a separate liveness protocol to identify stalled clients.
+
+
+%Ideally, RCuckoo could ensure that clients deemed to have
+%failed by the failure detector are prevented from issuing further
+%operations to the table without manual intervention (e.g. a reboot).
 
 %% An RDMA connection must be closed, transitioned to an error
 %% state, or have it's permissions revoked to prevent its
@@ -912,17 +915,20 @@ operations to the table without manual intervention (e.g. a reboot).
 
 %\todo{Stew - I added the below; is it not necessary?}
 
-While clients that fail holding a recovery lease are easy to identify,
-our current implementation has no way to identify which client failed
-holding a stranded lock.  There are two straightforward extensions to
-provide that functionality: increase the size of lock entries to
-include the queue pair of the client, or have a separate liveness
-datastructure that each client must update with some frequency so
-failed (or unreasonably slow) clients can be identified by their
-failure to update their entry in a timely manner.  Our design supports
-the latter, but we have not found the need to implement it in our
-testbed---we have never seen a stale write that was delivered with a
-delay anywhere close to approaching our timeout value.
+%While clients that fail holding a recovery lease are easy to identify,
+%our current implementation has no way to identify which client failed
+%holding a stranded lock.  There are two straightforward extensions to
+%provide that functionality: increase the size of lock entries to
+%include the queue pair of the client, or have a separate liveness
+
+Specifically, a portion of remote memory could be used to store a
+datastructure that each client must update with some frequency
+so failed (or unreasonably slow) clients can be identified by their
+failure to update their entry in a timely manner.  Such a protocol is
+straightforward to implement with one-sided RDMA operations, but we
+have not found the need to implement it in our testbed---we have never
+seen a stale write that was delivered with a delay anywhere close to
+approaching our timeout value.
 
 Once a failed client is identified, real-world deployments have
 many ways to ensure the client ceases operation, but it is interesting to

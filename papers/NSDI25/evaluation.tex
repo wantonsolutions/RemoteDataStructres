@@ -3,11 +3,11 @@
 
 We evaluate RCuckoo by directly comparing its performance in terms of
 throughput and latency against representative state-of-the-art
-disaggregated key/value stores.  When accessing large values, all
-systems attain similar throughput, gated by our testbed's 100-Gbps
+disaggregated key/value stores.  When accessing sufficiently large values, all
+systems can max-out our testbed's 100-Gbps
 link rate, so we focus on workloads with small key/value pairs that
-remove the bandwidth limitations, exposing the (in)efficiency of each
-system's table management and synchronization techniques.
+remove the bandwidth limitation, exposing the (in)efficiency of each
+system's management and synchronization techniques.
 
 When values are stored inline, RCuckoo outperforms existing systems
 while delivering competitive insert latencies.  Using fault injection,
@@ -175,11 +175,13 @@ around 2$\times$.
 \todo{What is the row/read size?  How close are we
   to line rate?}
 
-\textbf{Throughput.} Figure~\ref{fig:ycsb_throughput} shows YCSB throughput for RCuckoo, FUSEE,
-Clover, and Sherman on three different YCSB workloads. For each system, we allocate a 100-M-entry
-table and pre-populate it with 90~M entries that each consist of a 32-bit key and 32-bit value (we
-consider larger sizes in Section~\ref{ss:mb}).  We plot the aggregate throughput of a variable
-number of clients concurrently accessing entries according to a Zipf(0.99) distribution.
+\textbf{Throughput.} Figure~\ref{fig:ycsb_throughput} shows YCSB
+throughput for RCuckoo, FUSEE, Clover, and Sherman on three different
+YCSB workloads. For each system, we allocate a 100-M-entry table and
+pre-populate it with 90~M entries that each consist of a 32-bit key
+and 32-bit value (we consider larger sizes in Section~\ref{ss:mb}).
+We plot the aggregate throughput of a variable number of clients
+concurrently accessing entries according to a Zipf(0.99) distribution.
 
 In a read-only (YCSB-C) workload, FUSEE suffers from its extent-based
 value storage.  RCuckoo, Clover, and Sherman perform similarly at
@@ -209,7 +211,9 @@ our testbed while RCuckoo continues to scale.
 %begins to surpass FUSEE after about 125 clients.  FUSEE's maximum performance is gated by its requirement for an additional round trip per operation (to
 %retrieve the extent).
 Sherman begins to suffer from lock contention even earlier, topping
-out around 5 MOPS before collapsing.  Clover performs worst under
+out around 5 MOPS before collapsing.  (Absolute performance improves as Zipf skew decreases---not shown---but the
+trend remains.)
+Clover performs worst under
 write-heavy workloads due to its inability to effectively leverage
 caching with a constantly changing index structure.
 
