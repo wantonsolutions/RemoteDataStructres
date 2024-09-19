@@ -98,7 +98,7 @@ def plot_hero_ycsb_fill():
         ax.set_ylabel("us")
         ax.set_ylim(0,15)
 
-    plot_sherman_latency(axs)
+    #plot_sherman_latency(axs)
     plot_fusee_latency(axs)
     axs[0].legend(prop={'size': 6})
 
