@@ -9,17 +9,14 @@ link rate, so we focus on workloads with small key/value pairs that
 remove the bandwidth limitation, exposing the (in)efficiency of each
 system's management and synchronization techniques.
 
-When values are stored inline, RCuckoo outperforms existing systems
-while delivering competitive insert latencies.  Using fault injection,
-we show that our distributed approach to client failure detection and
-recovery enables RCuckoo to sustain high throughput even though 100s
-of clients are failing per second.  Finally, we justify our design
-decisions through a series of micro-benchmarks. Specifically, we
-quantify the benefit RCuckoo extracts from its locality enhancement
-and speculative search strategy before measuring the impact of
-%conduct sensitivity analysis
-%of our choice of locality parameter,
-%covering read threshold, and
+When values are stored inline, RCuckoo outperforms existing systems while delivering competitive
+insert latencies.  Using fault injection, we show that our distributed approach to client failure
+detection and recovery enables RCuckoo to sustain high throughput even though 100s of clients are
+failing per second.  Finally, we justify our design decisions through a series of micro-benchmarks.
+Specifically, we quantify the benefit RCuckoo extracts from its locality enhancement
+%% %and speculative search strategy %
+before measuring the impact of
+%conduct sensitivity analysis of our choice of locality parameter, covering read threshold, and
 index-table entry size.
 
 \input{implementation}
@@ -449,30 +446,20 @@ four or more locks per message.
 %     \label{fig:search_success}
 % \end{figure}
 
-\textbf{Secondary search.}
-%RCuckoo's two-stage search algorithm is designed to improve the probability that an insert will be
-%successful given that a clients local cache is out of sync.
-We measure second search success rate as a function of lock granularity under high contention.  A
-table is filled up to 85\% and then 320 clients concurrently run an insert-only workload.  For this
-experiment only, we flush the client's cache before every insert, ensuring the initial speculative
-path will fail unless the entry does not require cuckooing (unlikely at this fill factor).
-%We report the success rate of second   in order to maximize cuckoo path length.
-Figure~\ref{fig:microbenchmarks}(c) plots the success rate of the second search as a function of
-lock granularity.  \todo{not sure how 99th percentile impacts things} Recall that if a second search
-fails, RCuckoo clients release their locks and retry the insert operation using the contents of
-their cache, so multiple speculative and secondary searches may be performed.  At one row per lock,
-secondary search has limited effectiveness (as the only alternative is to cuckoo a different set of
-entries among the same rows), leading to multiple retries (approaching 4 in the 99th percentile, not
-shown).  As locks cover additional rows, however, the second search becomes much more
-useful.
-%% of failure rate of both search stages. The first % search is the success rate of a search based
-%entirely on % cached information. The second search is the success rate of % our restricted search
-%performed after acquiring locks. We % measure the response of both as a function of lock size.  %
-%Given 1 row per lock the failure rate of both searches is % over 4 as the local cache is almost
-%always out of sync, and % retries are not guaranteed to be synchronized. As lock % granularity
-%grows the frequency of second search success % drops dramatically. 
-At 64 rows per lock the second search succeeds 95\% of the time.
-%even when the cached search fails at a rate of 99\% per insert.
+% \textbf{Secondary search.}
+% We measure second search success rate as a function of lock granularity under high contention.  A
+% table is filled up to 85\% and then 320 clients concurrently run an insert-only workload.  For this
+% experiment only, we flush the client's cache before every insert, ensuring the initial speculative
+% path will fail unless the entry does not require cuckooing (unlikely at this fill factor).
+% Figure~\ref{fig:microbenchmarks}(c) plots the success rate of the second search as a function of
+% lock granularity.  \todo{not sure how 99th percentile impacts things} Recall that if a second search
+% fails, RCuckoo clients release their locks and retry the insert operation using the contents of
+% their cache, so multiple speculative and secondary searches may be performed.  At one row per lock,
+% secondary search has limited effectiveness (as the only alternative is to cuckoo a different set of
+% entries among the same rows), leading to multiple retries (approaching 4 in the 99th percentile, not
+% shown).  As locks cover additional rows, however, the second search becomes much more
+% useful.
+% At 64 rows per lock the second search succeeds 95\% of the time.
 
 
 %% \subsubsection{Masked CAS}
@@ -516,7 +503,7 @@ reads. However large entries increase bandwidth consumption for inserts.
 %, impacting insert performance.  % but larger values must be stored in extents.  % at the cost of
 %inflating the bandwidth of % operations. We run a 50\% read 50\% insert and a read only % workload
 %to illustrate the overhead of larger entries.
-Figure~\ref{fig:microbenchmarks}(d) shows the effect of entry size on throughput under 50\% insert
+Figure~\ref{fig:microbenchmarks}(c) shows the effect of entry size on throughput under 50\% insert
 and read-only (YCSB-C) workloads. Insert is a bandwidth-limited operation,
 %quickly saturates the network bandwidth. At
 %at 16-B entries link capacity restricts throughput to 8 MOPS. The performance of
@@ -537,7 +524,7 @@ are largely unaffected by entry size.
 % be available in the coming years. While round trip latency
 % is expected to remain largely the same.
 Extent entries are slightly slower.
-Figure~\ref{fig:microbenchmarks}(e) shows YCSB throughput as a function of
+Figure~\ref{fig:microbenchmarks}(d) shows YCSB throughput as a function of
 value size from 8 to 1024~B on 6 client machines with 120 cores using a
 Zipf(0.99) distribution.  For
 comparison, we show the performance for 8-B inlined values on the same
