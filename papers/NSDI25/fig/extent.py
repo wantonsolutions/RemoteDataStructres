@@ -3,8 +3,13 @@ import numpy as np
 
 import lib as lb
 
+five_row=False
+
 def plot_value_size_static():
-    fig, ax = plt.subplots(1,1, figsize=(4,2.5))
+    if five_row:
+        fig, ax = plt.subplots(1,1, figsize=(4,2.5))
+    else:
+        fig, ax = plt.subplots(1,1, figsize=(3,2.5))
     # sizes = [64,128,256,512,1024]
     # workloads = ["ycsb-c"]
     # workloads = ["ycsb-c","ycsb-b"]
@@ -69,12 +74,17 @@ def plot_value_size_static():
             ax.text(1.5, baselines[i]+0.5, str(gap)+"%", ha='right', va='bottom')
             print(gap)
         
-
-    # ax.legend(loc='upper right', fontsize='small')
-    ax.legend(loc='lower center', ncol=4,  fontsize=9)
+    if five_row:
+        ax.legend(loc='lower center', ncol=4,  fontsize=9)
+    else:
+        ax.legend(loc='lower center', fontsize=7, ncol=4)
     ax.set_xlabel("value size (bytes)")
     ax.set_ylabel("MOPS")
-    ax.set_ylim(0,26)
+
+    if five_row:
+        ax.set_ylim(0,26)
+    else:
+        ax.set_ylim(0,26)
 
     plt.tight_layout()
     plt.savefig("extent.pdf")
