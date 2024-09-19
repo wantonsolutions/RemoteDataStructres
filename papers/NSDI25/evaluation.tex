@@ -272,13 +272,13 @@ performance as a function of the table's initial fill factor.
 performed?}
 
 As a baseline we collect the read and insert latencies for all systems under light load
-(Figure~\ref{fig:ycsb_fill}(a)). Read latency is nearly identical for all systems save FUSEE, as it
-requires an additional round trip for uncached reads. Insert times vary: Clover and Sherman use
-two-sided RDMA operations for insert and both need to perform allocations and set up metadata for
-the requesting client.  FUSEE is slightly slower, roughly the same as RCuckoo's best case.  As the
-table fills, however, cuckoo paths grow in length causing RCuckoo insert operations to require
-additional round trips to find valid cuckoo paths.  At maximum fill, insert operations take roughly
-twice as long as in an empty table. 
+(Figure~\ref{fig:ycsb_fill}(a)). Read latency is nearly identical for all systems save FUSEE as it
+makes a read to both the index and extent. Insert times vary: Clover and Sherman use two-sided RDMA
+operations for insert and both need to perform allocations and set up metadata for the requesting
+client.  FUSEE is slightly slower, roughly the same as RCuckoo's best case.  As the table fills,
+however, cuckoo paths grow in length causing RCuckoo insert operations to require additional round
+trips to find valid cuckoo paths.  At maximum fill, insert operations take roughly twice as long as
+in an empty table. 
 
 Figure~\ref{fig:ycsb_fill}(b) shows impact of table fill on insert throughput (320 clients). As the
 index table fills, cuckoo paths become longer leading to increased contention and additional
