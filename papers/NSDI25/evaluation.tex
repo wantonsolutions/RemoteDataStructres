@@ -259,44 +259,38 @@ caching with a constantly changing index structure.
 \vskip -1em
 \end{figure*}
 
-\textbf{Inserts.}
-%% By default YCSB-A,B,C use updates. RCuckoo's insert algorithm is it's most complex and bandwidth
-%intensive component. In this section
+\textbf{Insert performance}
+
 Despite its complexity, RCuckoo's insert operation remains highly performant.  To evaluate insert
 performance we run workloads with a mix of reads and inserts.  Figure~\ref{fig:ycsb_fill} considers
-RCuckoo's performance on workloads that exclusively use inserts (rather than updates); as with YCSB nomenclature A is 50\% insert and 50\% read; W is insert only. Inserts become more expensive as the table fills, so we pre-populate the table with a
-varying number of entries and report insert performance as a function of the table's initial fill
-factor.  \todo{How long/how many inserts are performed?}
+RCuckoo's performance on workloads that exclusively use inserts (rather than updates); as with YCSB
+nomenclature A is 50\% insert and 50\% read; W is insert only. Inserts become more expensive as the
+table fills, so we pre-populate the table with a varying number of entries and report insert
+performance as a function of the table's initial fill factor.
+%%
+\todo{How long/how many inserts are
+performed?}
 
-Figure~\ref{fig:ycsb_fill}(a) shows the aggregate throughput of 320
-clients across four different workloads as a function of the table's
-fill factor.  As the index table fills, cuckoo paths become longer
-leading to increased contention and additional bandwidth consumption
-from larger covering reads. In each case (except read-only C)
-RCuckoo's performance declines with fill factor. In the insert-only
-W case RCuckoo's performance drops from a high of 11.5 MOPS in a
-nearly empty table to 4.5 MOPS at a 90\% fill factor.  As a point of
-comparison, FUSEE's maximum insert-only performance is 9.1 MOPS on our
-testbed, although it is independent of fill factor.  While FUSEE
-out-performs RCuckoo at high fill factors, we observe that 
-insert-only workloads are rare in
-practice~\cite{facebook-memcached}.
+As a baseline we collect the read and insert latencies for all systems under light load
+(Figure~\ref{fig:ycsb_fill}(a)). Read latency is nearly identical for all systems save FUSEE, as it
+requires an additional round trip for uncached reads. Insert times vary: Clover and Sherman use
+two-sided RDMA operations for insert and both need to perform allocations and set up metadata for
+the requesting client.  FUSEE is slightly slower, roughly the same as RCuckoo's best case.  As the
+table fills, however, cuckoo paths grow in length causing RCuckoo insert operations to require
+additional round trips to find valid cuckoo paths.  At maximum fill, insert operations take roughly
+twice as long as in an empty table. 
 
-\textbf{Latency and overhead.} We plot
-%operation latency, size, and RDMA message counts as a
-%function of fill factor i. We report
-the latency of insert and
-read operations in Figure~\ref{fig:ycsb_fill}(b).  For comparison systems we report the 
-best-case (lightly loaded) performance on our testbed.  Read latency is nearly identical for all systems save FUSEE,
-as it requires an additional round trip. Insert times vary: Clover and Sherman use two-sided RDMA
-operations for insert and both need to perform allocations and set up metadata for the requesting
-client.  FUSEE is slightly slower, roughly the same as RCuckoo's best case.  As the table fills,
-however, cuckoo paths grow in length causing RCuckoo insert operations to require additional round
-trips to find valid cuckoo paths.  At maximum fill, insert operations take roughly twice as long as
-in an empty table. This I/O amplification is reflected by the increase in both bytes
-(Figure~\ref{fig:ycsb_fill}(c)) and messages (Figure~\ref{fig:ycsb_fill}(d)) per operation.  The cost and performance of reads,
-on the other hand, is insensitive to fill factor.
-
+Figure~\ref{fig:ycsb_fill}(b) shows impact of table fill on insert throughput (320 clients). As the
+index table fills, cuckoo paths become longer leading to increased contention and additional
+bandwidth consumption from larger covering reads. In each case (except read-only C) RCuckoo's
+performance declines with fill factor. In the insert-only W case RCuckoo's performance drops from a
+high of 11.5 MOPS in a nearly empty table to 4.5 MOPS at a 90\% fill factor.  As a point of
+comparison, FUSEE's maximum insert-only performance is 9.1 MOPS on our testbed, although it is
+independent of fill factor.  While FUSEE out-performs RCuckoo at high fill factors, we observe that
+insert-only workloads are rare in practice~\cite{facebook-memcached}.
+%%
+Figures~\ref{fig:ycsb_fill}(c) and (d) show the impact of fill factor on the bandwidth cost of each
+operation and the number of RDMA messages they require to complete.
 
 % \begin{figure}[t]
 %     \includegraphics[width=0.99\linewidth]{fig/fault-rate.pdf}
