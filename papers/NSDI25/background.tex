@@ -4,11 +4,9 @@
 
 Existing disaggregated key/value stores build upon the extensive literature of
 %are the highest performance technology for sharing disaggregated
-RDMA-based key/value stores. In this section we overview that lineage
-and discuss the algorithmic distinctions between the two. Our hash
-table design draws on both cuckoo and hopscotch hashing. We
-provide a brief overview of both approaches and related
-literature.
+RDMA-based key/value stores. In this section we overview that lineage and discuss the algorithmic
+distinctions between the two. Our hash table design draws on both cuckoo and hopscotch hashing. We
+provide a brief overview of both approaches and related literature.
 
 
 % Key/value stores have long used RDMA to accelerate
@@ -200,21 +198,22 @@ setting.
 
 %\todo{Make sure to describe how a cuckoo path works}
 
-\textbf{Cuckoo hashing} uses independent hash functions to compute two
-potential table locations for a key, a primary and a secondary, where
-each location corresponds to an associative row of entries.  A key is
-always inserted into its primary location.  If that row is full, an
-existing key is evicted (or ``cuckooed'') to its secondary row to make
-space. If the cuckooed entry's secondary row is also full, the process
-iterates---by selecting yet another entry in the secondary row to
-cuckoo---until an open location is found. The chain of evictions is
-known as a~\textit{cuckoo path}.  Figure~\ref{fig:table-diagram} (our
-table diagram) shows an example of a cuckoo path of length 1. In
-practice when tables are nearly full paths can grow long and each step
-in the cuckoo path generates reads to random regions of the index.
-While insertions can be complex, reads can always be executed in a
-single round trip by reading the rows corresponding to both of a key's
-locations simultaneously~\cite{memc3,cuckoo-improvements,pilaf}.
+\textbf{Cuckoo hashing} uses independent hash functions to compute a primary and secondary location
+for each key. Keys are always inserted into their primary location and evict an existing key to
+their secondary on collision which in turn can cause a chain of evictions (a cuckoo path) shown in
+Figure~\ref{fig:table-diagram}. Associative locations and BFS search are used to minimize path
+length~\cite{memc3,cuckoo-improvements} which are the primary factor in the cost of insertions.
+% two potential table locations for a key, a primary and a secondary, where each location
+% corresponds to an associative row of entries.  A key is always inserted into its primary location.
+% If that row is full, an existing key is evicted (or ``cuckooed'') to its secondary row to make
+% space. If the cuckooed entry's secondary row is also full, the process iterates---by selecting yet
+% another entry in the secondary row to cuckoo---until an open location is found. The chain of
+% evictions is known as a~\textit{cuckoo path}.  Figure~\ref{fig:table-diagram} (our table diagram)
+% shows an example of a cuckoo path of length 1. In practice when tables are nearly full paths can
+% grow long and each step in the cuckoo path generates reads to random regions of the index.
+While insertions can have complex random memory accesses, reads can always be executed in a single
+round trip by reading the rows corresponding to both of a key's locations
+simultaneously~\cite{memc3,cuckoo-improvements,pilaf}.
 
 \textbf{Hopscotch hashing} works in a similar fashion but provides a slightly different guarantee,
 namely that keys will be located within a bounded neighborhood.  (While cuckoo hashing limits the

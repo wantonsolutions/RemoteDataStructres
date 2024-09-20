@@ -49,19 +49,16 @@ version numbers enable clients to detect if a row has been modified (used to det
     \vskip -1em
 \end{figure}
 
-Table entry and key sizes are configuration parameters, but are the same for all rows and must be fixed at
-table creation.  Individual entries, on the other hand, can contain either inlined key/value pairs (bottom left) or a key and
-48-bit pointer to an extent to store larger values (bottom right).  The
-least-significant bit of an entry signifies its type; values are
-inlined by default.  Extent entries use 23 bits to encode the value
-size (which can range from $2^3$ to $2^{26}$ bytes).
-%which are used by
-%default (and signified by a 0 LSB) or 
-Extents are located in separate, pre-allocated, per-client, RDMA-registered regions of server memory to avoid contention on
-inserts.
-Given the fully-disaggregated
-context we assume the index table will be initially provisioned at
-maximum size; we defer resizing to future work.
+Table entry and key sizes are configuration parameters, but are the same for all rows and must be
+fixed at table creation.  Individual entries, on the other hand, can contain either inlined
+key/value pairs (bottom left) or a key and 48-bit pointer to an extent to store larger values
+(bottom right).  The least-significant bit of an entry signifies its type; values are inlined by
+default.  Extent entries use 23 bits to encode the value size (which can range from $2^3$ to
+$2^{26}$ bytes).
+%which are used by default (and signified by a 0 LSB) or 
+Extents are located in separate, pre-allocated, per-client, RDMA-registered regions of server memory
+to avoid contention on inserts.  Given the fully-disaggregated context we assume the index table
+will be initially provisioned at maximum size; we defer resizing to future work.
 
 %We use 8-byte entries with 4-byte
 %keys and 4-byte values for the majority of our experiments.
