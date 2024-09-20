@@ -101,20 +101,31 @@ pointer-based approach for the same value size.
 %% extent storage. Due to atomic width limitations existing KV stores can
 %% not gain this performance.
 
-Similarly, increasing scale and contention places greater pressure on
-the RDMA atomic operations necessary to serialize
-updates~\cite{design-guidelines,sherman}.
-Figure~\ref{fig:rdma-benchmarks}(c) shows the 100-Gbps ConnectX-5s in
-our testbed top out at around 50 MOPS per second when servicing atomic
-operations on remote memory, and less than 10 if those operations are
-contended.  Our testbed NICs, however—like those from several
-vendors—include a small amount (256 KB in our case) of on-NIC memory
-that can be addressed by remote clients using RDMA
-operations~\cite{device-memory}. Accesses to NIC memory avoid the need
-to cross the server’s PCIe bus, decreasing latency and increasing
-throughput.  CAS operations perform between 1.8--3.1$\times$ faster on
-NIC memory.  We design RCuckoo to perform atomic operations only on
-datstructures in NIC memory.
+Prior works have avoided locks due to stark performance penalties~\cite{design-guidelines}.
+Figure~\ref{fig:rdma-benchmarks}(b) illustrates the bottleneck of RDMA atomics issued to main
+memory, while reads and writes scale linearly atomics experience harsh caps. Spinning on locks can
+quickly induce these bottlenecks as the penalties for accessing a single address is even more severe
+(3MOPS Figure~\ref{fig:rdma-benchmarks}(c)). Recently ConnectX series NICs have a small amount of
+on-NIC memory which avoids a PCIe round trip and scales linearly with all other RDMA
+operations~\cite{sherman}. Figure~\ref{fig:rdma-benchmarks}(c) illustrates the improvement of on-NIC
+memory for CAS on a single and multiple addresses. If a data structure can organize its locks
+densely into the small region of NIC memory spinning on locks is no longer a hardware bottleneck.
+
+% Recent ConnectX series NICs have a small amount of on-NIC memory on which atomic operations scale linearly with all other RDMA operations. Figure~\ref{fig:rdma-benchmarks}(c) illustrated the performance bottlenecks of CAS operations on device and main memory on a single address and on multiple addresses. If a data structure can organize its locks densely into NIC memory it can avoid the atomic bottleneck.
+% Similarly, increasing scale and contention places greater pressure on
+% the RDMA atomic operations necessary to serialize
+% updates~\cite{design-guidelines,sherman}.
+% Figure~\ref{fig:rdma-benchmarks}(c) shows the 100-Gbps ConnectX-5s in
+% our testbed top out at around 50 MOPS per second when servicing atomic
+% operations on remote memory, and less than 10 if those operations are
+% contended.  Our testbed NICs, however—like those from several
+% vendors—include a small amount (256 KB in our case) of on-NIC memory
+% that can be addressed by remote clients using RDMA
+% operations~\cite{device-memory}. Accesses to NIC memory avoid the need
+% to cross the server’s PCIe bus, decreasing latency and increasing
+% throughput.  CAS operations perform between 1.8--3.1$\times$ faster on
+% NIC memory.  We design RCuckoo to perform atomic operations only on
+% datstructures in NIC memory.
 
 
 %% at these lower packet
