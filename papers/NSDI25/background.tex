@@ -227,37 +227,56 @@ While insertions can have complex random memory accesses, reads can always be ex
 round trip by reading the rows corresponding to both of a key's locations
 simultaneously~\cite{memc3,cuckoo-improvements,pilaf}.
 
-\textbf{Hopscotch hashing} works in a similar fashion but provides a slightly different guarantee,
-namely that keys will be located within a bounded neighborhood.  (While cuckoo hashing limits the
-number of locations in which a key may be stored, it does not provide any locality guarantees
-regarding those locations.) It does so by finding the physically closest empty entry to the desired
-location and then, if that location is not within the neighborhood, iteratively moving other entries
-out of the way to make room for the new key.  The hopscotch process is facilitated by maintaining a
-per-entry bitmask of nearby collisions.  As with cuckoo hashing, clients can read in a single round
-trip time by reading a key's entire neighborhood at once.
+\textbf{Hopscotch hashing} is similar in that its reads also require only a single round
+trip~\cite{hopscotch,farm}. Its eviction policy differs from cuckoo hashing in that it evicts
+entries into a physically nearby location rather than a random one. Collisions are tracked with a
+per-entry bitmask which is updated on inserts. Critically, updating this bitmask requires locking an
+additional entry per update which multiples the number of updates per collision. Farm~\cite{farm}
+and Reno~\cite{reno} set hard limits on chain length but still require a server-side CPU to fix
+bitmasks when concurrent inserts execute.
+
+Both approaches have distinct pros and cons in how they manage collisions in the disaggregated
+setting. Cuckoo hashing has the potential to search random locations while searching for an open
+index, while hopscotch hashing has a bounded search but requires additional locking and state in the
+index. A system which avoided random search but does not require additional locking could
+potentially avoid the drawbacks of both approaches.
+
+% in the index leading to long
+% unpredictable paths, while hopscotch hashing is bounded but requires additional locking. 
+
+% works in a similar fashion but provides a slightly different guarantee,
+% namely that keys will be located within a bounded neighborhood.  (While cuckoo hashing limits the
+% number of locations in which a key may be stored, it does not provide any locality guarantees
+% regarding those locations.) It does so by finding the physically closest empty entry to the desired
+% location and then, if that location is not within the neighborhood, iteratively moving other entries
+% out of the way to make room for the new key.  The hopscotch process is facilitated by maintaining a
+% per-entry bitmask of nearby collisions.  As with cuckoo hashing, clients can read in a single round
+% trip time by reading a key's entire neighborhood at once.
 
 
-The insert operation is expensive for both approaches, and prior
-systems have taken steps to mitigate its cost.  In associative hashes
-like cuckoo hash tables, multiple entries can be chosen as eviction
-candidates and breadth-first-search (BFS) has been shown to minimize
-both cuckoo-path length and critical section
-time~\cite{memc3,cuckoo-improvements}.
+% The insert operation is expensive for both approaches, and prior
+% systems have taken steps to mitigate its cost.  In associative hashes
+% like cuckoo hash tables, multiple entries can be chosen as eviction
+% candidates and breadth-first-search (BFS) has been shown to minimize
+% both cuckoo-path length and critical section
+% time~\cite{memc3,cuckoo-improvements}.
 %While insertions require large
 %critical sections to perform search and execute updates along the
 %cuckoo path
-Farm~\cite{farm} and Reno~\cite{reno}, two systems based on hopscotch
-hashing, completely avoid executing long hopscotch chains due to their
-execution time and complexity.  Moreover, under either approach, the
-insert operation can fail despite vacant entries in the table---they
-are just too far away to be reached by either the cuckoo path or
-hopscotch's neighborhood-bounded linear probing.  The point at which
-inserts being to fail, known as the \emph{maximum fill factor}, is a
-function of the number of hash locations and row associativity in
-cuckoo hashing and desired neighborhood size for hopscotch hashing.
 
-RCuckoo uses cuckoo rather than hopscotch hashing due to locking
-concerns.
+
+% Farm~\cite{farm} and Reno~\cite{reno}, two systems based on hopscotch
+% hashing, completely avoid executing long hopscotch chains due to their
+% execution time and complexity.  Moreover, under either approach, the
+% insert operation can fail despite vacant entries in the table---they
+% are just too far away to be reached by either the cuckoo path or
+% hopscotch's neighborhood-bounded linear probing.  The point at which
+% inserts being to fail, known as the \emph{maximum fill factor}, is a
+% function of the number of hash locations and row associativity in
+% cuckoo hashing and desired neighborhood size for hopscotch hashing.
+
+% RCuckoo uses cuckoo rather than hopscotch hashing due to locking
+% concerns.
 %While both alog
 %also limits a key's location to a bounded set of 
 %bounded range of addresses and we considered using it as our core data
@@ -265,18 +284,19 @@ concerns.
 %disaggregated efficiently it is less straightforward than cuckoo
 %hashing for the following reasons:
 %%
-First, each step of a cuckoo insert process requires one update---to
-the entry being moved to its secondary location---rather than two.
-When an entry is relocated in a hopscotch table, the collision bitmask
-must also be updated.  (Reno~\cite{reno} uses one-sided atomics to
-sloppily update the bitmask but requires a server-side CPU to fix the
-bitmasks whenever concurrent inserts execute.)  Second, keys exist in
-one of two locations in cuckoo hashing so updates and deletes require
-locking only two rows, while hopscotch entries inhabit a range of
-locations, so a conservative locking strategy must lock the entire
-range.  Yet, RCuckoo takes inspiration from hopscotch neighborhoods and employs dependent hashing to increase the spatial
-locality of key locations, enabling clients to use local
-caches to speculatively compute cuckoo paths.
+
+% First, each step of a cuckoo insert process requires one update---to
+% the entry being moved to its secondary location---rather than two.
+% When an entry is relocated in a hopscotch table, the collision bitmask
+% must also be updated.  (Reno~\cite{reno} uses one-sided atomics to
+% sloppily update the bitmask but requires a server-side CPU to fix the
+% bitmasks whenever concurrent inserts execute.)  Second, keys exist in
+% one of two locations in cuckoo hashing so updates and deletes require
+% locking only two rows, while hopscotch entries inhabit a range of
+% locations, so a conservative locking strategy must lock the entire
+% range.  Yet, RCuckoo takes inspiration from hopscotch neighborhoods and employs dependent hashing to increase the spatial
+% locality of key locations, enabling clients to use local
+% caches to speculatively compute cuckoo paths.
 
 %Because each lock
 %acquisition is expensive this increases the fundamental difficulty of
