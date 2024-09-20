@@ -3,7 +3,7 @@
 
 We evaluate RCuckoo by directly comparing its performance in terms of
 throughput and latency against representative state-of-the-art
-disaggregated key/value stores.  When accessing sufficiently large values, all
+(partially) disaggregated key/value stores.  When accessing sufficiently large values, all
 systems can max-out our testbed's 100-Gbps
 link rate, so we focus on workloads with small key/value pairs that
 remove the bandwidth limitation, exposing the (in)efficiency of each
@@ -167,7 +167,7 @@ workloads which employ varying mixes of read and update operations
 before turning to the more complex insert operation.  RCuckoo delivers
 the highest performance on reads and updates across all settings,
 while insert performance varies as a function of table fill factor.
-Even in the worst case, however, RCuckoo limits I/O amplification to
+Even in the worst case, however, RCuckoo limits insert I/O amplification to
 around 2$\times$.
 \todo{What is the row/read size?  How close are we
   to line rate?}
@@ -259,12 +259,15 @@ caching with a constantly changing index structure.
 \vskip -1em
 \end{figure*}
 
-\textbf{Insert performance}
-
-Despite its complexity, RCuckoo's insert operation remains highly performant.  To evaluate insert
+\textbf{Latency.}
+Latency varies dramatically depending on operation for all systems, each of which optimizes for reads.  For RCuckoo, insert is by far the most involved operation, but it remains
+%\textbf{Insert performance.}
+%Despite its complexity, RCuckoo's insert operation remains
+highly performant.  To evaluate insert
 performance we run workloads with a mix of reads and inserts.  Figure~\ref{fig:ycsb_fill} considers
-RCuckoo's performance on workloads that exclusively use inserts (rather than updates); as with YCSB
-nomenclature A is 50\% insert and 50\% read; W is insert only. Inserts become more expensive as the
+%RCuckoo's
+performance on workloads that exclusively use inserts (rather than updates); as with YCSB
+nomenclature A is 50/50 read/insert; B is 95/5; C is read-only; and W is insert only. Inserts become more expensive as the
 table fills, so we pre-populate the table with a varying number of entries and report insert
 performance as a function of the table's initial fill factor.
 %%
@@ -277,20 +280,20 @@ makes a read to both the index and extent. Insert times vary: Clover and Sherman
 operations for insert and both need to perform allocations and set up metadata for the requesting
 client.  FUSEE is slightly slower, roughly the same as RCuckoo's best case.  As the table fills,
 however, cuckoo paths grow in length causing RCuckoo insert operations to require additional round
-trips to find valid cuckoo paths.  At maximum fill, insert operations take roughly twice as long as
-in an empty table. 
+trips to find valid cuckoo paths.  Insert operations at maximum fill take roughly twice as long as at empty. 
 
-Figure~\ref{fig:ycsb_fill}(b) shows impact of table fill on insert throughput (320 clients). As the
+\textbf{Insert I/O amplification.}
+Figure~\ref{fig:ycsb_fill}(b) shows impact of table fill on insert throughput at heavy load (320 clients). As the
 index table fills, cuckoo paths become longer leading to increased contention and additional
-bandwidth consumption from larger covering reads. In each case (except read-only C) RCuckoo's
+bandwidth consumption. In each case (except read-only C) RCuckoo's
 performance declines with fill factor. In the insert-only W case RCuckoo's performance drops from a
 high of 11.5 MOPS in a nearly empty table to 4.5 MOPS at a 90\% fill factor.  As a point of
 comparison, FUSEE's maximum insert-only performance is 9.1 MOPS on our testbed, although it is
 independent of fill factor.  While FUSEE out-performs RCuckoo at high fill factors, we observe that
 insert-only workloads are rare in practice~\cite{facebook-memcached}.
 %%
-Figures~\ref{fig:ycsb_fill}(c) and (d) show the impact of fill factor on the bandwidth cost of each
-operation and the number of RDMA messages they require to complete.
+Figures~\ref{fig:ycsb_fill}(c) and (d) show the impact of fill factor on the bandwidth cost (at most 2$\times$) of each
+operation and the number of RDMA messages ($\leq$1.5$\times$) they require to complete.
 
 % \begin{figure}[t]
 %     \includegraphics[width=0.99\linewidth]{fig/fault-rate.pdf}
@@ -312,7 +315,7 @@ hundreds of failures per second.
 %%
 We emulate client failures by
 performing a partial insert operation that randomly truncates the
-batch of RDMA operations including lock releases, leaving the table
+batch of RDMA operations (including lock releases), leaving the table
 %. The table
 %entries are left
 in one of the  states listed in
@@ -498,13 +501,13 @@ reads. However large entries increase bandwidth consumption for inserts.
 %inflating the bandwidth of % operations. We run a 50\% read 50\% insert and a read only % workload
 %to illustrate the overhead of larger entries.
 Figure~\ref{fig:microbenchmarks}(c) shows the effect of entry size on throughput under 50\% insert
-and read-only (YCSB-C) workloads. Insert is a bandwidth-limited operation,
+and read-only (YCSB-C) workloads. Insert is a bandwidth-limited operation on our 100-Gbps testbed,
 %quickly saturates the network bandwidth. At
 %at 16-B entries link capacity restricts throughput to 8 MOPS. The performance of
-while reads (and update/delete, not shown)
+while read performance (and update/delete, not shown)
 % (and
 % updates/deletes, not shown), 
-are largely unaffected by entry size.
+is largely unaffected by entry size.
 %Hence,
 %which have lower bandwidth requirements see very little chance in throughput across entry sizes. We
 %suggest that known read heavy workloads should use inlined entries as reads see a large
@@ -517,12 +520,12 @@ are largely unaffected by entry size.
 % which suggest that 800 GBPS and higher network speeds will
 % be available in the coming years. While round trip latency
 % is expected to remain largely the same.
-Extent entries are slightly slower.
+Extent entries are slightly slower:
 Figure~\ref{fig:microbenchmarks}(d) shows YCSB throughput as a function of
-value size from 8 to 1024~B on 6 client machines with 120 cores using a
-Zipf(0.99) distribution.  For
-comparison, we show the performance for 8-B inlined values on the same
-testbed and compute the difference.  
+value size from 8 to 1024~bytes on 6 client machines with 120 cores.  Read performance becomes link-rate limited after about 64 bytes.
+%using a Zipf(0.99) distribution.
+For
+comparison, we show the performance of the 8-byte inlined values used elsewhere in the evaluation on this configuration and compute the difference.  
 %~\footnote{RACE and FUSEE are limited to 8bits for size and support only powers of 2}..
 %The dashed line marks the performance of inlined 8byte values (16 byte entries) as a base line.
 %This benchmark was taken 
