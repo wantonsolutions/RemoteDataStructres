@@ -788,20 +788,22 @@ grants exclusive permission to reclaim locks on a region of the index
 table. The index table is broken into $n$ regions so repairs can be
 executed in parallel.
 
-\begin{figure}[t]
+%\begin{figure}[t]
 %  \vskip -1em
-    \centering
-        \includegraphics[width=0.99\linewidth]{fig/lease.pdf}
+%    \centering
+%        \includegraphics[width=0.99\linewidth]{fig/lease.pdf}
  %   \vspace{-1em}
-    \caption{Format of a repair lease table entry}
-    \label{fig:lease}
-   \vspace{-1em}
-\end{figure}
+%    \caption{Format of a repair lease table entry}
+%    \label{fig:lease}
+%   \vspace{-1em}
+%\end{figure}
 
-Figure~\ref{fig:lease} shows the format for entries in
-RCuckoo's lease table, maintained in RDMA-registered main memory on
-the server.  Lease entries contain the lease holder's queue pair ID
-(which RDMA ensures is unique for a given server), a set bit, and a
+RCuckoo maintains a lease table 
+%Figure~\ref{fig:lease} shows the format for entries in
+%RCuckoo's lease table, maintained
+in RDMA-registered main memory on
+the server.  Lease entries contain a $(\log n)$-bit lease ID, a set flag, the lease holder's 48-bit queue pair ID
+(which RDMA ensures is unique for a given server), and an 8-bit
 counter (incremented on each acquisition).  A lease is considered free
 if the set bit of the current entry in the lease table is zero.
 Clients attempt to acquire the lease using RDMA CAS operations to
