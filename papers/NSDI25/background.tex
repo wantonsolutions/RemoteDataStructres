@@ -75,7 +75,7 @@ contention---rather than raw network bandwidth---become the primary
 scalability bottlenecks. To this end our design choices seek to reduce
 round trips at the cost of slight bandwidth amplification
 and we focus our evaluation on workloads with small key/value pairs
-whose performance is not limited by line rate on our 100-Gbps testbed
+whose performance is not limited by line rate on our 100-Gbps ConnectX-5 testbed
 hardware.
 
 Concretely, Figure~\ref{fig:rdma-benchmarks}(a) shows the growth in
@@ -88,8 +88,8 @@ complete the work of two smaller, but dependant messages.
 Indeed, our
 evaluation (see Figure~\ref{fig:microbenchmarks}(d)) shows that even on our
 100-Gbps testbed inlining values and servicing lookups with a single
-large read provides a 4.7--37.2\% increase in throughput compared to a
-pointer-based approach for the same value size.
+large read provides a 4--37\% throughput increase compared to an
+extent-based approach for the same value size.
 
 
 %% Figure~\ref{fig:rdma-benchmarks}(b) shows the performance
@@ -101,16 +101,24 @@ pointer-based approach for the same value size.
 %% extent storage. Due to atomic width limitations existing KV stores can
 %% not gain this performance.
 
-Prior works have avoided locks due to stark performance penalties of RDMA
-atomics~\cite{design-guidelines}.  Figure~\ref{fig:rdma-benchmarks}(b) illustrates the bottleneck
-when atomics issued to main memory, while reads and writes scale linearly atomics experience harsh
-caps. Spinning on locks can quickly induce these bottlenecks as the penalty for accessing a single
-address is even more severe (3MOPS Figure~\ref{fig:rdma-benchmarks}(c)). Recently ConnectX series
-NICs have a small amount of on-NIC memory which avoids a PCIe round trip and scales linearly with
-all other RDMA operations~\cite{sherman,device-memory}. Figure~\ref{fig:rdma-benchmarks}(c)
-illustrates the improvement of on-NIC memory for CAS on a single and multiple addresses. If a data
-structure can organize its locks densely into the small region of NIC memory spinning on locks is no
-longer a hardware bottleneck.
+Prior systems have avoided locks due to the stark performance
+penalties of RDMA atomics~\cite{design-guidelines}.
+Figure~\ref{fig:rdma-benchmarks}(b) illustrates this bottleneck on
+ConnectX-5 NICs when atomic operations are issued on remote server
+memory: reads and writes scale almost linearly while atomics reach a
+hard limit around 50~MOPS.  Using RDMA atomic operations to spin on
+locks quickly induces these bottlenecks as the cap is even lower
+(3~MOPS as shown in Figure~\ref{fig:rdma-benchmarks}(c)) for atomics
+that contend with each other (i.e., access the same remote address).
+Recent ConnectX series NICs sport a small amount (256 KB) of on-NIC
+memory which avoids a PCIe round trip and raises the cap on atomic
+operation
+%scales linearly with all other RDMA operation
+throughput~\cite{device-memory,sherman}. Figure~\ref{fig:rdma-benchmarks}(c)
+illustrates the performance improvement for
+%of on-NIC memory for CAS on a
+single---i.e., contended---and independent addresses. If a system can arrange to store its locks exclusively on NIC memory spinning on locks may no
+longer be a bottleneck for most workloads.
 
 % Recent ConnectX series NICs have a small amount of on-NIC memory on which atomic operations scale linearly with all other RDMA operations. Figure~\ref{fig:rdma-benchmarks}(c) illustrated the performance bottlenecks of CAS operations on device and main memory on a single address and on multiple addresses. If a data structure can organize its locks densely into NIC memory it can avoid the atomic bottleneck.
 % Similarly, increasing scale and contention places greater pressure on
