@@ -235,19 +235,27 @@ While insertions can have complex random memory accesses, reads can always be ex
 round trip by reading the rows corresponding to both of a key's locations
 simultaneously~\cite{memc3,cuckoo-improvements,pilaf}.
 
-\textbf{Hopscotch hashing} is similar in that its reads also require only a single round
-trip~\cite{hopscotch,farm}. Its eviction policy differs from cuckoo hashing in that it evicts
-entries into a physically nearby location rather than a random one. Collisions are tracked with a
-per-entry bitmask which is updated on inserts. Critically, updating this bitmask requires locking an
-additional entry per update which multiples the number of updates per collision. Farm~\cite{farm}
-and Reno~\cite{reno} set hard limits on chain length but still require a server-side CPU to fix
-bitmasks when concurrent inserts execute.
+\textbf{Hopscotch hashing} is similar in that its reads can also be
+performed in only a single round trip~\cite{farm,hopscotch}, but at the cost of higher I/O
+amplification.  Unlike cuckoo hashing, in which
+keys have exactly two potential locations, entries in hopscotch
+hashing can be stored in a bounded range of nearby locations.  Its
+eviction policy maintains locality by moving existing entires to a physically nearby location---as opposed to one selected uniformly at random as in cuckoo hashing. Collisions
+are tracked with a per-entry bitmask which is updated on
+inserts. Critically, updating this bitmask requires locking an
+additional entry per update which multiples the number of updates per
+collision. Farm~\cite{farm} and Reno~\cite{reno} set hard limits on
+chain length but still require a server-side CPU to fix bitmasks when
+concurrent inserts execute.
 
-Both approaches have distinct pros and cons in how they manage collisions in the disaggregated
-setting. Cuckoo hashing has the potential to search random locations while searching for an open
-index, while hopscotch hashing has a bounded search but requires additional locking and state in the
-index. A system which avoided random search but does not require additional locking could
-potentially avoid the drawbacks of both approaches.
+Both approaches have distinct pros and cons in how they manage
+collisions in the disaggregated setting. Cuckoo hashing has the
+potential to probe random locations while searching for an open index,
+while hopscotch hashing has a bounded search but requires additional
+locking and state in the index.  We propose a system with cuckoo
+hashing's bandwidth-efficient reads while requiring only bounded
+searches on inserts like hopscotch hashing---without the additional
+locking overheads.
 
 % in the index leading to long
 % unpredictable paths, while hopscotch hashing is bounded but requires additional locking. 
