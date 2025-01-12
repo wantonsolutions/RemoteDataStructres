@@ -74,29 +74,28 @@ disaggregation.  To date, the most promising approach to deliver shared access t
 memory is to expose a key/value store (KVS) interface that provides coherent read/write
 semantics~\cite{rolex,smart,ditto,fusee,clover,sherman,ford}.
 
-When building a fully disaggregated KVS, a critical design
-decision is selecting an approach to managing race conditions in the
-absence of server-side CPUs that are powerful enough to mediate client
-requests.
-%The core challenging in designing a disaggregated KVS is efficient serialization. Memory
-%disaggregation assumes that machines housing pooled DRAM do not have CPUs powerful enough to service
-%requests.
-%Existing systems require Thus, clients must implement their own serialization protocols. These protocols use
-Commodity RDMA devices provide one-sided verbs that enable client-only
-synchronization, and existing systems carefully coordinate reads,
-writes, and atomic operations to maximize performance while delivering
-coherent access.  Systems that implement datastructures with ordered
-keys (e.g., BTrees \& Radix Trees) rely upon locking
-schemes~\cite{smart,sherman}, while those that provide unordered
-access favor lock-free techniques~\cite{rolex,ditto,fusee,clover} to
-decrease read latency while avoiding the RDMA hardware bottlenecks and complex
-failure scenarios that can arise with locks.  The trade-off, however,
-is that lock-free approaches perform worse as writes become more
-frequent.
-%Indeed,
-%prior lock-based systems assume that clients are co-located---and can
-%therefore combine writes---and do not tolerate client
-%failure~\cite{sherman,smart}.
+Full disaggregation means that compute and memory are entirely separate. RDMA KVS's with memory-size
+CPU's used them to manage locks and execute critical
+sections~\cite{memc3,pilaf,cell,cuckoo-improvements}. In contrast, a fully disaggregated KVS must
+implement a client-side serialization protocol implemented entirely in one-sided RDMA operations
+(read,write,atomic). Protocol design is the core challenge in designing these systems. KVS's with
+ordered keys 
+% When building a fully disaggregated KVS, a critical design decision is selecting an approach to
+% managing race conditions in the absence of server-side CPUs that are powerful enough to mediate
+% client requests.  The core challenging in designing a disaggregated KVS is efficient
+% serialization. Memory disaggregation assumes that machines housing pooled DRAM do not have CPUs
+% powerful enough to service requests.  Existing systems require Thus, clients must implement their
+% own serialization protocols. These protocols use Commodity RDMA devices provide one-sided verbs
+% that enable client-only synchronization, and existing systems carefully coordinate reads, writes,
+% and atomic operations to maximize performance while delivering coherent access.  Systems that
+% implement datastructures with ordered keys 
+(e.g., BTrees \& Radix Trees) rely upon locking schemes~\cite{smart,sherman}, while those that
+provide unordered access favor lock-free techniques~\cite{rolex,ditto,fusee,clover} to decrease read
+latency while avoiding the RDMA hardware bottlenecks and complex failure scenarios that can arise
+with locks.  The trade-off, however, is that lock-free approaches perform worse as writes become
+more frequent.
+%Indeed, prior lock-based systems assume that clients are co-located---and can therefore combine
+%writes---and do not tolerate client failure~\cite{sherman,smart}.
 
 In this work we present RCuckoo, a system that uses lock-based synchronization
 on commodity RDMA hardware to out-perform existing key/value stores across a
