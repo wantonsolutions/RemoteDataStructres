@@ -53,17 +53,25 @@ even the fastest rack-scale networking technologies have access
 latencies that are an order-of-magnitude slower than local memory
 tiers.
 
-High access latencies are particularly challenging for systems that
-seek to support shared read/write workloads due to the need to
-synchronize updates, as coordination costs do not decrease as link bandwidths improve, causing them to become the bottleneck to system performance.
-%Sharing disaggregated memory is fundamentally hard because cost of synchronization is high.
-As a result, most existing far-memory systems choose to statically
-partition memory and optimize performance through a
-variety of client-local techniques~\cite{kona,mira,aifm,trackfm,carbink}).
-%(cache policy, compilers, pointer analysis
-To date, the most promising approach to deliver shared access to
-pooled remote memory is to expose a key/value store (KVS) interface that
-provides coherent read/write
+% High access latencies are particularly challenging for systems that seek to support shared
+% read/write workloads due to the need to synchronize updates, as coordination costs do not decrease
+% as link bandwidths improve, causing them to become the bottleneck to system performance.
+% %Sharing disaggregated memory is fundamentally hard because cost of synchronization is high.
+% As a result, most existing far-memory systems choose to statically partition memory and optimize
+% performance through a variety of client-local techniques~\cite{kona,mira,aifm,trackfm,carbink}.
+% %(cache policy, compilers, pointer analysis
+% To date, the most promising approach to deliver shared access to pooled remote memory is to expose a
+% key/value store (KVS) interface that provides coherent read/write
+% semantics~\cite{rolex,smart,ditto,fusee,clover,sherman,ford}.
+
+Disaggregated main memory over RDMA has an access latency 20 times that of local memory (50ns $\rightarrow$
+1{\textmu}s)~\cite{clover}.  Most existing systems choose to statically partition remote memory because
+synchronizing shared updates\footnote{lock/unlock or optimistic concurrency} requires multiple round
+trips per operation at 20x the cost~\cite{kona,mira,aifm,trackfm,carbink}.
+%%
+While hard to achieve, sharing is important because it improves utilization -- the true aim of
+disaggregation.  To date, the most promising approach to deliver shared access to pooled remote
+memory is to expose a key/value store (KVS) interface that provides coherent read/write
 semantics~\cite{rolex,smart,ditto,fusee,clover,sherman,ford}.
 
 When building a fully disaggregated KVS, a critical design
