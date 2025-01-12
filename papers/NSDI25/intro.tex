@@ -59,7 +59,7 @@ synchronize updates, as coordination costs do not decrease as link bandwidths im
 %Sharing disaggregated memory is fundamentally hard because cost of synchronization is high.
 As a result, most existing far-memory systems choose to statically
 partition memory and optimize performance through a
-variety of client-local techniques~\cite{kona,mira,aifm,trackfm,carbink}).
+variety of client-local techniques~\cite{kona,mira,aifm,trackfm,carbink}.
 %(cache policy, compilers, pointer analysis
 To date, the most promising approach to deliver shared access to
 pooled remote memory is to expose a key/value store (KVS) interface that
@@ -162,7 +162,7 @@ relatedly, the number of locks that a client must acquire.
     \textbf{(c)} Atomic compare-and-swap performance on device and main memory.
     }
     \label{fig:rdma-benchmarks}
-\vskip -1em
+%\vskip -1em
 \end{figure*}
 
 Combined with aggressive
