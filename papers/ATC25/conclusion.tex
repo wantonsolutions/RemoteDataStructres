@@ -1,0 +1,16 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+In this work we design and implement a lock-based cuckoo hash table
+for passive remote memory. Using dependent hashing, a carefully
+designed locking protocol, and the latest RDMA NIC features we achieve
+single-round-trip reads, update operations that require two round
+trips when uncontested, and insert operations that require only two
+round trips in the median case.  Even in the face of high contention
+and nearly full tables, client caching limits I/O amplification.
+Moreover, our step-by-step insert protocol enables fully disaggregated
+failure detection and recovery.  
+
+% Future work could consider employing
+% a data replication strategy that addresses server failure in a
+% similarly disaggregated manner.

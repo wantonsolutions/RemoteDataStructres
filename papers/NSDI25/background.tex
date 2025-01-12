@@ -222,7 +222,10 @@ setting.
 for each key. Keys are always inserted into their primary location and evict an existing key to
 their secondary on collision which in turn can cause a chain of evictions (a cuckoo path) shown in
 Figure~\ref{fig:table-diagram}. Associative locations and BFS search are used to minimize path
-length~\cite{memc3,cuckoo-improvements} which is the primary factor in the cost of insertions.
+length~\cite{memc3,cuckoo-improvements} which is the primary factor in the cost of insertions.  Each
+path step incurs a random read to the index which requires an RDMA round trip. Proactively acquiring
+locks is not feasible as local caches would require the entire index, and quickly become stale as
+the index is updated.
 % two potential table locations for a key, a primary and a secondary, where each location
 % corresponds to an associative row of entries.  A key is always inserted into its primary location.
 % If that row is full, an existing key is evicted (or ``cuckooed'') to its secondary row to make
