@@ -503,7 +503,7 @@ $h_1()$, $h_2()$, and $h_3()$.  (In our implementation we use a
 different salt for each of the three functions.)  We compute the two
 locations $L_1$ and $L_2$ for a key $K$ as
 \[ L_1(K) = h_1(K)\mod T, \]
-\[ L_2(K) = L_1 + (h_2(K)\mod f^{f+\mathcal{Z}(h_3(K))})\mod T, \]
+\[ L_2(K) = L_1 + (h_2(K)\mod {\lfloor}f^{f+\mathcal{Z}(h_3(K))}{\rfloor})\mod T, \]
 \noindent where $T$ is the size of the index table in rows,
 $\mathcal{Z}(x)$ is the number of trailing zeros in $x$, and $f$ is a
 parameter that controls the expected distance between the two hash
