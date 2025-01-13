@@ -34,7 +34,7 @@ Figure~\ref{fig:table-diagram} shows RCuckoo's index and lock table
 key $K$ (which requires the cuckooing of key $C$).  The index table (right) is a single region of
 RDMA-registered main memory divided into rows of fixed-width entries.
 Each row contains $n$ associative entries (3 in this figure; we use 8
-in practice) and terminates with an 8-bit version number (not shown) and 64-bit
+in practice) and terminates with an 8-bit version number and 64-bit
 CRC (computed over the entire row including version number).
 Clients access the index table using 1-sided RDMA reads and writes.
 Clients can safely read one or more rows in a single lock-free RDMA operation as CRCs allow each row's contents to be verified while
