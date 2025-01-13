@@ -46,12 +46,14 @@ reduction in fragmentation and stranding provided by disaggregation
 could enable datacenter operators to provision for the sum-of-peak
 workloads rather than the peak-of-sums~\cite{dsnf,supernic}.
 Stagnating DRAM costs and densities are driving interest in primary
-storage pooling, but performant general-purpose far memory tiers
+storage pooling, but performant, general-purpose far-memory tiers
 remain
 elusive~\cite{fastswap,3po,kona,infiniswap,hydra,leap,legoos,dilos} as
 even the fastest rack-scale networking technologies have access
 latencies that are an order-of-magnitude slower than local memory
-tiers.
+tiers
+%Current RDMA technologies have access latencies that are 20 times that of local DRAM
+(e.g., RDMA access latency is approximately 1~{\textmu}s versus DRAM's 50~ns)~\cite{clover}.
 
 % High access latencies are particularly challenging for systems that seek to support shared
 % read/write workloads due to the need to synchronize updates, as coordination costs do not decrease
@@ -64,22 +66,30 @@ tiers.
 % key/value store (KVS) interface that provides coherent read/write
 % semantics~\cite{rolex,smart,ditto,fusee,clover,sherman,ford}.
 
-Disaggregated main memory over RDMA has an access latency 20 times that of local memory (50ns $\rightarrow$
-1{\textmu}s)~\cite{clover}.  Most existing systems choose to statically partition remote memory because
-synchronizing shared updates\footnote{lock/unlock or optimistic concurrency} requires multiple round
-trips per operation at 20x the cost~\cite{kona,mira,aifm,trackfm,carbink}.
-%%
-While hard to achieve, sharing is important because it improves utilization -- the true aim of
-disaggregation.  To date, the most promising approach to deliver shared access to pooled remote
-memory is to expose a key/value store (KVS) interface that provides coherent read/write
-semantics~\cite{rolex,smart,ditto,fusee,clover,sherman,ford}.
 
-Full disaggregation means that compute and memory are entirely separate. RDMA KVS's with memory-size
-CPU's used them to manage locks and execute critical
-sections~\cite{memc3,pilaf,cell,cuckoo-improvements}. In contrast, a fully disaggregated KVS must
-implement a client-side serialization protocol implemented entirely in one-sided RDMA operations
-(read,write,atomic). Protocol design is the core challenge in designing these systems. KVS's with
-ordered keys 
+As a result, most existing far-memory systems~\cite{kona,mira,aifm,trackfm,carbink} choose to statically partition remote memory to avoid the multiple round trips required to 
+synchronize shared updates.
+%\footnote{lock/unlock or optimistic concurrency} requires multiple round
+%trips per operation at 20x the cost
+%%
+We argue that, while challenging to achieve, memory sharing is
+critical to making remote memory pooling practical as it can
+dramatically improve utilization---the entire point of memory
+disaggregation.  To date, the most promising approach to delivering
+shared access to pooled remote memory is to expose a key/value store
+(KVS) interface that provides coherent read/write
+semantics~\cite{rolex,smart,ditto,fusee,clover,sherman,ford}.  Yet,
+most performant KVS systems employ two-sided RDMA operations which rely upon
+memory-side CPUs to manage locks and execute critical
+sections~\cite{memc3,cuckoo-improvements,pilaf,cell}, reducing their
+potential cost savings.
+
+In order to fully unlock the potential of memory disaggregation, we
+propose a design where compute and memory are entirely separate. In
+our fully disaggregated model, a KVS must implement a client-side
+serialization protocol implemented entirely in one-sided RDMA
+operations (i.e., read, write, and atomic updates).  Maintaining a coherent memory model is
+the core challenge in designing such systems. Existing KVS's with ordered keys
 % When building a fully disaggregated KVS, a critical design decision is selecting an approach to
 % managing race conditions in the absence of server-side CPUs that are powerful enough to mediate
 % client requests.  The core challenging in designing a disaggregated KVS is efficient
@@ -175,7 +185,7 @@ relatedly, the number of locks that a client must acquire.
 Combined with aggressive
 batching of RDMA operations, RCuckoo's spatial locality limits the
 number of round trips required for all table operations.  In the
-common case, reads execute in one or two (for large values) round
+common case, reads execute in one (for small values) or two round
 trips, uncontested updates and deletes require two round trips, and
 the median insert operation involves only two round trips---although
 the expected number increases as the table fills and cuckoo paths
