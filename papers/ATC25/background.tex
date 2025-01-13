@@ -20,7 +20,7 @@ provide a brief overview of both approaches and related literature.
 \subsection{Disaggregated Key/Value Stores}
 
 The challenge to adapting existing RDMA-based KVS designs to a fully
-disaggreagated setting is the need to rely exclusively on one-sided
+disaggregated setting is the need to rely exclusively on one-sided
 operations due to the lack of a server-side CPU.  Precursor RDMA KVS
 systems achieve performance by striking a delicate balance between
 efficient one-sided RDMA operations and CPU-serialized two-sided
@@ -55,7 +55,7 @@ Radix Trees.  In exchange for expensive update operations, locks allow
 these systems to support inlined values and, thus, faster small-value
 reads.  Performance is gated, however, by lock granularity and hold
 times. At the time of writing all lock-based KVS systems assume that
-clients are grouped into colocated servers which can locally
+clients are grouped into co-located servers which can locally
 coordinate lock accesses and batch their writes~\cite{smart,sherman},
 an assumption that optimistic
 KVS systems do not make~\cite{ditto,fusee,clover,race}. We show that it is possible to
@@ -83,7 +83,7 @@ round trip time for RDMA reads of increasing size. On our hardware,
 the round trip time for a single 1-KB read is lower than the total
 latency of issuing two dependent reads of just a few bytes each.  This
 suggests that performance can be gained if a single large packet can
-complete the work of two smaller, but dependant messages.  
+complete the work of two smaller, but dependent messages.  
 %%
 Indeed, our
 evaluation (see Figure~\ref{fig:microbenchmarks}(d)) shows that even on our
@@ -168,7 +168,7 @@ longer be a bottleneck for most workloads.
 % are similar for all message sizes less than about 128 bytes, and messages must exceed 1~KB before
 % the latency of a single large operation exceeds two RTTs of smaller ones.  We leverage this
 % observation in RCuckoo by collapsing multiple small reads into a single larger one when appropriate.
-% The optimal threshold trades off latency reduction against read amplificaiton.
+% The optimal threshold trades off latency reduction against read amplification.
 
 
 % Finally, we highlight that our testbed NICs, like those from several
@@ -225,14 +225,18 @@ longer be a bottleneck for most workloads.
 
 %%%%%%
 
-Both cuckoo and hopscotch hashing have been highly successful as indexes for RDMA
-KVS~\cite{farm,memc3,reno,cuckoo-improvements,pilaf}. Both algorithms enable clients to locally
-calculate a keys location (or neighborhood) in the index without consulting the server. This fact
-enables a critical division of labor for mixed read and write workloads. Reads are performed
-asynchronously via one-sided RDMA, while writes are serialized with locks by the servers CPU
-using two-sided RDMA. Both algorithms have complex mechanisms for resolving hash collisions which
-make them difficult to implement entirely with one-sided RDMA. This section describes both
-algorithms and their associated challenges.
+Both cuckoo and hopscotch hashing have been highly successful as
+indexes for RDMA
+KVS~\cite{farm,memc3,reno,cuckoo-improvements,pilaf}. Both algorithms
+enable clients to locally calculate a key's location (or neighborhood)
+in the index without consulting the server. This fact enables a
+critical division of labor for mixed read and write workloads. Reads
+can be performed asynchronously via one-sided RDMA, while writes
+require serialization---typically implemented using locks managed by
+the CPU at the memory server using two-sided RDMA.  Both cuckoo and hopscotch hashing algorithms
+have complex mechanisms for resolving hash collisions which make them
+difficult to implement entirely with one-sided RDMA. This section
+describes both algorithms and their associated challenges.
 
 \textbf{Cuckoo hashing} uses independent hash functions to compute a primary and secondary location
 for each key. Keys are always inserted into their primary location and evict an existing key to
@@ -241,24 +245,34 @@ Figure~\ref{fig:table-diagram}. Associative locations and BFS search are used to
 length~\cite{memc3,cuckoo-improvements} which is the largest factor in the cost of insertions. 
 %%
 In a fully disaggregated implementation each path step incurs a read to a random index location
-which requires an RDMA round trip. Proactively acquiring locks is not feasible as local caches would
-require the entire index and quickly become stale from concurrent updates to the table.
+which requires an RDMA round trip (as the lack of locality makes client-side caching infeasible).  The lack of locality similarly frustrates attempts to proactively acquire locks.
+%imilarly, proactively acquiring locks is not feasible as local caches would
+%require the entire index and quickly become stale from concurrent updates to the table.
 %%
-Although cuckoo hashing requires random memory accesses its hash hash the excellent property that it does
-not require any metadata to be stored and modified in the index. The complexity of its collision
-resolution is pushed entirely to its hash functions.
+That said, cuckoo hashing
+%Although cuckoo hashing requires random memory accesses its hash has the excellent property that it
+does not require any metadata to be maintained in the index, simplifying collision and error recovery.
+%The complexity of its collision
+%resolution is pushed entirely to its hash functions.
 
-\textbf{Hopscotch hashing} ensures that keys are inserted in the neighborhood of their hash
-location~\cite{hopscotch,farm}. Evictions are performed by \textit{hopscotching} entries through
-their neighborhood until an open location is found. Unlike cuckoo hashing, a hopscotch insertion has
-locality, but it comes at the cost of index metadata. Each entry has a bitmask which tracks its
-collisions. When hopscotching these bitmasks must be updated which requires additional locking.
-Farm~\cite{farm} and Reno~\cite{reno} set hard limits on chain length but still require a
-server-side CPU to fix bitmasks when concurrent inserts execute.
+\textbf{Hopscotch hashing}, on the other hand, delivers a tunable
+level of locality for insertions, but at the cost of maintaining index
+metadata.  In hopscotch hashing, all insertions occur in a
+neighborhood of their original hash
+location~\cite{farm,hopscotch}. Evictions are performed by
+``hopscotching'' entries through their neighborhood until an open
+location is found.  Each entry has a bitmask which tracks its
+collisions. When hopscotching these bitmasks must be updated which
+requires additional locking.  Farm~\cite{farm} and Reno~\cite{reno}
+bound this expense by setting hard limits on chain length but still
+require a server-side CPU to fix bitmasks when concurrent inserts
+execute.
 
-Hopscotch hashing hash the advantage of locality at the cost of additional metadata and locks, while
-cuckoo hashing eschews metadata at the cost of random accesses. Our system RCuckoo combines the
-advantages of both approaches by designing a cuckoo hash function which has hopscotch like locality.
+Hopscotch hashing has the advantage of locality at the cost of
+additional metadata and locks, while cuckoo hashing eschews metadata
+at the cost of random accesses. Our system RCuckoo combines the
+advantages of both approaches by designing a cuckoo hash function
+with hopscotch-like locality properties in the common case.
 
 
 % While insertions can
