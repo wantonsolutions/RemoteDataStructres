@@ -120,6 +120,16 @@ illustrates the performance improvement for
 single---i.e., contended---and independent addresses. If a system can arrange to store its locks exclusively on NIC memory spinning on locks may no
 longer be a bottleneck for most workloads.
 
+Others have explored ways to improve RDMA-based lock performance.  For
+example, Citron implements a general purpose, range-based lock table
+with fairness guarantees~\cite{citron}.  While the current design is
+ill-suited for our use case (each request solves a knapsack problem,
+maintains a tree structure, and introduces false contention), we hope
+to adapt its fair bakery algorithm to RCuckoo in future work.  At
+present, RCuckoo focuses on raw, common-case performance, supporting
+concurrent operations across disjoint ranges as described in the
+following section.
+
 
 % We considered Citron (a one-sided RDMA range lock manager)~\cite{citron}, as a potential lock
 % manager for RCuckoo. It's desireable as an off-the-shelf solution because it's adaptable to RCuckoos
@@ -284,11 +294,7 @@ cuckoo hashing eschews metadata at the cost of random accesses. Our system RCuck
 advantages of both approaches by designing a cuckoo hash function with hopscotch-like locality
 properties in the common case.
 %%
-We considered Citron (a fair range-lock table)~\cite{citron}. We deemed it's overheads too high
-because on each request it solves a knapsack problem, maintains a tree structure, and introduces
-false contention (RCuckoo can operate on disjoin ranges described in the following sections).
-Citrons fairness is desireable and in the future we would like to adapt its bakery implementation to
-RCuckoo.
+
 
 
 % While insertions can
