@@ -124,7 +124,7 @@ Others have explored ways to improve RDMA-based lock performance.  For
 example, Citron implements a general purpose, range-based lock table
 with fairness guarantees~\cite{citron}.  While the current design is
 ill-suited for our use case (each request solves a knapsack problem,
-maintains a tree structure, and introduces false contention), we hope
+maintains a tree structure, and can introduce false contention), we hope
 to adapt its fair bakery algorithm to RCuckoo in future work.  At
 present, RCuckoo focuses on raw, common-case performance, supporting
 concurrent operations across disjoint ranges as described in the
