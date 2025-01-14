@@ -120,6 +120,17 @@ illustrates the performance improvement for
 single---i.e., contended---and independent addresses. If a system can arrange to store its locks exclusively on NIC memory spinning on locks may no
 longer be a bottleneck for most workloads.
 
+
+% We considered Citron (a one-sided RDMA range lock manager)~\cite{citron}, as a potential lock
+% manager for RCuckoo. It's desireable as an off-the-shelf solution because it's adaptable to RCuckoos
+% lock locality. We deemed it's overheads too high for our use case as Citron required many additional
+% RDMA messages to maintain it's tree structure, and due to it's need to solve a knapsack problem on
+% each locking request, and because RCuckoo is not strictly range based, range locks would only
+% increase contention. In the future we would like to explore alternative solutions to achieve
+% fairness in RCuckoo.
+
+
+
 % Recent ConnectX series NICs have a small amount of on-NIC memory on which atomic operations scale linearly with all other RDMA operations. Figure~\ref{fig:rdma-benchmarks}(c) illustrated the performance bottlenecks of CAS operations on device and main memory on a single address and on multiple addresses. If a data structure can organize its locks densely into NIC memory it can avoid the atomic bottleneck.
 % Similarly, increasing scale and contention places greater pressure on
 % the RDMA atomic operations necessary to serialize
@@ -268,11 +279,16 @@ bound this expense by setting hard limits on chain length but still
 require a server-side CPU to fix bitmasks when concurrent inserts
 execute.
 
-Hopscotch hashing has the advantage of locality at the cost of
-additional metadata and locks, while cuckoo hashing eschews metadata
-at the cost of random accesses. Our system RCuckoo combines the
-advantages of both approaches by designing a cuckoo hash function
-with hopscotch-like locality properties in the common case.
+Hopscotch hashing has the advantage of locality at the cost of additional metadata and locks, while
+cuckoo hashing eschews metadata at the cost of random accesses. Our system RCuckoo combines the
+advantages of both approaches by designing a cuckoo hash function with hopscotch-like locality
+properties in the common case.
+%%
+We considered Citron (a fair range-lock table)~\cite{citron}. We deemed it's overheads too high
+because on each request it solves a knapsack problem, maintains a tree structure, and introduces
+false contention (RCuckoo can operate on disjoin ranges described in the following sections).
+Citrons fairness is desireable and in the future we would like to adapt its bakery implementation to
+RCuckoo.
 
 
 % While insertions can
