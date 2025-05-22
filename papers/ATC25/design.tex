@@ -119,10 +119,9 @@ when a particular ordering among a batch of messages is required.
 \begin{figure}[t]
 \includegraphics[width=0.99\linewidth]{fig/message_diagram.pdf}
 %%
-\caption{RCuckoo's protocol for reads, inserts, deletes and
-updates. Blue lines are index accesses, and red lines are
+\caption{RCuckoo's operation protocol. Blue lines are index accesses, and red lines are
 extent accesses. Solid lines are reads, dotted lines are
-CAS, and curved dashed lines are writes.}
+CAS, and curved dashed lines are writes. Overlapping messages indicate batching.}
 \label{fig:message_diagram}
 \vskip -1em
 \end{figure}
@@ -282,20 +281,20 @@ similarly consists only of currently locked rows---exists.  If so, the
 insert is performed; if not, the client releases its locks and retries.
 %the operation.
 
-\textbf{Speculative local search:} As noted in
-Section~\ref{sec:cuckoo-back} identifying a viable cuckoo path for
-insertions requires multiple dependent reads.  RCuckoo attempts to
-limit the number of remote operations by first conducting a
-speculative local search. Prior to contacting the server, RCuckoo
-clients search the contents of their local table cache to build a
-speculative cuckoo path.  As with prior work~\cite{cuckoo-improvements}, we use breadth-first
-search (BFS) to identify short paths in an attempt to minimize
-bandwidth and locking overhead.  If the
-client cache is empty the degenerate path is presumed, i.e., that the
-key will be inserted into its primary location
-without the need for any cuckooing.  Obviously, speculative cuckoo
-paths are most useful when client caches are fresh---often due to a
-failed prior attempt to insert the same key.
+\textbf{Speculative local search:} 
+
+We use a heuristic search to find cuckoo paths. Starting with an empty cache, we
+assume the row a key hashes to has an open slot (path length 1). We then lock
+the and read the rows the lock protects (cache syncronization). We retain the
+cache temporarily. If the insertion can't be completed with one lock we try
+again this time speculatively searching on cached rows.
+%%
+We use breadth-first search (BFS)~\cite{cuckoo-improvements}
+to identify short paths in an attempt to minimize bandwidth and locking
+overhead.  If the client cache is empty the degenerate path is presumed, i.e.,
+that the key will be inserted into its primary location without the need for any
+cuckooing.  Obviously, speculative cuckoo paths are most useful when client
+caches are fresh---often due to a failed prior attempt to insert the same key.
 
 % Because of
 % locality hashing there is a high probability that a valid
@@ -376,7 +375,7 @@ valid result.
     \caption{
  %   \textbf{(a)} Dependent hashing for factor $f$.
     \textbf{(a)} CDF of distances between cuckoo locations for different locality settings using RCuckoo's dependent hashing.
-    \textbf{(b)} Achieved maximum fill percentage for different locality settings. 90\% fill indicated by dashed red line.
+    \textbf{(b)} Fill percentage before insertion failure for different locality settings (average of 10 runs, negligible variance). 90\% fill indicated by dashed red line.
     \textbf{(c)} CDF of cuckoo spans for dependent and independent hashing. A cuckoo span is the distance between the smallest and largest index in a cuckoo path.
     }
     \label{fig:locality-hashing}
@@ -526,13 +525,12 @@ locations as a CDF for different values of $f$,
 %% increase the max fill by alleviating hotspots in the table. While
 %% searching for cuckoo paths with BFS these entries act as gateways for
 %% paths to access less filled portions of the table.
-while Figure~\ref{fig:locality-hashing}(b) shows that larger values of
-$f$ enable practical fill factors for tables with 100~M entries. In
-our evaluation we set $f=2.3$.  As shown in the figure, for index
-tables with eight entries per row, RCuckoo delivers an expected max fill of
-greater than 95\% with a 68\% probability that a key's locations are
-located five or fewer rows apart.
-
+while Figure~\ref{fig:locality-hashing}(b) shows that larger $f$ enables higher
+fill prior to the first insertion failure. In our evaluation we set
+$f=2.3$ based on this empirical data. As shown in the figure, for index tables
+with eight entries per row, RCuckoo delivers an expected max fill of greater
+than 95\% with a 68\% probability that a key's locations are located five or
+fewer rows apart.
 
 Decreased distances between hash locations naturally lead to shorter
 cuckoo paths when combined with our breadth-first search approach.
@@ -703,31 +701,29 @@ groups.
 \section{Fault tolerance}
 \label{sec:fault-tolerance}
 
-In keeping with the rest of its design, RCuckoo handles failures in a
-fully disaggregated manner as well.  We depend upon the RDMA hardware
-to handle network failures and focus exclusively on fail-stop client
-behavior.  Server failure can be addressed by employing client-driven
-replication on top of RCuckoo.  While there may be opportunities to
-integrate replication into RCuckoo itself, we defer such an
-exploration to future work.  In RCuckoo, client failure is only of
-concern if the failure occurs while the client was holding one or more locks, i.e., in the middle of a mutating operation
-(i.e., update, delete, or insert); hence, RCuckoo detects client
-failures by noticing that a pending mutation does not complete in a
-timely fashion.  Any client that encounters such a situation endeavors
-to recover the stranded lock and repair the impacted portion of the
-index table.
+In keeping with the rest of its design, RCuckoo handles failures in a fully
+disaggregated manner as well.  We depend upon the RDMA hardware to handle
+network failures and focus exclusively on clients which can \textit{fail-stop}
+mid-operation. Server failure can be addressed by employing client-driven
+replication on top of RCuckoo.  While there may be opportunities to integrate
+replication into RCuckoo itself, we defer such an exploration to future work.
+In RCuckoo, client failure is only of concern if the failure occurs while the
+client was holding one or more locks, i.e., in the middle of a mutating
+operation (i.e., update, delete, or insert); hence, RCuckoo detects client
+failures by noticing that a pending mutation does not complete in a timely
+fashion.  Any client that encounters such a situation endeavors to recover the
+stranded lock and repair the impacted portion of the index table.
 %
-%to prevent false failure detection. Our complete
-%fault detection and recovery mechanism is described in
-%Section~\ref{sec:fault-tolerance}.
+%to prevent false failure detection. Our complete fault detection and recovery
+%mechanism is described in Section~\ref{sec:fault-tolerance}.
 %
-%Specifically, clients acquire repair leases to reclaim the locks of
-%failed clients and then perform the operations required to return the
-%table to a valid state. In this section we
-The remainder of this section describes how RCuckoo clients detect
-faults, reclaim stranded locks, and, if necessary, repair the index
-table.  Finally, we discuss additional measures that can
-be employed to prevent stale writes if desired.
+%Specifically, clients acquire repair leases to reclaim the locks of failed
+%clients and then perform the operations required to return the table to a valid
+%state. In this section we
+The remainder of this section describes how RCuckoo clients detect faults,
+reclaim stranded locks, and, if necessary, repair the index table.  Finally, we
+discuss additional measures that can be employed to prevent stale writes if
+desired.
 
 %, and prevent delayed
 %RDMA writes issued by (assumed-to-be) failed clients from corrupting the table.

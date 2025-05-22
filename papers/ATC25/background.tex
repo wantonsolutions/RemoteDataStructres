@@ -101,24 +101,23 @@ extent-based approach for the same value size.
 %% extent storage. Due to atomic width limitations existing KV stores can
 %% not gain this performance.
 
-Prior systems have avoided locks due to the stark performance
-penalties of RDMA atomics~\cite{design-guidelines}.
-Figure~\ref{fig:rdma-benchmarks}(b) illustrates this bottleneck on
-ConnectX-5 NICs when atomic operations are issued on remote server
-memory: reads and writes scale almost linearly while atomics reach a
-hard limit around 50~MOPS.  Using RDMA atomic operations to spin on
-locks quickly induces these bottlenecks as the cap is even lower
-(3~MOPS as shown in Figure~\ref{fig:rdma-benchmarks}(c)) for atomics
-that contend with each other (i.e., access the same remote address).
-Recent ConnectX series NICs sport a small amount (256 KB) of on-NIC
-memory which avoids a PCIe round trip and raises the cap on atomic
-operation
+Prior systems have avoided locks due to the stark performance penalties of RDMA
+atomics~\cite{design-guidelines}.  Figure~\ref{fig:rdma-benchmarks}(b)
+illustrates this bottleneck on ConnectX-5 NICs when atomic operations are issued
+on remote server memory: reads and writes scale almost linearly while atomics
+reach a hard limit around 50~MOPS.  Using RDMA atomic operations to spin on
+locks quickly induces these bottlenecks as the cap is even lower (3~MOPS as
+shown in Figure~\ref{fig:rdma-benchmarks}(c)) for atomics that contend with each
+other (i.e., access the same remote address).  Recent ConnectX series NICs sport
+a small amount (256 KB) of on-NIC memory which avoids a PCIe round trip and
+raises the cap on atomic operation
 %scales linearly with all other RDMA operation
 throughput~\cite{device-memory,sherman}. Figure~\ref{fig:rdma-benchmarks}(c)
 illustrates the performance improvement for
 %of on-NIC memory for CAS on a
-single---i.e., contended---and independent addresses. If a system can arrange to store its locks exclusively on NIC memory spinning on locks may no
-longer be a bottleneck for most workloads.
+single---i.e., contended---and independent addresses. If a system can arrange to
+store its locks exclusively on NIC memory it can gain up to a 3x performance
+improvement on contended workloads.
 
 Others have explored ways to improve RDMA-based lock performance.  For
 example, Citron implements a general purpose, range-based lock table
