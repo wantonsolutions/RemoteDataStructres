@@ -281,27 +281,32 @@ similarly consists only of currently locked rows---exists.  If so, the
 insert is performed; if not, the client releases its locks and retries.
 %the operation.
 
-\textbf{Speculative local search:} 
-
-We use a heuristic search to find cuckoo paths. Starting with an empty cache, we
-assume the row a key hashes to has an open slot (path length 1). We then lock
-the and read the rows the lock protects (cache syncronization). We retain the
-cache temporarily. If the insertion can't be completed with one lock we try
-again this time speculatively searching on cached rows.
+\textbf{Speculative local search:} Each insertion attempt uses a
+heuristic search to find a \emph{speculative} cuckoo path.  An attempt starts
+by identifying a potential path using the (potentially stale) contents
+of the client's local table cache.
+%Starting with an empty
+%cache, we assume the row to which a key hashes has an open slot (i.e., a degenerate Cuckoo path length of 1) and attempt to obtain the necessary lock.  Once acquired, however, we read all the rows protected by the lock
+%(cache syncronization)
+%which we maintain in a local, per-client cache. If the insertion
+%cannot be completed in the identified row, we conduct a search within the set of cached rows.
 %%
-We use breadth-first search (BFS)~\cite{cuckoo-improvements}
-to identify short paths in an attempt to minimize bandwidth and locking
-overhead.  If the client cache is empty the degenerate path is presumed, i.e.,
-that the key will be inserted into its primary location without the need for any
-cuckooing.  Obviously, speculative cuckoo paths are most useful when client
-caches are fresh---often due to a failed prior attempt to insert the same key.
+We use breadth-first search (BFS)~\cite{cuckoo-improvements} to
+identify short paths in an attempt to minimize bandwidth and locking
+overhead.  If the client's cache does not contain a needed row (e.g.,
+corresponding to the inserted key's primary location or the secondary
+location of a displaced entry), it optimistically assumes the row will
+be able to accomodate the entry without the need for further
+cuckooing.  Obviously, speculative cuckoo paths are most useful when
+client caches are fresh---often due to a failed prior attempt to
+insert the same key.
 
 % Because of
 % locality hashing there is a high probability that a valid
 % insertion path can be found in buckets near a speculative
 % path, even if the clients cache is stale.
 
-\textbf{Cache synchronization:} Armed with a potential
+\textbf{Cache synchronization:} Armed with a speculative
 cuckoo path, clients identify the set of locks necessary to
 protect the relevant rows.  
 %%
@@ -315,9 +320,11 @@ synchronize their local cache by issuing reads for all of the rows covered by th
 general, locks cover multiple rows, so this will be a
 superset of the rows necessary for the identified path.
 Note that if lock acquisition is successful, the values
-returned by the read of the corresponding rows---and, thus,
-the client's local cache of those rows---will remain
-synchronized until the lock is released.
+returned by the read of the corresponding rows
+%---and, thus,
+%the client's local cache of those rows---
+will remain
+unchanged until the lock is released.
 
 Figure~\ref{fig:table-diagram} shows an example insert
 operation where the primary row for $K$ is full
@@ -325,13 +332,13 @@ and the entry for key $C$ is being evicted to its secondary
 location.  Hence, the client has acquired locks
 corresponding to the row where it hopes to insert the entry
 for key $K$ as well as the row into which it plans to cuckoo
-the existing entry for key $C$.  The rows shaded in gray are
-synchronized because they are covered by the acquired locks,
+the existing entry for key $C$.  Rows shaded in gray are
+synchronized because they are covered by the locks,
 while the contents of any other rows that happen to be in the 
 client's cache cannot be depended upon
 without additional validation.  Rather, they may increase
-the likelihood that a subsequent speculative search yields a
-valid result.
+the likelihood that a subsequent speculative search succeeds.
+%yields a valid result.
 % In this section we describe our protocol for reading,
 % inserting, and performing updates and deletes to an
 % RCuckoo hash table.  In principle, the cache can be
@@ -384,23 +391,24 @@ valid result.
 
 
 \textbf{Second search:} If all the lock acquisitions are successful,
-the client validates that the initial path remains valid.  Under an
+the client confirms that the speculative path remains valid.  Under an
 insert-heavy workload, however, speculative cuckoo paths are
 frequently stale.  Yet, a valid cuckoo path may still exist within the
-locked rows.  Hence, if the initial path is no longer viable, clients
-perform a second search restricted to only the synchronized part of
-its cache, i.e., rows for which they currently hold the lock.  In
-either case, if a valid path is found the series of swaps and
+locked rows.  Hence, if the speculative path is no longer viable,
+clients perform a second search within their cache restricted to only
+the rows for which they currently hold the lock in hopes of identifing
+an alternative path.  If the speculative path works---or a valid
+alternative is located---the appropriate series of swaps and
 version/CRC updates are calculated and issued as a batch of RDMA
 writes, one row at a time, followed by (an ordered set of) lock
-releases. If no valid path exists the client releases its locks and
-tries again, conducting another speculative search on the updated
-cache contents.
+releases.  If no valid path exists within the currently locked rows the
+client releases its locks and tries again, conducting another
+speculative search on the updated cache contents.
 
 \todo{Lightly filled table optimization}
 
 This entire process repeats until success, a client determines there
-is no viable cuckoo path (at which point the insert operation returns
+is no viable cuckoo path within a maximum search depth (we use a depth of five in our experiments, at which point the insert operation returns
 an error indicating the table is full), or a failed client is detected.  
 %\todo{describe resizing}
 % During development we
@@ -412,8 +420,9 @@ If cuckoo paths were to randomly span the table it is unlikely that an
 alternate valid path would exist within the locked rows when
 speculation fails.  In the next subsection, we describe how
 RCuckoo uses dependent hashing to dramatically increase the likelihood
-that an alternate path exists using rows surrounding those identified
-by the speculative search.
+that an alternate path exists.
+%using rows surrounding those identified
+%by the speculative search.
 %Our evaluation measures the success
 %rate of insertions as a function of lock granularity
 %(Section~\ref{sec:search_success}).
