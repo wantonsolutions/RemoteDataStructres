@@ -13,3 +13,6 @@ dist
 remotedatastructures.egg-info
 profiling
 .vscode
+papers/ATC25/paper.fls
+papers/ATC25/paper.fdb_latexmk
+papers/ATC25/paper.synctex.gz
