@@ -25,7 +25,7 @@ operations due to the lack of a server-side CPU.  Precursor RDMA KVS
 systems achieve performance by striking a delicate balance between
 efficient one-sided RDMA operations and CPU-serialized two-sided
 operations~\cite{farm,herd,pilaf,cell,storm}, where the later are used
-only judiciously, but are key to correctness.
+sparingly, but are critical for correctness.
 %Disaggregated
 %KVS must only use one-sided operations even when performing complex
 %operations like resolving a collision while inserting.
@@ -287,10 +287,10 @@ requires additional locking.  Farm~\cite{farm} and Reno~\cite{reno}
 bound this expense by setting hard limits on chain length but still
 require a server-side CPU to fix bitmasks when concurrent inserts
 execute.
-
-Hopscotch hashing has the advantage of locality at the cost of additional metadata and locks, while
+%%
+Hopscotch hashing trades locality for additional metadata, while
 cuckoo hashing eschews metadata at the cost of random accesses. Our system RCuckoo combines the
-advantages of both approaches by designing a cuckoo hash function with hopscotch-like locality
+advantages of both approaches with a cuckoo hash function with hopscotch-like locality
 properties in the common case.
 %%
 

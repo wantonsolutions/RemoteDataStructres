@@ -209,15 +209,14 @@ until they succeed or detect a failed client.
 \subsubsection{Inserts}
 \label{sec:insert}
 
-Inserts are challenging because concurrent operations might result in
-cuckoo paths that collide.  Rather than face the prospect of having to
-unravel a partially completed insert upon collision, RCuckoo clients
-compute a complete cuckoo path ahead of time and then acquire locks on
-all the relevant rows to ensure its success.  Moreover, to facilitate
-recovery from client failures, an insert is performed by cuckooing
-elements one at a time, starting by moving the last entry in the path
-to the empty location, and then replacing it with the previous
-entry in the path, and so on until the new entry is inserted in its primary location.
+Inserts are challenging because concurrent operations might result in cuckoo
+paths that collide. To avoid the complexity of rolling back partially completed
+inserts in the event of a collision, RCuckoo clients compute a complete cuckoo
+path ahead of time and then acquire locks on all the relevant rows to ensure its
+success.  Moreover, to facilitate recovery from client failures, an insert is
+performed by cuckooing elements one at a time, starting by moving the last entry
+in the path to the empty location, and then replacing it with the previous entry
+in the path, and so on until the new entry is inserted in its primary location.
 
 
 To speed up cuckoo-path searches, RCuckoo clients keep a local,
@@ -293,7 +292,7 @@ We use breadth-first search (BFS)~\cite{cuckoo-improvements}
 to identify short paths in an attempt to minimize bandwidth and locking
 overhead.  If the client cache is empty the degenerate path is presumed, i.e.,
 that the key will be inserted into its primary location without the need for any
-cuckooing.  Obviously, speculative cuckoo paths are most useful when client
+cuckooing. Speculative cuckoo paths are especially useful when client
 caches are fresh---often due to a failed prior attempt to insert the same key.
 
 % Because of
@@ -852,7 +851,7 @@ hash locations for the corresponding key (one of which may not be in
 the locked rows) for duplicates or a bad CRC.  Because RCuckoo updates
 one row per RDMA write, there can be at most one duplicate or bad CRC.
 
-Clients repair the table by moving though the states one step at a time.
+Clients repair the table by transitioning though the states one step at a time.
 %Corrections are issued as a batched sequence of three or fewer writes
 %as follows:
 To move from state 1 to 2, the client writes a new CRC for
