@@ -75,6 +75,18 @@
 %\usepackage{sectsty}
 %\sectionfont{\fontsize{12}{15}\selectfont}
 
+%suppress page numbers
+\makeatletter
+\renewcommand{\ps@plain}{%
+  \renewcommand{\@oddhead}{}%
+  \renewcommand{\@evenhead}{}%
+  \renewcommand{\@oddfoot}{}%
+  \renewcommand{\@evenfoot}{}%
+}
+\makeatother
+
+\pagestyle{plain}
+
 
 \newcommand\mypara[1]{\vspace{.3em}\noindent\textbf{#1}}
 \newcommand{\urlwofont}[1]{\urlstyle{same}\url{#1}}
