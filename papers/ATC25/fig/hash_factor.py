@@ -5,6 +5,10 @@ from experiments import data_management as dm
 import matplotlib.pyplot as plt
 import lib
 
+import matplotlib
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+
 from simulator import hash
 # import chash as hash
 

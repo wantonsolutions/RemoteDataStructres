@@ -1,5 +1,9 @@
 import matplotlib.pyplot as plt
 
+import matplotlib
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+
 message_size = [2,4,8,16,32,64,128,256,512,"1K"]
 latency = [0.8, 0.8, 0.8, 0.81, 0.83, 0.85, 0.9, 1.1, 1.25, 1.4]
 

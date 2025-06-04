@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+
 cas_label='CAS'
 write_label='Writes'
 read_label="Reads"

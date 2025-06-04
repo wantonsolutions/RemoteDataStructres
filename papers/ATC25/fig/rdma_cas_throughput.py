@@ -2,6 +2,9 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+
 
 cas_single_key_memory=('cas_single_key_memory', 2928908)
 cas_single_key_device=('cas_single_key_device', 8974950) #I don't think I have this value
