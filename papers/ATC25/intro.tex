@@ -45,16 +45,15 @@ resources~\cite{dredbox,firebox,blade-server,legoos}.  In theory,
 pooling reduces per-machine fragmentation and stranding by exposing
 resources over the network. Collectively, disaggregated resources can
 be provisioned for the sum-of-peak workloads rather than the
-peak-of-sums~\cite{dsnf,supernic}.  Stagnating DRAM costs and
+peak-of-sums~\cite{dsnf,supernic}. Stagnating DRAM
 densities are driving interest in primary storage pooling, but
 performant, general-purpose far-memory tiers remain
 elusive~\cite{fastswap,3po,kona,infiniswap,hydra,leap,legoos,dilos} as
-even the fastest rack-scale networking technologies have access
-latencies that are an order-of-magnitude slower than local memory
-tiers
+even the fastest rack-scale networks have access
+latencies that are an order-of-magnitude slower than local memory.
 %Current RDMA technologies have access latencies that are 20 times that of local
 %DRAM
-(e.g., RDMA access latency is approximately 1~{\textmu}s versus DRAM's
+(e.g., RDMA latency is approximately 1~{\textmu}s versus DRAM's
 50~ns)~\cite{clover}.
 
 % High access latencies are particularly challenging for systems that seek to support shared
