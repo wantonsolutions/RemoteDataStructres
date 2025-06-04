@@ -5,6 +5,10 @@ from experiments import plot_cuckoo as pc
 from experiments import data_management as dm
 import lib
 
+import matplotlib
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+
 #commit 102f229f5096df69810e274e54a86eb24e913af4 
 #is good for taking data for this experiment
 simulator=False

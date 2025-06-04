@@ -9,6 +9,10 @@ import numpy as np
 from tqdm import tqdm
 
 
+import matplotlib
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+
 ycsb_location = {
     "ycsb-a": 2,
     "ycsb-b": 1,

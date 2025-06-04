@@ -12,6 +12,10 @@ import numpy as np
 import json
 from tqdm import tqdm
 
+import matplotlib
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+
 def run_hero_ycsb_fill_latency():
     print("to refresh this function is located in hero_ycsb_fill_latency.py")
 

@@ -10,6 +10,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 
+import matplotlib
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
 
 data_dir = "insertion_span"
 
