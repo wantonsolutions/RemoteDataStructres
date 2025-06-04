@@ -73,9 +73,10 @@ synchronize shared updates.
 %\footnote{lock/unlock or optimistic concurrency} requires multiple round
 %trips per operation at 20x the cost
 %%
-We argue that, while challenging to achieve, memory sharing is
+%We argue that, 
+While challenging to achieve, memory sharing is
 critical to making remote memory pooling practical as it can
-dramatically improve utilization---the entire point of memory
+improve utilization---the entire point of memory
 disaggregation.  To date, the most promising approach to delivering
 shared access to pooled remote memory is to expose a key/value store
 (KVS) interface that provides coherent read/write
@@ -83,9 +84,9 @@ semantics~\cite{rolex,smart,ditto,fusee,clover,sherman,ford}.  Yet,
 most performant KVS systems employ two-sided RDMA operations which rely upon
 memory-side CPUs to manage locks and execute critical
 sections~\cite{memc3,cuckoo-improvements,pilaf,cell}, reducing their
-potential cost savings.
+potential savings.
 
-In order to fully unlock the potential of memory disaggregation, we propose a
+To fully unlock the potential of memory disaggregation, we propose a
 design where compute and memory are entirely separate. In our fully
 disaggregated model, a KVS must implement a client-side serialization protocol
 implemented entirely in one-sided RDMA operations (i.e., read, write, and atomic
